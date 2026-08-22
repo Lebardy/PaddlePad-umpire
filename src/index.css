@@ -1,0 +1,89 @@
+:root {
+  --bg: #f5f3fb;
+  --bg-elevated: #ffffff;
+  --text: #2b1f3d;
+  --text-muted: #736a85;
+  --border: #e3ddef;
+  --primary: #7c3aed;
+  --primary-hover: #6d28d9;
+  --primary-contrast: #ffffff;
+  --primary-soft: #ede6ff;
+  --accent: #0ea5e9;
+  --accent-soft: rgba(14, 165, 233, 0.12);
+  --danger: #e33d6f;
+  --danger-soft: rgba(227, 61, 111, 0.1);
+  --shadow-sm: 0 1px 2px rgba(43, 20, 77, 0.06);
+  --shadow-md: 0 6px 20px -4px rgba(69, 20, 130, 0.18);
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  color-scheme: light dark;
+  font: 16px/1.5 var(--sans);
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15111f;
+    --bg-elevated: #201a30;
+    --text: #f1edfa;
+    --text-muted: #a89bc0;
+    --border: #342a49;
+    --primary: #9d5cff;
+    --primary-hover: #b17dff;
+    --primary-contrast: #ffffff;
+    --primary-soft: rgba(157, 92, 255, 0.16);
+    --accent: #47bfff;
+    --accent-soft: rgba(71, 191, 255, 0.16);
+    --danger: #ff6b93;
+    --danger-soft: rgba(255, 107, 147, 0.14);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 8px 24px -6px rgba(0, 0, 0, 0.5);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--sans);
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  font-family: var(--sans);
+  transition: transform 0.08s ease, filter 0.08s ease, box-shadow 0.08s ease;
+}
+
+/* Global tactile press feedback: buttons visibly compress and darken
+   the instant they're tapped, rather than only changing on release.
+   Courtside taps need to feel immediate and confirmed. */
+button:active:not(:disabled) {
+  transform: scale(0.95);
+  filter: brightness(0.92);
+}
