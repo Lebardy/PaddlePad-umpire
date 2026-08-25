@@ -1,0 +1,46 @@
+:root {
+  --bg: #f5f3fb;
+  --bg-elevated: #ffffff;
+  --text: #2b1f3d;
+  --text-muted: #736a85;
+  --border: #e3ddef;
+  /* Cyan-led rather than the umpire app's purple, so the two apps are
+     tellable apart at a glance on a home screen. */
+  --primary: #0284c7;
+  --primary-soft: rgba(2, 132, 199, 0.1);
+  --win: #059669;
+  --win-soft: rgba(5, 150, 105, 0.1);
+  --loss: #e33d6f;
+  --loss-soft: rgba(227, 61, 111, 0.1);
+  --radius: 14px;
+  --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  color-scheme: light dark;
+  font: 16px/1.5 var(--sans);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15111f;
+    --bg-elevated: #201a30;
+    --text: #f1edfa;
+    --text-muted: #a89bc0;
+    --border: #342a49;
+    --primary: #47bfff;
+    --primary-soft: rgba(71, 191, 255, 0.14);
+    --win: #34d399;
+    --win-soft: rgba(52, 211, 153, 0.14);
+    --loss: #ff6b93;
+    --loss-soft: rgba(255, 107, 147, 0.14);
+  }
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+h1, h2 { margin: 0; font-weight: 600; }
+p { margin: 0; }
+button { font-family: var(--sans); transition: transform 0.08s ease, filter 0.08s ease; }
+button:active:not(:disabled) { transform: scale(0.97); filter: brightness(0.94); }

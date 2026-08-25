@@ -1465,3 +1465,83 @@ section h3 {
     max-width: 26rem;
   }
 }
+
+/* Sharing a player's claim code */
+
+.roster-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.share-code {
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: none;
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.share-code:hover {
+  background: var(--accent-soft);
+}
+
+.code-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.code-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.code-card-head h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.code-card .link-button {
+  width: auto;
+  margin: 0;
+  padding: 0.2rem 0.4rem;
+}
+
+.code-help {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin-bottom: 0.75rem;
+}
+
+/* White ground and a little padding so the QR stays scannable against a
+   dark background -- a transparent code on dark is unreadable to a
+   camera. */
+.qr-wrap {
+  display: inline-block;
+  background: #fff;
+  padding: 0.6rem;
+  border-radius: 8px;
+  line-height: 0;
+}
+
+.qr {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.code-large {
+  display: block;
+  margin: 0.75rem 0;
+  font-size: 1.2rem;
+}

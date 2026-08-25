@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import {
   rememberPlayer,
   addPlayerToSession,
@@ -8,6 +8,7 @@ import {
   unvoidSession,
 } from '../lib/storage'
 import PlayerPicker from '../components/PlayerPicker'
+import PlayerCodeCard from '../components/PlayerCodeCard'
 import * as sync from '../lib/sync'
 import {
   useSession,
@@ -24,6 +25,7 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
   const session = useSession(sessionId)
   const knownPlayers = usePlayers()
   const matches = useMatchesForSession(sessionId)
+  const [sharing, setSharing] = useState(null)
 
   // Pull this session's roster and matches so an umpire sees what
   // OTHER umpires recorded, not just their own device. Failures are
@@ -87,6 +89,10 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
       </button>
       <h2>{session.name}</h2>
 
+      {sharing && (
+        <PlayerCodeCard player={sharing} onClose={() => setSharing(null)} />
+      )}
+
       <section className="roster">
         <h3>Roster</h3>
         {roster.length === 0 && <p className="empty">No players yet.</p>}
@@ -94,9 +100,14 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
           {roster.map((p) => (
             <li key={p.id}>
               {p.name}
-              <button className="remove" onClick={() => handleRemove(p.id)}>
-                Remove
-              </button>
+              <span className="roster-actions">
+                <button className="share-code" onClick={() => setSharing(p)}>
+                  Code
+                </button>
+                <button className="remove" onClick={() => handleRemove(p.id)}>
+                  Remove
+                </button>
+              </span>
             </li>
           ))}
         </ul>

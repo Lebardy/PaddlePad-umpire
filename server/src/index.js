@@ -2,6 +2,7 @@ import cors from 'cors'
 import express from 'express'
 import { migrate, pool } from './db.js'
 import { rateLimit } from './ratelimit.js'
+import { requestLog } from './requestlog.js'
 import authRoutes from './routes/auth.js'
 import inviteRoutes from './routes/invites.js'
 // Umpire-facing: search, create and manage the player registry.
@@ -20,6 +21,7 @@ const app = express()
 app.set('trust proxy', 1)
 
 app.use(express.json({ limit: '1mb' }))
+app.use(requestLog)
 
 // The app is served from a different origin than the API (Vite in dev,
 // a static host in production), so CORS has to be explicit. Set
