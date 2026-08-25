@@ -7,7 +7,12 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt', not 'autoUpdate'. An auto-updating service worker
+      // swaps itself in without asking, which for a courtside scoring
+      // app could reload the screen mid-rally. The umpire is told an
+      // update is ready and picks the moment instead.
+      registerType: 'prompt',
+      injectRegister: null,
       includeAssets: ['favicon.svg'],
       manifest: {
         name: 'PaddlePad Umpire',

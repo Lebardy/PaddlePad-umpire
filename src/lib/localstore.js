@@ -93,7 +93,26 @@ export function subscribe(listener) {
   return () => listeners.delete(listener)
 }
 
+// Notifications are coalesced into a microtask.
+//
+// One tap writes twice -- the match log and the outbox entry -- and
+// each write used to notify separately, so every subscriber re-rendered
+// twice per tap and the sync layer scheduled itself twice. Batching
+// makes a burst of synchronous writes produce exactly one notification,
+// which matters on the scoring screen where taps arrive in bursts.
+let emitScheduled = false
+
 export function emit() {
+  if (emitScheduled) return
+  emitScheduled = true
+  queueMicrotask(() => {
+    emitScheduled = false
+    for (const listener of listeners) listener()
+  })
+}
+
+/** Notifies immediately, for tests and for teardown paths. */
+export function emitSync() {
   for (const listener of listeners) listener()
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   addRallyEvent,
   addThirdShotEvent,
@@ -8,6 +8,7 @@ import {
 import { useMatch, usePlayers } from '../lib/useLocalStore'
 import NotFound from './NotFound'
 import TakeoverNotice from '../components/TakeoverNotice'
+import * as sync from '../lib/sync'
 import { deriveMatchState, currentServerPlayerId } from '../lib/pickleball'
 
 // The four rally-ending outcomes an umpire can tap, and the exact
@@ -53,6 +54,15 @@ function LiveMatch({ matchId, onBack }) {
   const match = useMatch(matchId)
   const [showHistory, setShowHistory] = useState(false)
   const knownPlayers = usePlayers()
+
+  // Fetch this match's event log, which the session list deliberately
+  // doesn't carry. Failure is fine: anything already scored on this
+  // device is in local storage and stays usable offline.
+  useEffect(() => {
+    const controller = new AbortController()
+    sync.pullMatch(matchId, { signal: controller.signal }).catch(() => {})
+    return () => controller.abort()
+  }, [matchId])
 
   function name(id) {
     return knownPlayers.find((p) => p.id === id)?.name ?? '?'

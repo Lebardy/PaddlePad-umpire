@@ -90,7 +90,15 @@ export async function pullCore({ signal } = {}) {
   replaceServerState({ players, sessions })
 }
 
-/** Pulls one session's matches, preserving anything still unsynced. */
+/**
+ * Pulls one session's roster and its match list.
+ *
+ * Deliberately does NOT fetch each match's events. The session screen
+ * only shows who played and whether the match finished, and fetching
+ * full logs here was a request per match -- a slow, pointless fan-out
+ * that grew with every game the club recorded. LiveMatch pulls the one
+ * log it actually needs, when it needs it.
+ */
 export async function pullSession(sessionId, { signal } = {}) {
   if (!getToken()) return
   const [detail, matches] = await Promise.all([
@@ -98,13 +106,15 @@ export async function pullSession(sessionId, { signal } = {}) {
     api.fetchMatchesForSession(sessionId, { signal }),
   ])
   setReachable(true)
+  replaceServerState({ sessionDetail: detail, matches })
+}
 
-  const full = await Promise.all(
-    matches.map((m) =>
-      m.eventCount > 0 ? api.fetchMatch(m.id, { signal }) : { ...m, events: [] },
-    ),
-  )
-  replaceServerState({ sessionDetail: detail, matches: full })
+/** Pulls one match INCLUDING its event log, for the scoring screen. */
+export async function pullMatch(matchId, { signal } = {}) {
+  if (!getToken()) return
+  const match = await api.fetchMatch(matchId, { signal })
+  setReachable(true)
+  replaceServerState({ matches: [match] })
 }
 
 // ============================================================

@@ -7,6 +7,7 @@ import Login from './screens/Login'
 import Invites from './screens/Invites'
 import { clearSession, fetchCurrentUmpire, getStoredUmpire } from './lib/api'
 import SyncIndicator from './components/SyncIndicator'
+import UpdateNotice from './components/UpdateNotice'
 import * as sync from './lib/sync'
 import { migrateLegacyData } from './lib/storage'
 import './App.css'
@@ -87,6 +88,7 @@ function App() {
         <h1>PaddlePad Umpire</h1>
         {signedIn && (
           <div className="header-right">
+            <UpdateNotice />
             <SyncIndicator />
             <button className="sign-out" onClick={handleSignOut}>
               {umpire.name} · Sign out

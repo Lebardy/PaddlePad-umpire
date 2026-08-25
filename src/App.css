@@ -1042,3 +1042,17 @@ section h3 {
   font-weight: 600;
   cursor: pointer;
 }
+
+/* Waiting service-worker update */
+
+.update-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary);
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+  white-space: nowrap;
+}

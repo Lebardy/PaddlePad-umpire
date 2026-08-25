@@ -141,6 +141,14 @@ export function getMatch(matchId) {
   return getMatches().find((m) => m.id === matchId) ?? null
 }
 
+// NOTE: `match` must be a NEW object, never one mutated in place.
+//
+// Reads are reference-stable (see localstore.js), and the React hooks
+// compare snapshots with Object.is. Mutating the cached match and
+// storing it back leaves getMatch() returning the identical reference,
+// so React concludes nothing changed and skips the re-render -- taps
+// land in storage but never appear until something else forces a
+// render. Every mutator below therefore spreads into a new object.
 function saveMatch(match) {
   const updated = getMatches().map((m) => (m.id === match.id ? match : m))
   writeJSON(MATCHES_KEY, updated)
@@ -188,18 +196,22 @@ export function createMatch({ sessionId, teamA, teamB, stacking, firstServer }) 
 // exported match_duration_mins stays fixed once play stops.
 function finalizeAfterEventChange(match) {
   const derived = deriveMatchState(match)
+
+  let next = match
   if (derived.completed && match.status !== 'completed') {
-    match.status = 'completed'
-    match.endedAt = Date.now()
-    match.winner = derived.winner
+    next = {
+      ...match,
+      status: 'completed',
+      endedAt: Date.now(),
+      winner: derived.winner,
+    }
   } else if (!derived.completed && match.status === 'completed') {
     // an undo reverted the winning point
-    match.status = 'in_progress'
-    match.endedAt = null
-    match.winner = null
+    next = { ...match, status: 'in_progress', endedAt: null, winner: null }
   }
-  markDirty('log', match.id)
-  return saveMatch(match)
+
+  markDirty('log', next.id)
+  return saveMatch(next)
 }
 
 /**
@@ -214,11 +226,13 @@ function finalizeAfterEventChange(match) {
 export function addRallyEvent(matchId, { actingPlayerId, outcome, zone }) {
   const match = getMatch(matchId)
   if (!match || match.status === 'completed') return match
-  match.events = [
-    ...match.events,
-    { type: 'rally', id: crypto.randomUUID(), at: Date.now(), actingPlayerId, outcome, zone },
-  ]
-  return finalizeAfterEventChange(match)
+  return finalizeAfterEventChange({
+    ...match,
+    events: [
+      ...match.events,
+      { type: 'rally', id: crypto.randomUUID(), at: Date.now(), actingPlayerId, outcome, zone },
+    ],
+  })
 }
 
 /**
@@ -231,11 +245,13 @@ export function addRallyEvent(matchId, { actingPlayerId, outcome, zone }) {
 export function addThirdShotEvent(matchId, { playerId, shotType, success }) {
   const match = getMatch(matchId)
   if (!match || match.status === 'completed') return match
-  match.events = [
-    ...match.events,
-    { type: 'thirdShot', id: crypto.randomUUID(), at: Date.now(), playerId, shotType, success },
-  ]
-  return finalizeAfterEventChange(match)
+  return finalizeAfterEventChange({
+    ...match,
+    events: [
+      ...match.events,
+      { type: 'thirdShot', id: crypto.randomUUID(), at: Date.now(), playerId, shotType, success },
+    ],
+  })
 }
 
 /**
@@ -248,8 +264,10 @@ export function addThirdShotEvent(matchId, { playerId, shotType, success }) {
 export function undoLastEvent(matchId) {
   const match = getMatch(matchId)
   if (!match || match.events.length === 0) return match
-  match.events = match.events.slice(0, -1)
-  return finalizeAfterEventChange(match)
+  return finalizeAfterEventChange({
+    ...match,
+    events: match.events.slice(0, -1),
+  })
 }
 
 /**
@@ -263,12 +281,15 @@ export function endMatchManually(matchId) {
   const match = getMatch(matchId)
   if (!match || match.status === 'completed') return match
   const derived = deriveMatchState(match)
-  match.status = 'completed'
-  match.endedAt = Date.now()
-  match.winner = derived.score.A === derived.score.B ? null : derived.winner
-  match.endedEarly = true
-  markDirty('log', match.id)
-  return saveMatch(match)
+  const next = {
+    ...match,
+    status: 'completed',
+    endedAt: Date.now(),
+    winner: derived.score.A === derived.score.B ? null : derived.winner,
+    endedEarly: true,
+  }
+  markDirty('log', next.id)
+  return saveMatch(next)
 }
 
 // ============================================================
@@ -349,7 +370,12 @@ export function replaceServerState({ players, sessions, sessionDetail, matches }
         firstServer: m.firstServer,
         winner: m.winner,
         endedEarly: m.endedEarly,
-        events: (m.events ?? []).map((e) => ({ ...e })),
+        // A match list carries no events -- only the single-match fetch
+        // does. Defaulting to [] here would wipe the local log of an
+        // already-synced match every time the session screen refreshed.
+        events: m.events
+          ? m.events.map((e) => ({ ...e }))
+          : (local.find((l) => l.id === m.id)?.events ?? []),
       }))
 
     const serverIds = new Set(fromServer.map((m) => m.id))
