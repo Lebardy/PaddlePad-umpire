@@ -138,18 +138,34 @@ router.put('/:id/players', async (req, res) => {
   res.json({ playerIds: players.rows.map((p) => p.id), players: players.rows })
 })
 
-/** Deletes an empty session. Refuses once matches exist, so history can't vanish. */
+/**
+ * Cancels a session -- created by mistake, wrong night, wrong name.
+ *
+ * Unfinished matches inside it go too (nothing in them counted yet),
+ * but a session holding a COMPLETED match is refused: that is real
+ * recorded play, and cascading a delete through it would destroy data
+ * the ML pipeline has already been given. Void those matches first if
+ * they were genuinely wrong.
+ *
+ * Idempotent, so a delete queued offline and retried after someone else
+ * removed the same session still settles as success rather than
+ * dead-lettering.
+ */
 router.delete('/:id', async (req, res) => {
-  const used = await query('SELECT 1 FROM matches WHERE session_id = $1 LIMIT 1', [
-    req.params.id,
-  ])
-  if (used.rowCount > 0) {
-    return res
-      .status(409)
-      .json({ error: 'That session already has matches and cannot be deleted' })
+  const finished = await query(
+    "SELECT count(*)::int AS n FROM matches WHERE session_id = $1 AND status = 'completed'",
+    [req.params.id],
+  )
+  if (finished.rows[0].n > 0) {
+    return res.status(409).json({
+      error: `That session has ${finished.rows[0].n} finished match${
+        finished.rows[0].n === 1 ? '' : 'es'
+      } and can't be deleted. Void those first if they were wrong.`,
+    })
   }
-  const { rowCount } = await query('DELETE FROM sessions WHERE id = $1', [req.params.id])
-  if (rowCount === 0) return res.status(404).json({ error: 'No such session' })
+
+  // ON DELETE CASCADE clears session_players and any unfinished matches.
+  await query('DELETE FROM sessions WHERE id = $1', [req.params.id])
   res.status(204).end()
 })
 

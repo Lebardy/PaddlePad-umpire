@@ -294,3 +294,21 @@ export function claimMatch(matchId, { deviceId, force = false }) {
 export function fetchExportCsv() {
   return apiFetch('/export/match-logs.csv', { raw: true }).then((r) => r.text())
 }
+
+/** Cancels an unfinished match. Idempotent server-side. */
+export function deleteMatchOnServer(matchId) {
+  return apiFetch(`/matches/${matchId}`, { method: 'DELETE' })
+}
+
+/** Voids (or un-voids) a finished match, excluding it from the export. */
+export function setMatchVoided(matchId, { voided, reason }) {
+  return apiFetch(`/matches/${matchId}/void`, {
+    method: 'POST',
+    body: { voided, reason },
+  }).then((d) => d.match)
+}
+
+/** Cancels a session and its unfinished matches. Idempotent server-side. */
+export function deleteSessionOnServer(sessionId) {
+  return apiFetch(`/sessions/${sessionId}`, { method: 'DELETE' })
+}

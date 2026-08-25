@@ -3,6 +3,7 @@ import {
   rememberPlayer,
   addPlayerToSession,
   removePlayerFromSession,
+  deleteSession,
 } from '../lib/storage'
 import PlayerPicker from '../components/PlayerPicker'
 import * as sync from '../lib/sync'
@@ -39,6 +40,22 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
   function handlePick(player) {
     rememberPlayer(player)
     addPlayerToSession(sessionId, player.id)
+  }
+
+  // Cancels a session created by mistake. Unfinished matches inside go
+  // with it; a finished one blocks the delete, because that is real
+  // recorded play and should be voided individually instead.
+  function handleDeleteSession() {
+    const finished = matches.filter((m) => m.status === 'completed').length
+    if (finished > 0) {
+      alert(
+        `This session has ${finished} finished match${finished === 1 ? '' : 'es'}, ` +
+          'so it can\u2019t be cancelled. Open any that were wrong and void them instead.',
+      )
+      return
+    }
+    if (!confirm(`Cancel "${session.name}"? Any unfinished matches go with it.`)) return
+    if (deleteSession(sessionId)) onBack()
   }
 
   function handleRemove(playerId) {
@@ -102,6 +119,12 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
           onClick={() => onNewMatch(sessionId)}
         >
           New Match
+        </button>
+      </section>
+
+      <section className="danger-zone">
+        <button className="cancel-session" onClick={handleDeleteSession}>
+          Cancel this session
         </button>
       </section>
 

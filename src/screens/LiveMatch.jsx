@@ -4,6 +4,9 @@ import {
   addThirdShotEvent,
   undoLastEvent,
   endMatchManually,
+  deleteMatch,
+  voidMatch,
+  unvoidMatch,
 } from '../lib/storage'
 import { useMatch, usePlayers } from '../lib/useLocalStore'
 import NotFound from './NotFound'
@@ -118,6 +121,31 @@ function LiveMatch({ matchId, onBack }) {
     undoLastEvent(matchId)
   }
 
+  // An unfinished match is removed outright -- wrong pairing, wrong
+  // court, started by mistake. Nothing in it counted yet.
+  function handleCancel() {
+    if (
+      !confirm(
+        'Cancel this match? It will be deleted along with everything scored so far.',
+      )
+    ) {
+      return
+    }
+    if (deleteMatch(matchId)) onBack()
+  }
+
+  // A finished match is voided, not deleted. The play really happened;
+  // it was just credited to the wrong people, and that is exactly what
+  // has to be kept out of the ML export.
+  function handleVoid() {
+    const reason = prompt(
+      'Void this finished match so it is excluded from the exported data?\n\nOptional reason:',
+      '',
+    )
+    if (reason === null) return
+    voidMatch(matchId, reason)
+  }
+
   function handleEndEarly() {
     if (!confirm('End this match now? Final score will be locked in as-is.')) return
     endMatchManually(matchId)
@@ -171,6 +199,9 @@ function LiveMatch({ matchId, onBack }) {
       {match.status === 'in_progress' && (
         <>
           <div className="quick-controls">
+            <button className="cancel-match" onClick={handleCancel}>
+              Cancel match
+            </button>
             <button
               className="undo"
               onClick={handleUndo}
@@ -236,6 +267,24 @@ function LiveMatch({ matchId, onBack }) {
             </div>
           </section>
         </>
+      )}
+
+      {match.status === 'completed' && (
+        <div className="void-controls">
+          {match.voidedAt ? (
+            <>
+              <p className="voided-note">
+                This match is voided — it is excluded from the exported data.
+                {match.voidReason ? ` Reason: ${match.voidReason}` : ''}
+              </p>
+              <button onClick={() => unvoidMatch(matchId)}>Restore this match</button>
+            </>
+          ) : (
+            <button className="void-btn" onClick={handleVoid}>
+              Void this match (wrong pairing?)
+            </button>
+          )}
+        </div>
       )}
 
       {match.status === 'completed' && (

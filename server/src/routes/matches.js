@@ -25,6 +25,7 @@ const MATCH_SELECT = `
          m.stacking_a, m.stacking_b,
          m.first_server_team, m.first_server_player,
          m.status, m.winner, m.ended_early,
+         m.voided_at, m.void_reason,
          m.started_at, m.ended_at,
          m.scoring_device, m.scoring_claimed_at,
          u.name AS recorded_by_name,
@@ -45,6 +46,8 @@ function toClientMatch(row, events = undefined) {
     status: row.status,
     winner: row.winner,
     endedEarly: row.ended_early,
+    voidedAt: row.voided_at,
+    voidReason: row.void_reason,
     startedAt: row.started_at,
     endedAt: row.ended_at,
     recordedByName: row.recorded_by_name,
@@ -311,16 +314,58 @@ router.put('/:id/log', async (req, res) => {
   res.json({ match: toClientMatch(updated.rows[0], await loadEvents(req.params.id)) })
 })
 
-/** Deletes a match that hasn't been completed. Finished matches are history. */
+/**
+ * Cancels an unfinished match outright -- wrong pairing, wrong court,
+ * started by mistake. There is nothing worth keeping in a match
+ * abandoned before it counted.
+ *
+ * Idempotent on purpose: a device may queue this while offline and
+ * retry it later, possibly after another umpire already removed the
+ * same match. Answering 404 would dead-letter a request that in fact
+ * achieved exactly what was asked.
+ */
 router.delete('/:id', async (req, res) => {
-  const { rowCount } = await query(
-    "DELETE FROM matches WHERE id = $1 AND status <> 'completed'",
-    [req.params.id],
-  )
-  if (rowCount === 0) {
-    return res.status(409).json({ error: 'That match is finished, or does not exist' })
+  const { rows } = await query('SELECT status FROM matches WHERE id = $1', [
+    req.params.id,
+  ])
+
+  if (rows[0]?.status === 'completed') {
+    return res.status(409).json({
+      error: 'That match is already finished — void it instead of deleting it',
+    })
   }
+
+  await query('DELETE FROM matches WHERE id = $1', [req.params.id])
   res.status(204).end()
+})
+
+/**
+ * Voids a COMPLETED match, excluding it from the ML export while
+ * keeping the row.
+ *
+ * A mis-paired match is worse for the pipeline than no match: it
+ * credits one player's rallies to another, and nothing downstream can
+ * detect that. But hard-deleting finished play throws away a real
+ * record of something that happened, so this is reversible and
+ * attributed instead.
+ */
+router.post('/:id/void', async (req, res) => {
+  const voided = req.body?.voided !== false
+  const reason = String(req.body?.reason ?? '').trim() || null
+
+  const { rows } = await query(
+    `UPDATE matches
+        SET voided_at = CASE WHEN $2 THEN now() END,
+            voided_by = CASE WHEN $2 THEN $3::uuid END,
+            void_reason = CASE WHEN $2 THEN $4 END
+      WHERE id = $1
+      RETURNING id`,
+    [req.params.id, voided, req.umpire.id, reason],
+  )
+  if (rows.length === 0) return res.status(404).json({ error: 'No such match' })
+
+  const updated = await query(`${MATCH_SELECT} WHERE m.id = $1`, [req.params.id])
+  res.json({ match: toClientMatch(updated.rows[0]) })
 })
 
 export default router

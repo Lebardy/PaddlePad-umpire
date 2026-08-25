@@ -131,6 +131,22 @@ CREATE INDEX IF NOT EXISTS matches_session_idx ON matches (session_id);
 -- moment a device re-synced its log.
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS ended_early BOOLEAN NOT NULL DEFAULT false;
 
+-- A match the umpire has thrown out -- wrong pairing, wrong court,
+-- started by mistake.
+--
+-- Voided rather than deleted, because a COMPLETED match is real
+-- recorded activity that merely got attributed to the wrong people.
+-- Keeping the row means the mistake stays auditable and reversible;
+-- what matters is that the export skips it, since a mis-paired match is
+-- worse than no match at all for the ML pipeline -- it silently credits
+-- one player's rallies to another.
+--
+-- In-progress matches are hard-deleted instead: there is nothing worth
+-- keeping in a match abandoned before it counted.
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS voided_at   TIMESTAMPTZ;
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS voided_by   UUID REFERENCES umpires (id) ON DELETE SET NULL;
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS void_reason TEXT;
+
 -- Soft lease over who is currently scoring a match.
 --
 -- Two umpires scoring the same match do not produce complementary

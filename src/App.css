@@ -1061,3 +1061,61 @@ section h3 {
   border-color: var(--primary);
   background: var(--primary-soft);
 }
+
+/* Cancelling and voiding */
+
+.quick-controls .cancel-match {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.void-controls {
+  margin-bottom: 1.25rem;
+}
+
+.void-controls button {
+  width: 100%;
+  padding: 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.void-controls .void-btn {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.voided-note {
+  font-size: 0.85rem;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.6rem;
+  line-height: 1.4;
+}
+
+.danger-zone {
+  margin-top: 2rem;
+}
+
+.cancel-session {
+  width: 100%;
+  padding: 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.cancel-session:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}

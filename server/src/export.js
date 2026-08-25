@@ -68,7 +68,12 @@ export async function buildMatchLogRows(query) {
             first_server_team, first_server_player,
             winner, started_at, ended_at
        FROM matches
-      WHERE status = 'completed' AND ended_at IS NOT NULL
+      WHERE status = 'completed'
+        AND ended_at IS NOT NULL
+        -- Voided matches are excluded: a mis-paired match credits one
+        -- player's rallies to another, and nothing downstream could
+        -- detect that. Worse than having no match at all.
+        AND voided_at IS NULL
       ORDER BY ended_at`,
   )
   if (matches.length === 0) return []
@@ -77,7 +82,7 @@ export async function buildMatchLogRows(query) {
     `SELECT e.match_id, e.seq, e.type, e.payload
        FROM match_events e
        JOIN matches m ON m.id = e.match_id
-      WHERE m.status = 'completed'
+      WHERE m.status = 'completed' AND m.voided_at IS NULL
       ORDER BY e.match_id, e.seq`,
   )
 

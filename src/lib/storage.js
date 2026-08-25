@@ -342,9 +342,15 @@ export function replaceServerState({
         playerIds: mine?.playerIds ?? [],
       }
     })
-    // Sessions created here and not yet accepted must survive the pull.
+    // Sessions created here and not yet accepted must survive the pull;
+    // ones cancelled here but not yet deleted server-side must not come
+    // back from the dead.
+    const buriedSessions = new Set(getTombstones().sessions)
     const unsent = local.filter((l) => !sessions.some((s) => s.id === l.id))
-    writeJSON(SESSIONS_KEY, [...unsent, ...merged])
+    writeJSON(
+      SESSIONS_KEY,
+      [...unsent, ...merged].filter((s) => !buriedSessions.has(s.id)),
+    )
   }
 
   if (sessionDetail?.session) {
@@ -387,9 +393,11 @@ export function replaceServerState({
           : (local.find((l) => l.id === m.id)?.events ?? []),
       }))
 
-    const serverIds = new Set(fromServer.map((m) => m.id))
+    const buried = new Set(getTombstones().matches)
+    const kept = fromServer.filter((m) => !buried.has(m.id))
+    const serverIds = new Set(kept.map((m) => m.id))
     const keptLocal = local.filter((m) => dirty.has(m.id) || !serverIds.has(m.id))
-    writeJSON(MATCHES_KEY, [...keptLocal, ...fromServer])
+    writeJSON(MATCHES_KEY, [...keptLocal, ...kept])
   }
 }
 
@@ -455,4 +463,101 @@ export function migrateLegacyData() {
 
   write(SCHEMA_KEY, SCHEMA_VERSION)
   return { cleared: false }
+}
+
+// ============================================================
+// Cancelling sessions and matches
+// ============================================================
+
+const TOMBSTONES_KEY = 'paddlepad.tombstones'
+
+/**
+ * Ids deleted here but not yet deleted on the server.
+ *
+ * Tombstones exist because the outbox reads each entry's payload from
+ * local storage at push time, and a deleted record has none -- without
+ * a marker the queued delete would look like a vanished entity and be
+ * quietly dropped. They also stop a pull that lands before the delete
+ * syncs from resurrecting what the umpire just cancelled.
+ */
+function getTombstones() {
+  return read(TOMBSTONES_KEY, { matches: [], sessions: [] })
+}
+
+function addTombstone(kind, id) {
+  const current = getTombstones()
+  if (current[kind].includes(id)) return
+  write(TOMBSTONES_KEY, { ...current, [kind]: [...current[kind], id] })
+}
+
+export function clearTombstone(kind, id) {
+  const current = getTombstones()
+  write(TOMBSTONES_KEY, {
+    ...current,
+    [kind]: current[kind].filter((existing) => existing !== id),
+  })
+}
+
+export function isTombstoned(kind, id) {
+  return getTombstones()[kind].includes(id)
+}
+
+/**
+ * Cancels an unfinished match -- wrong pairing, wrong court, started by
+ * mistake. Removed outright, because nothing in it counted yet.
+ */
+export function deleteMatch(matchId) {
+  const match = getMatch(matchId)
+  if (!match || match.status === 'completed') return false
+
+  writeJSON(MATCHES_KEY, getMatches().filter((m) => m.id !== matchId))
+  addTombstone('matches', matchId)
+  markDirty('matchDelete', matchId)
+  return true
+}
+
+/**
+ * Voids a FINISHED match so the ML export skips it, while keeping the
+ * record.
+ *
+ * Finished play is a real thing that happened; it was just attributed
+ * to the wrong people. Keeping the row leaves the mistake auditable and
+ * lets it be undone, and what actually matters is that the export drops
+ * it -- a mis-paired match credits one player's rallies to another, and
+ * nothing downstream could ever notice.
+ */
+export function voidMatch(matchId, reason = '') {
+  const match = getMatch(matchId)
+  if (!match) return false
+  saveMatch({ ...match, voidedAt: Date.now(), voidReason: reason || null })
+  markDirty('matchVoid', matchId)
+  return true
+}
+
+export function unvoidMatch(matchId) {
+  const match = getMatch(matchId)
+  if (!match) return false
+  saveMatch({ ...match, voidedAt: null, voidReason: null })
+  markDirty('matchVoid', matchId)
+  return true
+}
+
+/**
+ * Cancels a session and any unfinished matches in it.
+ *
+ * Refused when a match inside has finished: that is real recorded play,
+ * and the server refuses too. Those should be voided individually if
+ * they were wrong, which keeps the decision explicit per match rather
+ * than sweeping several away at once.
+ */
+export function deleteSession(sessionId) {
+  const matches = getMatches().filter((m) => m.sessionId === sessionId)
+  if (matches.some((m) => m.status === 'completed')) return false
+
+  writeJSON(MATCHES_KEY, getMatches().filter((m) => m.sessionId !== sessionId))
+  writeJSON(SESSIONS_KEY, getSessions().filter((s) => s.id !== sessionId))
+  for (const match of matches) addTombstone('matches', match.id)
+  addTombstone('sessions', sessionId)
+  markDirty('sessionDelete', sessionId)
+  return true
 }

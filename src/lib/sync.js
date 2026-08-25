@@ -2,7 +2,13 @@ import { ApiError, getToken } from './api'
 import * as api from './api'
 import * as outbox from './outbox'
 import { subscribe } from './localstore'
-import { getSession, getMatch, replaceServerState } from './storage'
+import {
+  getSession,
+  getMatch,
+  replaceServerState,
+  clearTombstone,
+  isTombstoned,
+} from './storage'
 
 // ============================================================
 // Sync -- moves data between this device and the server.
@@ -131,8 +137,17 @@ function payloadFor(entry) {
     const session = getSession(entry.entityId)
     return session ? { sessionId: session.id, playerIds: session.playerIds } : null
   }
-  if (entry.kind === 'match' || entry.kind === 'log') {
+  if (entry.kind === 'match' || entry.kind === 'log' || entry.kind === 'matchVoid') {
     return getMatch(entry.entityId)
+  }
+  // Deletes have no local record left to read -- the tombstone IS the
+  // payload. Without this they would look like a vanished entity and be
+  // dropped from the queue, leaving the row alive on the server.
+  if (entry.kind === 'matchDelete') {
+    return isTombstoned('matches', entry.entityId) ? { id: entry.entityId } : null
+  }
+  if (entry.kind === 'sessionDelete') {
+    return isTombstoned('sessions', entry.entityId) ? { id: entry.entityId } : null
   }
   return null
 }
@@ -157,6 +172,23 @@ async function push(entry, payload) {
       endedEarly: Boolean(payload.endedEarly),
       endedEarlyAt: payload.endedAt ?? null,
     })
+    return
+  }
+  if (entry.kind === 'matchVoid') {
+    await api.setMatchVoided(payload.id, {
+      voided: Boolean(payload.voidedAt),
+      reason: payload.voidReason ?? '',
+    })
+    return
+  }
+  if (entry.kind === 'matchDelete') {
+    await api.deleteMatchOnServer(payload.id)
+    clearTombstone('matches', payload.id)
+    return
+  }
+  if (entry.kind === 'sessionDelete') {
+    await api.deleteSessionOnServer(payload.id)
+    clearTombstone('sessions', payload.id)
     return
   }
   throw new ApiError(`Unknown outbox kind: ${entry.kind}`, 400)
