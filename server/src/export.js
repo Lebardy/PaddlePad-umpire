@@ -43,6 +43,19 @@ const CONTEXT_COLUMNS = [
   'opponent_1_id',
   'opponent_2_id',
   'ended_at',
+  // What the game was played to (11, 15 or 21).
+  //
+  // Most pipeline features are ratios or per-minute rates and so are
+  // largely robust to game length. The exception is the consistency
+  // half of the feature set: a player whose matches mix formats will
+  // show more spread in their per-match rates, and the pipeline reads
+  // spread as INCONSISTENCY and marks them down for it -- even though
+  // nothing about their play changed, only the format.
+  //
+  // Exporting it costs nothing and lets the pipeline control for it,
+  // or filter to one format, rather than being unable to tell the
+  // difference. Note the pklmart validation data is all games to 11.
+  'point_target',
 ]
 
 export const RAW_MATCH_LOG_COLUMNS = [...ML_PIPELINE_COLUMNS, ...CONTEXT_COLUMNS]
@@ -65,7 +78,7 @@ const MAX_PLAUSIBLE_MATCH_MINS = 240
 export async function buildMatchLogRows(query) {
   const { rows: matches } = await query(
     `SELECT m.id, m.team_a, m.team_b, m.stacking_a, m.stacking_b,
-            m.first_server_team, m.first_server_player,
+            m.first_server_team, m.first_server_player, m.point_target,
             m.winner, m.started_at, m.ended_at
        FROM matches m
        JOIN sessions s ON s.id = m.session_id
@@ -111,6 +124,7 @@ export async function buildMatchLogRows(query) {
         team: match.first_server_team,
         playerId: match.first_server_player,
       },
+      pointTarget: match.point_target,
       events: eventsByMatch.get(match.id) ?? [],
     })
 
@@ -149,6 +163,7 @@ export async function buildMatchLogRows(query) {
         opponent_1_id: opponents[0] ?? '',
         opponent_2_id: opponents[1] ?? '',
         ended_at: new Date(match.ended_at).toISOString(),
+        point_target: match.point_target,
       })
     }
   }

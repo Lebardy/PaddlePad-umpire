@@ -20,9 +20,12 @@
 // Official side-out scoring: only the serving team can score. Doubles
 // gets two servers per side-out except the very first service of the
 // game, which is a single "server #2" turn (the standard 0-0-2 start
-// announced at the beginning of a game). Games are played to 11,
-// win by 2, matching one "game" in the PaddlePad ML pipeline's
-// per-match granularity (see pklmart_import.py in that repo).
+// announced at the beginning of a game).
+//
+// The point target travels with each match (11, 15 or 21) since it
+// varies by format; win-by-two applies to all of them. One match here
+// is one "game" at the granularity the PaddlePad ML pipeline expects
+// (see pklmart_import.py in that repo).
 //
 // This module is pure and has no dependency on storage.js: every
 // function here takes plain data in and returns plain data out, so
@@ -46,11 +49,27 @@ export function emptyStats() {
   }
 }
 
-/** Returns the winning team ('A'|'B') once someone has reached 11+ with a 2-point lead, else null. */
-function checkGameWon(score) {
+// Games are usually to 11, but 15 and 21 are both normal depending on
+// the format, so the target travels with the match rather than being
+// baked into the rules. Older matches carry no target and are read as
+// 11, which is what they were scored under.
+export const DEFAULT_POINT_TARGET = 11
+
+/** Point targets the app offers. Win-by-two applies to all of them. */
+export const POINT_TARGETS = [11, 15, 21]
+
+/**
+ * The winning team once someone has reached the target with a two-point
+ * lead, else null.
+ *
+ * Win-by-two is universal across these formats, so it is not separately
+ * configurable -- a game tied at target-minus-one keeps going until
+ * someone is clear by two, whatever the target.
+ */
+function checkGameWon(score, target) {
   const leadScore = Math.max(score.A, score.B)
   const trailScore = Math.min(score.A, score.B)
-  if (leadScore >= 11 && leadScore - trailScore >= 2) {
+  if (leadScore >= target && leadScore - trailScore >= 2) {
     return score.A > score.B ? 'A' : 'B'
   }
   return null
@@ -93,13 +112,13 @@ function sideOut(state, isDoubles) {
  * team scores and keeps serve if they won the rally, otherwise it's a
  * side-out (see sideOut) and the score is unchanged.
  */
-function applyRallyResult(state, winningTeam, isDoubles) {
+function applyRallyResult(state, winningTeam, isDoubles, target) {
   if (winningTeam === state.servingTeam) {
     const score = {
       ...state.score,
       [winningTeam]: state.score[winningTeam] + 1,
     }
-    const winner = checkGameWon(score)
+    const winner = checkGameWon(score, target)
     return { ...state, score, completed: !!winner, winner }
   }
   return sideOut(state, isDoubles)
@@ -140,6 +159,10 @@ export function initialScoreState({ firstServerTeam, firstServerIndex, isDoubles
  */
 export function deriveMatchState(match) {
   const isDoubles = match.teamA.length === 2
+  // Read off the match rather than passed in separately, so every
+  // existing caller keeps working and a match simply carries the rules
+  // it was played under.
+  const target = match.pointTarget ?? DEFAULT_POINT_TARGET
 
   let scoreState = initialScoreState({
     firstServerTeam: match.firstServer.team,
@@ -180,7 +203,7 @@ export function deriveMatchState(match) {
             ? 'B'
             : 'A'
 
-      scoreState = applyRallyResult(scoreState, winningTeam, isDoubles)
+      scoreState = applyRallyResult(scoreState, winningTeam, isDoubles, target)
     } else if (event.type === 'thirdShot') {
       ensure(event.playerId)
       if (event.shotType === 'drop') {
@@ -192,7 +215,7 @@ export function deriveMatchState(match) {
     }
   }
 
-  return { ...scoreState, isDoubles, stats }
+  return { ...scoreState, isDoubles, pointTarget: target, stats }
 }
 
 /** The player id currently serving, given a match and its derived state. */

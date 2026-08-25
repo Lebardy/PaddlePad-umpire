@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { query, withTransaction } from '../db.js'
 import { requireAuth } from '../auth.js'
-import { deriveMatchState } from '../pickleball.js'
+import { POINT_TARGETS, deriveMatchState } from '../pickleball.js'
 import { isUuid, stackingFromColumns, stackingToColumns } from '../validate.js'
 
 const router = Router()
@@ -24,6 +24,7 @@ const MATCH_SELECT = `
   SELECT m.id, m.session_id, m.team_a, m.team_b,
          m.stacking_a, m.stacking_b,
          m.first_server_team, m.first_server_player,
+         m.point_target,
          m.status, m.winner, m.ended_early,
          m.voided_at, m.void_reason,
          m.started_at, m.ended_at,
@@ -43,6 +44,7 @@ function toClientMatch(row, events = undefined) {
     teamB: row.team_b,
     stacking: stackingFromColumns(row),
     firstServer: { team: row.first_server_team, playerId: row.first_server_player },
+    pointTarget: row.point_target,
     status: row.status,
     winner: row.winner,
     endedEarly: row.ended_early,
@@ -97,6 +99,7 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   const { id, sessionId, teamA, teamB, stacking, firstServer, startedAt } = req.body ?? {}
+  const pointTarget = req.body?.pointTarget ?? 11
 
   if (!isUuid(id)) return res.status(400).json({ error: 'A valid match id is required' })
   if (!isUuid(sessionId)) return res.status(400).json({ error: 'A valid session id is required' })
@@ -112,6 +115,11 @@ router.post('/', async (req, res) => {
   if (new Set([...teamA, ...teamB]).size !== teamA.length + teamB.length) {
     return res.status(400).json({ error: 'A player cannot appear twice in one match' })
   }
+  if (!POINT_TARGETS.includes(pointTarget)) {
+    return res.status(400).json({
+      error: `pointTarget must be one of ${POINT_TARGETS.join(', ')}`,
+    })
+  }
   if (firstServer?.team !== 'A' && firstServer?.team !== 'B') {
     return res.status(400).json({ error: 'firstServer.team must be A or B' })
   }
@@ -125,14 +133,15 @@ router.post('/', async (req, res) => {
   await query(
     `INSERT INTO matches (id, session_id, recorded_by, team_a, team_b,
                           stacking_a, stacking_b,
-                          first_server_team, first_server_player, started_at)
-     VALUES ($1, $2, $3, $4::uuid[], $5::uuid[], $6, $7, $8, $9,
-             COALESCE($10::timestamptz, now()))
+                          first_server_team, first_server_player, point_target,
+                          started_at)
+     VALUES ($1, $2, $3, $4::uuid[], $5::uuid[], $6, $7, $8, $9, $10,
+             COALESCE($11::timestamptz, now()))
      ON CONFLICT (id) DO NOTHING`,
     [
       id, sessionId, req.umpire.id, teamA, teamB,
       stacking_a, stacking_b,
-      firstServer.team, firstServer.playerId,
+      firstServer.team, firstServer.playerId, pointTarget,
       startedAt ? new Date(startedAt).toISOString() : null,
     ],
   )
@@ -265,6 +274,9 @@ router.put('/:id/log', async (req, res) => {
     teamA: row.team_a,
     teamB: row.team_b,
     firstServer: { team: row.first_server_team, playerId: row.first_server_player },
+    // Without this the server would score a game played to 15 as though
+    // it were to 11 and declare a winner partway through.
+    pointTarget: row.point_target,
     events,
   })
 

@@ -135,6 +135,17 @@ CREATE TABLE IF NOT EXISTS matches (
 
 CREATE INDEX IF NOT EXISTS matches_session_idx ON matches (session_id);
 
+-- Games are usually to 11, but 15 and 21 are both normal depending on
+-- the format, so the target is recorded per match rather than assumed.
+--
+-- It must be stored, not inferred: the winner is re-derived from the
+-- event log on every sync, and deriving a match played to 15 against a
+-- target of 11 would declare the wrong team the winner partway through.
+-- Existing rows default to 11, which is what they were actually scored
+-- under.
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS point_target INTEGER NOT NULL DEFAULT 11
+    CONSTRAINT matches_point_target_valid CHECK (point_target IN (11, 15, 21));
+
 -- A match that was stopped early (a retirement or forfeit) rather than
 -- won on court. This is the ONE piece of match state that cannot be
 -- re-derived from the event log, because ending early appends no event

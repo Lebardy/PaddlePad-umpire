@@ -31,6 +31,7 @@ export async function getPlayerMatches(query, playerId) {
             m.stacking_b,
             m.first_server_team,
             m.first_server_player,
+            m.point_target,
             m.winner,
             m.started_at,
             m.ended_at,
@@ -85,6 +86,7 @@ export async function getPlayerMatches(query, playerId) {
         team: row.first_server_team,
         playerId: row.first_server_player,
       },
+      pointTarget: row.point_target,
       events: eventsByMatch.get(row.id) ?? [],
     })
 
@@ -115,6 +117,7 @@ export async function getPlayerMatches(query, playerId) {
       startedAt: row.started_at,
       endedEarly: row.ended_early,
       isDoubles: row.team_a.length === 2,
+      pointTarget: row.point_target,
       // From this player's point of view, not team A's.
       won: row.winner === null ? null : row.winner === team,
       yourScore: derived.score[team],
@@ -148,6 +151,7 @@ function scoreProgression(row, events, team) {
       team: row.first_server_team,
       playerId: row.first_server_player,
     },
+    pointTarget: row.point_target,
   }
 
   const margins = []
