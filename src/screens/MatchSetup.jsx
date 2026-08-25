@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { getSession, getKnownPlayers, createMatch } from '../lib/storage'
+import { createMatch } from '../lib/storage'
+import { useSession, usePlayers } from '../lib/useLocalStore'
+import NotFound from './NotFound'
 
 // Configures a new match before handing off to LiveMatch: singles vs
 // doubles, both teams' rosters (drawn from the session's players),
@@ -8,11 +10,8 @@ import { getSession, getKnownPlayers, createMatch } from '../lib/storage'
 // until it's unambiguous who's on court and who serves -- see
 // `readyToStart`.
 function MatchSetup({ sessionId, onBack, onStart }) {
-  const session = getSession(sessionId)
-  const knownPlayers = getKnownPlayers()
-  const roster = session.playerIds
-    .map((id) => knownPlayers.find((p) => p.id === id))
-    .filter(Boolean)
+  const session = useSession(sessionId)
+  const knownPlayers = usePlayers()
 
   const [isDoubles, setIsDoubles] = useState(false)
   const [teamA, setTeamA] = useState([])
@@ -20,6 +19,17 @@ function MatchSetup({ sessionId, onBack, onStart }) {
   const [stackingA, setStackingA] = useState(false)
   const [stackingB, setStackingB] = useState(false)
   const [firstServerId, setFirstServerId] = useState('')
+
+  // Every hook above must run before this bails out -- returning early
+  // ahead of a useState would make the hook order conditional, which
+  // React forbids. That is also why `roster` moved below the guard
+  // rather than staying where it dereferenced session.playerIds
+  // unguarded.
+  if (!session) return <NotFound what="session" onBack={onBack} />
+
+  const roster = session.playerIds
+    .map((id) => knownPlayers.find((p) => p.id === id))
+    .filter(Boolean)
 
   const maxPerTeam = isDoubles ? 2 : 1
   const assigned = new Set([...teamA, ...teamB])

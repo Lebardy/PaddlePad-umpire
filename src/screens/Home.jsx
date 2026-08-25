@@ -1,17 +1,20 @@
 import { useState } from 'react'
 import {
-  getSessions,
   createSession,
   exportRawMatchLogs,
   matchLogsToCSV,
 } from '../lib/storage'
+import { useSessions } from '../lib/useLocalStore'
 
 // Landing screen: create/open sessions, and export the whole app's
 // match history as the CSV the separate PaddlePad ML pipeline
 // consumes (export is global, not per-session, since the ML pipeline
 // aggregates a player's stats across every match they've ever played).
 function Home({ onOpenSession, onOpenInvites }) {
-  const sessions = getSessions()
+  // Subscribed rather than read during render: previously this never
+  // updated after a write, and only looked correct because navigating
+  // away unmounted the screen.
+  const sessions = useSessions()
   const [name, setName] = useState('')
 
   function handleCreate(e) {

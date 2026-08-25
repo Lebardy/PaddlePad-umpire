@@ -1,10 +1,21 @@
 import { deriveMatchState } from './pickleball'
+import { read, write } from './localstore'
 
 // ============================================================
-// PaddlePad Umpire persistence layer
+// PaddlePad Umpire local persistence layer
 //
-// Everything lives in the browser's localStorage under three keys --
-// there is no backend yet. Three record types:
+// This is the DEVICE-LOCAL half of storage. Every write here lands in
+// the browser immediately and synchronously, which is what lets an
+// umpire keep scoring with no signal: taps are never waiting on a
+// network round trip. A separate syncer (lib/sync.js) pushes what is
+// here up to the server in the background.
+//
+// The functions below stay synchronous deliberately. LiveMatch calls
+// them between every rally, and making them async would add a loading
+// state to an operation that is genuinely instantaneous -- as well as
+// an interleaving point where two fast taps could race.
+//
+// Three record types:
 //
 //   sessions -- a named event (e.g. a league night); holds the roster
 //               (a list of known-player ids) it draws players from.
@@ -25,17 +36,16 @@ const SESSIONS_KEY = 'paddlepad.sessions'
 const PLAYERS_KEY = 'paddlepad.players'
 const MATCHES_KEY = 'paddlepad.matches'
 
+// Both delegate to localstore, which parses on write and hands back a
+// reference-stable value. That stability is what lets the React hooks
+// in useLocalStore.js subscribe to these keys without re-rendering
+// forever -- see the comment at the top of localstore.js.
 function readJSON(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : fallback
-  } catch {
-    return fallback
-  }
+  return read(key, fallback)
 }
 
 function writeJSON(key, value) {
-  localStorage.setItem(key, JSON.stringify(value))
+  write(key, value)
 }
 
 /** Every session, newest first. */

@@ -1,27 +1,25 @@
 import { useState } from 'react'
 import {
-  getSession,
-  getKnownPlayers,
   upsertKnownPlayer,
   addPlayerToSession,
   removePlayerFromSession,
-  getMatchesForSession,
 } from '../lib/storage'
+import {
+  useSession,
+  usePlayers,
+  useMatchesForSession,
+} from '../lib/useLocalStore'
+import NotFound from './NotFound'
 
 // One session's roster management plus its match list. Matches
 // themselves are scored on the LiveMatch screen (onOpenMatch/
 // onNewMatch hand off there) -- this screen only sets up who's
 // eligible to play.
 function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
-  const [session, setSession] = useState(() => getSession(sessionId))
-  const [knownPlayers, setKnownPlayers] = useState(getKnownPlayers())
+  const session = useSession(sessionId)
+  const knownPlayers = usePlayers()
+  const matches = useMatchesForSession(sessionId)
   const [newName, setNewName] = useState('')
-  const matches = getMatchesForSession(sessionId)
-
-  function refresh() {
-    setSession(getSession(sessionId))
-    setKnownPlayers(getKnownPlayers())
-  }
 
   function handleAddNew(e) {
     e.preventDefault()
@@ -29,18 +27,20 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
     const player = upsertKnownPlayer(newName)
     addPlayerToSession(sessionId, player.id)
     setNewName('')
-    refresh()
   }
 
   function handleAddKnown(playerId) {
     addPlayerToSession(sessionId, playerId)
-    refresh()
   }
 
   function handleRemove(playerId) {
     removePlayerFromSession(sessionId, playerId)
-    refresh()
   }
+
+  // session.playerIds was dereferenced unguarded here. Harmless while
+  // everything was device-local; now a session can exist on the server
+  // but not yet on this device.
+  if (!session) return <NotFound what="session" onBack={onBack} />
 
   const roster = session.playerIds
     .map((id) => knownPlayers.find((p) => p.id === id))

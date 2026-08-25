@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import {
-  getMatch,
-  getKnownPlayers,
   addRallyEvent,
   addThirdShotEvent,
   undoLastEvent,
   endMatchManually,
 } from '../lib/storage'
+import { useMatch, usePlayers } from '../lib/useLocalStore'
+import NotFound from './NotFound'
 import { deriveMatchState, currentServerPlayerId } from '../lib/pickleball'
 
 // The four rally-ending outcomes an umpire can tap, and the exact
@@ -49,38 +49,33 @@ function describeEvent(event, name) {
 // tapped during play; only the history log is collapsed by default, as
 // it's for reviewing after the fact rather than logging mid-rally.
 function LiveMatch({ matchId, onBack }) {
-  const [match, setMatch] = useState(() => getMatch(matchId))
+  const match = useMatch(matchId)
   const [showHistory, setShowHistory] = useState(false)
-  const knownPlayers = getKnownPlayers()
+  const knownPlayers = usePlayers()
 
   function name(id) {
     return knownPlayers.find((p) => p.id === id)?.name ?? '?'
   }
 
-  function refresh() {
-    setMatch(getMatch(matchId))
-  }
-
   function logRally(actingPlayerId, outcome, zone) {
     addRallyEvent(matchId, { actingPlayerId, outcome, zone })
-    refresh()
   }
 
   function logThirdShot(playerId, shotType, success) {
     addThirdShotEvent(matchId, { playerId, shotType, success })
-    refresh()
   }
 
   function handleUndo() {
     undoLastEvent(matchId)
-    refresh()
   }
 
   function handleEndEarly() {
     if (!confirm('End this match now? Final score will be locked in as-is.')) return
     endMatchManually(matchId)
-    refresh()
   }
+
+  // match.teamA / match.events were dereferenced unguarded below.
+  if (!match) return <NotFound what="match" onBack={onBack} />
 
   const derived = deriveMatchState(match)
   const players = [...match.teamA, ...match.teamB]
