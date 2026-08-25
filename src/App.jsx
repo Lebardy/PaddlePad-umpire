@@ -84,14 +84,21 @@ function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <img src="/favicon.svg" alt="" />
-        <h1>PaddlePad Umpire</h1>
+        {/* Brand and controls sit in normal flow rather than the
+            controls being absolutely positioned over a centred title.
+            Absolute positioning meant that on a narrow phone the sync
+            pill and umpire name simply overlapped the title. */}
+        <div className="app-brand">
+          <img src="/favicon.svg" alt="" />
+          <h1>PaddlePad Umpire</h1>
+        </div>
         {signedIn && (
           <div className="header-right">
             <UpdateNotice />
             <SyncIndicator />
             <button className="sign-out" onClick={handleSignOut}>
-              {umpire.name} · Sign out
+              <span className="umpire-name">{umpire.name}</span>
+              <span className="sign-out-label">Sign out</span>
             </button>
           </div>
         )}
