@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchMatches, fetchMe } from '../lib/api'
+import EmptyState from '../components/EmptyState'
 import Hero from '../components/Hero'
 import StatGrid from '../components/StatGrid'
 import ShotProfile from '../components/ShotProfile'
@@ -17,6 +18,7 @@ import MatchList from '../components/MatchList'
  */
 function Profile({ player, onSignOut }) {
   const [summary, setSummary] = useState(null)
+  const [inProgress, setInProgress] = useState(0)
   const [matches, setMatches] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -32,6 +34,7 @@ function Profile({ player, onSignOut }) {
         ])
         if (controller.signal.aborted) return
         setSummary(me.summary)
+        setInProgress(me.inProgress ?? 0)
         setMatches(history)
         setError(null)
       } catch (err) {
@@ -59,13 +62,7 @@ function Profile({ player, onSignOut }) {
       {error && <p className="error">{error}</p>}
 
       {!loading && !error && summary?.matches === 0 && (
-        <div className="empty-state">
-          <h2>No finished matches yet</h2>
-          <p>
-            Once someone scores a match you played in, it&rsquo;ll show up here
-            with your stats.
-          </p>
-        </div>
+        <EmptyState name={player.name} inProgress={inProgress} />
       )}
 
       {!loading && !error && summary?.matches > 0 && (

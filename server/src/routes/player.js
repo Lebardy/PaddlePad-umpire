@@ -1,7 +1,11 @@
 import { Router } from 'express'
 import { query } from '../db.js'
 import { requirePlayer } from '../auth.js'
-import { getPlayerMatches, summarisePlayer } from '../player-stats.js'
+import {
+  countMatchesInProgress,
+  getPlayerMatches,
+  summarisePlayer,
+} from '../player-stats.js'
 
 const router = Router()
 
@@ -18,10 +22,17 @@ router.get('/me', async (req, res) => {
   )
   if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
 
-  const matches = await getPlayerMatches(query, req.player.id)
+  const [matches, inProgress] = await Promise.all([
+    getPlayerMatches(query, req.player.id),
+    countMatchesInProgress(query, req.player.id),
+  ])
+
   res.json({
     player: { id: rows[0].id, name: rows[0].name, claimedAt: rows[0].claimed_at },
     summary: summarisePlayer(matches),
+    // Lets the empty state say "being scored right now" rather than the
+    // flatly discouraging "no matches".
+    inProgress,
   })
 })
 

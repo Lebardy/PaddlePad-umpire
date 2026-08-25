@@ -224,14 +224,84 @@
 }
 .chip-quiet { color: var(--text-muted); font-weight: 400; }
 
-/* ============ Empty ============ */
+/* ============ Empty state ============ */
 
-.empty-state {
+.empty { padding-top: 1rem; }
+
+.empty-head { margin-bottom: 1.5rem; }
+.empty-head h1 {
+  font-size: clamp(1.6rem, 7vw, 2rem);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin: 0.4rem 0 0.6rem;
+  overflow-wrap: anywhere;
+}
+.empty-lede { color: var(--text-secondary); line-height: 1.55; }
+
+/* A live match is the one thing here that is actually happening, so it
+   gets the only piece of colour on the screen. */
+.live-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--status-good-soft);
+  border: 1px solid var(--status-good);
+  color: var(--status-good);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+}
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--status-good);
+  animation: live-pulse 2s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+/* Respect a stated preference for less motion -- a pulsing dot is
+   decoration, not information. */
+@media (prefers-reduced-motion: reduce) {
+  .live-dot { animation: none; }
+}
+
+/* The shape of the page to come, drawn as empty structure. Deliberately
+   no placeholder numbers: inventing figures to fill it would teach a
+   first-time player that this app shows numbers it made up. */
+.preview {
   background: var(--surface);
-  border: 1px dashed var(--border);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 2.5rem 1.25rem;
+  padding: 1.1rem;
+  margin-bottom: 1.5rem;
+}
+.preview-card {
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+  padding: 0.9rem;
+  margin-bottom: 1.1rem;
+}
+.ghost {
+  display: block;
+  background: var(--border);
+  border-radius: 5px;
+}
+.ghost-hero { width: 38%; height: 2rem; margin-bottom: 0.55rem; }
+.ghost-line { width: 62%; height: 0.6rem; margin-bottom: 0.9rem; }
+.ghost-row { display: flex; gap: 0.35rem; }
+.ghost-pill { width: 1.55rem; height: 1.55rem; border-radius: 50%; }
+
+.promise-list { display: flex; flex-direction: column; gap: 0.9rem; }
+.promise-list li { display: flex; flex-direction: column; gap: 0.1rem; }
+.promise-title { font-size: 0.9rem; font-weight: 600; }
+.promise-body { font-size: 0.84rem; color: var(--text-secondary); line-height: 1.45; }
+
+.empty-foot {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  line-height: 1.5;
   text-align: center;
 }
-.empty-state h2 { font-size: 1.05rem; margin-bottom: 0.5rem; }
-.empty-state p { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.55; }

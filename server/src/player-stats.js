@@ -169,3 +169,26 @@ export function summarisePlayer(matches) {
     dropPreference: thirdShots > 0 ? totals.dropAttempts / thirdShots : null,
   }
 }
+
+/**
+ * How many matches this player is in that haven't finished yet.
+ *
+ * Exists purely for the empty state. "No matches yet" and "a match of
+ * yours is being scored right now" feel completely different to someone
+ * who just claimed their code: the first reads like the app is broken,
+ * the second reads like it is working and waiting. Without this the app
+ * cannot tell them apart.
+ */
+export async function countMatchesInProgress(query, playerId) {
+  const { rows } = await query(
+    `SELECT count(*)::int AS n
+       FROM matches m
+       JOIN sessions s ON s.id = m.session_id
+      WHERE (m.team_a @> ARRAY[$1]::uuid[] OR m.team_b @> ARRAY[$1]::uuid[])
+        AND m.status = 'in_progress'
+        AND m.voided_at IS NULL
+        AND s.voided_at IS NULL`,
+    [playerId],
+  )
+  return rows[0].n
+}
