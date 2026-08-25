@@ -1119,3 +1119,17 @@ section h3 {
   border-color: var(--danger);
   color: var(--danger);
 }
+
+.voided-tag {
+  margin-left: 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger);
+  border-radius: 999px;
+  padding: 0.1rem 0.4rem;
+  vertical-align: middle;
+}

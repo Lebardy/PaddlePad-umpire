@@ -10,6 +10,8 @@ const SESSION_SELECT = `
   SELECT s.id,
          s.name,
          s.created_at,
+         s.voided_at,
+         s.void_reason,
          u.name AS created_by_name,
          (SELECT count(*)::int FROM session_players sp WHERE sp.session_id = s.id) AS player_count,
          (SELECT count(*)::int FROM matches m WHERE m.session_id = s.id)           AS match_count
@@ -160,13 +162,46 @@ router.delete('/:id', async (req, res) => {
     return res.status(409).json({
       error: `That session has ${finished.rows[0].n} finished match${
         finished.rows[0].n === 1 ? '' : 'es'
-      } and can't be deleted. Void those first if they were wrong.`,
+      } and can't be deleted. Void the session instead — that keeps the record but leaves it out of the exported data.`,
     })
   }
 
   // ON DELETE CASCADE clears session_players and any unfinished matches.
   await query('DELETE FROM sessions WHERE id = $1', [req.params.id])
   res.status(204).end()
+})
+
+/**
+ * Voids (or restores) a whole session, excluding every match in it from
+ * the ML export while keeping all the records.
+ *
+ * This is the answer for a session that cannot be deleted because real
+ * play happened in it -- a duplicate night, the wrong court, a practice
+ * run someone recorded in earnest. Deleting would destroy genuine
+ * history; voiding just stops the pipeline being fed it.
+ *
+ * Deliberately does NOT touch the matches' own voided_at. Keeping the
+ * two independent means restoring this session brings back only the
+ * matches that were fine, and leaves any individually-voided ones
+ * still excluded.
+ */
+router.post('/:id/void', async (req, res) => {
+  const voided = req.body?.voided !== false
+  const reason = String(req.body?.reason ?? '').trim() || null
+
+  const { rows } = await query(
+    `UPDATE sessions
+        SET voided_at = CASE WHEN $2 THEN now() END,
+            voided_by = CASE WHEN $2 THEN $3::uuid END,
+            void_reason = CASE WHEN $2 THEN $4 END
+      WHERE id = $1
+      RETURNING id`,
+    [req.params.id, voided, req.umpire.id, reason],
+  )
+  if (rows.length === 0) return res.status(404).json({ error: 'No such session' })
+
+  const updated = await query(`${SESSION_SELECT} WHERE s.id = $1`, [req.params.id])
+  res.json({ session: updated.rows[0] })
 })
 
 export default router

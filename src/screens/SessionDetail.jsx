@@ -4,6 +4,8 @@ import {
   addPlayerToSession,
   removePlayerFromSession,
   deleteSession,
+  voidSession,
+  unvoidSession,
 } from '../lib/storage'
 import PlayerPicker from '../components/PlayerPicker'
 import * as sync from '../lib/sync'
@@ -46,16 +48,20 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
   // with it; a finished one blocks the delete, because that is real
   // recorded play and should be voided individually instead.
   function handleDeleteSession() {
-    const finished = matches.filter((m) => m.status === 'completed').length
-    if (finished > 0) {
-      alert(
-        `This session has ${finished} finished match${finished === 1 ? '' : 'es'}, ` +
-          'so it can\u2019t be cancelled. Open any that were wrong and void them instead.',
-      )
-      return
-    }
     if (!confirm(`Cancel "${session.name}"? Any unfinished matches go with it.`)) return
     if (deleteSession(sessionId)) onBack()
+  }
+
+  // For a session where real play happened. Deleting would destroy
+  // genuine history, so this keeps every record and simply stops the
+  // exported data including any of it.
+  function handleVoidSession() {
+    const reason = prompt(
+      `Void "${session.name}"?\n\nEvery match in it stays recorded but is left out of the exported data. You can restore it later.\n\nOptional reason:`,
+      '',
+    )
+    if (reason === null) return
+    voidSession(sessionId, reason)
   }
 
   function handleRemove(playerId) {
@@ -66,6 +72,8 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
   // everything was device-local; now a session can exist on the server
   // but not yet on this device.
   if (!session) return <NotFound what="session" onBack={onBack} />
+
+  const finishedCount = matches.filter((m) => m.status === 'completed').length
 
   const roster = session.playerIds
     .map((id) => knownPlayers.find((p) => p.id === id))
@@ -123,9 +131,37 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
       </section>
 
       <section className="danger-zone">
-        <button className="cancel-session" onClick={handleDeleteSession}>
-          Cancel this session
-        </button>
+        {session.voidedAt ? (
+          <>
+            <p className="voided-note">
+              This session is voided — none of its matches appear in the
+              exported data.
+              {session.voidReason ? ` Reason: ${session.voidReason}` : ''}
+            </p>
+            <button
+              className="cancel-session"
+              onClick={() => unvoidSession(sessionId)}
+            >
+              Restore this session
+            </button>
+          </>
+        ) : finishedCount > 0 ? (
+          <>
+            <p className="placeholder-note">
+              This session has {finishedCount} finished match
+              {finishedCount === 1 ? '' : 'es'}, so it can&rsquo;t be deleted —
+              that would destroy real recorded play. Voiding keeps everything
+              but leaves it out of the exported data.
+            </p>
+            <button className="cancel-session" onClick={handleVoidSession}>
+              Void this session
+            </button>
+          </>
+        ) : (
+          <button className="cancel-session" onClick={handleDeleteSession}>
+            Cancel this session
+          </button>
+        )}
       </section>
 
       <section className="add-player">

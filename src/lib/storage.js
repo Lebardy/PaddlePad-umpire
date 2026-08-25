@@ -339,6 +339,8 @@ export function replaceServerState({
         id: s.id,
         name: s.name,
         createdAt: new Date(s.created_at).getTime(),
+        voidedAt: s.voided_at ? new Date(s.voided_at).getTime() : null,
+        voidReason: s.void_reason ?? null,
         playerIds: mine?.playerIds ?? [],
       }
     })
@@ -559,5 +561,39 @@ export function deleteSession(sessionId) {
   for (const match of matches) addTombstone('matches', match.id)
   addTombstone('sessions', sessionId)
   markDirty('sessionDelete', sessionId)
+  return true
+}
+
+/**
+ * Voids a whole session so the export skips every match in it, while
+ * keeping all the records.
+ *
+ * The answer for a session that can't be deleted because real play
+ * happened in it -- a duplicate night, the wrong court, a practice run
+ * recorded in earnest. Deleting would destroy genuine history; voiding
+ * only stops the ML pipeline being fed it.
+ *
+ * Individual matches keep their own voided state, so restoring this
+ * later brings back only the ones that were fine.
+ */
+export function voidSession(sessionId, reason = '') {
+  const session = getSession(sessionId)
+  if (!session) return false
+  const updated = getSessions().map((s) =>
+    s.id === sessionId ? { ...s, voidedAt: Date.now(), voidReason: reason || null } : s,
+  )
+  writeJSON(SESSIONS_KEY, updated)
+  markDirty('sessionVoid', sessionId)
+  return true
+}
+
+export function unvoidSession(sessionId) {
+  const session = getSession(sessionId)
+  if (!session) return false
+  const updated = getSessions().map((s) =>
+    s.id === sessionId ? { ...s, voidedAt: null, voidReason: null } : s,
+  )
+  writeJSON(SESSIONS_KEY, updated)
+  markDirty('sessionVoid', sessionId)
   return true
 }

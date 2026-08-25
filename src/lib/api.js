@@ -312,3 +312,11 @@ export function setMatchVoided(matchId, { voided, reason }) {
 export function deleteSessionOnServer(sessionId) {
   return apiFetch(`/sessions/${sessionId}`, { method: 'DELETE' })
 }
+
+/** Voids (or restores) a session, excluding all its matches from the export. */
+export function setSessionVoided(sessionId, { voided, reason }) {
+  return apiFetch(`/sessions/${sessionId}/void`, {
+    method: 'POST',
+    body: { voided, reason },
+  }).then((d) => d.session)
+}

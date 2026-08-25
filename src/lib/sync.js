@@ -133,6 +133,9 @@ function payloadFor(entry) {
     const session = getSession(entry.entityId)
     return session ? { id: session.id, name: session.name } : null
   }
+  if (entry.kind === 'sessionVoid') {
+    return getSession(entry.entityId)
+  }
   if (entry.kind === 'roster') {
     const session = getSession(entry.entityId)
     return session ? { sessionId: session.id, playerIds: session.playerIds } : null
@@ -171,6 +174,13 @@ async function push(entry, payload) {
       events: payload.events.map((event, index) => ({ ...event, seq: index })),
       endedEarly: Boolean(payload.endedEarly),
       endedEarlyAt: payload.endedAt ?? null,
+    })
+    return
+  }
+  if (entry.kind === 'sessionVoid') {
+    await api.setSessionVoided(payload.id, {
+      voided: Boolean(payload.voidedAt),
+      reason: payload.voidReason ?? '',
     })
     return
   }

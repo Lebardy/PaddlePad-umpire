@@ -64,17 +64,23 @@ const MAX_PLAUSIBLE_MATCH_MINS = 240
  */
 export async function buildMatchLogRows(query) {
   const { rows: matches } = await query(
-    `SELECT id, team_a, team_b, stacking_a, stacking_b,
-            first_server_team, first_server_player,
-            winner, started_at, ended_at
-       FROM matches
-      WHERE status = 'completed'
-        AND ended_at IS NOT NULL
+    `SELECT m.id, m.team_a, m.team_b, m.stacking_a, m.stacking_b,
+            m.first_server_team, m.first_server_player,
+            m.winner, m.started_at, m.ended_at
+       FROM matches m
+       JOIN sessions s ON s.id = m.session_id
+      WHERE m.status = 'completed'
+        AND m.ended_at IS NOT NULL
         -- Voided matches are excluded: a mis-paired match credits one
         -- player's rallies to another, and nothing downstream could
         -- detect that. Worse than having no match at all.
-        AND voided_at IS NULL
-      ORDER BY ended_at`,
+        AND m.voided_at IS NULL
+        -- A voided SESSION excludes everything in it, without marking
+        -- the matches themselves. Keeping the two independent means
+        -- restoring a session brings back only the matches that were
+        -- fine, leaving individually-voided ones still out.
+        AND s.voided_at IS NULL
+      ORDER BY m.ended_at`,
   )
   if (matches.length === 0) return []
 
@@ -82,7 +88,10 @@ export async function buildMatchLogRows(query) {
     `SELECT e.match_id, e.seq, e.type, e.payload
        FROM match_events e
        JOIN matches m ON m.id = e.match_id
-      WHERE m.status = 'completed' AND m.voided_at IS NULL
+       JOIN sessions s ON s.id = m.session_id
+      WHERE m.status = 'completed'
+        AND m.voided_at IS NULL
+        AND s.voided_at IS NULL
       ORDER BY e.match_id, e.seq`,
   )
 

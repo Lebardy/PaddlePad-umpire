@@ -95,6 +95,18 @@ CREATE TABLE IF NOT EXISTS sessions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- A session thrown out wholesale -- wrong night, duplicate, a practice
+-- run someone recorded for real.
+--
+-- Voiding a session excludes every match in it from the export without
+-- touching the matches themselves. That independence matters: it means
+-- restoring a session brings back only the matches that were fine,
+-- leaving any individually-voided ones still excluded. A cascade would
+-- quietly un-void those too.
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS voided_at   TIMESTAMPTZ;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS voided_by   UUID REFERENCES umpires (id) ON DELETE SET NULL;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS void_reason TEXT;
+
 CREATE TABLE IF NOT EXISTS session_players (
     session_id UUID NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
     player_id  UUID NOT NULL REFERENCES players (id) ON DELETE CASCADE,

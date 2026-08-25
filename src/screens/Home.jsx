@@ -79,7 +79,10 @@ function Home({ onOpenSession, onOpenInvites }) {
               className="session-item"
               onClick={() => onOpenSession(s.id)}
             >
-              <span className="session-name">{s.name}</span>
+              <span className="session-name">
+                {s.name}
+                {s.voidedAt && <span className="voided-tag">voided</span>}
+              </span>
               <span className="session-meta">{s.playerIds.length} players</span>
             </button>
           </li>
