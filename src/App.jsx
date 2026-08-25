@@ -6,6 +6,8 @@ import LiveMatch from './screens/LiveMatch'
 import Login from './screens/Login'
 import Invites from './screens/Invites'
 import { clearSession, fetchCurrentUmpire, getStoredUmpire } from './lib/api'
+import SyncIndicator from './components/SyncIndicator'
+import * as sync from './lib/sync'
 import './App.css'
 
 // Central view-router. There is no URL routing in this app (it's a
@@ -56,6 +58,16 @@ function App() {
     setView({ name: 'match', matchId, sessionId })
   }
 
+  // Sync starts only once there is a signed-in umpire, since every
+  // endpoint needs a token. Pull failures are swallowed deliberately:
+  // being offline at launch is normal courtside, and whatever is
+  // already on the device stays usable.
+  useEffect(() => {
+    if (!umpire) return
+    sync.init()
+    sync.pullCore().catch(() => {})
+  }, [umpire])
+
   function handleSignOut() {
     clearSession()
     setUmpire(null)
@@ -70,9 +82,12 @@ function App() {
         <img src="/favicon.svg" alt="" />
         <h1>PaddlePad Umpire</h1>
         {signedIn && (
-          <button className="sign-out" onClick={handleSignOut}>
-            {umpire.name} · Sign out
-          </button>
+          <div className="header-right">
+            <SyncIndicator />
+            <button className="sign-out" onClick={handleSignOut}>
+              {umpire.name} · Sign out
+            </button>
+          </div>
         )}
       </header>
 

@@ -6,8 +6,11 @@
 // local dev server so `pnpm dev` works with no configuration.
 // ============================================================
 
+// Optional-chained so this module can also be imported outside Vite
+// (the sync tests run it under plain Node), where import.meta.env does
+// not exist at all.
 const API_URL = (
-  import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
+  import.meta.env?.VITE_API_URL ?? 'http://localhost:3000'
 ).replace(/\/$/, '')
 
 const TOKEN_KEY = 'paddlepad.token'
@@ -53,7 +56,10 @@ export class ApiError extends Error {
   }
 }
 
-async function apiFetch(path, { method = 'GET', body, auth = true } = {}) {
+async function apiFetch(
+  path,
+  { method = 'GET', body, auth = true, signal, raw = false } = {},
+) {
   const headers = {}
   if (body !== undefined) headers['Content-Type'] = 'application/json'
 
@@ -67,9 +73,13 @@ async function apiFetch(path, { method = 'GET', body, auth = true } = {}) {
     response = await fetch(`${API_URL}${path}`, {
       method,
       headers,
+      signal,
       body: body === undefined ? undefined : JSON.stringify(body),
     })
-  } catch {
+  } catch (error) {
+    // An aborted request is the caller's own doing, not a failure of
+    // the network -- rethrow it so it can't be mistaken for offline.
+    if (error?.name === 'AbortError') throw error
     // fetch only rejects on network-level failure, so this is the
     // "server unreachable" case rather than an application error --
     // worth naming explicitly, since courtside wifi is unreliable.
@@ -81,10 +91,25 @@ async function apiFetch(path, { method = 'GET', body, auth = true } = {}) {
 
   if (response.status === 204) return null
 
+  // `raw` is for responses that aren't JSON -- the CSV export.
+  if (raw) {
+    if (!response.ok) {
+      throw new ApiError(`Request failed (${response.status})`, response.status)
+    }
+    return response
+  }
+
   const data = await response.json().catch(() => ({}))
 
   if (!response.ok) {
-    throw new ApiError(data.error ?? `Request failed (${response.status})`, response.status)
+    const error = new ApiError(
+      data.error ?? `Request failed (${response.status})`,
+      response.status,
+    )
+    // Some errors carry useful payload: a duplicate player carries the
+    // existing player, a busy match carries who is holding it.
+    error.data = data
+    throw error
   }
   return data
 }
@@ -152,4 +177,120 @@ export async function fetchCurrentUmpire() {
     }
     throw error
   }
+}
+
+// ============================================================
+// Players
+//
+// Player creation is the one write that requires connectivity, and
+// deliberately so. Players are the only entity with a semantic unique
+// key (one name, one person), so if two offline devices each invented
+// an id for "Maria" only one could survive, and reconciling would mean
+// rewriting that id across sessions, matches, both team arrays and
+// every event payload on both devices -- reintroducing exactly the
+// identity fragmentation the shared player table exists to prevent.
+//
+// Adding a person is a setup action, not a mid-rally one, so it can
+// afford to need a connection. Scoring stays fully offline.
+// ============================================================
+
+export function searchPlayers(q = '', { signal } = {}) {
+  const suffix = q ? `?q=${encodeURIComponent(q)}` : ''
+  return apiFetch(`/players${suffix}`, { signal }).then((d) => d.players)
+}
+
+/**
+ * Creates a player. On a duplicate name the thrown ApiError has
+ * `.status === 409` and `.data.player` holding the existing record and
+ * its match count, so the caller can offer "same person?" without a
+ * second round trip.
+ */
+export function createPlayer(name) {
+  return apiFetch('/players', { method: 'POST', body: { name } }).then((d) => d.player)
+}
+
+export function fetchPlayerClaimCode(playerId) {
+  return apiFetch(`/players/${playerId}/claim-code`).then((d) => d.claimCode)
+}
+
+// ============================================================
+// Sessions
+// ============================================================
+
+export function fetchSessions({ signal } = {}) {
+  return apiFetch('/sessions', { signal }).then((d) => d.sessions)
+}
+
+export function fetchSession(sessionId, { signal } = {}) {
+  return apiFetch(`/sessions/${sessionId}`, { signal })
+}
+
+export function pushSession({ id, name }) {
+  return apiFetch('/sessions', { method: 'POST', body: { id, name } }).then((d) => d.session)
+}
+
+/** Replaces a session's whole roster; see the route for why it's a replace. */
+export function pushRoster(sessionId, playerIds) {
+  return apiFetch(`/sessions/${sessionId}/players`, {
+    method: 'PUT',
+    body: { playerIds },
+  })
+}
+
+// ============================================================
+// Matches
+// ============================================================
+
+export function fetchMatchesForSession(sessionId, { signal } = {}) {
+  return apiFetch(`/matches/session/${sessionId}`, { signal }).then((d) => d.matches)
+}
+
+export function fetchMatch(matchId, { signal } = {}) {
+  return apiFetch(`/matches/${matchId}`, { signal }).then((d) => d.match)
+}
+
+export function pushMatch(match) {
+  return apiFetch('/matches', {
+    method: 'POST',
+    body: {
+      id: match.id,
+      sessionId: match.sessionId,
+      teamA: match.teamA,
+      teamB: match.teamB,
+      stacking: match.stacking,
+      firstServer: match.firstServer,
+      startedAt: match.startedAt,
+    },
+  }).then((d) => d.match)
+}
+
+/**
+ * Uploads a match's whole event log: "this match's log is exactly
+ * this." Full-state rather than append/undo operations, so a retry is
+ * free and an undo is just a shorter array.
+ *
+ * A 409 means another device holds the scoring lease; the error carries
+ * `.data.heldBy`.
+ */
+export function pushMatchLog(matchId, { deviceId, events, endedEarly, endedEarlyAt }) {
+  return apiFetch(`/matches/${matchId}/log`, {
+    method: 'PUT',
+    body: { deviceId, events, endedEarly, endedEarlyAt },
+  }).then((d) => d.match)
+}
+
+export function claimMatch(matchId, { deviceId, force = false }) {
+  return apiFetch(`/matches/${matchId}/claim`, {
+    method: 'POST',
+    body: { deviceId, force },
+  }).then((d) => d.match)
+}
+
+// ============================================================
+// Export
+// ============================================================
+
+/** The ML pipeline CSV, covering every umpire's matches. */
+export function fetchExportCsv() {
+  return apiFetch('/export/match-logs.csv', { raw: true }).then((r) => r.text())
 }

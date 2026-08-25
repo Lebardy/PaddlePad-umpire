@@ -26,9 +26,43 @@
   letter-spacing: -0.01em;
 }
 
-.sign-out {
+.header-right {
   position: absolute;
   right: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.sync-pill {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  white-space: nowrap;
+}
+
+/* Pending-but-online is a dot, not a count: at one tap per rally a
+   number would flicker constantly and earn nothing. */
+.sync-pill--quiet {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.sync-pill--error {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  cursor: pointer;
+}
+
+.sign-out {
   background: none;
   border: none;
   color: var(--text-muted);

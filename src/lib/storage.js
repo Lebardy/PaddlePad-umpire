@@ -1,5 +1,6 @@
 import { deriveMatchState } from './pickleball'
 import { read, write } from './localstore'
+import { markDirty, pending as outboxPending } from './outbox'
 
 // ============================================================
 // PaddlePad Umpire local persistence layer
@@ -67,6 +68,7 @@ export function createSession(name) {
     playerIds: [],
   }
   writeJSON(SESSIONS_KEY, [session, ...getSessions()])
+  markDirty('session', session.id)
   return session
 }
 
@@ -100,6 +102,7 @@ export function addPlayerToSession(sessionId, playerId) {
       : s,
   )
   writeJSON(SESSIONS_KEY, updated)
+  markDirty('roster', sessionId)
   return updated.find((s) => s.id === sessionId)
 }
 
@@ -115,6 +118,7 @@ export function removePlayerFromSession(sessionId, playerId) {
       : s,
   )
   writeJSON(SESSIONS_KEY, updated)
+  markDirty('roster', sessionId)
   return updated.find((s) => s.id === sessionId)
 }
 
@@ -175,6 +179,7 @@ export function createMatch({ sessionId, teamA, teamB, stacking, firstServer }) 
     winner: null,
   }
   writeJSON(MATCHES_KEY, [match, ...getMatches()])
+  markDirty('match', match.id)
   return match
 }
 
@@ -193,6 +198,7 @@ function finalizeAfterEventChange(match) {
     match.endedAt = null
     match.winner = null
   }
+  markDirty('log', match.id)
   return saveMatch(match)
 }
 
@@ -260,6 +266,8 @@ export function endMatchManually(matchId) {
   match.status = 'completed'
   match.endedAt = Date.now()
   match.winner = derived.score.A === derived.score.B ? null : derived.winner
+  match.endedEarly = true
+  markDirty('log', match.id)
   return saveMatch(match)
 }
 
@@ -405,4 +413,98 @@ export function matchLogsToCSV(rows) {
     lines.push(RAW_MATCH_LOG_COLUMNS.map((col) => row[col]).join(','))
   }
   return lines.join('\n')
+}
+
+// ============================================================
+// Merging server state into the local cache
+// ============================================================
+
+/**
+ * Folds freshly pulled server data into local storage.
+ *
+ * THE RULE: a pull must never destroy work this device still owes the
+ * server. If a match is queued in the outbox, its local version is the
+ * newer one -- the server simply hasn't heard about those taps yet --
+ * so the local copy wins and the pull skips it. Overwriting it would
+ * silently delete an umpire's rallies, which is the worst bug this app
+ * could have.
+ *
+ * Everything not queued is safe to replace, since the server is the
+ * shared source of truth for it.
+ */
+export function replaceServerState({ players, sessions, sessionDetail, matches }) {
+  if (players) {
+    writeJSON(
+      PLAYERS_KEY,
+      players.map((p) => ({ id: p.id, name: p.name })),
+    )
+  }
+
+  if (sessions) {
+    const dirty = new Set(
+      pendingEntities('session').concat(pendingEntities('roster')),
+    )
+    const local = getSessions()
+    const merged = sessions.map((s) => {
+      const mine = local.find((l) => l.id === s.id)
+      // Keep the local roster if this device still owes the server one.
+      if (mine && dirty.has(s.id)) return mine
+      return {
+        id: s.id,
+        name: s.name,
+        createdAt: new Date(s.created_at).getTime(),
+        playerIds: mine?.playerIds ?? [],
+      }
+    })
+    // Sessions created here and not yet accepted must survive the pull.
+    const unsent = local.filter((l) => !sessions.some((s) => s.id === l.id))
+    writeJSON(SESSIONS_KEY, [...unsent, ...merged])
+  }
+
+  if (sessionDetail?.session) {
+    const dirty = new Set(pendingEntities('roster'))
+    if (!dirty.has(sessionDetail.session.id)) {
+      const updated = getSessions().map((s) =>
+        s.id === sessionDetail.session.id
+          ? { ...s, playerIds: sessionDetail.session.playerIds }
+          : s,
+      )
+      writeJSON(SESSIONS_KEY, updated)
+    }
+  }
+
+  if (matches) {
+    const dirty = new Set(
+      pendingEntities('match').concat(pendingEntities('log')),
+    )
+    const local = getMatches()
+    const fromServer = matches
+      .filter((m) => !dirty.has(m.id))
+      .map((m) => ({
+        id: m.id,
+        sessionId: m.sessionId,
+        createdAt: new Date(m.startedAt).getTime(),
+        startedAt: new Date(m.startedAt).getTime(),
+        endedAt: m.endedAt ? new Date(m.endedAt).getTime() : null,
+        status: m.status,
+        teamA: m.teamA,
+        teamB: m.teamB,
+        stacking: m.stacking,
+        firstServer: m.firstServer,
+        winner: m.winner,
+        endedEarly: m.endedEarly,
+        events: (m.events ?? []).map((e) => ({ ...e })),
+      }))
+
+    const serverIds = new Set(fromServer.map((m) => m.id))
+    const keptLocal = local.filter((m) => dirty.has(m.id) || !serverIds.has(m.id))
+    writeJSON(MATCHES_KEY, [...keptLocal, ...fromServer])
+  }
+}
+
+/** Entity ids of a given kind currently queued for the server. */
+function pendingEntities(kind) {
+  return outboxPending()
+    .filter((entry) => entry.kind === kind)
+    .map((entry) => entry.entityId)
 }
