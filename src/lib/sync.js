@@ -228,11 +228,99 @@ async function runDrain() {
   notify()
 }
 
-/** Forces a blocked match log through, taking the scoring lease. */
-export async function takeOverMatch(matchId) {
-  await api.claimMatch(matchId, { deviceId: outbox.getDeviceId(), force: true })
-  outbox.markDirty('log', matchId)
-  await drain()
+/**
+ * Compares two event logs by id, position by position.
+ *
+ * Event ids are minted once, on the device that recorded the tap, and
+ * never change -- so the shared prefix tells us exactly how the two
+ * logs relate rather than making us guess from counts.
+ *
+ *   'same'        identical
+ *   'server-ahead' this device's log is a prefix of the server's, so
+ *                  this device is simply behind (it was watching, not
+ *                  scoring)
+ *   'local-ahead'  the server's log is a prefix of this device's, so
+ *                  this device holds taps the server never received
+ *   'diverged'     both contain taps the other lacks -- a genuine
+ *                  double-scoring conflict
+ */
+export function compareLogs(local, remote) {
+  const shared = Math.min(local.length, remote.length)
+  for (let i = 0; i < shared; i += 1) {
+    if (local[i]?.id !== remote[i]?.id) return 'diverged'
+  }
+  if (local.length === remote.length) return 'same'
+  return local.length < remote.length ? 'server-ahead' : 'local-ahead'
+}
+
+/**
+ * Takes over scoring a match.
+ *
+ * The first version of this simply forced the local log up, on the
+ * reasoning that two umpires scoring one match are producing rival
+ * opinions and one has to win. That was wrong about the situation that
+ * actually occurs.
+ *
+ * In practice the second device is not scoring at all -- it has the
+ * match open and is watching a copy that has fallen behind. Its log is
+ * not a rival opinion, it is simply OLDER, and pushing it deleted the
+ * real scoring. That is what "take over and the score went backwards"
+ * was.
+ *
+ * So takeover now reads the server first and works out how the two logs
+ * actually relate:
+ *
+ *   behind      adopt the server's log and carry on from there -- which
+ *               is what "take over scoring" means in plain English
+ *   ahead       this device really does hold unsent taps; push them
+ *   diverged    both sides recorded different rallies. Nothing is
+ *               thrown away silently: the counts are handed back so the
+ *               umpire can choose.
+ *
+ * @param {string} matchId
+ * @param {object} [options]
+ * @param {'server'|'mine'} [options.resolution] choice for a diverged log
+ */
+export async function takeOverMatch(matchId, { resolution } = {}) {
+  const deviceId = outbox.getDeviceId()
+
+  const remote = await api.fetchMatch(matchId)
+  setReachable(true)
+
+  const local = getMatch(matchId)
+  const localEvents = local?.events ?? []
+  const remoteEvents = remote.events ?? []
+  const relation = compareLogs(localEvents, remoteEvents)
+
+  const adoptServer = async () => {
+    await api.claimMatch(matchId, { deviceId, force: true })
+    // force, because this match is in the outbox and a normal merge
+    // deliberately refuses to overwrite queued work.
+    replaceServerState({ matches: [remote], force: true })
+    outbox.resolve(outbox.outboxKey('log', matchId))
+    notify()
+    return { status: 'adopted', events: remoteEvents.length }
+  }
+
+  const pushMine = async () => {
+    await api.claimMatch(matchId, { deviceId, force: true })
+    outbox.markDirty('log', matchId)
+    await drain()
+    return { status: 'pushed', events: localEvents.length }
+  }
+
+  if (relation === 'diverged') {
+    if (resolution === 'server') return adoptServer()
+    if (resolution === 'mine') return pushMine()
+    return {
+      status: 'conflict',
+      localCount: localEvents.length,
+      remoteCount: remoteEvents.length,
+    }
+  }
+
+  if (relation === 'local-ahead') return pushMine()
+  return adoptServer()
 }
 
 export function retryDead(key) {

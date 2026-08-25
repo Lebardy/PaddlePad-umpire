@@ -9,11 +9,17 @@ import { useMatch, usePlayers } from '../lib/useLocalStore'
 import NotFound from './NotFound'
 import TakeoverNotice from '../components/TakeoverNotice'
 import * as sync from '../lib/sync'
+import { getDeviceId } from '../lib/outbox'
 import { deriveMatchState, currentServerPlayerId } from '../lib/pickleball'
 
 // The four rally-ending outcomes an umpire can tap, and the exact
 // (outcome, zone) pair addRallyEvent needs to file each into the right
 // ML stat bucket -- see deriveMatchState in pickleball.js.
+// How often a device that is only WATCHING a match re-reads it. Slow
+// enough to be negligible, fast enough that a watcher isn't looking at
+// a score several rallies out of date.
+const WATCH_POLL_MS = 8_000
+
 const OUTCOMES = [
   { outcome: 'winner', zone: 'open', label: 'Clean Winner' },
   { outcome: 'winner', zone: 'dink', label: 'Dink Winner' },
@@ -56,13 +62,45 @@ function LiveMatch({ matchId, onBack }) {
   const knownPlayers = usePlayers()
 
   // Fetch this match's event log, which the session list deliberately
-  // doesn't carry. Failure is fine: anything already scored on this
-  // device is in local storage and stays usable offline.
+  // doesn't carry, and keep refreshing while ANOTHER device is the one
+  // scoring.
+  //
+  // Without the refresh, a second device that merely has the match open
+  // sits on whatever it loaded at mount. Its scoreboard silently falls
+  // behind the real one, and -- worse -- a takeover from that stale
+  // state used to overwrite the real scoring. Adopting the server's log
+  // on takeover fixes the data loss; this stops the screen lying in the
+  // meantime, and is what makes a finished match appear on the watching
+  // device.
+  //
+  // It polls only when this device is NOT the scorer and the screen is
+  // actually being looked at, so the umpire doing the scoring never
+  // pays for it.
+  const scoringDevice = match?.scoringDevice
+  const isScorer = !scoringDevice || scoringDevice === getDeviceId()
+
   useEffect(() => {
     const controller = new AbortController()
-    sync.pullMatch(matchId, { signal: controller.signal }).catch(() => {})
-    return () => controller.abort()
-  }, [matchId])
+    let timer = null
+
+    const refresh = () => {
+      sync.pullMatch(matchId, { signal: controller.signal }).catch(() => {})
+    }
+    refresh()
+
+    if (!isScorer) {
+      const tick = () => {
+        if (document.visibilityState === 'visible') refresh()
+        timer = setTimeout(tick, WATCH_POLL_MS)
+      }
+      timer = setTimeout(tick, WATCH_POLL_MS)
+    }
+
+    return () => {
+      controller.abort()
+      if (timer) clearTimeout(timer)
+    }
+  }, [matchId, isScorer])
 
   function name(id) {
     return knownPlayers.find((p) => p.id === id)?.name ?? '?'

@@ -7,40 +7,82 @@ import { useSyncStatus } from '../lib/useSyncStatus'
  * Shown when this device's taps for a match are blocked because another
  * device holds the scoring lease.
  *
- * Concurrent scoring is refused rather than merged. Two umpires on one
- * match are not producing complementary halves to stitch together --
- * they are producing two independent readings of the same rallies, and
- * interleaving them yields a sequence matching neither.
+ * Taking over reads the server first and works out how the two logs
+ * relate, rather than assuming this device's copy should win. In almost
+ * every real case this device was only WATCHING and has fallen behind,
+ * so taking over means adopting the current score and carrying on --
+ * not replacing it with something older.
  *
- * So the umpire is asked, and taking over is deliberately destructive:
- * this device's log replaces what is stored. Saying that plainly is
- * better than a merge nobody could trust afterwards.
+ * The only case that needs a human is a genuine divergence, where both
+ * devices recorded rallies the other never saw. Then the umpire is
+ * shown both counts and chooses; nothing is discarded quietly.
  */
 function TakeoverNotice({ matchId }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const [conflict, setConflict] = useState(null)
+  const [outcome, setOutcome] = useState(null)
 
-  // Recomputed on each sync-status change, which is when a block starts
-  // or clears.
   useSyncStatus()
   const blocked = pending().find(
     (entry) => entry.kind === 'log' && entry.entityId === matchId && entry.state === 'blocked',
   )
 
-  if (!blocked) return null
+  if (!blocked && !conflict && !outcome) return null
 
-  const holder = blocked.lastError?.umpireName
+  const holder = blocked?.lastError?.umpireName
 
-  async function handleTakeOver() {
+  async function run(resolution) {
     setBusy(true)
     setError(null)
     try {
-      await takeOverMatch(matchId)
+      const result = await takeOverMatch(matchId, { resolution })
+      if (result.status === 'conflict') {
+        setConflict(result)
+      } else {
+        setConflict(null)
+        setOutcome(result)
+        setTimeout(() => setOutcome(null), 4000)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
       setBusy(false)
     }
+  }
+
+  if (outcome) {
+    return (
+      <div className="takeover takeover--ok">
+        <p className="takeover-text">
+          {outcome.status === 'adopted'
+            ? `You're scoring now, continuing from the current score (${outcome.events} taps).`
+            : `You're scoring now. Your ${outcome.events} taps were uploaded.`}
+        </p>
+      </div>
+    )
+  }
+
+  if (conflict) {
+    return (
+      <div className="takeover">
+        <p className="takeover-text">
+          <strong>Both devices recorded different rallies.</strong> This device
+          has {conflict.localCount} taps; the server has {conflict.remoteCount}.
+          One of them has to be kept — they can&rsquo;t be combined, because each
+          is a different account of the same points.
+        </p>
+        {error && <p className="form-error">{error}</p>}
+        <div className="dupe-actions">
+          <button className="dupe-yes" onClick={() => run('server')} disabled={busy}>
+            Keep the server&rsquo;s {conflict.remoteCount}
+          </button>
+          <button className="dupe-no" onClick={() => run('mine')} disabled={busy}>
+            Keep my {conflict.localCount}
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -52,8 +94,8 @@ function TakeoverNotice({ matchId }) {
         Your taps are saved here but aren&rsquo;t being uploaded.
       </p>
       {error && <p className="form-error">{error}</p>}
-      <button className="takeover-btn" onClick={handleTakeOver} disabled={busy}>
-        {busy ? 'Taking over…' : 'Take over scoring (replaces their log)'}
+      <button className="takeover-btn" onClick={() => run()} disabled={busy}>
+        {busy ? 'Taking over…' : 'Take over scoring'}
       </button>
     </div>
   )

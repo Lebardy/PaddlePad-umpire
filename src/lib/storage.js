@@ -309,7 +309,16 @@ export function endMatchManually(matchId) {
  * Everything not queued is safe to replace, since the server is the
  * shared source of truth for it.
  */
-export function replaceServerState({ players, sessions, sessionDetail, matches }) {
+export function replaceServerState({
+  players,
+  sessions,
+  sessionDetail,
+  matches,
+  // Overrides the never-clobber-queued-work rule. Used ONLY by an
+  // explicit takeover, where the umpire has been asked and has chosen
+  // the server's version. Never set it for a background pull.
+  force = false,
+}) {
   if (players) {
     writeJSON(
       PLAYERS_KEY,
@@ -351,9 +360,9 @@ export function replaceServerState({ players, sessions, sessionDetail, matches }
   }
 
   if (matches) {
-    const dirty = new Set(
-      pendingEntities('match').concat(pendingEntities('log')),
-    )
+    const dirty = force
+      ? new Set()
+      : new Set(pendingEntities('match').concat(pendingEntities('log')))
     const local = getMatches()
     const fromServer = matches
       .filter((m) => !dirty.has(m.id))

@@ -1056,3 +1056,8 @@ section h3 {
   cursor: pointer;
   white-space: nowrap;
 }
+
+.takeover--ok {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
