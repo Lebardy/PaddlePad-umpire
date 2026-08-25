@@ -1,9 +1,11 @@
+import { useEffect } from 'react'
 import {
   rememberPlayer,
   addPlayerToSession,
   removePlayerFromSession,
 } from '../lib/storage'
 import PlayerPicker from '../components/PlayerPicker'
+import * as sync from '../lib/sync'
 import {
   useSession,
   usePlayers,
@@ -19,6 +21,16 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
   const session = useSession(sessionId)
   const knownPlayers = usePlayers()
   const matches = useMatchesForSession(sessionId)
+
+  // Pull this session's roster and matches so an umpire sees what
+  // OTHER umpires recorded, not just their own device. Failures are
+  // swallowed on purpose: offline is normal courtside, and whatever is
+  // cached locally stays usable.
+  useEffect(() => {
+    const controller = new AbortController()
+    sync.pullSession(sessionId, { signal: controller.signal }).catch(() => {})
+    return () => controller.abort()
+  }, [sessionId])
 
   // The picker has already resolved this to a real server player --
   // either an existing one the umpire confirmed, or a newly created

@@ -7,6 +7,7 @@ import {
 } from '../lib/storage'
 import { useMatch, usePlayers } from '../lib/useLocalStore'
 import NotFound from './NotFound'
+import TakeoverNotice from '../components/TakeoverNotice'
 import { deriveMatchState, currentServerPlayerId } from '../lib/pickleball'
 
 // The four rally-ending outcomes an umpire can tap, and the exact
@@ -89,6 +90,8 @@ function LiveMatch({ matchId, onBack }) {
       <button className="back-link" onClick={onBack}>
         &larr; Back
       </button>
+
+      <TakeoverNotice matchId={matchId} />
 
       <div className="scoreboard">
         <div className={`score-side ${derived.servingTeam === 'A' ? 'serving' : ''}`}>
