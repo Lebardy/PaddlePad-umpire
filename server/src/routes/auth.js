@@ -4,6 +4,8 @@ import {
   MIN_PASSWORD_LENGTH,
   hashPassword,
   requireAuth,
+  requirePlayer,
+  signPlayerToken,
   signToken,
   verifyPassword,
 } from '../auth.js'
@@ -172,6 +174,58 @@ router.get('/me', requireAuth, async (req, res) => {
   )
   if (!rows[0]) return res.status(401).json({ error: 'Account no longer exists' })
   res.json({ umpire: rows[0] })
+})
+
+/**
+ * A player claiming the record an umpire has been building for them.
+ *
+ * This lives here rather than in routes/players.js because that router
+ * guards every route with requireAuth -- and a player claiming has no
+ * token yet, which is the entire point. Mounting it there would reject
+ * the request before it ever reached this handler.
+ *
+ * There is no password. The data is a player's own pickleball stats,
+ * and an extra signup step is exactly the friction that stops people
+ * bothering at all -- which would leave the records unclaimed and the
+ * app pointless. The code is the credential.
+ *
+ * The code stays valid after claiming, so a player can sign in again on
+ * a new phone. An umpire can regenerate it, which invalidates the old.
+ */
+router.post('/player/claim', async (req, res) => {
+  // Codes get read aloud and typed on phones, so accept any casing or
+  // spacing. Without this, "pad 7k3m 9qxr" fails against the
+  // exact-match unique index and the code simply looks broken.
+  const code = normalizeInviteCode(req.body?.code)
+
+  if (!code) return res.status(400).json({ error: 'Enter your code to continue' })
+
+  const { rows } = await query(
+    `UPDATE players
+        SET claimed_at = COALESCE(claimed_at, now())
+      WHERE claim_code = $1
+      RETURNING id, name, claimed_at`,
+    [code],
+  )
+
+  if (rows.length === 0) {
+    return res.status(404).json({ error: "That code doesn't match any player" })
+  }
+
+  const player = rows[0]
+  res.json({
+    token: signPlayerToken(player),
+    player: { id: player.id, name: player.name, claimedAt: player.claimed_at },
+  })
+})
+
+/** Confirms a stored player token is still good, on app launch. */
+router.get('/player/me', requirePlayer, async (req, res) => {
+  const { rows } = await query('SELECT id, name FROM players WHERE id = $1', [
+    req.player.id,
+  ])
+  if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
+  res.json({ player: rows[0] })
 })
 
 export default router

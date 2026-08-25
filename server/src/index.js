@@ -4,10 +4,13 @@ import { migrate, pool } from './db.js'
 import { rateLimit } from './ratelimit.js'
 import authRoutes from './routes/auth.js'
 import inviteRoutes from './routes/invites.js'
-import playerRoutes from './routes/players.js'
+// Umpire-facing: search, create and manage the player registry.
+import playerAdminRoutes from './routes/players.js'
 import sessionRoutes from './routes/sessions.js'
 import matchRoutes from './routes/matches.js'
 import exportRoutes from './routes/export.js'
+// Player-facing: a claimed player reading their OWN history.
+import playerSelfRoutes from './routes/player.js'
 
 const app = express()
 
@@ -60,14 +63,20 @@ app.use('/auth/register', rateLimit({ max: 5, windowMs: 60_000 }))
 // Mistyped player names are the realistic spam vector on an otherwise
 // trusted API, and the export is the only genuinely expensive query.
 app.use('/players', rateLimit({ max: 60, windowMs: 60_000 }))
+// A claim code is a bearer credential, so this gets a login-grade limit
+// rather than a read-grade one. 60/min against a code space would be far
+// too generous for something that grants access on its own.
+app.use('/auth/player/claim', rateLimit({ max: 10, windowMs: 60_000 }))
+app.use('/player', rateLimit({ max: 60, windowMs: 60_000 }))
 app.use('/export', rateLimit({ max: 5, windowMs: 60_000 }))
 
 app.use('/auth', authRoutes)
 app.use('/invites', inviteRoutes)
-app.use('/players', playerRoutes)
+app.use('/players', playerAdminRoutes)
 app.use('/sessions', sessionRoutes)
 app.use('/matches', matchRoutes)
 app.use('/export', exportRoutes)
+app.use('/player', playerSelfRoutes)
 
 // Express 5 forwards rejected promises from async handlers here, so
 // route handlers don't each need their own try/catch.

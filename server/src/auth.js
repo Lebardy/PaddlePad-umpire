@@ -48,14 +48,45 @@ export async function verifyPassword(password, stored) {
 }
 
 export function signToken(umpire) {
-  return jwt.sign({ sub: umpire.id, name: umpire.name }, JWT_SECRET, {
-    expiresIn: TOKEN_TTL,
-  })
+  return jwt.sign(
+    { sub: umpire.id, name: umpire.name, role: 'umpire' },
+    JWT_SECRET,
+    { expiresIn: TOKEN_TTL },
+  )
 }
 
 /**
- * Express middleware: requires a valid `Authorization: Bearer <token>`
- * header and attaches `req.umpire = { id, name }`.
+ * A token for a PLAYER who has claimed their own record.
+ *
+ * Carries a different role so it can never be mistaken for an umpire's.
+ * A player may read their own history and nothing else -- they cannot
+ * score, edit rosters, issue invites, or pull the club-wide export.
+ * That separation is enforced by role, not by which screens the app
+ * happens to show.
+ */
+export function signPlayerToken(player) {
+  return jwt.sign(
+    { sub: player.id, name: player.name, role: 'player' },
+    JWT_SECRET,
+    { expiresIn: TOKEN_TTL },
+  )
+}
+
+/** Extracts and verifies a bearer token, or null if absent/invalid. */
+function verify(req) {
+  const header = req.get('authorization') ?? ''
+  const [scheme, token] = header.split(' ')
+  if (scheme !== 'Bearer' || !token) return null
+  try {
+    return jwt.verify(token, JWT_SECRET)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Express middleware: requires a valid umpire token and attaches
+ * `req.umpire = { id, name }`.
  *
  * Note this authenticates the umpire but deliberately does not
  * restrict which umpire may edit which match -- a venue's umpires are
@@ -63,22 +94,40 @@ export function signToken(umpire) {
  * their creator would block the normal handover case where one umpire
  * takes over a court mid-session. Attribution is recorded instead
  * (matches.recorded_by) so any entry can still be traced to a scorer.
+ *
+ * A PLAYER token is refused here. Players may read their own history
+ * and nothing else, and that boundary is enforced by role rather than
+ * by which screens each app happens to show.
  */
 export function requireAuth(req, res, next) {
-  const header = req.get('authorization') ?? ''
-  const [scheme, token] = header.split(' ')
-
-  if (scheme !== 'Bearer' || !token) {
-    return res.status(401).json({ error: 'Missing bearer token' })
+  const payload = verify(req)
+  if (!payload) {
+    return res.status(401).json({ error: 'Missing or invalid token' })
   }
 
-  try {
-    const payload = jwt.verify(token, JWT_SECRET)
-    req.umpire = { id: payload.sub, name: payload.name }
-    next()
-  } catch {
-    res.status(401).json({ error: 'Invalid or expired token' })
+  // Tokens issued before roles existed have no role claim; treat those
+  // as umpires so a signed-in umpire is not logged out by this change.
+  // A player token, which always carries a role, can never slip through
+  // this default.
+  if ((payload.role ?? 'umpire') !== 'umpire') {
+    return res.status(403).json({ error: 'That action is for umpires only' })
   }
+
+  req.umpire = { id: payload.sub, name: payload.name }
+  next()
+}
+
+/** Requires a token belonging to a claimed PLAYER, not an umpire. */
+export function requirePlayer(req, res, next) {
+  const payload = verify(req)
+  if (!payload) {
+    return res.status(401).json({ error: 'Missing or invalid token' })
+  }
+  if (payload.role !== 'player') {
+    return res.status(403).json({ error: 'That action is for players only' })
+  }
+  req.player = { id: payload.sub, name: payload.name }
+  next()
 }
 
 /**
