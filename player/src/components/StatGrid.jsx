@@ -1,41 +1,41 @@
-/** Formats a 0-1 ratio, or an em dash when there's nothing to divide by. */
 function percent(value) {
   return value === null || value === undefined ? '—' : `${Math.round(value * 100)}%`
 }
 
 /**
- * Headline numbers.
+ * A row of headline numbers.
  *
- * Every figure here is either a raw count of taps or a ratio of them.
- * Nothing needs other players to exist to be true, which is what makes
- * it safe to show from the very first match -- unlike a rating.
+ * These are a handful of single values, so they are stat tiles rather
+ * than a grouped bar chart -- reading four numbers should not require
+ * decoding an axis.
+ *
+ * Values wear text tokens, never a series colour: a number is text, and
+ * colouring it would imply a series identity that isn't there.
  */
 function StatGrid({ summary }) {
   const tiles = [
-    { label: 'Matches', value: summary.matches },
-    { label: 'Won', value: `${summary.wins}–${summary.losses}` },
-    { label: 'Win rate', value: percent(summary.winRate) },
-    { label: 'Winners', value: summary.totalWinners },
-    { label: 'Errors', value: summary.totalErrors },
+    { label: 'Win rate', value: percent(summary.winRate), note: `${summary.wins} of ${summary.wins + summary.losses}` },
+    { label: 'Winners', value: summary.totalWinners, note: 'points you finished' },
+    { label: 'Errors', value: summary.totalErrors, note: 'points you gave away' },
     {
-      label: 'Drops landed',
-      value: percent(summary.dropSuccessRate),
-      // Zero attempts and zero successes look identical in a percentage,
-      // so the count is what makes the number readable.
-      note:
-        summary.dropAttempts > 0
-          ? `${summary.dropSuccesses} of ${summary.dropAttempts}`
-          : 'none logged',
+      label: 'Winners per error',
+      // The single most telling ratio in the set: are you creating more
+      // than you're giving away? Guarded so zero errors reads as a dash
+      // rather than Infinity.
+      value: summary.totalErrors > 0
+        ? (summary.totalWinners / summary.totalErrors).toFixed(2)
+        : summary.totalWinners > 0 ? '—' : '0',
+      note: summary.totalErrors === 0 && summary.totalWinners > 0 ? 'no errors yet' : 'above 1.00 is good',
     },
   ]
 
   return (
-    <section className="stat-grid">
+    <section className="stat-grid" aria-label="Headline statistics">
       {tiles.map((tile) => (
         <div className="stat-tile" key={tile.label}>
           <span className="stat-value">{tile.value}</span>
           <span className="stat-label">{tile.label}</span>
-          {tile.note && <span className="stat-note">{tile.note}</span>}
+          <span className="stat-note">{tile.note}</span>
         </div>
       ))}
     </section>

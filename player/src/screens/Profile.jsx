@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { fetchMatches, fetchMe } from '../lib/api'
-import MatchList from '../components/MatchList'
+import Hero from '../components/Hero'
 import StatGrid from '../components/StatGrid'
+import ShotProfile from '../components/ShotProfile'
+import Highlights from '../components/Highlights'
+import MatchList from '../components/MatchList'
 
 /**
  * A player's own page: who they are, how they've done, and every match.
@@ -46,15 +49,11 @@ function Profile({ player, onSignOut }) {
 
   return (
     <div className="profile">
-      <header className="profile-header">
-        <div>
-          <p className="eyebrow">Player</p>
-          <h1>{player.name}</h1>
-        </div>
+      <div className="profile-top">
         <button className="link" onClick={onSignOut}>
           Sign out
         </button>
-      </header>
+      </div>
 
       {loading && <p className="muted">Loading your matches…</p>}
       {error && <p className="error">{error}</p>}
@@ -71,7 +70,10 @@ function Profile({ player, onSignOut }) {
 
       {!loading && !error && summary?.matches > 0 && (
         <>
+          <Hero player={player} summary={summary} matches={matches} />
           <StatGrid summary={summary} />
+          <ShotProfile summary={summary} />
+          <Highlights matches={matches} />
 
           {/* The slot the ML pipeline will fill. Saying so plainly beats
               showing a rating computed from too little data, which would
