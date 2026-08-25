@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react'
 import qrcode from 'qrcode-generator'
 import { fetchPlayerClaimCode } from '../lib/api'
 
-// Where the player app lives. Build-time, like the API URL, so a
-// production build points at the deployed player app rather than a
-// developer's laptop.
+// Where the player app lives. Build-time, like the API URL, so this
+// must be rebuilt if the player app ever moves -- the QR encodes it, and
+// a stale value here produces codes that lead nowhere.
 const PLAYER_APP_URL = (
-  import.meta.env?.VITE_PLAYER_APP_URL ?? 'https://paddlepad-play.up.railway.app'
+  import.meta.env?.VITE_PLAYER_APP_URL ?? 'https://paddlepad.up.railway.app'
 ).replace(/\/$/, '')
 
 /**

@@ -57,7 +57,7 @@ Every statement is idempotent, so there's no separate migration step.
    | Variable | Value |
    |---|---|
    | `JWT_SECRET` | A fresh random 48-byte hex string — **not** the one from your local `.env` |
-   | `CORS_ORIGIN` | The deployed app's URL, e.g. `https://paddlepad.up.railway.app` |
+   | `CORS_ORIGIN` | Comma-separated list of every app origin, e.g. `https://paddlepad-umpire.up.railway.app,https://paddlepad.up.railway.app` |
 
    `PORT` is provided by Railway; the server reads it automatically.
 
