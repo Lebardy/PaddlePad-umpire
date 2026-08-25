@@ -8,6 +8,7 @@ import Invites from './screens/Invites'
 import { clearSession, fetchCurrentUmpire, getStoredUmpire } from './lib/api'
 import SyncIndicator from './components/SyncIndicator'
 import * as sync from './lib/sync'
+import { migrateLegacyData } from './lib/storage'
 import './App.css'
 
 // Central view-router. There is no URL routing in this app (it's a
@@ -64,6 +65,9 @@ function App() {
   // already on the device stays usable.
   useEffect(() => {
     if (!umpire) return
+    // Drop anything written before the server existed; those records
+    // hold device-minted player ids that no longer resolve.
+    migrateLegacyData()
     sync.init()
     sync.pullCore().catch(() => {})
   }, [umpire])

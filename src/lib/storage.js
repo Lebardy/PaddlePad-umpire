@@ -272,150 +272,6 @@ export function endMatchManually(matchId) {
 }
 
 // ============================================================
-// ML pipeline export
-//
-// Produces one row per player per completed match, matching the exact
-// column shape aggregate_player_profiles() in the PaddlePad ML repo
-// expects (see data_generator.generate_unlabeled_match_logs there).
-// ============================================================
-
-// The 12 columns the ML pipeline actually reads today. Kept first and
-// in this exact order so the CSV stays a drop-in superset of what
-// data_generator.generate_unlabeled_match_logs() produces.
-const ML_PIPELINE_COLUMNS = [
-  'player_id',
-  'match_id',
-  'match_number',
-  'drop_attempts',
-  'drop_successes',
-  'drive_attempts',
-  'dink_errors',
-  'clean_winners',
-  'dink_winners',
-  'unforced_errors',
-  'match_duration_mins',
-  'uses_stacking',
-]
-
-// Match context the pipeline does NOT read yet, recorded now because
-// it's already captured during play and costs the umpire nothing.
-//
-// Without these, the pipeline can never do the two things it currently
-// can't: opponent-adjusted skill (so beating weak players doesn't
-// inflate a rating the way raw per-minute rates do) and growth over
-// time (aggregate_player_profiles collapses a player's whole history
-// into one row, so improvement is invisible and even reads as
-// inconsistency in the *_std features).
-//
-// Opponents are separate columns rather than one packed field on
-// purpose: matchLogsToCSV does a bare comma join with no quoting, so
-// any value containing a comma would silently corrupt the file.
-//
-// Adding these is safe. Every stage of the ML pipeline selects its
-// columns by explicit name (player_profiles.py, feature_engineering.py
-// and clustering.py all use literal column lists, never select_dtypes
-// or positional slicing), so unknown columns are dropped at the first
-// step rather than leaking into the feature space. `uses_stacking` is
-// the existing precedent -- it has been carried and ignored all along.
-const CONTEXT_COLUMNS = [
-  'team',
-  'won',
-  'partner_id',
-  'opponent_1_id',
-  'opponent_2_id',
-  'ended_at',
-]
-
-const RAW_MATCH_LOG_COLUMNS = [...ML_PIPELINE_COLUMNS, ...CONTEXT_COLUMNS]
-
-/**
- * Flattens every completed match into one row per player per match,
- * in exactly the shape the PaddlePad ML pipeline's
- * aggregate_player_profiles() consumes (see
- * ~/skul/PaddlePad/PaddlePad/data_generator.py for the reference
- * column set this mirrors). In-progress matches are excluded since
- * their stats and match_duration_mins aren't final yet.
- *
- * match_number is computed here rather than stored, because it means
- * "this player's Nth completed match ever" -- it has to be assigned
- * across the whole export in chronological order, not per match.
- *
- * Rows also carry the CONTEXT_COLUMNS (who won, partner, opponents,
- * timestamp), which the pipeline ignores today but which are required
- * for any future opponent-adjusted rating or growth-over-time work.
- * Because those are derived from data already stored on each match,
- * re-exporting recovers them for matches logged before this existed.
- *
- * @returns {object[]} rows keyed by the RAW_MATCH_LOG_COLUMNS names.
- */
-export function exportRawMatchLogs() {
-  const completed = getMatches().filter((m) => m.status === 'completed')
-
-  const rows = []
-  for (const match of completed) {
-    const derived = deriveMatchState(match)
-    const durationMins = (match.endedAt - match.startedAt) / 60000
-    const players = [
-      ...match.teamA.map((playerId) => ({ playerId, team: 'A' })),
-      ...match.teamB.map((playerId) => ({ playerId, team: 'B' })),
-    ]
-
-    for (const { playerId, team } of players) {
-      const stats = derived.stats[playerId]
-      const ownTeam = team === 'A' ? match.teamA : match.teamB
-      const opponents = team === 'A' ? match.teamB : match.teamA
-      const partnerId = ownTeam.find((id) => id !== playerId) ?? ''
-
-      rows.push({
-        player_id: playerId,
-        match_id: match.id,
-        drop_attempts: stats.drop_attempts,
-        drop_successes: stats.drop_successes,
-        drive_attempts: stats.drive_attempts,
-        dink_errors: stats.dink_errors,
-        clean_winners: stats.clean_winners,
-        dink_winners: stats.dink_winners,
-        unforced_errors: stats.unforced_errors,
-        match_duration_mins: Math.round(durationMins * 100) / 100,
-        uses_stacking: match.stacking[team] ? 1 : 0,
-
-        // Context columns -- see CONTEXT_COLUMNS. `won` is left blank
-        // rather than 0 when a match was ended early at a tied score,
-        // so "did not win" and "no result" stay distinguishable.
-        team,
-        won: match.winner === null ? '' : match.winner === team ? 1 : 0,
-        partner_id: partnerId,
-        opponent_1_id: opponents[0] ?? '',
-        opponent_2_id: opponents[1] ?? '',
-        ended_at: new Date(match.endedAt).toISOString(),
-
-        _endedAt: match.endedAt,
-      })
-    }
-  }
-
-  // match_number: each player's Nth completed match, in play order.
-  const countByPlayer = {}
-  rows.sort((a, b) => a._endedAt - b._endedAt)
-  for (const row of rows) {
-    countByPlayer[row.player_id] = (countByPlayer[row.player_id] ?? 0) + 1
-    row.match_number = countByPlayer[row.player_id]
-    delete row._endedAt
-  }
-
-  return rows
-}
-
-/** Serializes exportRawMatchLogs() rows to a CSV string, header first. */
-export function matchLogsToCSV(rows) {
-  const lines = [RAW_MATCH_LOG_COLUMNS.join(',')]
-  for (const row of rows) {
-    lines.push(RAW_MATCH_LOG_COLUMNS.map((col) => row[col]).join(','))
-  }
-  return lines.join('\n')
-}
-
-// ============================================================
 // Merging server state into the local cache
 // ============================================================
 
@@ -507,4 +363,61 @@ function pendingEntities(kind) {
   return outboxPending()
     .filter((entry) => entry.kind === kind)
     .map((entry) => entry.entityId)
+}
+
+/**
+ * Caches a server player locally so their name resolves offline.
+ *
+ * Unlike the old upsertKnownPlayer this never MINTS an id -- the server
+ * is the only thing allowed to do that, because one name means one
+ * person and two devices inventing ids for the same human is exactly
+ * the fragmentation the shared registry exists to prevent.
+ */
+export function rememberPlayer(player) {
+  const players = getKnownPlayers()
+  if (players.some((p) => p.id === player.id)) return player
+  writeJSON(PLAYERS_KEY, [...players, { id: player.id, name: player.name }])
+  return player
+}
+
+// ============================================================
+// One-time cleanup of pre-server data
+// ============================================================
+
+const SCHEMA_KEY = 'paddlepad.schemaVersion'
+const SCHEMA_VERSION = 2
+
+/**
+ * Clears data written before the server existed.
+ *
+ * Those records carry player ids this device invented for itself, which
+ * no longer resolve against the shared registry -- so a session would
+ * render with players that cannot be found and matches that can never
+ * sync. Discarding is what the project owner chose: it was all test
+ * data, and keeping it would have meant an id-rewriting importer that
+ * is far more risk than the data is worth.
+ *
+ * Runs once, guarded by a version stamp, so it cannot eat real data on
+ * a later launch.
+ */
+export function migrateLegacyData() {
+  const stored = read(SCHEMA_KEY, null)
+  if (stored === SCHEMA_VERSION) return { cleared: false }
+
+  const had = {
+    sessions: getSessions().length,
+    matches: getMatches().length,
+    players: getKnownPlayers().length,
+  }
+
+  if (stored === null && (had.sessions || had.matches || had.players)) {
+    writeJSON(SESSIONS_KEY, [])
+    writeJSON(MATCHES_KEY, [])
+    writeJSON(PLAYERS_KEY, [])
+    write(SCHEMA_KEY, SCHEMA_VERSION)
+    return { cleared: true, had }
+  }
+
+  write(SCHEMA_KEY, SCHEMA_VERSION)
+  return { cleared: false }
 }

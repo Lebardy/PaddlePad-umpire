@@ -1,9 +1,9 @@
-import { useState } from 'react'
 import {
-  upsertKnownPlayer,
+  rememberPlayer,
   addPlayerToSession,
   removePlayerFromSession,
 } from '../lib/storage'
+import PlayerPicker from '../components/PlayerPicker'
 import {
   useSession,
   usePlayers,
@@ -19,18 +19,14 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
   const session = useSession(sessionId)
   const knownPlayers = usePlayers()
   const matches = useMatchesForSession(sessionId)
-  const [newName, setNewName] = useState('')
 
-  function handleAddNew(e) {
-    e.preventDefault()
-    if (!newName.trim()) return
-    const player = upsertKnownPlayer(newName)
+  // The picker has already resolved this to a real server player --
+  // either an existing one the umpire confirmed, or a newly created
+  // one. All that's left is putting them on this session's roster,
+  // which is a local write and so works offline.
+  function handlePick(player) {
+    rememberPlayer(player)
     addPlayerToSession(sessionId, player.id)
-    setNewName('')
-  }
-
-  function handleAddKnown(playerId) {
-    addPlayerToSession(sessionId, playerId)
   }
 
   function handleRemove(playerId) {
@@ -46,9 +42,6 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
     .map((id) => knownPlayers.find((p) => p.id === id))
     .filter(Boolean)
 
-  const availableKnown = knownPlayers.filter(
-    (p) => !session.playerIds.includes(p.id),
-  )
 
   return (
     <div className="session-detail">
@@ -102,35 +95,7 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
 
       <section className="add-player">
         <h3>Add a player</h3>
-        <p className="placeholder-note">
-          Placeholder for now &mdash; real invite-code / QR joining comes
-          later once the backend exists.
-        </p>
-
-        <form onSubmit={handleAddNew}>
-          <input
-            type="text"
-            placeholder="Player name"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-          />
-          <button type="submit">Add</button>
-        </form>
-
-        {availableKnown.length > 0 && (
-          <div className="known-players">
-            <p>Or add someone you've tracked before:</p>
-            <ul>
-              {availableKnown.map((p) => (
-                <li key={p.id}>
-                  <button onClick={() => handleAddKnown(p.id)}>
-                    {p.name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <PlayerPicker excludeIds={session.playerIds} onPick={handlePick} />
       </section>
     </div>
   )

@@ -1,9 +1,6 @@
 import { useState } from 'react'
-import {
-  createSession,
-  exportRawMatchLogs,
-  matchLogsToCSV,
-} from '../lib/storage'
+import { createSession } from '../lib/storage'
+import { fetchExportCsv } from '../lib/api'
 import { useSessions } from '../lib/useLocalStore'
 
 // Landing screen: create/open sessions, and export the whole app's
@@ -16,6 +13,8 @@ function Home({ onOpenSession, onOpenInvites }) {
   // away unmounted the screen.
   const sessions = useSessions()
   const [name, setName] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState(null)
 
   function handleCreate(e) {
     e.preventDefault()
@@ -25,19 +24,38 @@ function Home({ onOpenSession, onOpenInvites }) {
     onOpenSession(session.id)
   }
 
-  // Downloads every completed match across every session as one CSV,
-  // in the exact row shape the PaddlePad ML pipeline's
-  // aggregate_player_profiles() expects as input.
-  function handleExport() {
-    const rows = exportRawMatchLogs()
-    const csv = matchLogsToCSV(rows)
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'paddlepad_match_logs.csv'
-    link.click()
-    URL.revokeObjectURL(url)
+  // Downloads the ML pipeline CSV.
+  //
+  // This now comes from the server rather than being built here, which
+  // is the whole point of moving data off the device: a locally-built
+  // export could only ever contain matches THIS phone recorded, so the
+  // pipeline would silently receive one umpire's slice of the club's
+  // data no matter how many matches everyone else logged.
+  //
+  // The download is triggered after an await. That is fine for a
+  // programmatic anchor -- unlike popups, blob downloads are not gated
+  // on an unbroken user gesture -- but it is the reason for the
+  // "Preparing..." state rather than an instant response.
+  async function handleExport() {
+    setExporting(true)
+    setExportError(null)
+    try {
+      const csv = await fetchExportCsv()
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `paddlepad_match_logs_${new Date().toISOString().slice(0, 10)}.csv`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setExportError(
+        err.status === 0
+          ? 'The export needs a connection — it gathers every umpire\u2019s matches from the server.'
+          : err.message,
+      )
+    } finally {
+      setExporting(false)
+    }
   }
 
   return (
@@ -68,8 +86,9 @@ function Home({ onOpenSession, onOpenInvites }) {
         ))}
       </ul>
 
-      <button className="export-btn" onClick={handleExport}>
-        Export match data (CSV)
+      {exportError && <p className="form-error">{exportError}</p>}
+      <button className="export-btn" onClick={handleExport} disabled={exporting}>
+        {exporting ? 'Preparing…' : 'Export match data (CSV)'}
       </button>
       {onOpenInvites && (
         <button className="export-btn" onClick={onOpenInvites}>
