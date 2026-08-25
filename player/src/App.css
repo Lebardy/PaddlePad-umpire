@@ -305,3 +305,41 @@
   line-height: 1.5;
   text-align: center;
 }
+
+/* ============ Match sparkline ============ */
+
+/* The shape of a match: one line for the lead, read against a visible
+   zero baseline. Thin marks and no axis -- at this size an axis would
+   be more chrome than the data. */
+.spark {
+  display: block;
+  width: 100%;
+  height: 34px;
+  margin: 0.55rem 0 0.1rem;
+  overflow: visible;
+}
+
+.spark-base {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.spark-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.spark-line.won { stroke: var(--status-good); }
+.spark-line.lost { stroke: var(--status-critical); }
+
+/* A wash rather than a fill, so the line stays the thing you read. */
+.spark-area { stroke: none; }
+.spark-area.won { fill: var(--status-good-soft); }
+.spark-area.lost { fill: var(--status-critical-soft); }
+
+.match-story {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}

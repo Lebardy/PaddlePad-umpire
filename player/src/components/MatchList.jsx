@@ -1,3 +1,6 @@
+import Sparkline from './Sparkline'
+import { matchStory } from '../lib/story'
+
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
@@ -18,6 +21,7 @@ function MatchList({ matches }) {
           const errors = match.stats.unforced_errors + match.stats.dink_errors
           const result =
             match.won === null ? 'none' : match.won ? 'won' : 'lost'
+          const story = matchStory(match.progression, match.won)
 
           return (
             <li key={match.id} className={`match ${result}`}>
@@ -38,6 +42,12 @@ function MatchList({ matches }) {
                   {formatDate(match.endedAt)} · {match.sessionName}
                   {match.endedEarly && ' · stopped early'}
                 </p>
+
+                {/* The shape of the game, and the one thing worth
+                    saying about it. Both come from the same score
+                    margins, so neither costs an extra request. */}
+                <Sparkline margins={match.progression} won={match.won} />
+                {story && <p className="match-story">{story}</p>}
 
                 <div className="match-chips">
                   <span className="chip">{winners}W</span>

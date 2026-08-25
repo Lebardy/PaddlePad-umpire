@@ -92,6 +92,21 @@ export async function getPlayerMatches(query, playerId) {
     const ownTeam = team === 'A' ? row.team_a : row.team_b
     const opponents = team === 'A' ? row.team_b : row.team_a
 
+    // How the lead moved through the match, from this player's side.
+    //
+    // Sent instead of the raw event log, which is both far larger and
+    // far less interesting: forty lines of "clean winner, clean winner,
+    // unforced error" is tedious to read, while this is the shape of
+    // the game -- the runs, the comeback, where it turned. One small
+    // integer per POINT (not per rally: under side-out rules most
+    // rallies change only the serve), so a whole match costs a few
+    // dozen bytes.
+    const progression = scoreProgression(
+      row,
+      eventsByMatch.get(row.id) ?? [],
+      team,
+    )
+
     return {
       id: row.id,
       matchNumber: Number(row.match_number),
@@ -110,10 +125,50 @@ export async function getPlayerMatches(query, playerId) {
       opponents: opponents.map((id) => nameOf.get(id) ?? 'Unknown'),
       usedStacking: team === 'A' ? row.stacking_a : row.stacking_b,
       stats: derived.stats[playerId],
+      progression,
     }
   })
 
   return result.reverse() // newest first for display
+}
+
+/**
+ * Replays a match one rally at a time and records the score margin from
+ * one team's point of view after every point that actually landed.
+ *
+ * Rallies that only changed the serve are skipped, because a flat
+ * stretch in the middle of a chart says nothing a reader can use --
+ * what they want to see is the scoring.
+ */
+function scoreProgression(row, events, team) {
+  const base = {
+    teamA: row.team_a,
+    teamB: row.team_b,
+    firstServer: {
+      team: row.first_server_team,
+      playerId: row.first_server_player,
+    },
+  }
+
+  const margins = []
+  let previous = 0
+  const replay = []
+
+  for (const event of events) {
+    replay.push(event)
+    if (event.type !== 'rally') continue
+
+    const state = deriveMatchState({ ...base, events: replay })
+    const total = state.score.A + state.score.B
+    if (total === previous) continue // a side-out, not a point
+    previous = total
+
+    margins.push(
+      team === 'A' ? state.score.A - state.score.B : state.score.B - state.score.A,
+    )
+  }
+
+  return margins
 }
 
 /**
