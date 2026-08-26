@@ -1,6 +1,6 @@
 import { DEFAULT_POINT_TARGET, deriveMatchState } from './pickleball'
 import { read, write } from './localstore'
-import { markDirty, pending as outboxPending } from './outbox'
+import { clearOutbox, markDirty, pending as outboxPending } from './outbox'
 
 // ============================================================
 // PaddlePad Umpire local persistence layer
@@ -490,6 +490,35 @@ export function migrateLegacyData() {
 
   write(SCHEMA_KEY, SCHEMA_VERSION)
   return { cleared: false }
+}
+
+/**
+ * Wipes every trace of this device's scoring data: sessions, players,
+ * matches, the outbox and any tombstones.
+ *
+ * Signing out has to do this. The token is not the only thing an umpire
+ * leaves behind -- the whole local mirror stays in the browser, and it
+ * is not inert. A pull deliberately KEEPS local records the server did
+ * not return (see replaceServerState), because that is how a match
+ * scored offline survives until it syncs. The same rule means data
+ * deleted on the server reappears on this device and, if anything is
+ * still queued, gets pushed straight back up.
+ *
+ * So leaving it behind is not merely untidy: it can undo a deletion,
+ * and it hands the next person to use the device a full copy of the
+ * club's match history.
+ *
+ * The caller is responsible for warning about unsynced work first --
+ * see handleSignOut in App.jsx. This function itself is unconditional
+ * by design, since it is also the recovery path when local state has
+ * diverged from the server badly enough to be worth abandoning.
+ */
+export function clearLocalData() {
+  write(SESSIONS_KEY, [])
+  write(PLAYERS_KEY, [])
+  write(MATCHES_KEY, [])
+  write(TOMBSTONES_KEY, { matches: [], sessions: [] })
+  clearOutbox()
 }
 
 // ============================================================

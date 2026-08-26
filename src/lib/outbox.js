@@ -97,6 +97,19 @@ export function getState() {
   return load()
 }
 
+/**
+ * Empties the queue completely, dead letters included.
+ *
+ * Only for signing out and for abandoning local state wholesale (see
+ * clearLocalData in storage.js). Anything queued here is work this
+ * device owes the server, so discarding it silently loses match data --
+ * which is why the caller warns first rather than this function
+ * refusing, since the recovery path needs it to be unconditional.
+ */
+export function clearOutbox() {
+  save({ order: [], entries: {}, deadLetter: [] })
+}
+
 /** Entries in push order. */
 export function pending() {
   const state = load()

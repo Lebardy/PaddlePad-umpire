@@ -9,7 +9,8 @@ import { clearSession, fetchCurrentUmpire, getStoredUmpire } from './lib/api'
 import SyncIndicator from './components/SyncIndicator'
 import UpdateNotice from './components/UpdateNotice'
 import * as sync from './lib/sync'
-import { migrateLegacyData } from './lib/storage'
+import { clearLocalData, migrateLegacyData } from './lib/storage'
+import { pendingCount } from './lib/outbox'
 import './App.css'
 
 // Central view-router. There is no URL routing in this app (it's a
@@ -73,8 +74,31 @@ function App() {
     sync.pullCore().catch(() => {})
   }, [umpire])
 
+  // Signing out clears the local mirror as well as the token.
+  //
+  // Leaving it behind is not just untidy. A pull deliberately keeps
+  // local records the server did not return, so anything deleted on the
+  // server would come back on this device -- and anything still queued
+  // would be pushed up again, undoing the deletion. It would also hand
+  // the next person to use this device the club's whole match history.
+  //
+  // Unsynced work is the one thing worth stopping for, because it
+  // exists nowhere else yet.
   function handleSignOut() {
+    const unsynced = pendingCount()
+    if (
+      unsynced > 0 &&
+      !confirm(
+        `${unsynced} change${unsynced === 1 ? '' : 's'} on this device ` +
+          "haven't reached the server yet, and signing out discards them. " +
+          'Connect to the internet and wait for the sync to finish if you ' +
+          'want to keep them.\n\nSign out anyway?',
+      )
+    ) {
+      return
+    }
     clearSession()
+    clearLocalData()
     setUmpire(null)
     setView({ name: 'home' })
   }
