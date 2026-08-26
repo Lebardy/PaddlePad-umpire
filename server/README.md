@@ -119,6 +119,56 @@ you expect is actually in the served bundle.
 `GET /health` returns `{"ok":true}` only when the database is actually
 reachable, so it's suitable as Railway's health check path.
 
+### The staging environment
+
+The Railway project has two environments. `production` is what the club
+uses; `staging` is an identical copy to deploy to first.
+
+| | production | staging |
+|---|---|---|
+| api | `paddlepad-api.up.railway.app` | `api-staging-8ac6.up.railway.app` |
+| web (umpire) | `paddlepad-umpire.up.railway.app` | `web-staging-e8e9.up.railway.app` |
+| play (player) | `paddlepad.up.railway.app` | `play-staging-7f59.up.railway.app` |
+
+```bash
+railway up --service api  --environment staging
+railway up --service web  --environment staging
+railway up --service play --environment staging
+```
+
+Then run the smoke test against it, which is safe here in a way it is
+not against production — staging's data is disposable:
+
+```bash
+SMOKE_INVITE=<staging bootstrap code> \
+  node scripts/smoke.mjs https://api-staging-8ac6.up.railway.app
+```
+
+The staging services are set to sleep when idle, so the first request
+after a quiet spell takes a few seconds to wake.
+
+**The separation is the whole point, and it is not automatic.**
+Duplicating an environment copies the variables verbatim, which means a
+fresh staging environment starts out pointing at production: its
+`CORS_ORIGIN` and `VITE_API_URL` name the production domains, and its
+`JWT_SECRET` is production's — so a token minted on staging would be
+accepted by production. All four were overridden by hand when staging
+was created.
+
+If you ever recreate it, verify these before trusting it:
+
+- staging `JWT_SECRET` differs from production's, and a token signed
+  with it is **rejected** by the production API;
+- staging `DATABASE_URL` resolves to staging's own Postgres (the
+  internal hostname is identical in both environments — compare the
+  credentials, not the host);
+- `CORS_ORIGIN` and both `VITE_*` variables name staging domains;
+- the built bundle contains no production URL:
+  ```bash
+  curl -s https://web-staging-e8e9.up.railway.app/assets/index-*.js \
+    | grep -oE 'https://[a-z0-9.-]*railway\.app' | sort -u
+  ```
+
 ## Endpoints
 
 | Method | Path | Auth | Purpose |
