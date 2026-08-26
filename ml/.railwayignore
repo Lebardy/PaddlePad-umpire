@@ -1,0 +1,8 @@
+# `railway up` uploads this directory. The virtualenv is hundreds of
+# megabytes of platform-specific binaries that the build reinstalls from
+# requirements.txt anyway, so shipping it is pure upload time -- and a
+# Linux container unpacking a local venv is the kind of thing that fails
+# confusingly rather than loudly.
+.venv
+__pycache__
+*.pyc
