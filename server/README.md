@@ -43,6 +43,57 @@ pnpm dev
 The schema in `schema.sql` is applied automatically on every boot.
 Every statement is idempotent, so there's no separate migration step.
 
+## Testing
+
+```bash
+cd server
+pnpm test:e2e
+```
+
+That is the whole loop. It starts a throwaway Postgres in Docker,
+resets it, boots the API against it on its own port, runs the smoke
+test, and shuts the API down again. Nothing it touches is real: the
+database is local-only, empty, and `pnpm test:db:down` takes it with
+it.
+
+It needs the Docker daemon running (`sudo systemctl start docker`).
+The container is deliberately left up between runs, so the second run
+is a couple of seconds rather than ten.
+
+`scripts/smoke.mjs` holds the assertions, and it is worth reading
+rather than just running — each one is a claim the sync design makes
+about itself:
+
+1. pushing the same log twice changes nothing (retry safety)
+2. pushing a shorter log removes the extra events (undo)
+3. status and winner are derived, never believed (trust)
+4. ending early survives a re-sync (`ended_early`)
+5. one code, one match, cannot be double-claimed (concurrency)
+6. a game to 15 is not declared won at 11 (`point_target`)
+
+You can also point it at a deployed API directly:
+
+```bash
+SMOKE_INVITE=<code> node scripts/smoke.mjs https://paddlepad-api.up.railway.app
+```
+
+Do that sparingly. It writes real rows into whatever it talks to, and
+recovering from that means trusting `scripts/cleanup-test-data.mjs` to
+find every one of them again.
+
+### What this does not catch
+
+Everything about the deploy itself. Root directory, service variables,
+`CORS_ORIGIN`, and differences between the local and Railway builds are
+all invisible from here — and that has been this project's most
+expensive class of bug, not logic errors. Twice the API service
+deployed the React app because its root directory was wrong, and the
+tests were green throughout.
+
+So a green run is a necessary check before deploying, not a sufficient
+one. Verify the deploy separately: hit `/health`, and confirm the code
+you expect is actually in the served bundle.
+
 ## Deploying to Railway
 
 1. **Add a Postgres service** to your Railway project. Railway sets

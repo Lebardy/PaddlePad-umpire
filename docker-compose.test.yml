@@ -1,0 +1,40 @@
+# ============================================================
+# Throwaway Postgres for local testing.
+#
+#   docker compose -f docker-compose.test.yml up -d --wait
+#   docker compose -f docker-compose.test.yml down -v
+#
+# This is NOT a second copy of production and must never become one.
+# Its whole job is to be disposable: `down -v` takes the data with it,
+# and server/schema.sql is applied on boot, so a fresh container is
+# always at the current schema with no migration drift to babysit.
+#
+# Deliberately on port 5433, not 5432. A system Postgres on the default
+# port would otherwise be shadowed by -- or would shadow -- this one,
+# and a test run that silently pointed at real data is exactly the
+# accident this file exists to prevent.
+#
+# The credentials below are hard-coded on purpose. They guard nothing:
+# the database is empty, local-only, and thrown away. Anything that
+# needs a real secret belongs in server/.env, which is gitignored.
+# ============================================================
+
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: paddlepad-test-db
+    environment:
+      POSTGRES_USER: paddlepad
+      POSTGRES_PASSWORD: paddlepad
+      POSTGRES_DB: paddlepad_test
+    ports:
+      - '5433:5432'
+    # No named volume: the container's own filesystem is enough for
+    # data meant to be discarded, and it keeps `down -v` honest.
+    healthcheck:
+      # `up --wait` blocks on this, so the test script never races the
+      # database into a connection refused on a cold start.
+      test: ['CMD-SHELL', 'pg_isready -U paddlepad -d paddlepad_test']
+      interval: 1s
+      timeout: 3s
+      retries: 30
