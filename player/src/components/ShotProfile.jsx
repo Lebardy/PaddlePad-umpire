@@ -15,67 +15,14 @@
  * tooltip would hide values from most of its readers. Every number is
  * directly labelled instead, which is what a tooltip would have shown
  * and is reachable by touch, keyboard and screen reader alike.
+ *
+ * StackedBar and Meter live in their own files now: match detail draws
+ * the same two forms for a single match, and one definition means the
+ * career view and the single-match view can never drift apart.
  */
 
-function pct(part, whole) {
-  return whole > 0 ? (part / whole) * 100 : 0
-}
-
-function StackedBar({ segments, total }) {
-  return (
-    <>
-      <div
-        className="stack"
-        role="img"
-        aria-label={segments
-          .map((s) => `${s.label}: ${s.value} of ${total}`)
-          .join(', ')}
-      >
-        {segments.map((segment) =>
-          segment.value > 0 ? (
-            <span
-              key={segment.label}
-              className={`stack-seg ${segment.className}`}
-              style={{ width: `${pct(segment.value, total)}%` }}
-            />
-          ) : null,
-        )}
-      </div>
-
-      {/* Legend AND direct values: with two series, identity must never
-          rest on colour alone. */}
-      <ul className="stack-legend">
-        {segments.map((segment) => (
-          <li key={segment.label}>
-            <span className={`swatch ${segment.className}`} aria-hidden="true" />
-            <span className="legend-label">{segment.label}</span>
-            <span className="legend-value">{segment.value}</span>
-          </li>
-        ))}
-      </ul>
-    </>
-  )
-}
-
-function Meter({ label, value, caption }) {
-  const filled = value === null ? 0 : Math.round(value * 100)
-  return (
-    <div className="meter-block">
-      <div className="meter-head">
-        <span className="meter-label">{label}</span>
-        <span className="meter-value">{value === null ? '—' : `${filled}%`}</span>
-      </div>
-      <div
-        className="meter-track"
-        role="img"
-        aria-label={`${label}: ${value === null ? 'no data' : `${filled} percent`}`}
-      >
-        <span className="meter-fill" style={{ width: `${filled}%` }} />
-      </div>
-      <p className="meter-caption">{caption}</p>
-    </div>
-  )
-}
+import Meter from './Meter'
+import StackedBar from './StackedBar'
 
 function ShotProfile({ summary }) {
   const winnerTotal = summary.cleanWinners + summary.dinkWinners

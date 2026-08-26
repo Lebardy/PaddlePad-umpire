@@ -9,8 +9,14 @@
  *
  * Above the line is coloured as good and below as critical, with the
  * baseline itself visible -- the crossings ARE the story.
+ *
+ * `size` switches between the thumbnail in a list row and the full-width
+ * version on a match's own screen. It has to be a CLASS rather than a
+ * bigger `height`, because height only sets the viewBox here -- the
+ * rendered height comes from CSS, so passing a larger number would
+ * change the aspect distortion and nothing else.
  */
-function Sparkline({ margins, won, height = 34 }) {
+function Sparkline({ margins, won, height = 34, size = 'sm' }) {
   if (!margins || margins.length < 2) return null
 
   const peak = Math.max(1, ...margins.map((m) => Math.abs(m)))
@@ -27,7 +33,7 @@ function Sparkline({ margins, won, height = 34 }) {
 
   return (
     <svg
-      className="spark"
+      className={`spark spark-${size}`}
       viewBox={`0 0 ${width} ${height}`}
       preserveAspectRatio="none"
       role="img"

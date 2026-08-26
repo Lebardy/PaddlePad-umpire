@@ -36,6 +36,41 @@ function scaled(threshold, pointTarget) {
 }
 
 /**
+ * The point at which this player's team took a lead they never gave up.
+ *
+ * Read backwards for the last moment the margin was not positive, which
+ * is a more useful thing to name than the first lead: a team that led
+ * early and was pegged back did not "take the lead" there in any sense
+ * the player would recognise.
+ *
+ * Returns null for a match that was never behind or level, since "took
+ * the lead at 1-0" is not worth saying.
+ */
+export function turningPoint(margins) {
+  if (!margins || margins.length < 4) return null
+  const final = margins[margins.length - 1]
+  if (final <= 0) return null
+
+  let index = -1
+  for (let i = margins.length - 1; i >= 0; i -= 1) {
+    if (margins[i] <= 0) {
+      index = i
+      break
+    }
+  }
+  // Never behind or level at all, or it only turned on the last point.
+  if (index === -1 || index >= margins.length - 1) return null
+
+  // The margin alone doesn't carry the scoreline, but the point number
+  // and the margin together do: after n scored points with a margin of
+  // m, the split is (n + m) / 2 to (n - m) / 2.
+  const at = index + 2
+  const margin = margins[index + 1]
+  const yours = Math.round((at + margin) / 2)
+  return { at, yours, theirs: at - yours }
+}
+
+/**
  * The most interesting single thing about the match, or null when
  * nothing stands out -- better to say nothing than to dress up an
  * ordinary game.

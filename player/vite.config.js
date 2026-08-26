@@ -1,6 +1,11 @@
+import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+
+// Read once at config time so the About screen can show a real version
+// rather than a number someone has to remember to bump by hand.
+const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url)))
 
 // The player app is a SEPARATE deployable from the umpire app, with its
 // own Railway service rooted at this directory. It deliberately shares
@@ -9,6 +14,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 // would work locally and then fail in production -- the same trap that
 // forced the scoring engine to live inside server/.
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(version) },
   plugins: [
     react(),
     VitePWA({
@@ -22,7 +28,7 @@ export default defineConfig({
         name: 'PaddlePad',
         short_name: 'PaddlePad',
         description: 'Your pickleball matches and stats',
-        theme_color: '#0ea5e9',
+        theme_color: '#2a78d6',
         background_color: '#f5f3fb',
         display: 'standalone',
         start_url: '/',

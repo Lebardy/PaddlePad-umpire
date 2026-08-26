@@ -1,8 +1,129 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import Claim from './screens/Claim'
-import Profile from './screens/Profile'
+import Overview from './screens/Overview'
+import Matches from './screens/Matches'
+import MatchDetail from './screens/MatchDetail'
+import People from './screens/People'
+import PersonDetail from './screens/PersonDetail'
+import You from './screens/You'
+import EmptyState from './components/EmptyState'
+import ErrorState from './components/ErrorState'
+import TabBar from './components/TabBar'
+import { OverviewSkeleton } from './components/Skeleton'
+import { PlayerDataProvider, usePlayerData } from './lib/PlayerData'
+import { matchPath, navigate, restoreScroll, useRoute } from './lib/router'
 import { clearSession, getStoredPlayer, verifySession } from './lib/api'
+import { useState } from 'react'
 import './App.css'
+
+const TITLES = {
+  '/': 'PaddlePad',
+  '/matches': 'Matches · PaddlePad',
+  '/people': 'People · PaddlePad',
+  '/you': 'You · PaddlePad',
+}
+
+/**
+ * The signed-in app: route table, tab bar, and the states that wrap
+ * every screen.
+ *
+ * Loading and error live here rather than in each screen so there is one
+ * definition of what "not ready" looks like. A skeleton on one tab and a
+ * sentence on another is exactly the inconsistency that reads as
+ * unfinished.
+ */
+function SignedIn({ player, onSignOut }) {
+  const path = useRoute()
+  const { summary, loading, error, refresh, matches } = usePlayerData()
+
+  useEffect(() => {
+    document.title = TITLES[path] ?? 'PaddlePad'
+  }, [path])
+
+  // Browsers restore scroll for real navigations but not for pushState,
+  // so returning from a match to a long list would otherwise land at the
+  // top every time.
+  useEffect(() => {
+    restoreScroll()
+  }, [path])
+
+  if (loading && !summary) {
+    return (
+      <div className="app-body">
+        <OverviewSkeleton />
+      </div>
+    )
+  }
+
+  if (error && matches.length === 0) {
+    return (
+      <div className="app-body">
+        <ErrorState message={error} onRetry={refresh} />
+      </div>
+    )
+  }
+
+  // A player with no finished matches has nothing to navigate between,
+  // so they get the one honest screen rather than four empty tabs.
+  if (summary && summary.matches === 0) {
+    return (
+      <div className="app-body">
+        <EmptyStateScreen player={player} onSignOut={onSignOut} />
+      </div>
+    )
+  }
+
+  const matchRoute = matchPath('/matches/:id', path)
+  const personRoute = matchPath('/people/:name', path)
+
+  let screen
+  if (path === '/') screen = <Overview player={player} />
+  else if (path === '/matches') screen = <Matches />
+  else if (matchRoute) screen = <MatchDetail id={matchRoute.id} />
+  else if (path === '/people') screen = <People />
+  else if (personRoute) screen = <PersonDetail name={personRoute.name} />
+  else if (path === '/you') screen = <You player={player} onSignOut={onSignOut} />
+  else screen = <NotFound />
+
+  return (
+    <>
+      <div className="app-body">
+        {/* A refresh that failed while data is already on screen is a
+            note, not a takeover -- the numbers shown are still real,
+            just slightly old. */}
+        {error && <p className="stale-note">Couldn&rsquo;t refresh just now.</p>}
+        {screen}
+      </div>
+      <TabBar path={path} />
+    </>
+  )
+}
+
+function EmptyStateScreen({ player, onSignOut }) {
+  const { inProgress } = usePlayerData()
+  return (
+    <>
+      <div className="profile-top">
+        <button className="link" onClick={onSignOut}>
+          Sign out
+        </button>
+      </div>
+      <EmptyState name={player.name} inProgress={inProgress} />
+    </>
+  )
+}
+
+function NotFound() {
+  return (
+    <div className="not-found">
+      <h1>Not here</h1>
+      <p className="muted">That page doesn&rsquo;t exist.</p>
+      <button type="button" className="retry" onClick={() => navigate('/')}>
+        Go to your overview
+      </button>
+    </div>
+  )
+}
 
 function App() {
   // Seeded from storage so a returning player isn't flashed the claim
@@ -30,25 +151,36 @@ function App() {
   }, [])
 
   function handleSignOut() {
+    // Asked first because this is genuinely hard to undo: the claim code
+    // is the only credential, and a player who has lost it has to find
+    // an umpire to get another.
+    if (!confirm('Sign out? You’ll need your code again to get back in.')) return
     clearSession()
     setPlayer(null)
+    navigate('/', { replace: true })
   }
 
   if (!player && !checked) {
     return (
       <main className="app">
-        <p className="muted">Loading…</p>
+        <OverviewSkeleton />
+      </main>
+    )
+  }
+
+  if (!player) {
+    return (
+      <main className="app">
+        <Claim onClaimed={setPlayer} />
       </main>
     )
   }
 
   return (
-    <main className="app">
-      {player ? (
-        <Profile player={player} onSignOut={handleSignOut} />
-      ) : (
-        <Claim onClaimed={setPlayer} />
-      )}
+    <main className="app app-tabbed">
+      <PlayerDataProvider>
+        <SignedIn player={player} onSignOut={handleSignOut} />
+      </PlayerDataProvider>
     </main>
   )
 }

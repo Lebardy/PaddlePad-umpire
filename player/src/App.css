@@ -7,6 +7,12 @@
   padding-bottom: max(3rem, env(safe-area-inset-bottom));
 }
 
+/* With a fixed tab bar the last row would otherwise sit under it and be
+   permanently unreachable. */
+.app-tabbed {
+  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
+}
+
 .muted { color: var(--text-muted); text-align: center; padding: 3rem 0; }
 .muted-inline { color: var(--text-muted); font-size: 0.88rem; }
 
@@ -171,29 +177,38 @@
 
 /* ============ Rating slot ============ */
 
-.rating-slot {
-  background: var(--primary-soft);
-  border: 1px dashed var(--primary);
-  border-radius: var(--radius);
-  padding: 1rem 1.1rem;
-  margin-bottom: 1.5rem;
-}
-.rating-slot h2 { font-size: 0.9rem; margin-bottom: 0.4rem; color: var(--primary); }
-.rating-slot p { font-size: 0.84rem; color: var(--text-secondary); line-height: 1.5; }
-
 /* ============ Matches ============ */
 
 .match-list h2 { font-size: 0.95rem; margin-bottom: 0.8rem; }
 .match-list ol { display: flex; flex-direction: column; gap: 0.6rem; }
 
 .match {
-  display: flex;
-  gap: 0.9rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-left: 4px solid var(--border);
   border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* The row is a link now, so the padding lives here -- the tap target
+   has to be the whole card, not the text inside it. */
+.match-link {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
   padding: 0.85rem 0.95rem;
+  color: inherit;
+  text-decoration: none;
+}
+.match-link:active { background: var(--surface-sunken); }
+@media (hover: hover) {
+  .match-link:hover { background: var(--surface-sunken); }
+}
+.match-chevron {
+  color: var(--text-muted);
+  font-size: 1.4rem;
+  line-height: 1;
+  flex-shrink: 0;
 }
 .match.won { border-left-color: var(--status-good); }
 .match.lost { border-left-color: var(--status-critical); }
@@ -319,6 +334,11 @@
   overflow: visible;
 }
 
+/* A class, not a taller viewBox: height here only sets the viewBox, and
+   the SVG scales with preserveAspectRatio="none", so the rendered size
+   has to come from CSS. */
+.spark-lg { height: 130px; margin: 0.9rem 0 0.4rem; }
+
 .spark-base {
   stroke: var(--border);
   stroke-width: 1;
@@ -342,4 +362,408 @@
   font-size: 0.76rem;
   font-weight: 600;
   color: var(--text-secondary);
+}
+
+/* ============ Navigation ============ */
+
+/* Fixed to the bottom because this is a one-handed phone app and the
+   top of a modern phone is the hardest place to reach. */
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.5rem 0.25rem 0.55rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.68rem;
+  font-weight: 500;
+  /* Comfortably over the 44px minimum even on a short phone. */
+  min-height: 3rem;
+}
+.tab-active { color: var(--primary); }
+.tab:active { background: var(--surface-sunken); }
+
+.app-body { min-height: 60vh; }
+
+.back-link {
+  background: none;
+  border: 0;
+  color: var(--primary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.35rem 0;
+  margin-bottom: 0.6rem;
+  cursor: pointer;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+}
+.section-head h1 { font-size: 1.35rem; }
+.section-head h2 { font-size: 0.95rem; }
+
+.link {
+  background: none;
+  border: 0;
+  color: var(--primary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.not-found { text-align: center; padding: 4rem 0; }
+.not-found h1 { font-size: 1.4rem; margin-bottom: 0.4rem; }
+.not-found .retry { margin-top: 1rem; }
+
+/* ============ Filters ============ */
+
+.filter-row { display: flex; gap: 0.4rem; margin-bottom: 1rem; }
+.filter {
+  flex: 1;
+  padding: 0.5rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.filter-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* ============ Form trend ============ */
+
+.trend {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.5rem;
+}
+.trend-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+.trend-head h2 { font-size: 0.95rem; }
+.trend-now {
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.trend-svg { display: block; width: 100%; height: 90px; overflow: visible; }
+.trend-baseline { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 3; }
+.trend-line {
+  fill: none;
+  stroke: var(--series-1);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.trend-caption {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+  line-height: 1.45;
+}
+.trend-early h2 { margin-bottom: 0.4rem; }
+
+/* ============ Personal bests ============ */
+
+.bests { margin-bottom: 1.5rem; }
+.bests h2 { font-size: 0.95rem; margin-bottom: 0.8rem; }
+.bests-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.6rem;
+}
+.best-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.8rem 0.9rem;
+  color: inherit;
+  text-decoration: none;
+}
+.best-label { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; }
+.best-value { font-size: 1.5rem; font-weight: 700; }
+.best-detail { font-size: 0.74rem; color: var(--text-secondary); overflow-wrap: anywhere; }
+
+/* ============ Match detail ============ */
+
+.detail-head {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.2rem;
+  margin-bottom: 1rem;
+}
+.detail-head.won { border-left-color: var(--status-good); }
+.detail-head.lost { border-left-color: var(--status-critical); }
+
+.detail-score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  font-variant-numeric: tabular-nums;
+  margin: 0.2rem 0 0.5rem;
+}
+.ds-yours { font-size: 3rem; font-weight: 700; line-height: 1; }
+.ds-dash { color: var(--text-muted); font-size: 1.6rem; }
+.ds-theirs { font-size: 1.9rem; color: var(--text-muted); font-weight: 600; }
+
+.detail-versus { font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
+.detail-partner { font-size: 0.85rem; color: var(--text-secondary); }
+.detail-meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.35rem; }
+
+.fact-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.6rem; }
+.chip-note {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin-bottom: 1rem;
+}
+
+.detail-shape,
+.detail-stats {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+}
+.detail-shape h2,
+.detail-stats h2 { font-size: 0.95rem; margin-bottom: 0.4rem; }
+.detail-story { font-size: 0.95rem; font-weight: 600; margin-top: 0.4rem; }
+.detail-notes { margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.detail-notes li { font-size: 0.82rem; color: var(--text-secondary); }
+
+.detail-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.25rem 0 0.5rem;
+}
+.detail-nav-link {
+  color: var(--primary);
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+/* ============ People ============ */
+
+.people-screen h1,
+.person-detail h1,
+.you-screen h1 { font-size: 1.35rem; margin-bottom: 0.9rem; }
+.people-screen h2 { font-size: 0.9rem; color: var(--text-secondary); margin: 1.25rem 0 0.6rem; }
+
+.person-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.person-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.85rem;
+  color: inherit;
+  text-decoration: none;
+}
+.person-row:active { background: var(--surface-sunken); }
+.person-name { flex: 1; font-weight: 600; font-size: 0.92rem; overflow-wrap: anywhere; }
+.person-record { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 0.95rem; }
+.person-played { font-size: 0.72rem; color: var(--text-muted); min-width: 4.5rem; text-align: right; }
+
+.person-head { text-align: center; margin-bottom: 1.25rem; }
+.person-head h1 { margin: 0.6rem 0 0.8rem; }
+.person-records { display: flex; justify-content: center; gap: 1.5rem; }
+.person-records li { display: flex; flex-direction: column; gap: 0.1rem; }
+.pr-label { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; }
+.pr-value { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pr-note { font-size: 0.72rem; color: var(--text-muted); }
+
+/* ============ Avatar ============ */
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 700;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+.avatar-sm { width: 2.1rem; height: 2.1rem; font-size: 0.72rem; }
+.avatar-md { width: 3rem; height: 3rem; font-size: 1rem; }
+.avatar-lg { width: 4.25rem; height: 4.25rem; font-size: 1.4rem; }
+
+/* ============ You ============ */
+
+.you-head { text-align: center; margin-bottom: 1.5rem; }
+.you-head h1 { margin: 0.7rem 0 0.2rem; }
+
+.you-record { margin-bottom: 1.5rem; }
+.you-record ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.6rem;
+}
+.you-record li {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.8rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.yr-value { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.yr-label { font-size: 0.72rem; color: var(--text-muted); }
+
+.you-about,
+.you-install { margin-bottom: 1.5rem; }
+.you-about h2,
+.you-install h2 { font-size: 0.9rem; margin-bottom: 0.4rem; }
+.you-about p,
+.you-install p { font-size: 0.84rem; color: var(--text-secondary); line-height: 1.55; margin-bottom: 0.4rem; }
+
+.sign-out {
+  width: 100%;
+  padding: 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--status-critical);
+  background: transparent;
+  color: var(--status-critical);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sign-out-note {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 0.5rem;
+  line-height: 1.45;
+}
+
+/* ============ Loading, errors, staleness ============ */
+
+.skeleton { padding-top: 0.5rem; }
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.6rem;
+  margin: 1rem 0 1.5rem;
+}
+.skeleton-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.skeleton-row {
+  display: flex;
+  gap: 0.9rem;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem 0.95rem;
+}
+.skeleton-row-body { flex: 1; display: flex; flex-direction: column; gap: 0.4rem; }
+.ghost-score { width: 3.2rem; height: 1.6rem; }
+.ghost-tile { width: 100%; height: 4.2rem; border-radius: var(--radius); }
+
+/* The shimmer says "working", which a static block does not. Motion is
+   removed rather than slowed for anyone who asked for less of it. */
+.ghost {
+  background: linear-gradient(
+    90deg,
+    var(--surface-sunken) 25%,
+    var(--border) 37%,
+    var(--surface-sunken) 63%
+  );
+  background-size: 400% 100%;
+  animation: ghost-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes ghost-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ghost { animation: none; }
+}
+
+.error-state {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem 1.2rem;
+  text-align: center;
+  margin-top: 2rem;
+}
+.error-state-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.4rem; }
+.error-state-body { font-size: 0.86rem; color: var(--text-secondary); line-height: 1.5; }
+
+.retry {
+  margin-top: 1rem;
+  padding: 0.7rem 1.4rem;
+  border-radius: var(--radius-sm);
+  border: 0;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* A refresh that failed while real numbers are on screen is a footnote,
+   not a takeover. */
+.stale-note {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 0.75rem;
+}
+
+.crash { text-align: center; padding: 3rem 1rem; }
+.crash h1 { font-size: 1.3rem; margin-bottom: 0.5rem; }
+.crash p { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; }
+.crash details { margin-top: 1.5rem; text-align: left; }
+.crash summary { font-size: 0.8rem; color: var(--text-muted); cursor: pointer; }
+.crash pre {
+  font-size: 0.7rem;
+  overflow-x: auto;
+  background: var(--surface-sunken);
+  padding: 0.7rem;
+  border-radius: var(--radius-sm);
+  margin-top: 0.5rem;
 }

@@ -71,6 +71,16 @@
 }
 
 * { box-sizing: border-box; }
+
+/* Focus was styled on exactly one input before. With a tab bar and rows
+   of links, a keyboard user previously had no way to tell where they
+   were. :focus-visible rather than :focus so a tap doesn't leave a ring
+   behind on a phone. */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 body { margin: 0; }
 h1, h2 { margin: 0; font-weight: 600; }
 p { margin: 0; }

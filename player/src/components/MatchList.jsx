@@ -1,4 +1,5 @@
 import Sparkline from './Sparkline'
+import { Link } from '../lib/router'
 import { matchStory } from '../lib/story'
 
 function formatDate(iso) {
@@ -25,6 +26,10 @@ function MatchList({ matches }) {
 
           return (
             <li key={match.id} className={`match ${result}`}>
+              {/* The whole row is the target. A row that shows a match
+                  but cannot open it is the thing that made this app feel
+                  like a page rather than an app. */}
+              <Link className="match-link" to={`/matches/${match.id}`}>
               <div className="match-score">
                 <span className="ms-yours">{match.yourScore}</span>
                 <span className="ms-dash">–</span>
@@ -65,6 +70,8 @@ function MatchList({ matches }) {
                   <span className="chip chip-quiet">#{match.matchNumber}</span>
                 </div>
               </div>
+              <span className="match-chevron" aria-hidden="true">&rsaquo;</span>
+              </Link>
             </li>
           )
         })}
