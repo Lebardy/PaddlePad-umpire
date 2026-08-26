@@ -108,7 +108,52 @@ was built; check what the URL actually serves.
 - `INTERNAL_API_KEY` — the same value as the api service in that
   environment, and a different value between environments.
 
-Then a Railway cron trigger on `POST /run`, nightly.
+### The nightly run
+
+It runs in a **thread inside this service** (`scheduler.py`), waking at
+19:00 UTC — 3am Manila. That is not the arrangement to want. Railway
+cron services are expected to start, run and **exit**, and this one is a
+gunicorn process that never does, so a `cronSchedule` set on it would
+look configured and quietly never fire. A second service is the right
+answer and is not currently available: the free plan caps the project at
+five services, and `api`, `web`, `play`, `ml` and Postgres use all five.
+
+Two consequences worth knowing:
+
+- **It only fires while the container is up.** `sleepApplication` must
+  stay **off** for this service. Turning it on would stop the nightly
+  run with nothing reporting a problem.
+- **It is tied to `--workers 1`** in the `Procfile`. A second worker is a
+  second process with its own thread, and both would wake at 3am and
+  publish near-identical snapshots.
+
+### When the plan is upgraded: moving to a real cron service
+
+Two steps, in this order:
+
+1. Set `PADDLEPAD_SCHEDULE=off` on the `ml` service. The thread then
+   never starts, and `POST /run` keeps working. Do this **first**, so
+   there is never a window where both the thread and the new service are
+   scheduled.
+2. Create an `ml-cron` service from this same directory:
+
+   ```bash
+   railway add --service ml-cron     # NOT --variables, see below
+   railway variables --service ml-cron --set "PADDLEPAD_API_URL=..." \
+                                      --set "INTERNAL_API_KEY=..."
+   ```
+
+   Then set `rootDirectory: "ml"`, `startCommand: "python run.py"` and
+   `cronSchedule: "0 19 * * *"` on its service instance through the
+   GraphQL API (`railway api`) — `rootDirectory` has no CLI flag, and
+   setting it in the dashboard did not save when it was tried here.
+   Leave `healthcheckPath` unset; a process that exits has nothing to
+   health-check.
+
+**Never pass `--variables` to `railway add`.** That command echoes each
+prompt back *including the value*. It is how the staging
+`INTERNAL_API_KEY` ended up in a terminal transcript and had to be
+rotated. `railway variables --set` prints only the name.
 
 ## Known limitations
 

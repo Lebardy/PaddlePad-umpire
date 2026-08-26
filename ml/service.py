@@ -17,6 +17,10 @@ An endpoint that scored one player on demand would therefore secretly
 re-run the entire clustering on every page load, and would give slightly
 different answers each time as n_init=20 re-seeds. So the work happens
 in batches, and the app reads the last published snapshot.
+
+The nightly schedule runs in a thread here rather than as a separate
+Railway cron service, because the free plan caps the project at five
+services and all five are in use. See scheduler.py.
 """
 
 import os
@@ -24,6 +28,7 @@ import threading
 
 from flask import Flask, jsonify, request
 
+import scheduler
 from run import run
 
 app = Flask(__name__)
@@ -34,6 +39,12 @@ app = Flask(__name__)
 run_lock = threading.Lock()
 
 TRIGGER_KEY = os.environ.get("INTERNAL_API_KEY", "")
+
+# Started at import so it runs under gunicorn, which imports this module
+# rather than executing it. Tied to `--workers 1` in the Procfile: a
+# second worker would be a second process with its own thread, and both
+# would wake at 3am and publish near-identical snapshots.
+scheduler.start(run, run_lock, enabled=scheduler.enabled_from_env())
 
 
 @app.get("/health")
