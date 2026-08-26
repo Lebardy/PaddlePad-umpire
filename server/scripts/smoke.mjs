@@ -487,6 +487,45 @@ async function main() {
       // in a pool of twelve "Professional". Stored, never shown.
       check('the tier is not sent to the player', me.rating?.skillTier === undefined,
         String(me.rating?.skillTier))
+
+      check('one run gives one history point', me.rating?.history?.length === 1,
+        JSON.stringify(me.rating?.history))
+
+      // A SECOND run at the same score must not add a point. The
+      // pipeline is deterministic -- random_state is fixed and the score
+      // is not from K-Means -- so unchanged data reproduces the previous
+      // score exactly, and a nightly schedule would otherwise pile up
+      // identical points and bury the real changes among them.
+      await internal('/internal/ratings', {
+        method: 'POST',
+        body: { playerCount: 1, ratings: [{ playerId: playerA, skillScore: 72.4 }] },
+      })
+      const same = await fetch(`${API}/player/me`, {
+        headers: { Authorization: `Bearer ${claimBody.token}` },
+      }).then((r) => r.json())
+      check('an unchanged score does not add a history point',
+        same.rating?.history?.length === 1, JSON.stringify(same.rating?.history))
+
+      // A CHANGED score must. Sent with a larger pool, which is the
+      // thing that makes a drop explicable rather than mysterious.
+      await internal('/internal/ratings', {
+        method: 'POST',
+        body: { playerCount: 9, ratings: [{ playerId: playerA, skillScore: 64.2 }] },
+      })
+      const moved = await fetch(`${API}/player/me`, {
+        headers: { Authorization: `Bearer ${claimBody.token}` },
+      }).then((r) => r.json())
+      const history = moved.rating?.history ?? []
+      check('a changed score adds a history point', history.length === 2,
+        JSON.stringify(history))
+      check('history is oldest first', history[0]?.skillScore === 72,
+        JSON.stringify(history.map((h) => h.skillScore)))
+      check('each point carries the pool it was measured against',
+        history[0]?.poolSize === 1 && history[1]?.poolSize === 9,
+        JSON.stringify(history.map((h) => h.poolSize)))
+      check('the headline score is the newest point',
+        moved.rating?.skillScore === history[history.length - 1]?.skillScore,
+        `${moved.rating?.skillScore} vs ${history[history.length - 1]?.skillScore}`)
     } else {
       check('claiming a player for the rating check succeeded', false,
         JSON.stringify(claimBody).slice(0, 80))

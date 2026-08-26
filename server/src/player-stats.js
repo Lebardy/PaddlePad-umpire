@@ -270,6 +270,58 @@ export async function countMatchesInProgress(query, playerId) {
  * already loaded this player's matches, and that array is filtered by
  * exactly the same rules the gate counts against.
  */
+// How many runs back to look when assembling a history. Nightly runs
+// make this about two months. It is a scan bound, not a point count --
+// most of these collapse away, see below.
+const HISTORY_RUNS_SCANNED = 60
+
+// How many points survive into the response. Enough to show a shape,
+// few enough that the payload stays small forever.
+const HISTORY_POINTS = 12
+
+/**
+ * Turns a player's rating rows into the points where their score CHANGED.
+ *
+ * Not a list of runs, and that distinction is the whole design.
+ *
+ * The pipeline is deterministic: `random_state=42` is fixed, and the
+ * skill score does not come from K-Means at all -- it is a weighted sum
+ * of min-max normalised features. So two runs over unchanged data
+ * produce byte-identical scores. That is not a guess; on staging the
+ * same player scored 36.1900 in two consecutive runs.
+ *
+ * Charting every nightly run would therefore draw a flat line almost
+ * every day, with the occasional step lost among fifty identical
+ * points. Collapsing runs of equal scores and keeping the EARLIEST of
+ * each streak means every point answers "this is when it became that",
+ * which is the question someone watching their score actually has.
+ *
+ * `rows` arrives newest-first; the result is oldest-first, because that
+ * is the direction a chart is read.
+ */
+function buildRatingHistory(rows) {
+  const points = []
+  // Walked newest-first, so the LAST row of each equal streak is the
+  // earliest one -- overwriting as we go leaves exactly that.
+  for (const row of rows) {
+    const previous = points[points.length - 1]
+    if (previous && previous.skillScore === Math.round(row.skill_score)) {
+      previous.computedAt = row.computed_at
+      previous.poolSize = row.player_count
+      continue
+    }
+    points.push({
+      // Rounded to match the headline number. Comparing the raw floats
+      // would treat 36.19 and 36.191 as a change and draw a step the
+      // player could never see in the number itself.
+      skillScore: Math.round(row.skill_score),
+      computedAt: row.computed_at,
+      poolSize: row.player_count,
+    })
+  }
+  return points.slice(0, HISTORY_POINTS).reverse()
+}
+
 export async function getRatingState(query, playerId, matchCount) {
   const { rows: rated } = await query(
     `SELECT r.skill_score, r.skill_group, r.playstyle_archetype,
@@ -280,8 +332,8 @@ export async function getRatingState(query, playerId, matchCount) {
       WHERE r.player_id = $1
         AND run.status = 'completed'
       ORDER BY run.computed_at DESC
-      LIMIT 1`,
-    [playerId],
+      LIMIT $2`,
+    [playerId, HISTORY_RUNS_SCANNED],
   )
 
   if (rated[0]) {
@@ -300,6 +352,10 @@ export async function getRatingState(query, playerId, matchCount) {
       computedAt: row.computed_at,
       poolSize: row.player_count,
       fromMatches: row.match_count,
+      // When the score actually moved, and what pool it was measured
+      // against each time. See buildRatingHistory for why this is a
+      // list of CHANGES rather than a list of runs.
+      history: buildRatingHistory(rated),
       // skill_tier is deliberately not returned. assign_skill_tier
       // applies absolute cutoffs (40 / 75) to a purely relative score,
       // so in a small pool the top player is labelled "Professional"

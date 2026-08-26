@@ -535,6 +535,42 @@
 }
 .rating-scored .muted-inline { display: block; line-height: 1.45; }
 
+/* ---- Score history ---- */
+
+.rating-history { margin-top: 0.9rem; }
+.rating-history-svg {
+  display: block;
+  width: 100%;
+  height: 64px;
+  /* The dots are drawn at the extremes of the range, so half of each
+     would be clipped by the viewBox without this. */
+  overflow: visible;
+}
+.rating-history-line {
+  fill: none;
+  stroke: var(--series-1);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* preserveAspectRatio="none" stretches the viewBox horizontally, which
+     would otherwise stretch the stroke with it and give a line that is
+     thinner than it is tall. */
+  vector-effect: non-scaling-stroke;
+}
+.rating-history-dot {
+  fill: var(--surface);
+  stroke: var(--series-1);
+  stroke-width: 2;
+}
+.rating-history-caption,
+.rating-history-none {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  margin-top: 0.55rem;
+  line-height: 1.45;
+  display: block;
+}
+
 /* ============ Personal bests ============ */
 
 .bests { margin-bottom: 1.5rem; }

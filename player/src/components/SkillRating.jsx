@@ -17,6 +17,7 @@
 // ============================================================
 
 import Meter from './Meter'
+import RatingHistory from './RatingHistory'
 
 /**
  * Why five matches, said in the app's own voice.
@@ -126,6 +127,8 @@ function Rated({ rating }) {
         right now, from {rating.fromMatches} of your matches. It moves as
         other people play, so it&rsquo;s a comparison rather than a grade.
       </p>
+
+      <RatingHistory history={rating.history} />
     </section>
   )
 }
