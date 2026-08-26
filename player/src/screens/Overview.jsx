@@ -1,15 +1,15 @@
 // ============================================================
 // The landing screen: who you are, how you're doing, what's notable.
 //
-// Everything here is a raw count or a simple ratio taken straight from
-// what the umpire tapped. There is still deliberately no skill rating:
-// that comes from the ML pipeline, which needs many matches across many
-// players before it says anything true.
+// Most of what follows is a raw count or a simple ratio taken straight
+// from what the umpire tapped, and needs no population to be true.
 //
-// The dashed "Skill rating — not enough matches across the club yet"
-// box that used to sit here is gone. A panel apologising for a missing
-// feature is the single loudest way an app says it is unfinished, and
-// this one also pointed at a club concept the app does not have.
+// The exception is SkillRating, which carries the ML pipeline's score.
+// That one IS population-dependent, which is why it renders its own
+// progress toward being computable rather than a number that would be
+// confidently wrong -- see the component for the reasoning. It is not
+// the dashed apology box that used to sit here: that one blamed a club
+// concept the player could neither see nor influence.
 // ============================================================
 
 import { Link } from '../lib/router'
@@ -22,13 +22,14 @@ import Highlights from '../components/Highlights'
 import MatchList from '../components/MatchList'
 import PersonalBests from '../components/PersonalBests'
 import TrendChart from '../components/TrendChart'
+import SkillRating from '../components/SkillRating'
 import LiveNote from '../components/LiveNote'
 
 const TREND_WINDOW = 5
 const RECENT_COUNT = 5
 
 function Overview({ player }) {
-  const { summary, matches, inProgress } = usePlayerData()
+  const { summary, matches, inProgress, rating } = usePlayerData()
   const trend = rollingWinRate(matches, TREND_WINDOW)
   const bests = personalBests(matches)
   const recent = matches.slice(0, RECENT_COUNT)
@@ -40,6 +41,8 @@ function Overview({ player }) {
       {inProgress > 0 && <LiveNote count={inProgress} />}
 
       <StatGrid summary={summary} />
+
+      <SkillRating rating={rating} />
 
       {trend.length >= 2 ? (
         <TrendChart points={trend} window={TREND_WINDOW} />

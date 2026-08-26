@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Python, for the ML service in ml/
+.venv
+__pycache__/
+*.pyc
+
 # Secrets -- never commit. Contains the database password and the
 # JWT_SECRET that signs umpire logins; anyone holding the latter can
 # forge a login as any umpire. Only .env.example belongs in git.

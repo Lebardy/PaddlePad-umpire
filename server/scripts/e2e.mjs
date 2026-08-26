@@ -45,6 +45,11 @@ const TEST_API = `http://127.0.0.1:${TEST_PORT}`
 // ever accepted anywhere else.
 const TEST_JWT_SECRET = 'e2e-only-secret-not-used-anywhere-else-0123456789abcdef'
 const TEST_INVITE = 'E2EE-2EE2-E2E2'
+// The shared key the ML service would use. Fixed here for the same
+// reason as the JWT secret above: a test credential that is obviously a
+// test credential cannot be mistaken for a real one if it leaks into a
+// log or a screenshot.
+const TEST_INTERNAL_KEY = 'e2e-only-internal-key-not-used-anywhere-else-0123456789'
 
 /**
  * Refuses to touch anything that isn't the disposable test database.
@@ -153,6 +158,7 @@ async function startApi() {
       DATABASE_URL: TEST_DATABASE_URL,
       JWT_SECRET: TEST_JWT_SECRET,
       BOOTSTRAP_INVITE_CODE: TEST_INVITE,
+      INTERNAL_API_KEY: TEST_INTERNAL_KEY,
       CORS_ORIGIN: 'http://localhost:5173',
       PORT: String(TEST_PORT),
     },
@@ -199,7 +205,11 @@ async function main() {
   console.log('› running the smoke test\n')
   const status = run('node', [path.join(HERE, 'smoke.mjs'), TEST_API], {
     cwd: SERVER_DIR,
-    env: { ...process.env, SMOKE_INVITE: TEST_INVITE },
+    env: {
+      ...process.env,
+      SMOKE_INVITE: TEST_INVITE,
+      SMOKE_INTERNAL_KEY: TEST_INTERNAL_KEY,
+    },
   })
 
   api.kill('SIGTERM')

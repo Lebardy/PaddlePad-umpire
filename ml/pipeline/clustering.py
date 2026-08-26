@@ -1,0 +1,2105 @@
+import numpy as np
+import pandas as pd
+
+from sklearn.cluster import KMeans
+from sklearn.metrics import (
+    silhouette_score,
+    adjusted_rand_score
+)
+
+
+# ============================================================
+# CLUSTERING FEATURES
+# ============================================================
+
+CLUSTERING_FEATURES = [
+    "winner_rate_mean",
+    "general_error_rate_mean",
+    "dink_error_rate_mean",
+    "drop_efficiency_mean",
+    "aggression_mean",
+    "winner_rate_std",
+    "general_error_rate_std",
+    "dink_error_rate_std",
+    "drop_efficiency_std",
+    "aggression_std"
+]
+
+
+# ============================================================
+# PLAYSTYLE CLUSTERING FEATURES
+# ============================================================
+
+PLAYSTYLE_CLUSTERING_FEATURES = [
+    "aggression_mean",
+    "aggression_std",
+    "drop_efficiency_mean",
+    "drop_efficiency_std",
+    "winner_rate_std",
+    "general_error_rate_std",
+    "dink_error_rate_std",
+    "drop_usage_rate",
+    "error_to_winner_ratio",
+    "drop_preference_rate_mean",
+    "drop_preference_rate_std",
+    "net_game_preference_rate_mean",
+    "net_game_preference_rate_std"
+]
+
+# ============================================================
+# PREPARE CLUSTERING DATA
+# ============================================================
+
+def prepare_clustering_data(
+    skill_profiles,
+    scaled_features
+):
+    """
+    Combine player information with the standardized
+    behavioral feature representation.
+
+    The skill score is kept for comparison only.
+    It is NOT used to create the skill clusters.
+    """
+
+    skills = skill_profiles.copy()
+    features = scaled_features.copy()
+
+    # --------------------------------------------------------
+    # Validate IDs
+    # --------------------------------------------------------
+
+    if "player_id" not in skills.columns:
+        raise ValueError(
+            "skill_profiles must contain 'player_id'."
+        )
+
+    if "player_id" not in features.columns:
+        raise ValueError(
+            "scaled_features must contain 'player_id'."
+        )
+
+    # --------------------------------------------------------
+    # Validate features
+    # --------------------------------------------------------
+
+    missing_features = [
+        feature
+        for feature in CLUSTERING_FEATURES
+        if feature not in features.columns
+    ]
+
+    if missing_features:
+        raise ValueError(
+            "Missing clustering features: "
+            + ", ".join(missing_features)
+        )
+
+    # --------------------------------------------------------
+    # Select columns
+    # --------------------------------------------------------
+
+    skill_data = skills[
+        [
+            "player_id",
+            "skill_score"
+        ]
+    ].copy()
+
+    feature_data = features[
+        [
+            "player_id",
+            *CLUSTERING_FEATURES
+        ]
+    ].copy()
+
+    # --------------------------------------------------------
+    # Merge
+    # --------------------------------------------------------
+
+    combined = skill_data.merge(
+        feature_data,
+        on="player_id",
+        how="inner",
+        validate="one_to_one"
+    )
+
+    # --------------------------------------------------------
+    # Validate merge
+    # --------------------------------------------------------
+
+    if len(combined) != len(skill_data):
+        raise ValueError(
+            "Some players were lost when combining "
+            "skill data and clustering features."
+        )
+
+    return combined
+
+
+# ============================================================
+# PRINT CLUSTERING INPUT
+# ============================================================
+
+def print_clustering_input_summary(
+    clustering_data
+):
+    """
+    Show the exact player representation that will be
+    given to K-Means.
+    """
+
+    print(
+        "\n=== SKILL CLUSTERING INPUT ==="
+    )
+
+    print(
+        f"Total players: "
+        f"{len(clustering_data)}"
+    )
+
+    print(
+        f"Features used: "
+        f"{len(CLUSTERING_FEATURES)}"
+    )
+
+    print(
+        "\nFeatures:"
+    )
+
+    for feature in CLUSTERING_FEATURES:
+        print(
+            f"  {feature}"
+        )
+
+
+# ============================================================
+# PRINT SAMPLE INPUT
+# ============================================================
+
+def print_clustering_samples(
+    clustering_data,
+    number_of_players=5
+):
+    """
+    Display a few players that will enter K-Means.
+    """
+
+    columns = [
+        "player_id",
+        "skill_score",
+        *CLUSTERING_FEATURES
+    ]
+
+    print(
+        "\n=== SAMPLE SKILL CLUSTERING INPUT ==="
+    )
+
+    print(
+        clustering_data[
+            columns
+        ]
+        .head(number_of_players)
+        .to_string(
+            index=False
+        )
+    )
+
+
+# ============================================================
+# TEST K VALUES FOR SKILL CLUSTERING
+# ============================================================
+
+def test_skill_k_values(
+    clustering_data,
+    k_min=2,
+    k_max=5,
+    random_state=42
+):
+    """
+    Test multiple K values for the first-level
+    skill clustering.
+
+    K is selected using the highest Silhouette Score.
+    """
+
+    X = clustering_data[
+        CLUSTERING_FEATURES
+    ].copy()
+
+    maximum_k = min(
+        k_max,
+        len(X) - 1
+    )
+
+    if maximum_k < k_min:
+        raise ValueError(
+            "Not enough players for K selection."
+        )
+
+    results = {}
+
+    print(
+        "\n=== SKILL CLUSTER K SELECTION ==="
+    )
+
+    for k in range(
+        k_min,
+        maximum_k + 1
+    ):
+
+        kmeans = KMeans(
+            n_clusters=k,
+            random_state=random_state,
+            n_init=20
+        )
+
+        labels = (
+            kmeans.fit_predict(X)
+        )
+
+        score = silhouette_score(
+            X,
+            labels
+        )
+
+        results[k] = {
+            "silhouette": score,
+            "labels": labels,
+            "model": kmeans
+        }
+
+        print(
+            f"  K={k}: "
+            f"Silhouette Score = "
+            f"{score:.3f}"
+        )
+
+    best_k = max(
+        results,
+        key=lambda k:
+        results[k]["silhouette"]
+    )
+
+    print(
+        f"\nBest K for skill groups: "
+        f"K={best_k}"
+    )
+
+    print(
+        f"Best Silhouette Score: "
+        f"{results[best_k]['silhouette']:.3f}"
+    )
+
+    return (
+        best_k,
+        results
+    )
+
+
+# ============================================================
+# RUN FINAL SKILL CLUSTERING
+# ============================================================
+
+def cluster_skill_groups(
+    clustering_data,
+    best_k,
+    random_state=42
+):
+    """
+    Run the final first-level K-Means model.
+
+    This produces generic skill groups such as:
+
+        Cluster 0
+        Cluster 1
+        Cluster 2
+
+    We intentionally DO NOT call them Beginner,
+    Intermediate, or Professional yet.
+    """
+
+    X = clustering_data[
+        CLUSTERING_FEATURES
+    ].copy()
+
+    kmeans = KMeans(
+        n_clusters=best_k,
+        random_state=random_state,
+        n_init=20
+    )
+
+    labels = (
+        kmeans.fit_predict(X)
+    )
+
+    result = clustering_data.copy()
+
+    result[
+        "skill_cluster"
+    ] = labels
+
+    cluster_counts = (
+        result[
+            "skill_cluster"
+        ]
+        .value_counts()
+        .sort_index()
+    )
+
+    print(
+        "\n=== SKILL CLUSTER RESULT ==="
+    )
+
+    print(
+        f"Selected K: "
+        f"{best_k}"
+    )
+
+    for cluster_id, count in (
+        cluster_counts.items()
+    ):
+
+        print(
+            f"Cluster {cluster_id}: "
+            f"{count} players"
+        )
+
+    return (
+        result,
+        kmeans
+    )
+
+
+# ============================================================
+# INSPECT SKILL CLUSTER PROFILES
+# ============================================================
+
+def print_skill_cluster_profiles(
+    clustering_data,
+    skill_clustered,
+    scaler
+):
+    """
+    Convert skill-cluster centroids back into the original
+    feature scale so we can interpret them.
+
+    This function is ONLY for interpretation.
+    """
+
+    print(
+        "\n=== SKILL CLUSTER PROFILES ==="
+    )
+
+    # --------------------------------------------------------
+    # Attach labels
+    # --------------------------------------------------------
+
+    data = clustering_data.copy()
+
+    data[
+        "skill_cluster"
+    ] = skill_clustered[
+        "skill_cluster"
+    ].to_numpy()
+
+    # --------------------------------------------------------
+    # Centroids in standardized space
+    # --------------------------------------------------------
+
+    centroids_scaled = (
+        data
+        .groupby(
+            "skill_cluster"
+        )[
+            CLUSTERING_FEATURES
+        ]
+        .mean()
+    )
+
+    # --------------------------------------------------------
+    # Back to pre-scaled ML-oriented units
+    # --------------------------------------------------------
+
+    centroids_oriented = (
+        scaler.inverse_transform(
+            centroids_scaled[
+                CLUSTERING_FEATURES
+            ]
+        )
+    )
+
+    centroids = pd.DataFrame(
+        centroids_oriented,
+        columns=CLUSTERING_FEATURES,
+        index=centroids_scaled.index
+    )
+
+    # --------------------------------------------------------
+    # Undo direction transformations
+    # --------------------------------------------------------
+
+    centroids[
+        "general_error_rate_mean"
+    ] *= -1
+
+    centroids[
+        "dink_error_rate_mean"
+    ] *= -1
+
+    centroids[
+        "winner_rate_std"
+    ] *= -1
+
+    centroids[
+        "general_error_rate_std"
+    ] *= -1
+
+    centroids[
+        "dink_error_rate_std"
+    ] *= -1
+
+    centroids[
+        "drop_efficiency_std"
+    ] *= -1
+
+    centroids[
+        "aggression_std"
+    ] *= -1
+
+    # --------------------------------------------------------
+    # Print each group
+    # --------------------------------------------------------
+
+    for cluster_id, profile in (
+        centroids.iterrows()
+    ):
+
+        cluster_players = (
+            data[
+                data[
+                    "skill_cluster"
+                ]
+                ==
+                cluster_id
+            ]
+        )
+
+        print(
+            f"\nCluster {cluster_id}"
+        )
+
+        print(
+            f"  Players: "
+            f"{len(cluster_players)}"
+        )
+
+        print(
+            f"  Average skill score: "
+            f"{cluster_players['skill_score'].mean():.2f}"
+        )
+
+        print(
+            "\n  Typical performance:"
+        )
+
+        print(
+            f"    Winner rate: "
+            f"{profile['winner_rate_mean']:.3f} / min"
+        )
+
+        print(
+            f"    General errors: "
+            f"{profile['general_error_rate_mean']:.3f} / min"
+        )
+
+        print(
+            f"    Dink errors: "
+            f"{profile['dink_error_rate_mean']:.3f} / min"
+        )
+
+        print(
+            f"    Drop efficiency: "
+            f"{profile['drop_efficiency_mean'] * 100:.1f}%"
+        )
+
+        print(
+            f"    Aggression rate: "
+            f"{profile['aggression_mean']:.3f}"
+        )
+
+        print(
+            "\n  Match-to-match variability:"
+        )
+
+        print(
+            f"    Winner rate variability: "
+            f"{profile['winner_rate_std']:.3f}"
+        )
+
+        print(
+            f"    General error variability: "
+            f"{profile['general_error_rate_std']:.3f}"
+        )
+
+        print(
+            f"    Dink error variability: "
+            f"{profile['dink_error_rate_std']:.3f}"
+        )
+
+        print(
+            f"    Drop efficiency variability: "
+            f"{profile['drop_efficiency_std']:.3f}"
+        )
+
+        print(
+            f"    Aggression variability: "
+            f"{profile['aggression_std']:.3f}"
+        )
+
+# ============================================================
+# INTERPRET SKILL CLUSTERS
+# ============================================================
+
+def interpret_skill_clusters(
+    skill_clustered
+):
+    """
+    Assign human-readable names to the discovered
+    first-level skill clusters.
+
+    The cluster with the highest average skill score
+    is interpreted as the higher-performance group.
+
+    The cluster with the lowest average skill score
+    is interpreted as the lower-performance group.
+
+    IMPORTANT:
+    This uses only the calculated statistical skill score
+    for interpretation. The skill score was NOT provided
+    to K-Means.
+    """
+
+    cluster_scores = (
+        skill_clustered
+        .groupby(
+            "skill_cluster"
+        )[
+            "skill_score"
+        ]
+        .mean()
+        .sort_values()
+    )
+
+    cluster_ids = (
+        cluster_scores
+        .index
+        .tolist()
+    )
+
+    labels = {}
+
+    # --------------------------------------------------------
+    # Two-cluster case
+    # --------------------------------------------------------
+
+    if len(cluster_ids) == 2:
+
+        labels[
+            cluster_ids[0]
+        ] = "Developing / Lower-Performance"
+
+        labels[
+            cluster_ids[1]
+        ] = "Higher-Performance"
+
+    # --------------------------------------------------------
+    # Three-cluster case
+    # --------------------------------------------------------
+
+    elif len(cluster_ids) == 3:
+
+        labels[
+            cluster_ids[0]
+        ] = "Developing / Lower-Performance"
+
+        labels[
+            cluster_ids[1]
+        ] = "Intermediate-Performance"
+
+        labels[
+            cluster_ids[2]
+        ] = "Higher-Performance"
+
+    # --------------------------------------------------------
+    # Generic fallback for K > 3
+    # --------------------------------------------------------
+
+    else:
+
+        for position, cluster_id in enumerate(
+            cluster_ids
+        ):
+
+            labels[
+                cluster_id
+            ] = (
+                f"Performance Group "
+                f"{position + 1}"
+            )
+
+    return labels
+
+
+# ============================================================
+# ADD SKILL GROUP LABELS
+# ============================================================
+
+def apply_skill_cluster_labels(
+    skill_clustered,
+    cluster_labels
+):
+    """
+    Add human-readable skill-group labels to the
+    discovered cluster assignments.
+    """
+
+    result = skill_clustered.copy()
+
+    result[
+        "skill_group"
+    ] = (
+        result[
+            "skill_cluster"
+        ]
+        .map(
+            cluster_labels
+        )
+    )
+
+    return result
+
+
+# ============================================================
+# PRINT SKILL GROUP SUMMARY
+# ============================================================
+
+def print_skill_group_summary(
+    skill_clustered,
+    cluster_labels
+):
+    """
+    Display the discovered skill groups using the actual
+    statistics of the clusters.
+    """
+
+    print(
+        "\n=== DISCOVERED SKILL GROUPS ==="
+    )
+
+    summary = (
+        skill_clustered
+        .groupby(
+            [
+                "skill_cluster",
+                "skill_group"
+            ]
+        )
+        .agg(
+            players=(
+                "player_id",
+                "count"
+            ),
+            average_skill_score=(
+                "skill_score",
+                "mean"
+            ),
+            minimum_skill_score=(
+                "skill_score",
+                "min"
+            ),
+            maximum_skill_score=(
+                "skill_score",
+                "max"
+            )
+        )
+        .reset_index()
+    )
+
+    for _, row in summary.iterrows():
+
+        print(
+            f"\nCluster "
+            f"{int(row['skill_cluster'])}"
+        )
+
+        print(
+            f"  Label: "
+            f"{row['skill_group']}"
+        )
+
+        print(
+            f"  Players: "
+            f"{int(row['players'])}"
+        )
+
+        print(
+            f"  Average skill score: "
+            f"{row['average_skill_score']:.2f}"
+        )
+
+        print(
+            f"  Skill score range: "
+            f"{row['minimum_skill_score']:.2f} "
+            f"to "
+            f"{row['maximum_skill_score']:.2f}"
+        )
+
+# ============================================================
+# LEVEL 2: PLAYSTYLE K SELECTION
+# ============================================================
+
+def test_playstyle_k_values(
+    skill_clustered,
+    skill_group,
+    k_min=2,
+    k_max=5,
+    random_state=42
+):
+    """
+    Test K values for second-level playstyle clustering
+    inside one discovered skill group.
+
+    The first-level skill group is already known.
+
+    Example:
+
+        Developing / Lower-Performance
+                    ↓
+              K-Means #2
+                    ↓
+              playstyle groups
+    """
+
+    # --------------------------------------------------------
+    # Select the players belonging to this skill group
+    # --------------------------------------------------------
+
+    group_data = (
+        skill_clustered[
+            skill_clustered[
+                "skill_group"
+            ]
+            ==
+            skill_group
+        ]
+        .copy()
+        .reset_index(drop=True)
+    )
+
+    if len(group_data) < 3:
+        raise ValueError(
+            f"Not enough players in "
+            f"'{skill_group}' for clustering."
+        )
+
+    # --------------------------------------------------------
+    # Extract standardized behavioral features
+    # --------------------------------------------------------
+
+    X = group_data[
+        PLAYSTYLE_CLUSTERING_FEATURES
+    ].copy()
+
+    maximum_k = min(
+        k_max,
+        len(group_data) - 1
+    )
+
+    results = {}
+
+    print(
+        f"\n=== PLAYSTYLE K SELECTION: "
+        f"{skill_group} ==="
+    )
+
+    for k in range(
+        k_min,
+        maximum_k + 1
+    ):
+
+        kmeans = KMeans(
+            n_clusters=k,
+            random_state=random_state,
+            n_init=20
+        )
+
+        labels = (
+            kmeans.fit_predict(X)
+        )
+
+        score = silhouette_score(
+            X,
+            labels
+        )
+
+        results[k] = {
+            "silhouette": score,
+            "labels": labels,
+            "model": kmeans
+        }
+
+        print(
+            f"  K={k}: "
+            f"Silhouette Score = "
+            f"{score:.3f}"
+        )
+
+    best_k = max(
+        results,
+        key=lambda k:
+        results[k]["silhouette"]
+    )
+
+    print(
+        f"\nBest K for "
+        f"{skill_group}: "
+        f"K={best_k}"
+    )
+
+    print(
+        f"Best Silhouette Score: "
+        f"{results[best_k]['silhouette']:.3f}"
+    )
+
+    return (
+        group_data,
+        best_k,
+        results
+    )
+
+
+# ============================================================
+# LEVEL 2: RUN PLAYSTYLE K-MEANS
+# ============================================================
+
+def cluster_playstyles(
+    group_data,
+    best_k,
+    random_state=42
+):
+    """
+    Run second-level K-Means inside one skill group.
+    """
+
+    X = group_data[
+        PLAYSTYLE_CLUSTERING_FEATURES
+    ].copy()
+
+    kmeans = KMeans(
+        n_clusters=best_k,
+        random_state=random_state,
+        n_init=20
+    )
+
+    labels = (
+        kmeans.fit_predict(X)
+    )
+
+    result = group_data.copy()
+
+    result[
+        "playstyle_cluster"
+    ] = labels
+
+    cluster_counts = (
+        result[
+            "playstyle_cluster"
+        ]
+        .value_counts()
+        .sort_index()
+    )
+
+    return (
+        result,
+        kmeans,
+        cluster_counts
+    )
+
+# ============================================================
+# LEVEL 2: PLAYSTYLE CLUSTER PROFILES
+# ============================================================
+
+def print_playstyle_cluster_profiles(
+    group_data,
+    clustered_data,
+    raw_playstyle_features
+):
+    """
+    Display human-readable statistics for each discovered
+    playstyle cluster, using each player's RAW feature values.
+
+    Several features (see
+    feature_engineering.FEATURES_TO_RESIDUALIZE) are
+    residualized against skill_score BEFORE they are fed to
+    K-Means, so the cluster ASSIGNMENTS reflect skill-adjusted
+    style. But the values displayed here are plain averages of
+    each player's original, un-adjusted stats -- deliberately,
+    so this reads as ordinary percentages/rates rather than
+    abstract residual deltas.
+    """
+
+    skill_group = (
+        group_data[
+            "skill_group"
+        ]
+        .iloc[0]
+    )
+
+    print(
+        "\n=== PLAYSTYLE CLUSTER PROFILES ==="
+    )
+
+    print(
+        f"Skill group: "
+        f"{skill_group}"
+    )
+
+    # --------------------------------------------------------
+    # Calculate centroids from raw per-player values
+    # --------------------------------------------------------
+
+    centroids = (
+        get_playstyle_centroids(
+            clustered_data,
+            raw_playstyle_features
+        )
+    )
+
+    # --------------------------------------------------------
+    # Print each playstyle cluster
+    # --------------------------------------------------------
+
+    for cluster_id, profile in (
+        centroids.iterrows()
+    ):
+
+        players = (
+            clustered_data[
+                clustered_data[
+                    "playstyle_cluster"
+                ]
+                ==
+                cluster_id
+            ]
+        )
+
+        print(
+            f"\nPlaystyle Cluster {cluster_id}"
+        )
+
+        print(
+            f"  Players: "
+            f"{len(players)}"
+        )
+
+        print(
+            f"  Average skill score: "
+            f"{players['skill_score'].mean():.2f}"
+        )
+
+        print(
+            "\n  Behavioral characteristics:"
+        )
+
+        print(
+            f"    Aggression: "
+            f"{profile['aggression_mean']:.3f}"
+        )
+
+        print(
+            f"    Aggression variability: "
+            f"{profile['aggression_std']:.3f}"
+        )
+
+        print(
+            f"    Drop efficiency: "
+            f"{profile['drop_efficiency_mean'] * 100:.1f}%"
+        )
+
+        print(
+            f"    Drop efficiency variability: "
+            f"{profile['drop_efficiency_std']:.3f}"
+        )
+
+        print(
+            f"    Winner rate variability: "
+            f"{profile['winner_rate_std']:.3f}"
+        )
+
+        print(
+            f"    General error variability: "
+            f"{profile['general_error_rate_std']:.3f}"
+        )
+
+        print(
+            f"    Dink error variability: "
+            f"{profile['dink_error_rate_std']:.3f}"
+        )
+
+        print(
+            f"    Drop usage rate: "
+            f"{profile['drop_usage_rate']:.3f} / min"
+        )
+
+        print(
+            f"    Error-to-winner ratio: "
+            f"{profile['error_to_winner_ratio']:.3f}"
+        )
+
+        print(
+            f"    Drop preference (drop vs. drive): "
+            f"{profile['drop_preference_rate_mean'] * 100:.1f}%"
+        )
+
+        print(
+            f"    Drop preference variability: "
+            f"{profile['drop_preference_rate_std']:.3f}"
+        )
+
+        print(
+            f"    Net-game preference (dink vs. power winners): "
+            f"{profile['net_game_preference_rate_mean'] * 100:.1f}%"
+        )
+
+        print(
+            f"    Net-game preference variability: "
+            f"{profile['net_game_preference_rate_std']:.3f}"
+        )
+
+# ============================================================
+# PLAYSTYLE STABILITY TEST
+# ============================================================
+
+def test_playstyle_stability(
+    skill_clustered,
+    skill_group,
+    random_states=None,
+    k_min=2,
+    k_max=5
+):
+    """
+    Test the stability of Level 2 playstyle clustering
+    across multiple random seeds.
+
+    We check:
+
+        1. Which K is selected?
+        2. Silhouette score for each run
+        3. Cluster agreement using ARI
+
+    The first run is used as the reference partition.
+    """
+
+    if random_states is None:
+        random_states = [
+            1,
+            7,
+            21,
+            42,
+            100
+        ]
+
+    # --------------------------------------------------------
+    # Select the requested skill group
+    # --------------------------------------------------------
+
+    group_data = (
+        skill_clustered[
+            skill_clustered[
+                "skill_group"
+            ] == skill_group
+        ]
+        .copy()
+        .reset_index(drop=True)
+    )
+
+    if len(group_data) < 3:
+        raise ValueError(
+            f"Not enough players in '{skill_group}'."
+        )
+
+    X = group_data[
+        PLAYSTYLE_CLUSTERING_FEATURES
+    ].copy()
+
+    results = {}
+
+    print(
+        f"\n=== PLAYSTYLE STABILITY: "
+        f"{skill_group} ==="
+    )
+
+    # --------------------------------------------------------
+    # Run multiple seeds
+    # --------------------------------------------------------
+
+    for seed in random_states:
+
+        best_k = None
+        best_score = -1
+        best_labels = None
+
+        maximum_k = min(
+            k_max,
+            len(group_data) - 1
+        )
+
+        for k in range(
+            k_min,
+            maximum_k + 1
+        ):
+
+            model = KMeans(
+                n_clusters=k,
+                random_state=seed,
+                n_init=20
+            )
+
+            labels = (
+                model.fit_predict(X)
+            )
+
+            score = silhouette_score(
+                X,
+                labels
+            )
+
+            if score > best_score:
+
+                best_score = score
+                best_k = k
+                best_labels = labels
+
+        results[seed] = {
+            "k": best_k,
+            "silhouette": best_score,
+            "labels": best_labels
+        }
+
+        print(
+            f"Seed {seed}: "
+            f"K={best_k} | "
+            f"Silhouette={best_score:.3f}"
+        )
+
+    # --------------------------------------------------------
+    # Determine most common K
+    # --------------------------------------------------------
+
+    selected_k_values = [
+        result["k"]
+        for result in results.values()
+    ]
+
+    k_counts = (
+        pd.Series(
+            selected_k_values
+        )
+        .value_counts()
+        .sort_index()
+    )
+
+    most_common_k = (
+        k_counts
+        .idxmax()
+    )
+
+    most_common_count = (
+        k_counts
+        .max()
+    )
+
+    print(
+        f"\nMost common K: "
+        f"{most_common_k} "
+        f"({most_common_count}/"
+        f"{len(random_states)} runs)"
+    )
+
+    # --------------------------------------------------------
+    # Compare cluster assignments
+    # --------------------------------------------------------
+
+    reference_seed = random_states[0]
+
+    reference = results[
+        reference_seed
+    ]
+
+    print(
+        "\nCluster agreement "
+        f"against seed {reference_seed}:"
+    )
+
+    for seed in random_states:
+
+        if seed == reference_seed:
+            continue
+
+        current = results[seed]
+
+        if current["k"] != reference["k"]:
+
+            print(
+                f"  Seed {seed}: "
+                f"K differs "
+                f"({current['k']} vs "
+                f"{reference['k']})"
+            )
+
+            continue
+
+        ari = adjusted_rand_score(
+            reference["labels"],
+            current["labels"]
+        )
+
+        print(
+            f"  Seed {seed}: "
+            f"ARI={ari:.3f}"
+        )
+
+    # --------------------------------------------------------
+    # Average metrics
+    # --------------------------------------------------------
+
+    silhouette_values = [
+        result["silhouette"]
+        for result in results.values()
+    ]
+
+    print(
+        "\nMetric stability:"
+    )
+
+    print(
+        f"  Average Silhouette: "
+        f"{np.mean(silhouette_values):.3f}"
+    )
+
+    print(
+        f"  Silhouette Std: "
+        f"{np.std(silhouette_values):.3f}"
+    )
+
+    return results
+
+# ============================================================
+# AUTOMATIC PLAYSTYLE ARCHETYPE INTERPRETATION
+# ============================================================
+
+# ============================================================
+# ARCHETYPE NAMING VOCABULARY
+# ============================================================
+#
+# A name is built as:
+#
+#     {skill prefix} {0-N trait adjectives} {identity noun}
+#
+# e.g. "Advanced Aggressive Net Player" or
+# "Developing All-Court Player" -- always a grammatically
+# complete phrase (adjectives, then a noun), never a bare list
+# of unrelated words.
+#
+# TRAIT_DESCRIPTORS supply the adjectives: how the player plays
+# (temperament, precision, consistency). IDENTITY_DESCRIPTORS
+# supply the single noun that anchors the name: what kind of
+# player they are, based on shot selection. Splitting these two
+# roles is what keeps combinations readable -- two adjectives
+# plus one noun always reads as English, whereas stacking
+# arbitrary adjectives together does not.
+#
+# Naming compares a cluster only to its own siblings (other
+# style clusters in the same skill group), using the same
+# z-scored numbers K-Means itself clustered on -- this is
+# dataset-agnostic by construction, unlike fixed absolute
+# thresholds.
+#
+# drop_usage_rate and the two *_std preference features are
+# deliberately left out of naming (not the clustering feature
+# set): they overlap heavily with the two identity features
+# below and would just add redundant wording.
+# ============================================================
+
+TRAIT_DESCRIPTORS = {
+    "aggression_mean": ("Patient", "Aggressive"),
+    "drop_efficiency_mean": ("Raw", "Precise"),
+    "error_to_winner_ratio": ("Clean", "Error-Prone"),
+    "aggression_std": ("Steady", "Erratic"),
+    "drop_efficiency_std": ("Reliable", "Inconsistent"),
+    "winner_rate_std": ("Consistent", "Streaky"),
+    "general_error_rate_std": ("Composed", "Volatile"),
+    "dink_error_rate_std": ("Solid-Net", "Shaky-Net")
+}
+
+IDENTITY_DESCRIPTORS = {
+    "drop_preference_rate_mean": ("Driver", "Dropper"),
+    "net_game_preference_rate_mean": ("Power Player", "Net Player")
+}
+
+DEFAULT_IDENTITY_NOUN = "All-Court Player"
+
+# Cohen's d convention treats |z| >= 0.2 as at least a "small"
+# effect size. Below that, a cluster isn't meaningfully
+# different from its skill group's average on that feature, so
+# it's not worth naming after it.
+MEANINGFUL_EFFECT_SIZE = 0.2
+
+
+def get_playstyle_centroids(
+    clustered_data,
+    raw_playstyle_features
+):
+    """
+    Compute playstyle cluster centroids from each player's RAW
+    (pre-residualization, pre-scaling) feature values.
+
+    This intentionally does NOT reconstruct centroids from the
+    K-Means input space via scaler.inverse_transform: several
+    playstyle features are residualized against skill_score
+    before clustering (see
+    feature_engineering.residualize_playstyle_features), so
+    their scaled/residual values are small deltas around zero,
+    not human-readable percentages or rates. Averaging each
+    player's original values instead keeps the reported
+    centroids honest and interpretable.
+
+    Returns:
+        DataFrame containing one row per playstyle cluster.
+    """
+
+    merged = (
+        clustered_data[
+            [
+                "player_id",
+                "playstyle_cluster"
+            ]
+        ]
+        .merge(
+            raw_playstyle_features,
+            on="player_id",
+            how="left",
+            validate="one_to_one"
+        )
+    )
+
+    centroids = (
+        merged
+        .groupby(
+            "playstyle_cluster"
+        )[
+            PLAYSTYLE_CLUSTERING_FEATURES
+        ]
+        .mean()
+    )
+
+    return centroids
+
+
+# Known skill-group labels, mapped to a short prefix word.
+# interpret_skill_clusters can produce more than these two (a
+# 3-way split adds "Intermediate-Performance"; K > 3 falls back
+# to "Performance Group N") -- both of those are handled by the
+# fallback branch below, not hardcoded here, so this keeps
+# working if the number of skill groups changes.
+_KNOWN_SKILL_GROUP_PREFIXES = {
+    "Developing / Lower-Performance": "Developing",
+    "Higher-Performance": "Advanced"
+}
+
+
+def _skill_group_prefix(
+    skill_group
+):
+    """
+    Short word used to prefix a generated archetype name.
+    Unlike the naming logic itself, this is just cosmetic --
+    it does not gate which descriptors get chosen.
+
+    Falls back to a shortened version of whatever
+    interpret_skill_clusters produced (e.g.
+    "Intermediate-Performance" -> "Intermediate",
+    "Performance Group 3" -> "Group 3") so naming keeps working
+    if skill K ever selects more than 2-3 groups.
+    """
+
+    if skill_group in _KNOWN_SKILL_GROUP_PREFIXES:
+        return _KNOWN_SKILL_GROUP_PREFIXES[skill_group]
+
+    return (
+        skill_group
+        .replace("-Performance", "")
+        .replace("Performance Group", "Group")
+    )
+
+
+def _pick_identity_noun(
+    scaled_profile
+):
+    """
+    Pick the single noun that anchors an archetype name, from
+    whichever identity feature (shot-selection tendency) is
+    furthest from this skill group's average. Falls back to a
+    generic noun if neither identity feature is meaningfully
+    different from average.
+    """
+
+    best_magnitude = 0.0
+    best_noun = DEFAULT_IDENTITY_NOUN
+
+    for feature, (low_label, high_label) in (
+        IDENTITY_DESCRIPTORS.items()
+    ):
+
+        z = scaled_profile[feature]
+
+        if abs(z) > best_magnitude:
+
+            best_magnitude = abs(z)
+
+            best_noun = (
+                high_label
+                if z >= 0
+                else low_label
+            )
+
+    if best_magnitude < MEANINGFUL_EFFECT_SIZE:
+        return DEFAULT_IDENTITY_NOUN
+
+    return best_noun
+
+
+def _rank_trait_descriptors(
+    scaled_profile
+):
+    """
+    Rank every trait feature by how far this cluster sits from
+    its skill group's average (in standard deviations),
+    furthest first. Returns (magnitude, label) pairs.
+    """
+
+    scored = []
+
+    for feature, (low_label, high_label) in (
+        TRAIT_DESCRIPTORS.items()
+    ):
+
+        z = scaled_profile[feature]
+
+        label = (
+            high_label
+            if z >= 0
+            else low_label
+        )
+
+        scored.append(
+            (abs(z), label)
+        )
+
+    scored.sort(
+        key=lambda scored_pair: scored_pair[0],
+        reverse=True
+    )
+
+    return scored
+
+
+# ============================================================
+# SKILL-AWARE PLAYSTYLE ARCHETYPE NAMING
+# ============================================================
+
+def generate_playstyle_archetype_name(
+    scaled_profile,
+    skill_group,
+    max_traits=2
+):
+    """
+    Generate a human-readable playstyle name from a cluster's
+    centroid in the SAME z-scored, skill-residualized space
+    K-Means actually clustered on (one row of the scaled
+    centroids computed in interpret_playstyle_clusters).
+
+    The name always has the shape:
+
+        {skill prefix} {0 to max_traits adjectives} {noun}
+
+    which reads as a grammatically ordinary phrase no matter
+    how many adjectives are included, rather than a list of
+    loosely related words. `max_traits` is raised by
+    interpret_playstyle_clusters when two clusters would
+    otherwise generate the same name -- e.g. if a skill group
+    is later split into more style clusters than this
+    vocabulary can uniquely describe with just 2 adjectives.
+
+    Each value in `scaled_profile` is already "number of
+    standard deviations from this skill group's average" for
+    that feature -- a magnitude that means the same thing
+    regardless of the feature's original units or the dataset
+    it came from.
+
+    The naming layer does NOT affect K-Means -- it only
+    describes clusters after the fact.
+    """
+
+    ranked_traits = _rank_trait_descriptors(
+        scaled_profile
+    )
+
+    traits = [
+        label
+        for magnitude, label in ranked_traits
+        if magnitude >= MEANINGFUL_EFFECT_SIZE
+    ][:max_traits]
+
+    noun = _pick_identity_noun(
+        scaled_profile
+    )
+
+    prefix = _skill_group_prefix(
+        skill_group
+    )
+
+    parts = [prefix] + traits + [noun]
+
+    return " ".join(parts)
+
+
+def _generate_unique_playstyle_names(
+    scaled_centroids,
+    skill_group
+):
+    """
+    Generate archetype names for every cluster in one skill
+    group, resolving any collisions by asking for MORE
+    descriptive detail (more adjectives) rather than jumping
+    straight to a meaningless "Type 2" suffix.
+
+    This is what lets naming keep working if a skill group is
+    ever split into more style clusters than 2 adjectives can
+    tell apart -- as clusters increase, this tries 3 adjectives,
+    then the full trait vocabulary, before it ever resorts to
+    numbering duplicates.
+    """
+
+    cluster_ids = list(
+        scaled_centroids.index
+    )
+
+    trait_counts_to_try = sorted(
+        {2, 3, len(TRAIT_DESCRIPTORS)}
+    )
+
+    archetype_map = {}
+
+    for max_traits in trait_counts_to_try:
+
+        archetype_map = {
+            int(cluster_id): generate_playstyle_archetype_name(
+                scaled_centroids.loc[cluster_id],
+                skill_group,
+                max_traits=max_traits
+            )
+            for cluster_id in cluster_ids
+        }
+
+        all_unique = (
+            len(set(archetype_map.values()))
+            ==
+            len(cluster_ids)
+        )
+
+        if all_unique:
+            return archetype_map
+
+    # ----------------------------------------------------
+    # Even the full trait vocabulary couldn't tell every
+    # cluster apart (rare -- only possible with many nearly
+    # identical clusters). Number the remaining duplicates
+    # as a last resort.
+    # ----------------------------------------------------
+
+    used_names = {}
+
+    for cluster_id, name in list(
+        archetype_map.items()
+    ):
+
+        if name not in used_names:
+
+            used_names[name] = 1
+
+        else:
+
+            used_names[name] += 1
+
+            archetype_map[
+                cluster_id
+            ] = (
+                f"{name} "
+                f"Type {used_names[name]}"
+            )
+
+    return archetype_map
+
+
+# ============================================================
+# INTERPRET PLAYSTYLE CLUSTERS
+# ============================================================
+
+def interpret_playstyle_clusters(
+    group_data,
+    clustered_data,
+    raw_playstyle_features
+):
+    """
+    Interpret the playstyle clusters after K-Means.
+
+    The cluster labels are generated from the cluster
+    statistics and the skill-group context.
+    """
+
+    # --------------------------------------------------------
+    # Identify the skill group
+    # --------------------------------------------------------
+
+    skill_group = (
+        group_data[
+            "skill_group"
+        ]
+        .iloc[0]
+    )
+
+    # --------------------------------------------------------
+    # Raw centroids, for human-readable display/evidence
+    # (print_playstyle_evidence, print_playstyle_cluster_profiles)
+    # --------------------------------------------------------
+
+    centroids = (
+        get_playstyle_centroids(
+            clustered_data,
+            raw_playstyle_features
+        )
+    )
+
+    # --------------------------------------------------------
+    # Scaled centroids, in the SAME z-scored space K-Means
+    # clustered on. Used ONLY for naming: this is what
+    # actually distinguishes each cluster from its siblings,
+    # already skill-adjusted and unit-free.
+    # --------------------------------------------------------
+
+    scaled_centroids = (
+        clustered_data
+        .groupby(
+            "playstyle_cluster"
+        )[
+            PLAYSTYLE_CLUSTERING_FEATURES
+        ]
+        .mean()
+    )
+
+    # --------------------------------------------------------
+    # Generate names (escalates detail level to resolve
+    # collisions before falling back to numbering duplicates --
+    # see _generate_unique_playstyle_names)
+    # --------------------------------------------------------
+
+    archetype_map = _generate_unique_playstyle_names(
+        scaled_centroids,
+        skill_group
+    )
+
+    return (
+        archetype_map,
+        centroids,
+        scaled_centroids
+    )
+
+# ============================================================
+# APPLY PLAYSTYLE ARCHETYPE LABELS
+# ============================================================
+
+def apply_playstyle_archetypes(
+    clustered_data,
+    archetype_map
+):
+    """
+    Add the automatically generated archetype name to
+    every player based on their playstyle cluster.
+    """
+
+    result = clustered_data.copy()
+
+    result[
+        "playstyle_archetype"
+    ] = (
+        result[
+            "playstyle_cluster"
+        ]
+        .map(
+            archetype_map
+        )
+    )
+
+    return result
+
+
+# ============================================================
+# PRINT PLAYSTYLE ARCHETYPE SUMMARY
+# ============================================================
+
+def print_playstyle_archetype_summary(
+    clustered_data,
+    archetype_map
+):
+    """
+    Display the discovered archetype names and
+    player counts.
+    """
+
+    print(
+        "\n=== AUTOMATIC PLAYSTYLE ARCHETYPES ==="
+    )
+
+    for cluster_id, archetype in (
+        sorted(
+            archetype_map.items()
+        )
+    ):
+
+        players = (
+            clustered_data[
+                clustered_data[
+                    "playstyle_cluster"
+                ]
+                ==
+                cluster_id
+            ]
+        )
+
+        print(
+            f"\nPlaystyle Cluster {cluster_id}"
+        )
+
+        print(
+            f"  Archetype: "
+            f"{archetype}"
+        )
+
+        print(
+            f"  Players: "
+            f"{len(players)}"
+        )
+
+        print(
+            f"  Average skill score: "
+            f"{players['skill_score'].mean():.2f}"
+        )
+
+
+def print_playstyle_evidence(
+    clustered_data,
+    archetype_map,
+    centroids
+):
+    """
+    Display the statistics supporting each automatically
+    generated archetype name.
+
+    This is useful for the PaddlePad UI because the system
+    can explain the classification using the player's own
+    behavioral statistics.
+    """
+
+    print(
+        "\n=== PLAYSTYLE ARCHETYPE EVIDENCE ==="
+    )
+
+    for cluster_id, archetype in (
+        sorted(
+            archetype_map.items()
+        )
+    ):
+
+        profile = centroids.loc[
+            cluster_id
+        ]
+
+        print(
+            f"\n{archetype}"
+        )
+
+        print(
+            f"  Aggression: "
+            f"{profile['aggression_mean']:.3f}"
+        )
+
+        print(
+            f"  Drop efficiency: "
+            f"{profile['drop_efficiency_mean'] * 100:.1f}%"
+        )
+
+        print(
+            f"  Drop usage: "
+            f"{profile['drop_usage_rate']:.3f} / min"
+        )
+
+        print(
+            f"  Error-to-winner ratio: "
+            f"{profile['error_to_winner_ratio']:.3f}"
+        )
+
+        print(
+            f"  Aggression variability: "
+            f"{profile['aggression_std']:.3f}"
+        )
+
+        print(
+            f"  Drop efficiency variability: "
+            f"{profile['drop_efficiency_std']:.3f}"
+        )
+
+        print(
+            f"  Winner variability: "
+            f"{profile['winner_rate_std']:.3f}"
+        )
+
+        print(
+            f"  General error variability: "
+            f"{profile['general_error_rate_std']:.3f}"
+        )
+
+        print(
+            f"  Dink error variability: "
+            f"{profile['dink_error_rate_std']:.3f}"
+        )
+
+        print(
+            f"  Drop preference (drop vs. drive): "
+            f"{profile['drop_preference_rate_mean'] * 100:.1f}%"
+        )
+
+        print(
+            f"  Net-game preference (dink vs. power winners): "
+            f"{profile['net_game_preference_rate_mean'] * 100:.1f}%"
+        )
+
+# ============================================================
+# FINAL PADDLEPAD PLAYER PROFILES
+# ============================================================
+
+def build_final_player_profiles(
+    developing_playstyles,
+    higher_playstyles,
+    playstyle_features
+):
+    """
+    Build one clean final record per player.
+
+    The final result contains:
+
+        player_id
+        skill_score
+        skill_group
+        skill_cluster
+        playstyle_cluster
+        playstyle_archetype
+
+    Plus the player's own playstyle evidence.
+    """
+
+    # ========================================================
+    # 1. COMBINE THE TWO PLAYSTYLE BRANCHES
+    # ========================================================
+
+    playstyle_assignments = pd.concat(
+        [
+            developing_playstyles[
+                [
+                    "player_id",
+                    "skill_score",
+                    "skill_group",
+                    "skill_cluster",
+                    "playstyle_cluster",
+                    "playstyle_archetype"
+                ]
+            ],
+
+            higher_playstyles[
+                [
+                    "player_id",
+                    "skill_score",
+                    "skill_group",
+                    "skill_cluster",
+                    "playstyle_cluster",
+                    "playstyle_archetype"
+                ]
+            ]
+        ],
+        ignore_index=True
+    )
+
+    # ========================================================
+    # 2. SELECT PLAYER'S OWN EVIDENCE
+    # ========================================================
+
+    evidence_columns = [
+        "aggression_mean",
+        "aggression_std",
+        "drop_efficiency_mean",
+        "drop_efficiency_std",
+        "winner_rate_std",
+        "general_error_rate_std",
+        "dink_error_rate_std",
+        "drop_usage_rate",
+        "error_to_winner_ratio",
+        "drop_preference_rate_mean",
+        "drop_preference_rate_std",
+        "net_game_preference_rate_mean",
+        "net_game_preference_rate_std"
+    ]
+
+    player_evidence = playstyle_features[
+        [
+            "player_id",
+            *evidence_columns
+        ]
+    ].copy()
+
+    # ========================================================
+    # 3. VERIFY UNIQUE PLAYER IDS
+    # ========================================================
+
+    if playstyle_assignments[
+        "player_id"
+    ].duplicated().any():
+
+        raise ValueError(
+            "Duplicate player IDs found in playstyle assignments."
+        )
+
+    if player_evidence[
+        "player_id"
+    ].duplicated().any():
+
+        raise ValueError(
+            "Duplicate player IDs found in player evidence."
+        )
+
+    # ========================================================
+    # 4. MERGE PLAYER ASSIGNMENT + PLAYER EVIDENCE
+    # ========================================================
+
+    final_profiles = playstyle_assignments.merge(
+        player_evidence,
+        on="player_id",
+        how="left",
+        validate="one_to_one"
+    )
+
+    # ========================================================
+    # 5. VERIFY EVERY PLAYER HAS EVIDENCE
+    # ========================================================
+
+    missing_evidence = (
+        final_profiles[
+            evidence_columns
+        ]
+        .isnull()
+        .any(axis=1)
+    )
+
+    if missing_evidence.any():
+
+        missing_players = (
+            final_profiles.loc[
+                missing_evidence,
+                "player_id"
+            ]
+            .tolist()
+        )
+
+        raise ValueError(
+            "Missing playstyle evidence for players: "
+            + ", ".join(missing_players)
+        )
+
+    # ========================================================
+    # 6. SORT
+    # ========================================================
+
+    final_profiles = (
+        final_profiles
+        .sort_values(
+            "player_id"
+        )
+        .reset_index(
+            drop=True
+        )
+    )
+
+    return final_profiles
+
+# ============================================================
+# PRINT FINAL PADDLEPAD PLAYER PROFILES
+# ============================================================
+
+def print_final_player_profiles(
+    final_profiles,
+    number_of_players=20
+):
+    """
+    Display the final PaddlePad player profiles.
+
+    Shows:
+        - Skill score
+        - Discovered skill group
+        - Playstyle cluster
+        - Playstyle archetype
+        - Player's own behavioral evidence
+    """
+
+    columns = [
+        "player_id",
+        "skill_score",
+        "skill_group",
+        "skill_cluster",
+        "playstyle_cluster",
+        "playstyle_archetype",
+        "aggression_mean",
+        "drop_efficiency_mean",
+        "drop_usage_rate",
+        "error_to_winner_ratio",
+        "drop_preference_rate_mean",
+        "net_game_preference_rate_mean",
+        "aggression_std",
+        "general_error_rate_std",
+        "dink_error_rate_std"
+    ]
+
+    print(
+        "\n=== FINAL PADDLEPAD PLAYER PROFILES ==="
+    )
+
+    print(
+        final_profiles[
+            columns
+        ]
+        .head(
+            number_of_players
+        )
+        .to_string(
+            index=False
+        )
+    )

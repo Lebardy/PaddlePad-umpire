@@ -4,6 +4,7 @@ import { requirePlayer } from '../auth.js'
 import {
   countMatchesInProgress,
   getPlayerMatches,
+  getRatingState,
   summarisePlayer,
 } from '../player-stats.js'
 
@@ -27,12 +28,20 @@ router.get('/me', async (req, res) => {
     countMatchesInProgress(query, req.player.id),
   ])
 
+  // Needs the match count, so it runs after the pair above rather than
+  // alongside them. One extra query on the profile load, and only when
+  // the player has no rating yet does it cost a second.
+  const rating = await getRatingState(query, req.player.id, matches.length)
+
   res.json({
     player: { id: rows[0].id, name: rows[0].name, claimedAt: rows[0].claimed_at },
     summary: summarisePlayer(matches),
     // Lets the empty state say "being scored right now" rather than the
     // flatly discouraging "no matches".
     inProgress,
+    // Either a score with the pool it was measured against, or the
+    // reason there isn't one yet. Never a bare null.
+    rating,
   })
 })
 

@@ -109,6 +109,7 @@ you expect is actually in the served bundle.
    |---|---|
    | `JWT_SECRET` | A fresh random 48-byte hex string — **not** the one from your local `.env` |
    | `CORS_ORIGIN` | Comma-separated list of every app origin, e.g. `https://paddlepad-umpire.up.railway.app,https://paddlepad.up.railway.app` |
+   | `INTERNAL_API_KEY` | A fresh random 48-byte hex string, shared only with the `ml` service in the **same** environment. Different per environment. |
 
    `PORT` is provided by Railway; the server reads it automatically.
 
@@ -177,8 +178,32 @@ If you ever recreate it, verify these before trusting it:
 | `POST` | `/auth/register` | — | Create an umpire account |
 | `POST` | `/auth/login` | — | Sign in, returns a token |
 | `GET` | `/auth/me` | Bearer | Validate a stored token on app launch |
+| `GET` | `/export/match-logs.csv` | Bearer (umpire) | The club-wide ML export |
+| `GET` | `/player/me` | Bearer (player) | A player's own summary, plus their rating or its gate state |
+| `GET` | `/internal/match-logs.json` | `x-internal-key` | Same rows as the export, for the ML service |
+| `POST` | `/internal/ratings` | `x-internal-key` | Records one pipeline run as a snapshot |
 
 Tokens are JWTs valid for 30 days, sent as `Authorization: Bearer <token>`.
+
+### The `/internal` routes
+
+These are for the ML service (`ml/`) and nothing else. They use a shared
+key in `x-internal-key`, not a bearer token, and the two systems do not
+overlap in either direction: an umpire token is refused on `/internal`,
+and the key is accepted nowhere else. When `INTERNAL_API_KEY` is unset
+the routes refuse everything, so a missing value is a locked door rather
+than an open one.
+
+A service umpire account was the obvious alternative and was rejected:
+that would be a real login with a real password hash, able to sign in to
+the umpire app and score matches. The ML service needs to read match
+logs and write a ratings snapshot. A header key grants exactly that.
+
+Ratings are stored as immutable **snapshots** (`rating_runs` +
+`player_ratings`), never as a column on `players`. The score is entirely
+pool-relative, so it moves when *other* people play; without the date
+and pool size stored alongside it, that movement would be unexplainable
+after the fact. See the comment above those tables in `schema.sql`.
 
 ## Security notes
 

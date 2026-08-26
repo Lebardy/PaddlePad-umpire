@@ -210,3 +210,80 @@ CREATE TABLE IF NOT EXISTS match_events (
 -- same event position twice cannot duplicate it.
 CREATE UNIQUE INDEX IF NOT EXISTS match_events_match_seq_idx
     ON match_events (match_id, seq);
+
+-- ============================================================
+-- ML pipeline results
+--
+-- Ratings are stored as immutable SNAPSHOTS, never as a column on
+-- players, and this is the most important thing to understand about
+-- these two tables.
+--
+-- The skill score is entirely POOL-RELATIVE: skill_model.py scores
+-- each player by where they sit between the weakest and strongest
+-- player currently in the data (min_max_normalize). A player's number
+-- therefore moves because OTHER PEOPLE played, without them touching a
+-- paddle. If a rating were a column that got overwritten, that movement
+-- would be invisible and unexplainable -- someone would open the app,
+-- see they had dropped four points, and nothing anywhere could say why.
+--
+-- As snapshots, every number carries the moment it was computed and the
+-- size of the pool it was computed against. "78, as of 24 August,
+-- against 46 players" is a defensible statement; "78" alone is not.
+-- It also means a bad run can be discarded without losing the last
+-- good one.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS rating_runs (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    computed_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- 'completed' rows are the only ones ever read by the app. A run
+    -- that fails its own integrity checks is recorded as 'failed' with
+    -- the reason in `notes`, so a silent no-op is distinguishable from
+    -- a run that never happened.
+    status           TEXT NOT NULL DEFAULT 'completed'
+                     CHECK (status IN ('completed', 'failed')),
+    -- The pool the scores are relative to. Without these two numbers a
+    -- stored score cannot be interpreted later.
+    player_count     INTEGER NOT NULL DEFAULT 0,
+    match_count      INTEGER NOT NULL DEFAULT 0,
+    -- Which revision of the vendored pipeline produced this. Scores
+    -- from different pipeline versions are not comparable.
+    pipeline_version TEXT,
+    -- Free-form record of the conditions of the run: the point-target
+    -- mix, how many players were held back by the sufficiency gate,
+    -- and the failure reason when status = 'failed'.
+    notes            JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+
+CREATE INDEX IF NOT EXISTS rating_runs_latest_idx
+    ON rating_runs (computed_at DESC) WHERE status = 'completed';
+
+CREATE TABLE IF NOT EXISTS player_ratings (
+    run_id             UUID NOT NULL REFERENCES rating_runs (id) ON DELETE CASCADE,
+    player_id          UUID NOT NULL REFERENCES players (id) ON DELETE CASCADE,
+    -- 0-100, relative to the pool recorded on the run.
+    skill_score        DOUBLE PRECISION NOT NULL,
+    -- Stored but deliberately NOT shown in the player app. assign_skill_tier
+    -- applies absolute cutoffs (40 / 75) to a relative score, so in a small
+    -- pool the best player scores 100 and is labelled "Professional"
+    -- regardless of how they actually play. Keeping the value means the
+    -- problem stays visible in the data rather than being hidden.
+    skill_tier         TEXT,
+    -- Level 1 of the clustering: which broad performance band the player
+    -- was placed in before playstyles were clustered within it.
+    skill_group        TEXT,
+    playstyle_cluster  INTEGER,
+    playstyle_archetype TEXT,
+    -- The player's own feature values behind the archetype, so a rating
+    -- can be explained rather than merely asserted.
+    evidence           JSONB NOT NULL DEFAULT '{}'::jsonb,
+    -- How many matches this player's row was computed from. Below the
+    -- gate's floor a player is excluded from the run entirely, so this
+    -- is always a qualifying count -- recorded so the app can say what
+    -- the number rests on.
+    match_count        INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (run_id, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS player_ratings_player_idx
+    ON player_ratings (player_id);

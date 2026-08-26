@@ -1,0 +1,5 @@
+# One worker: runs are serialised by a lock inside the process anyway,
+# and a second worker would only make it possible to start two runs at
+# once from different connections. The timeout is generous because a run
+# is real computation, not a request.
+web: gunicorn service:app --bind 0.0.0.0:$PORT --workers 1 --timeout 600

@@ -494,6 +494,47 @@
 }
 .trend-early h2 { margin-bottom: 0.4rem; }
 
+/* ============ Skill rating ============ */
+
+/* Same card as .trend rather than a variant of its own: the rating is
+   one more thing the overview says, not a special announcement, and
+   giving it a louder surface than everything around it would read as an
+   advertisement for the feature. */
+.rating {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.5rem;
+}
+.rating h2 { font-size: 0.95rem; }
+.rating .section-head { margin-bottom: 0.6rem; }
+.rating-progress h2 { margin-bottom: 0.7rem; }
+.rating-progress .muted-inline { margin-top: 0.6rem; display: block; line-height: 1.45; }
+
+.rating-score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  margin-bottom: 0.15rem;
+}
+.rating-number {
+  font-size: 2.6rem;
+  font-weight: 700;
+  line-height: 1;
+  /* Tabular figures so the number does not jump sideways between runs. */
+  font-variant-numeric: tabular-nums;
+  color: var(--primary);
+}
+.rating-outof { font-size: 0.9rem; color: var(--text-muted); }
+
+.rating-archetype {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.rating-scored .muted-inline { display: block; line-height: 1.45; }
+
 /* ============ Personal bests ============ */
 
 .bests { margin-bottom: 1.5rem; }

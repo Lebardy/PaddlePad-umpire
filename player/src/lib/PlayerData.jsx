@@ -29,6 +29,10 @@ export function PlayerDataProvider({ children }) {
     summary: null,
     matches: [],
     inProgress: 0,
+    // Either a skill score with the pool it was measured against, or
+    // the reason there isn't one yet. Never a bare null -- see
+    // getRatingState on the server for why the difference matters.
+    rating: null,
     loading: true,
     error: null,
     loadedAt: null,
@@ -60,6 +64,7 @@ export function PlayerDataProvider({ children }) {
           summary: me.summary,
           matches: history,
           inProgress: me.inProgress ?? 0,
+          rating: me.rating ?? null,
           loading: false,
           error: null,
           loadedAt: loadedAtRef.current,
@@ -74,6 +79,7 @@ export function PlayerDataProvider({ children }) {
           loading: false,
           error: err.message,
           matches: quiet ? s.matches : [],
+          rating: quiet ? s.rating : null,
         }))
       } finally {
         inFlightRef.current = null

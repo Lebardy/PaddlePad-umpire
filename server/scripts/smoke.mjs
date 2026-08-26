@@ -366,6 +366,133 @@ async function main() {
   check('every csv row has the same column count',
     lines.slice(1).every((l) => l.split(',').length === headerCols))
 
+  // ============================================================
+  section('internal — the ML pipeline seam')
+  // ============================================================
+
+  const INTERNAL_KEY = process.env.SMOKE_INTERNAL_KEY
+  if (!INTERNAL_KEY) {
+    check('SMOKE_INTERNAL_KEY is set so the internal routes can be tested', false,
+      'set it to the API\'s INTERNAL_API_KEY')
+  } else {
+    async function internal(path, { method = 'GET', body, key = INTERNAL_KEY } = {}) {
+      const response = await fetch(API + path, {
+        method,
+        headers: {
+          ...(body ? { 'Content-Type': 'application/json' } : {}),
+          ...(key ? { 'x-internal-key': key } : {}),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      })
+      const text = await response.text()
+      let json
+      try { json = JSON.parse(text) } catch { json = { raw: text } }
+      return { status: response.status, body: json }
+    }
+
+    const noKey = await internal('/internal/match-logs.json', { key: null })
+    check('internal without a key -> 401', noKey.status === 401, String(noKey.status))
+
+    const wrongKey = await internal('/internal/match-logs.json', { key: 'x'.repeat(64) })
+    check('internal with a wrong key -> 401', wrongKey.status === 401, String(wrongKey.status))
+
+    // The two credential systems must not overlap in EITHER direction:
+    // an umpire token is the credential most likely to be lying around,
+    // and it must not open the service door.
+    const asUmpire = await call('/internal/match-logs.json')
+    check('an umpire token is not accepted on internal -> 401',
+      asUmpire.status === 401, String(asUmpire.status))
+
+    const logs = await internal('/internal/match-logs.json')
+    check('internal match-logs with the key -> 200', logs.status === 200)
+    check('internal returns the same rows as the umpire export',
+      logs.body.count === (json.body.rows ?? []).length,
+      `${logs.body.count} vs ${(json.body.rows ?? []).length}`)
+    // The gate rides along with the data so the Python side does not
+    // keep its own copy of the thresholds to drift out of step with.
+    check('internal carries the rating gate thresholds',
+      typeof logs.body.gate?.minMatchesPerPlayer === 'number' &&
+      typeof logs.body.gate?.minPlayers === 'number', JSON.stringify(logs.body.gate))
+
+    // A failed run is recorded rather than dropped: "the gate held" and
+    // "the service never woke up" must not look identical afterwards.
+    const failedRun = await internal('/internal/ratings', {
+      method: 'POST',
+      body: { status: 'failed', notes: { reason: 'smoke test' } },
+    })
+    check('a failed run is recorded -> 201', failedRun.status === 201, String(failedRun.status))
+
+    const bogus = await internal('/internal/ratings', {
+      method: 'POST',
+      body: { ratings: [{ playerId: uuid(), skillScore: 50 }] },
+    })
+    check('ratings for an unknown player are refused -> 400', bogus.status === 400,
+      JSON.stringify(bogus.body).slice(0, 80))
+
+    const good = await internal('/internal/ratings', {
+      method: 'POST',
+      body: {
+        pipelineVersion: 'smoke',
+        playerCount: 1,
+        matchCount: 9,
+        ratings: [{
+          playerId: playerA,
+          skillScore: 72.4,
+          skillTier: 'Intermediate',
+          skillGroup: 'Higher-Performance',
+          playstyleCluster: 1,
+          playstyleArchetype: 'Patient Net Controller',
+          evidence: { aggression_mean: 0.61 },
+          matchCount: 9,
+        }],
+      },
+    })
+    check('a completed run is written -> 201', good.status === 201, String(good.status))
+
+    // The whole point of storing snapshots: the number is meaningless
+    // without the pool and the moment it was computed against.
+    check('the run records the pool it was computed against',
+      good.body.run?.id && good.body.run?.computed_at, JSON.stringify(good.body.run))
+
+    const dupe = await internal('/internal/ratings', {
+      method: 'POST',
+      body: { ratings: [
+        { playerId: playerA, skillScore: 1 },
+        { playerId: playerA, skillScore: 2 },
+      ] },
+    })
+    check('a duplicate player in one snapshot is refused -> 400', dupe.status === 400,
+      String(dupe.status))
+
+    // And the player-facing end of the seam: the score reaches the
+    // player app, with the two facts that make it interpretable.
+    const claimed = await fetch(`${API}/auth/player/claim`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: claim.body.claimCode }),
+    })
+    const claimBody = await claimed.json()
+    if (claimBody.token) {
+      const me = await fetch(`${API}/player/me`, {
+        headers: { Authorization: `Bearer ${claimBody.token}` },
+      }).then((r) => r.json())
+      check('the player sees their rating', me.rating?.state === 'rated',
+        JSON.stringify(me.rating).slice(0, 90))
+      check('the rating is rounded, not false precision', me.rating?.skillScore === 72,
+        String(me.rating?.skillScore))
+      check('the rating carries the pool it was measured against',
+        me.rating?.poolSize === 1 && !!me.rating?.computedAt,
+        JSON.stringify(me.rating))
+      // Absolute cutoffs on a relative score would label the top player
+      // in a pool of twelve "Professional". Stored, never shown.
+      check('the tier is not sent to the player', me.rating?.skillTier === undefined,
+        String(me.rating?.skillTier))
+    } else {
+      check('claiming a player for the rating check succeeded', false,
+        JSON.stringify(claimBody).slice(0, 80))
+    }
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) {
     console.log('\nfailed:')

@@ -161,3 +161,49 @@ export function requireAdmin(queryFn) {
     }
   }
 }
+
+// ============================================================
+// Service-to-service auth for the ML pipeline
+// ============================================================
+
+// The ML service needs to read match logs and write back a ratings
+// snapshot, and nothing else. A shared key grants exactly that.
+//
+// Deliberately NOT a service umpire account: that would be a real login
+// with a real password hash that could sign in to the umpire app and
+// score matches. The smallest credential that does the job is the right
+// one.
+//
+// Unset means the internal routes refuse everything rather than falling
+// open, so forgetting to set it in Railway is a locked door, not an
+// open one.
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY
+
+/**
+ * Requires the shared internal-service key in `x-internal-key`.
+ *
+ * An umpire or player bearer token is NOT accepted here, and this key
+ * is not accepted anywhere else -- the two credential systems do not
+ * overlap in either direction.
+ */
+export function requireInternalKey(req, res, next) {
+  if (!INTERNAL_API_KEY || INTERNAL_API_KEY.length < 32) {
+    return res.status(503).json({
+      error: 'Internal API is not configured on this server',
+    })
+  }
+
+  const presented = req.get('x-internal-key') ?? ''
+
+  // Compared in constant time on equal-length buffers. Buffer.from of a
+  // shorter string would make timingSafeEqual throw rather than return
+  // false, so the length check comes first and is itself the only
+  // length-dependent branch.
+  const expected = Buffer.from(INTERNAL_API_KEY)
+  const actual = Buffer.from(presented)
+  if (actual.length !== expected.length || !timingSafeEqual(expected, actual)) {
+    return res.status(401).json({ error: 'Missing or invalid internal key' })
+  }
+
+  next()
+}

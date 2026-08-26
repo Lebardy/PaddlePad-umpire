@@ -15,6 +15,7 @@
 // ============================================================
 
 import { deriveMatchState } from './pickleball.js'
+import { MIN_MATCHES_PER_PLAYER, RECOMMENDED_PLAYERS } from './rating-gate.js'
 
 /**
  * Every completed match this player appeared in, newest first.
@@ -250,4 +251,105 @@ export async function countMatchesInProgress(query, playerId) {
     [playerId],
   )
   return rows[0].n
+}
+
+// ============================================================
+// The ML skill rating, and what to say when there isn't one
+// ============================================================
+
+/**
+ * What this player's rating situation is right now.
+ *
+ * Returns one of four states rather than a nullable score, because
+ * "we have not computed this yet" and "you have not played enough" and
+ * "not enough people have played enough" are three genuinely different
+ * things and the app should not be left guessing which it is looking
+ * at. Only `rated` carries a number.
+ *
+ * `matchCount` is passed in rather than re-queried: the caller has
+ * already loaded this player's matches, and that array is filtered by
+ * exactly the same rules the gate counts against.
+ */
+export async function getRatingState(query, playerId, matchCount) {
+  const { rows: rated } = await query(
+    `SELECT r.skill_score, r.skill_group, r.playstyle_archetype,
+            r.evidence, r.match_count,
+            run.computed_at, run.player_count
+       FROM player_ratings r
+       JOIN rating_runs run ON run.id = r.run_id
+      WHERE r.player_id = $1
+        AND run.status = 'completed'
+      ORDER BY run.computed_at DESC
+      LIMIT 1`,
+    [playerId],
+  )
+
+  if (rated[0]) {
+    const row = rated[0]
+    return {
+      state: 'rated',
+      // Rounded here rather than in the app: the extra decimals are
+      // false precision on a score this relative, and rounding once at
+      // the source stops two screens disagreeing.
+      skillScore: Math.round(row.skill_score),
+      playstyleArchetype: row.playstyle_archetype,
+      skillGroup: row.skill_group,
+      evidence: row.evidence,
+      // The two facts that make a relative score interpretable. Never
+      // send the score without them.
+      computedAt: row.computed_at,
+      poolSize: row.player_count,
+      fromMatches: row.match_count,
+      // skill_tier is deliberately not returned. assign_skill_tier
+      // applies absolute cutoffs (40 / 75) to a purely relative score,
+      // so in a small pool the top player is labelled "Professional"
+      // regardless of how they play -- a straightforwardly false claim
+      // to put in front of a real person. The value stays in the
+      // database for analysis.
+    }
+  }
+
+  // The player's own progress comes first, and is the only thing shown
+  // until they clear it. Telling someone they are blocked by how many
+  // OTHER people have played is telling them about something they
+  // cannot influence.
+  if (matchCount < MIN_MATCHES_PER_PLAYER) {
+    return {
+      state: 'not_enough_matches',
+      have: matchCount,
+      need: MIN_MATCHES_PER_PLAYER,
+    }
+  }
+
+  // Only reached once this player personally qualifies, at which point
+  // the pool condition is both true and specific.
+  const { rows } = await query(
+    `SELECT count(*)::int AS n FROM (
+        SELECT p.id
+          FROM players p
+          JOIN matches m
+            ON (m.team_a @> ARRAY[p.id]::uuid[] OR m.team_b @> ARRAY[p.id]::uuid[])
+          JOIN sessions s ON s.id = m.session_id
+         WHERE m.status = 'completed'
+           AND m.voided_at IS NULL
+           AND s.voided_at IS NULL
+         GROUP BY p.id
+        HAVING count(*) >= $1
+     ) qualifying`,
+    [MIN_MATCHES_PER_PLAYER],
+  )
+  const qualifying = rows[0].n
+
+  // Enough people qualify, but this player is not in the latest run --
+  // they cleared the bar since it last ran, so the answer is "soon",
+  // not "not yet".
+  if (qualifying >= RECOMMENDED_PLAYERS) {
+    return { state: 'pending', poolSize: qualifying }
+  }
+
+  return {
+    state: 'not_enough_players',
+    have: qualifying,
+    need: RECOMMENDED_PLAYERS,
+  }
 }
