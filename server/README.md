@@ -130,6 +130,7 @@ uses; `staging` is an identical copy to deploy to first.
 | api | `paddlepad-api.up.railway.app` | `api-staging-8ac6.up.railway.app` |
 | web (umpire) | `paddlepad-umpire.up.railway.app` | `web-staging-e8e9.up.railway.app` |
 | play (player) | `paddlepad.up.railway.app` | `play-staging-7f59.up.railway.app` |
+| ml (pipeline) | not deployed yet | `ml-staging-12f5.up.railway.app` |
 
 ```bash
 railway up --service api  --environment staging

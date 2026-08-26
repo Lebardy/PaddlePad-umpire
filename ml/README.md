@@ -91,6 +91,16 @@ Always `--dry-run` first against an environment you care about.
 
 A fourth Railway service per environment, root directory `/ml`, with:
 
+**Set the root directory before the first deploy.** There is no CLI flag
+for it -- it is a service setting in the Railway dashboard, under
+Settings -> Source -> Root Directory. `railway up` uploads the git root
+regardless of which directory you run it from, so a service left at the
+default `/` builds the repo root: this service's first deploy served the
+React umpire app on `ml-staging-12f5.up.railway.app` and reported
+success while doing it. A green deploy is not evidence the right thing
+was built; check what the URL actually serves.
+
+
 - `PADDLEPAD_API_URL` — the api service's URL for the same environment.
   **Check this points at the matching environment.** Staging computing
   against production data and publishing to staging would look entirely
