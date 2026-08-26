@@ -48,8 +48,7 @@ function RatingHistory({ history }) {
   if (!history || history.length < 2) {
     return (
       <p className="muted-inline rating-history-none">
-        This is your first rating — once it changes, you&rsquo;ll see the
-        movement here.
+        Your first rating — changes will show up here.
       </p>
     )
   }
@@ -111,18 +110,16 @@ function RatingHistory({ history }) {
 
       <p className="rating-history-caption">
         {first.skillScore} on {since}, {last.skillScore} now.{' '}
+        {/* The one place the pool-relative nature is spelled out. The
+            card above used to say it too, which meant reading the same
+            idea twice before reaching the chart that shows it. */}
         {poolGrew ? (
           <>
-            Measured against {first.poolSize}{' '}
-            {first.poolSize === 1 ? 'player' : 'players'} then and{' '}
-            {last.poolSize} now — your score compares you to everyone
-            playing, so it can move when other people play.
+            The pool grew from {first.poolSize} to {last.poolSize} — your
+            score can move when others play.
           </>
         ) : (
-          <>
-            Your score compares you to everyone playing, so it can move
-            when other people play, not only when you do.
-          </>
+          <>Your score can move when others play, not only when you do.</>
         )}
       </p>
     </div>

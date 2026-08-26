@@ -37,15 +37,10 @@ function NotEnoughMatches({ have, need }) {
       <Meter
         label={`${have} of ${need} matches`}
         value={have / need}
-        caption={
-          left === 1
-            ? 'One more match and your rating is calculated.'
-            : `${left} more matches and your rating is calculated.`
-        }
+        caption={left === 1 ? 'One to go.' : `${left} to go.`}
       />
       <p className="muted-inline">
-        It waits because a couple of matches can&rsquo;t tell a good day
-        from a good player.
+        A couple of matches can&rsquo;t tell a good day from a good player.
       </p>
     </section>
   )
@@ -64,9 +59,8 @@ function NotEnoughPlayers({ have, need }) {
       <h2>Skill rating</h2>
       <Meter label={`${have} of about ${need} players`} value={have / need} caption="" />
       <p className="muted-inline">
-        You&rsquo;ve played enough. A rating compares you to everyone else
-        playing, so it needs a bigger group before it means anything —
-        about {need} regulars.
+        You&rsquo;ve played enough — a rating needs a bigger group to
+        compare you against.
       </p>
     </section>
   )
@@ -78,8 +72,7 @@ function Pending() {
     <section className="rating rating-progress" aria-label="Skill rating">
       <h2>Skill rating</h2>
       <p className="muted-inline">
-        You&rsquo;ve played enough — your rating is calculated overnight
-        and will appear here tomorrow.
+        You&rsquo;ve played enough — your rating appears tomorrow.
       </p>
     </section>
   )
@@ -123,9 +116,8 @@ function Rated({ rating }) {
       )}
 
       <p className="muted-inline">
-        Where you sit among the {rating.poolSize} players in PaddlePad
-        right now, from {rating.fromMatches} of your matches. It moves as
-        other people play, so it&rsquo;s a comparison rather than a grade.
+        Compared with {rating.poolSize} players, from{' '}
+        {rating.fromMatches} of your matches.
       </p>
 
       <RatingHistory history={rating.history} />
