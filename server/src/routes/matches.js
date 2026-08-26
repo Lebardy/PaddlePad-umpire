@@ -1,14 +1,15 @@
 import { Router } from 'express'
 import { query, withTransaction } from '../db.js'
 import { requireAuth } from '../auth.js'
-import { POINT_TARGETS, deriveMatchState } from '../pickleball.js'
+import { DEFAULT_POINT_TARGET, POINT_TARGETS, deriveMatchState } from '../pickleball.js'
 import { isUuid, stackingFromColumns, stackingToColumns } from '../validate.js'
 
 const router = Router()
 router.use(requireAuth)
 
-// A game to 11 win-by-2 is 20-60 events; 150 would be a marathon. The
-// cap is a sanity bound on a single request, not a real gameplay limit.
+// A game to 11 win-by-2 is 20-60 events, and one to 21 perhaps double
+// that; 500 would be a marathon. The cap is a sanity bound on a single
+// request, not a real gameplay limit.
 const MAX_EVENTS = 500
 
 // How long a device keeps the right to score a match before another
@@ -99,7 +100,9 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   const { id, sessionId, teamA, teamB, stacking, firstServer, startedAt } = req.body ?? {}
-  const pointTarget = req.body?.pointTarget ?? 11
+  // An older app build sends no target; it only ever played to 11, so
+  // that is the honest reading of what it recorded.
+  const pointTarget = req.body?.pointTarget ?? DEFAULT_POINT_TARGET
 
   if (!isUuid(id)) return res.status(400).json({ error: 'A valid match id is required' })
   if (!isUuid(sessionId)) return res.status(400).json({ error: 'A valid session id is required' })

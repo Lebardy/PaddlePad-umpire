@@ -1,14 +1,20 @@
 import { useState } from 'react'
+import { DEFAULT_POINT_TARGET, POINT_TARGETS } from '../lib/pickleball'
 import { createMatch } from '../lib/storage'
 import { useSession, usePlayers } from '../lib/useLocalStore'
 import NotFound from './NotFound'
 
 // Configures a new match before handing off to LiveMatch: singles vs
 // doubles, both teams' rosters (drawn from the session's players),
-// each doubles team's stacking flag, and who serves first. All of
-// this becomes createMatch()'s input, so a match can't be started
-// until it's unambiguous who's on court and who serves -- see
-// `readyToStart`.
+// each doubles team's stacking flag, who serves first, and how many
+// points the game is played to. All of this becomes createMatch()'s
+// input, so a match can't be started until it's unambiguous who's on
+// court and who serves -- see `readyToStart`.
+//
+// The point target must be settled BEFORE the first rally, not after:
+// the winner is re-derived from the event log every time it syncs, so
+// changing the target mid-match would retroactively rewrite when the
+// game ended.
 function MatchSetup({ sessionId, onBack, onStart }) {
   const session = useSession(sessionId)
   const knownPlayers = usePlayers()
@@ -19,6 +25,9 @@ function MatchSetup({ sessionId, onBack, onStart }) {
   const [stackingA, setStackingA] = useState(false)
   const [stackingB, setStackingB] = useState(false)
   const [firstServerId, setFirstServerId] = useState('')
+  // 11 is the common case, so it stays the default and an umpire who
+  // never touches this control gets the same behaviour as before.
+  const [pointTarget, setPointTarget] = useState(DEFAULT_POINT_TARGET)
 
   // Every hook above must run before this bails out -- returning early
   // ahead of a useState would make the hook order conditional, which
@@ -68,6 +77,7 @@ function MatchSetup({ sessionId, onBack, onStart }) {
       teamB,
       stacking: { A: isDoubles && stackingA, B: isDoubles && stackingB },
       firstServer: { team: firstServerTeam, playerId: firstServerId },
+      pointTarget,
     })
     onStart(match.id)
   }
@@ -99,6 +109,25 @@ function MatchSetup({ sessionId, onBack, onStart }) {
             Doubles
           </button>
         </div>
+      </section>
+
+      <section>
+        <h3>Play to</h3>
+        <div className="format-toggle">
+          {POINT_TARGETS.map((target) => (
+            <button
+              key={target}
+              className={pointTarget === target ? 'active' : ''}
+              onClick={() => setPointTarget(target)}
+            >
+              {target}
+            </button>
+          ))}
+        </div>
+        <p className="setup-note">
+          Win by 2 whichever you pick, and it can&rsquo;t be changed once
+          the match starts.
+        </p>
       </section>
 
       <section>

@@ -665,6 +665,14 @@ section h3 {
   gap: 0.5rem;
 }
 
+/* Quiet caption under a setup control, for rules that are easy to
+   assume wrong (win-by-two) or that stop being changeable later. */
+.setup-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
 .team-slots {
   list-style: none;
   padding: 0;

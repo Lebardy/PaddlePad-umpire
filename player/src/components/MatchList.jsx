@@ -21,7 +21,7 @@ function MatchList({ matches }) {
           const errors = match.stats.unforced_errors + match.stats.dink_errors
           const result =
             match.won === null ? 'none' : match.won ? 'won' : 'lost'
-          const story = matchStory(match.progression, match.won)
+          const story = matchStory(match.progression, match.won, match.pointTarget)
 
           return (
             <li key={match.id} className={`match ${result}`}>
@@ -40,6 +40,11 @@ function MatchList({ matches }) {
                 )}
                 <p className="match-meta">
                   {formatDate(match.endedAt)} · {match.sessionName}
+                  {/* Only when it wasn't the usual 11, so a 15-13 score
+                      doesn't read as a game that ran unusually long. */}
+                  {match.pointTarget && match.pointTarget !== 11
+                    ? ` · to ${match.pointTarget}`
+                    : ''}
                   {match.endedEarly && ' · stopped early'}
                 </p>
 

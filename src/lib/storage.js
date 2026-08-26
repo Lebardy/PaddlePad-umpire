@@ -1,4 +1,4 @@
-import { deriveMatchState } from './pickleball'
+import { DEFAULT_POINT_TARGET, deriveMatchState } from './pickleball'
 import { read, write } from './localstore'
 import { markDirty, pending as outboxPending } from './outbox'
 
@@ -25,9 +25,10 @@ import { markDirty, pending as outboxPending } from './outbox'
 //               (the ML pipeline needs repeat matches per player to
 //               compute consistency/std features, not just one-off
 //               session-local rows).
-//   matches  -- one pickleball game (to 11, win by 2). Stores only an
-//               append-only event log (see pickleball.js) plus setup
-//               info (teams/stacking/first server); score, server
+//   matches  -- one pickleball game (to its own point target, win by
+//               2). Stores only an append-only event log (see
+//               pickleball.js) plus setup info (teams, stacking,
+//               first server, point target); score, server
 //               rotation and per-player raw stats are always derived
 //               from that log, never stored redundantly. This is what
 //               makes "undo last point" trivial (see undoLastEvent).
@@ -169,9 +170,22 @@ function saveMatch(match) {
  * @param {{team: 'A'|'B', playerId: string}} params.firstServer - who
  *   serves first; for doubles this also fixes which of the two
  *   teammates is "server 1" vs "server 2" for the rest of the game.
+ * @param {number} [params.pointTarget] - 11, 15 or 21. Recorded on the
+ *   match rather than assumed, because the winner is re-derived from
+ *   the event log on every sync and deriving a game played to 15
+ *   against a target of 11 would declare a winner partway through.
+ *   Defaults to 11, which is what matches created before this existed
+ *   were scored under.
  * @returns {object} the created match record.
  */
-export function createMatch({ sessionId, teamA, teamB, stacking, firstServer }) {
+export function createMatch({
+  sessionId,
+  teamA,
+  teamB,
+  stacking,
+  firstServer,
+  pointTarget = DEFAULT_POINT_TARGET,
+}) {
   const match = {
     id: crypto.randomUUID(),
     sessionId,
@@ -183,6 +197,7 @@ export function createMatch({ sessionId, teamA, teamB, stacking, firstServer }) 
     teamB,
     stacking, // { A: bool, B: bool }
     firstServer, // { team: 'A'|'B', playerId }
+    pointTarget, // 11 | 15 | 21; fixed for the life of the match
     events: [],
     winner: null,
   }
@@ -385,8 +400,18 @@ export function replaceServerState({
         teamB: m.teamB,
         stacking: m.stacking,
         firstServer: m.firstServer,
+        // Must be carried across, not defaulted: deriveMatchState falls
+        // back to 11 without it, so a game played to 15 would be
+        // declared won at 11 on every device that pulled the match
+        // rather than creating it.
+        pointTarget: m.pointTarget,
         winner: m.winner,
         endedEarly: m.endedEarly,
+        // Voiding happens on one device and has to be visible on the
+        // others, otherwise a match thrown out here still looks live
+        // there.
+        voidedAt: m.voidedAt ? new Date(m.voidedAt).getTime() : null,
+        voidReason: m.voidReason ?? null,
         // A match list carries no events -- only the single-match fetch
         // does. Defaulting to [] here would wipe the local log of an
         // already-synced match every time the session screen refreshed.

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { DEFAULT_POINT_TARGET } from '../lib/pickleball'
 import {
   rememberPlayer,
   addPlayerToSession,
@@ -126,6 +127,12 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
                   {m.teamB.map((id) => roster.find((p) => p.id === id)?.name).join(' / ')}
                 </span>
                 <span className={`match-status ${m.status}`}>
+                  {/* Only shown when it isn't the usual 11, so the list
+                      stays scannable and an unusual format still can't
+                      be mistaken for a normal one. */}
+                  {m.pointTarget && m.pointTarget !== DEFAULT_POINT_TARGET
+                    ? `to ${m.pointTarget} \u00b7 `
+                    : ''}
                   {m.status === 'completed' ? 'Final' : 'Live'}
                 </span>
               </button>

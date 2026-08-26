@@ -185,6 +185,8 @@ function LiveMatch({ matchId, onBack }) {
         <p className="serve-note">
           Serving: {name(serverId)}
           {derived.isDoubles ? ` (server ${derived.serverNumber})` : ''}
+          {' \u00b7 '}
+          first to {derived.pointTarget}
         </p>
       )}
 
