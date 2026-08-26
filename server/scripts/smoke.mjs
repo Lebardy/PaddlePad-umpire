@@ -7,7 +7,7 @@
 // Needs SMOKE_EMAIL and SMOKE_PASSWORD for an existing umpire, or
 // SMOKE_INVITE to register a new one.
 //
-// The five assertions that matter are the sync design's correctness
+// The six assertions that matter are the sync design's correctness
 // argument, and they are why this file is kept rather than thrown away:
 //
 //   1. pushing the same log twice changes nothing        (retry safety)
@@ -15,6 +15,7 @@
 //   3. status/winner are DERIVED, not believed           (trust)
 //   4. ending early survives a re-sync                   (ended_early)
 //   5. one code / one match cannot be double-claimed     (concurrency)
+//   6. a game to 15 is not declared won at 11            (point_target)
 // ============================================================
 
 const API = (process.argv[2] ?? process.env.API_URL ?? 'http://localhost:3000').replace(/\/$/, '')
@@ -263,6 +264,66 @@ async function main() {
   })
   check('the taking-over device can now push', afterTakeover.status === 200)
 
+  section('ASSERTION 6 — the point target is stored and honoured')
+  // The whole risk of a per-match target is that it might be ignored on
+  // the way in and re-derived against 11 on the way out, which would
+  // declare a game to 15 finished at 11-9. These push exactly that.
+  const longMatchId = uuid()
+  const long1 = await call('/matches', {
+    method: 'POST',
+    body: {
+      id: longMatchId, sessionId, teamA, teamB,
+      stacking: { A: false, B: false },
+      firstServer: { team: 'A', playerId: teamA[0] },
+      pointTarget: 15,
+      startedAt: Date.now() - 30 * 60_000,
+    },
+  })
+  check('create match with pointTarget 15 -> 201', long1.status === 201, JSON.stringify(long1.body))
+  check('the target comes back on the match', long1.body.match?.pointTarget === 15,
+    String(long1.body.match?.pointTarget))
+
+  const elevenStraight = Array.from({ length: 11 }, (_, i) => rally(i, teamA[0]))
+  const at11 = await call(`/matches/${longMatchId}/log`, {
+    method: 'PUT', body: { deviceId: DEVICE, events: elevenStraight },
+  })
+  check('11 straight points does NOT finish a game to 15',
+    at11.body.match?.status === 'in_progress', at11.body.match?.status)
+
+  const fifteenStraight = Array.from({ length: 15 }, (_, i) => rally(i, teamA[0]))
+  const at15 = await call(`/matches/${longMatchId}/log`, {
+    method: 'PUT', body: { deviceId: DEVICE, events: fifteenStraight },
+  })
+  check('15 straight points finishes it', at15.body.match?.status === 'completed', at15.body.match?.status)
+  check('winner still derived as A', at15.body.match?.winner === 'A', String(at15.body.match?.winner))
+
+  const badTarget = await call('/matches', {
+    method: 'POST',
+    body: {
+      id: uuid(), sessionId, teamA, teamB,
+      stacking: { A: false, B: false },
+      firstServer: { team: 'A', playerId: teamA[0] },
+      pointTarget: 13,
+      startedAt: Date.now(),
+    },
+  })
+  check('an unsupported target is refused -> 400', badTarget.status === 400, JSON.stringify(badTarget.body))
+
+  // An older app build sends no target at all, and only ever played to
+  // 11 -- so that has to stay the reading, not a null.
+  const defaultTargetId = uuid()
+  const noTarget = await call('/matches', {
+    method: 'POST',
+    body: {
+      id: defaultTargetId, sessionId, teamA, teamB,
+      stacking: { A: false, B: false },
+      firstServer: { team: 'A', playerId: teamA[0] },
+      startedAt: Date.now(),
+    },
+  })
+  check('a match sent without a target defaults to 11',
+    noTarget.body.match?.pointTarget === 11, String(noTarget.body.match?.pointTarget))
+
   section('export — every umpire\'s matches, not just one device\'s')
   const json = await call('/export/match-logs.json')
   check('export json -> 200', json.status === 200)
@@ -277,11 +338,31 @@ async function main() {
   const loserRow = mine.find((r) => r.player_id === teamB[0])
   check('losing player has won=0 (not blank)', loserRow?.won === 0, String(loserRow?.won))
 
+  const longRows = (json.body.rows ?? []).filter((r) => r.match_id === longMatchId)
+  check('the 15-point match exports point_target=15',
+    longRows.length > 0 && longRows.every((r) => r.point_target === 15),
+    JSON.stringify(longRows.map((r) => r.point_target)))
+  check('an 11-point match still exports point_target=11', winnerRow?.point_target === 11,
+    String(winnerRow?.point_target))
+
   const csv = await call('/export/match-logs.csv', { raw: true })
   check('export csv -> 200', csv.status === 200)
   const lines = csv.text.trim().split('\n')
+  // Asserted as the exact header rather than a column COUNT: the first
+  // twelve are the columns aggregate_player_profiles() reads positionally
+  // in the ML pipeline, so a reordering is as damaging as a missing
+  // column and a count would not notice it.
+  const expectedHeader = [
+    'player_id', 'match_id', 'match_number',
+    'drop_attempts', 'drop_successes', 'drive_attempts',
+    'dink_errors', 'clean_winners', 'dink_winners', 'unforced_errors',
+    'match_duration_mins', 'uses_stacking',
+    'team', 'won', 'partner_id', 'opponent_1_id', 'opponent_2_id',
+    'ended_at', 'point_target',
+  ].join(',')
+  check('csv header is exactly the expected columns, in order',
+    lines[0] === expectedHeader, lines[0])
   const headerCols = lines[0].split(',').length
-  check('csv header has 18 columns', headerCols === 18, String(headerCols))
   check('every csv row has the same column count',
     lines.slice(1).every((l) => l.split(',').length === headerCols))
 
