@@ -85,6 +85,12 @@ app.use('/players', rateLimit({ max: 60, windowMs: 60_000 }))
 // rather than a read-grade one. 60/min against a code space would be far
 // too generous for something that grants access on its own.
 app.use('/auth/player/claim', rateLimit({ max: 10, windowMs: 60_000 }))
+// Same grade for the account endpoints, and register is the tighter of
+// the two: besides guessing passwords it can be used to probe which
+// names are already on the roster, since a taken name has to be
+// answered differently from a free one.
+app.use('/auth/player/register', rateLimit({ max: 5, windowMs: 60_000 }))
+app.use('/auth/player/login', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/player', rateLimit({ max: 60, windowMs: 60_000 }))
 app.use('/export', rateLimit({ max: 5, windowMs: 60_000 }))
 // One caller, a handful of calls per run. Tight enough that a leaked

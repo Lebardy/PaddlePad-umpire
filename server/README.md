@@ -71,6 +71,11 @@ about itself:
 5. one code, one match, cannot be double-claimed (concurrency)
 6. a game to 15 is not declared won at 11 (`point_target`)
 
+and, for player accounts: a claim code cannot take over an account that
+already exists, the right code links a new account to the matches an
+umpire already recorded, and the code still works afterwards as the
+recovery path.
+
 You can also point it at a deployed API directly:
 
 ```bash
@@ -80,6 +85,19 @@ SMOKE_INVITE=<code> node scripts/smoke.mjs https://paddlepad-api.up.railway.app
 Do that sparingly. It writes real rows into whatever it talks to, and
 recovering from that means trusting `scripts/cleanup-test-data.mjs` to
 find every one of them again.
+
+That script deletes strictly by **ownership** — `sessions.created_by`,
+`players.created_by`, `matches.recorded_by` — which is what makes it
+structurally unable to reach a real umpire's records whatever they are
+named. A self-registered player has no owner by definition, so the smoke
+run prints the ids it created and the exact command to remove them:
+
+```bash
+node scripts/cleanup-test-data.mjs 'smoke.%@example.com' <player-ids>
+```
+
+Those are deleted by id, never by name, and any id with even one
+recorded match is refused.
 
 ### What this does not catch
 
@@ -176,15 +194,72 @@ If you ever recreate it, verify these before trusting it:
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | `GET` | `/health` | — | Liveness + database reachability |
-| `POST` | `/auth/register` | — | Create an umpire account |
-| `POST` | `/auth/login` | — | Sign in, returns a token |
+| `POST` | `/auth/register` | — | Create an umpire account (needs an invite) |
+| `POST` | `/auth/login` | — | Sign in as an umpire, returns a token |
 | `GET` | `/auth/me` | Bearer | Validate a stored token on app launch |
+| `POST` | `/auth/player/claim` | — | Exchange an umpire-issued code for a player session |
+| `POST` | `/auth/player/register` | — | Sign up as a player |
+| `POST` | `/auth/player/login` | — | Sign in as a player, username + password |
+| `POST` | `/auth/player/credentials` | Bearer (player) | Add or change sign-in details |
 | `GET` | `/export/match-logs.csv` | Bearer (umpire) | The club-wide ML export |
 | `GET` | `/player/me` | Bearer (player) | A player's own summary, plus their rating or its gate state |
 | `GET` | `/internal/match-logs.json` | `x-internal-key` | Same rows as the export, for the ML service |
 | `POST` | `/internal/ratings` | `x-internal-key` | Records one pipeline run as a snapshot |
 
 Tokens are JWTs valid for 30 days, sent as `Authorization: Bearer <token>`.
+
+### The two ways a player gets in
+
+Both exist on purpose, and neither replaces the other.
+
+**The claim code** is the fast one. An umpire hands over a code or a QR
+and the player is looking at their stats seconds later, with nothing to
+fill in. That speed is the point: the data is a person's own pickleball
+stats, and a signup form at the moment someone is handed a QR courtside
+is exactly the friction that leaves records unclaimed and this app
+pointless.
+
+**A username and password** is the durable one. It survives a lost code,
+a new phone and a cleared browser, and it can be set up afterwards from
+the profile screen by someone who arrived by code — which is the order
+that actually works.
+
+The code proves who you are; the password keeps you in.
+
+#### Why a username and not an email
+
+Nothing in this app has anything to send. With no verification link and
+no reset mail, an email address would be a username in disguise: never
+checked, never used, and inviting the fair question of why it was
+collected at all. A username is the honest version of the same field,
+and it means no personal contact data is held for players. Adding email
+later is one nullable column, not a redesign.
+
+#### Registering under a name already on the roster
+
+Players live in one table keyed by a case-insensitive unique name,
+because the ML pipeline aggregates by `player_id` and the same human has
+to resolve to the same row whichever umpire logged the match. So a name
+that already exists is never simply handed over — otherwise registering
+as "Maria Santos" would inherit the real Maria's history and her rating.
+
+| Situation | Result |
+|---|---|
+| Name is new | Created, starts empty |
+| Name exists, umpire-created, no account | Needs the claim code; the right one links the account to that row and all its history |
+| Name exists and already has an account | Refused outright |
+
+The middle row answers with `needsCode: true` so the app can reveal the
+code field rather than showing a dead end.
+
+#### Recovery
+
+There is no password reset, because there is no email to send one to.
+**The claim code deliberately keeps working after a password is set**, so
+an umpire regenerating it is how a locked-out player gets back in. That
+is a decision, not an oversight — it is written into the schema comment
+and pinned by a test. Unlike a reset email it has a trusted human in the
+loop.
 
 ### The `/internal` routes
 
@@ -214,10 +289,26 @@ after the fact. See the comment above those tables in `schema.sql`.
 - Login returns the same error whether the email is unknown or the
   password is wrong, and spends comparable time in both cases, so the
   endpoint can't be used to discover which emails are registered.
-- **Registration is currently open.** Anyone who can reach the API can
-  create an umpire account. That's acceptable while this is used by one
-  trusted group, but it needs an invite or approval flow before the API
-  is exposed publicly.
+- **Umpire registration is invite-only.** The API is on the public
+  internet, so an open form would let anyone create an account and write
+  into the match data. Only admins can issue invites, and codes are
+  single-use, claimed in the same transaction that creates the umpire.
+- **Player sign-in returns one message** whether the username is unknown
+  or the password is wrong, and spends comparable time on both, so it
+  cannot be used to discover which usernames exist. Registration
+  necessarily reveals that a username is taken — unavoidable if
+  usernames are unique — but nothing else.
+- **Rate limits key on `req.ip`**, which Express resolves from the
+  `trust proxy` hop count set in `index.js`. They previously read
+  `X-Forwarded-For` directly and took the *first* entry, which is the
+  one a caller writes for themselves: proxies **append**, so a request
+  sent with `X-Forwarded-For: 1.2.3.4` arrives as `1.2.3.4, <real
+  client>`. Every limit was one header away from being bypassed. Do not
+  reintroduce manual parsing of that header, and do not raise the hop
+  count without adding a real proxy hop.
+- `DANGEROUSLY_DISABLE_RATE_LIMITS=1` turns every limit off, for tests
+  against a disposable database only. The API prints a loud warning at
+  boot whenever it is set, so it cannot be on quietly.
 - Authentication identifies the umpire but does **not** restrict which
   umpire may edit which match. That's deliberate: umpires hand courts
   over mid-session, and locking a match to its creator would block the

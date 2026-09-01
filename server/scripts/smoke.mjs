@@ -41,6 +41,10 @@ function section(title) {
 
 let token = null
 
+// Player rows this run creates that no umpire owns -- see the note at
+// the point they are registered.
+const selfRegistered = []
+
 async function call(path, { method = 'GET', body, raw = false } = {}) {
   const response = await fetch(API + path, {
     method,
@@ -530,6 +534,255 @@ async function main() {
       check('claiming a player for the rating check succeeded', false,
         JSON.stringify(claimBody).slice(0, 80))
     }
+  }
+
+  section('player accounts — sign up alongside the claim code')
+  {
+    // A player token, not the umpire one `call` carries.
+    async function asPlayer(path, { method = 'GET', body, bearer } = {}) {
+      const response = await fetch(API + path, {
+        method,
+        headers: {
+          ...(body ? { 'Content-Type': 'application/json' } : {}),
+          ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      })
+      const text = await response.text()
+      let json
+      try { json = JSON.parse(text) } catch { json = { raw: text } }
+      return { status: response.status, body: json }
+    }
+    const register = (body) =>
+      asPlayer('/auth/player/register', { method: 'POST', body })
+
+    const u = `smoke_${stamp}`.slice(0, 20)
+    const PASSWORD = 'not-a-real-password'
+
+    // --- someone nobody has ever scored a match for ---
+    const fresh = await register({
+      name: `Smoke Newcomer ${stamp}`,
+      username: u,
+      password: PASSWORD,
+    })
+    check('register a brand-new name -> 201', fresh.status === 201,
+      JSON.stringify(fresh.body).slice(0, 120))
+    // Self-registered, so created_by is NULL and cleanup-test-data.mjs
+    // cannot find it by ownership like it finds everything else here.
+    // Reported at the end so a run against a shared database can be
+    // cleaned up completely.
+    if (fresh.body.player?.id) selfRegistered.push(fresh.body.player.id)
+    check('register returns a working player token',
+      (await asPlayer('/player/me', { bearer: fresh.body.token })).status === 200)
+    check('register never echoes a password hash',
+      !JSON.stringify(fresh.body).includes('password'), JSON.stringify(fresh.body).slice(0, 120))
+
+    const takenUser = await register({
+      name: `Smoke Someone Else ${stamp}`,
+      username: u.toUpperCase(),
+      password: PASSWORD,
+    })
+    check('a username differing only in CASE is refused -> 409',
+      takenUser.status === 409, JSON.stringify(takenUser.body))
+    check('409 says which field to fix', takenUser.body.usernameTaken === true)
+
+    for (const [label, username] of [
+      ['with spaces', 'two words'],
+      ['too short', 'ab'],
+      ['with a dot', 'ben.cruz'],
+    ]) {
+      const bad = await register({
+        name: `Smoke Bad ${label} ${stamp}`,
+        username,
+        password: PASSWORD,
+      })
+      check(`a username ${label} is refused -> 400`, bad.status === 400, String(bad.status))
+      check(`the refusal states the rule, not just "invalid" (${label})`,
+        /letters, numbers and underscores/.test(bad.body.error ?? ''), bad.body.error)
+    }
+
+    const shortPw = await register({
+      name: `Smoke Short ${stamp}`,
+      username: `smk_short_${stamp}`.slice(0, 20),
+      password: 'short',
+    })
+    check('too short a password is refused -> 400', shortPw.status === 400, String(shortPw.status))
+
+    // --- THE CASE THIS DESIGN EXISTS FOR ---
+    // nameA is on the roster with real matches and a rating behind it.
+    // Registering under that name must not simply hand it over, and
+    // must not be a dead end either.
+    const noCode = await register({
+      name: nameA,
+      username: `smk_a_${stamp}`.slice(0, 20),
+      password: PASSWORD,
+    })
+    check('registering as an EXISTING roster name is refused -> 409',
+      noCode.status === 409, JSON.stringify(noCode.body).slice(0, 120))
+    check('the refusal asks for the code rather than dead-ending',
+      noCode.body.needsCode === true, JSON.stringify(noCode.body))
+
+    const wrongCode = await register({
+      name: nameA,
+      username: `smk_a_${stamp}`.slice(0, 20),
+      password: PASSWORD,
+      code: 'PAD2-PAD2-PAD2',
+    })
+    check('the WRONG code is refused, still offering the field',
+      wrongCode.status === 409 && wrongCode.body.needsCode === true,
+      JSON.stringify(wrongCode.body).slice(0, 120))
+
+    const linked = await register({
+      name: nameA,
+      username: `smk_a_${stamp}`.slice(0, 20),
+      password: PASSWORD,
+      code: claim.body.claimCode,
+    })
+    check('the RIGHT code links the account to the existing player -> 201',
+      linked.status === 201, JSON.stringify(linked.body).slice(0, 120))
+    check('it links rather than creating a duplicate',
+      linked.body.player?.id === playerA,
+      `${linked.body.player?.id} vs ${playerA}`)
+
+    const linkedMe = await asPlayer('/player/me', { bearer: linked.body.token })
+    check('the history an umpire recorded comes with it',
+      (linkedMe.body.summary?.matches ?? 0) > 0,
+      JSON.stringify(linkedMe.body.summary ?? null))
+    check('and so does the rating', linkedMe.body.rating?.state === 'rated',
+      JSON.stringify(linkedMe.body.rating ?? null).slice(0, 80))
+    check('/player/me reports the username so the app can stop prompting',
+      linkedMe.body.player?.username === `smk_a_${stamp}`.slice(0, 20),
+      String(linkedMe.body.player?.username))
+
+    const takenTwice = await register({
+      name: nameA,
+      username: `smk_a2_${stamp}`.slice(0, 20),
+      password: PASSWORD,
+      code: claim.body.claimCode,
+    })
+    check('a name that ALREADY has an account is refused outright -> 409',
+      takenTwice.status === 409, String(takenTwice.status))
+    check('and no longer offers the code field — the code cannot take over an account',
+      takenTwice.body.needsCode === undefined, JSON.stringify(takenTwice.body))
+
+    // --- signing back in ---
+    const login = (body) => asPlayer('/auth/player/login', { method: 'POST', body })
+
+    const goodLogin = await login({ username: `smk_a_${stamp}`.slice(0, 20), password: PASSWORD })
+    check('sign in with username and password -> 200', goodLogin.status === 200,
+      JSON.stringify(goodLogin.body).slice(0, 120))
+    check('signing in returns the same player', goodLogin.body.player?.id === playerA)
+    check('CASE-INSENSITIVE username on the way in',
+      (await login({ username: `SMK_A_${stamp}`.slice(0, 20).toUpperCase(), password: PASSWORD }))
+        .status === 200)
+
+    const wrongPw = await login({ username: `smk_a_${stamp}`.slice(0, 20), password: 'wrong-password' })
+    const unknown = await login({ username: `nobody_${stamp}`.slice(0, 20), password: PASSWORD })
+    check('a wrong password -> 401', wrongPw.status === 401, String(wrongPw.status))
+    check('an unknown username -> 401', unknown.status === 401, String(unknown.status))
+    check('both give the SAME message, so neither reveals which usernames exist',
+      wrongPw.body.error === unknown.body.error,
+      `${wrongPw.body.error} vs ${unknown.body.error}`)
+
+    // Most player rows have username NULL and no password hash. An
+    // empty or missing username must miss them all rather than matching
+    // one, which is the shape of bug that lets anyone in as anyone.
+    check('an empty username signs nobody in',
+      (await login({ password: PASSWORD })).status === 401)
+
+    // --- the boundary between the two roles ---
+    const asUmpireRoute = await asPlayer('/players', { bearer: linked.body.token })
+    check('a player token still cannot reach an umpire route -> 403',
+      asUmpireRoute.status === 403, String(asUmpireRoute.status))
+
+    // --- the claim code as the recovery path ---
+    // Deliberately still valid after a password is set: with no email
+    // there is no reset link, so an umpire regenerating the code is how
+    // a locked-out player gets back in.
+    const recovered = await asPlayer('/auth/player/claim', {
+      method: 'POST',
+      body: { code: claim.body.claimCode },
+    })
+    check('the claim code still works AFTER a password is set (the recovery path)',
+      recovered.status === 200 && recovered.body.player?.id === playerA,
+      JSON.stringify(recovered.body).slice(0, 100))
+    check('and it reports the username, so no prompt to set up what exists',
+      recovered.body.player?.username === `smk_a_${stamp}`.slice(0, 20),
+      String(recovered.body.player?.username))
+
+    // --- upgrading a code-only session into an account ---
+    const echo = await call('/players', {
+      method: 'POST',
+      body: { name: `Smoke Echo ${stamp}` },
+    })
+    const echoCode = await call(`/players/${echo.body.player.id}/claim-code`)
+    const echoSession = await asPlayer('/auth/player/claim', {
+      method: 'POST',
+      body: { code: echoCode.body.claimCode },
+    })
+    check('a code-only player starts with no username',
+      echoSession.body.player?.username === null,
+      String(echoSession.body.player?.username))
+
+    const setUp = await asPlayer('/auth/player/credentials', {
+      method: 'POST',
+      bearer: echoSession.body.token,
+      body: { username: `smk_e_${stamp}`.slice(0, 20), password: PASSWORD },
+    })
+    check('setting up sign-in from inside the app -> 200', setUp.status === 200,
+      JSON.stringify(setUp.body))
+    check('and it works immediately',
+      (await login({ username: `smk_e_${stamp}`.slice(0, 20), password: PASSWORD })).status === 200)
+
+    // A phone left unlocked on the profile screen must not be a silent
+    // account takeover.
+    const noCurrent = await asPlayer('/auth/player/credentials', {
+      method: 'POST',
+      bearer: echoSession.body.token,
+      body: { username: `smk_e_${stamp}`.slice(0, 20), password: 'a-different-password' },
+    })
+    check('changing an EXISTING password without the current one -> 403',
+      noCurrent.status === 403, String(noCurrent.status))
+    check('the old password still works after that refusal',
+      (await login({ username: `smk_e_${stamp}`.slice(0, 20), password: PASSWORD })).status === 200)
+
+    const withCurrent = await asPlayer('/auth/player/credentials', {
+      method: 'POST',
+      bearer: echoSession.body.token,
+      body: {
+        username: `smk_e_${stamp}`.slice(0, 20),
+        password: 'a-different-password',
+        currentPassword: PASSWORD,
+      },
+    })
+    check('with the current password it goes through -> 200', withCurrent.status === 200,
+      String(withCurrent.status))
+
+    const stealUsername = await asPlayer('/auth/player/credentials', {
+      method: 'POST',
+      bearer: echoSession.body.token,
+      body: {
+        username: `smk_a_${stamp}`.slice(0, 20),
+        password: 'a-different-password',
+        currentPassword: 'a-different-password',
+      },
+    })
+    check('and someone else\'s username cannot be taken -> 409',
+      stealUsername.status === 409, String(stealUsername.status))
+
+    // --- the roster stays free of credentials ---
+    const roster2 = await call(`/players?q=${encodeURIComponent(nameA)}`)
+    const rosterText = JSON.stringify(roster2.body)
+    check('the roster never carries a username or a hash',
+      !rosterText.includes('username') && !rosterText.includes('password') &&
+      !rosterText.includes('claim_code'), rosterText.slice(0, 120))
+  }
+
+  if (selfRegistered.length > 0) {
+    console.log(
+      `\nself-registered players left behind (no umpire owns them):\n` +
+        `  node scripts/cleanup-test-data.mjs 'smoke.%@example.com' ${selfRegistered.join(',')}`,
+    )
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

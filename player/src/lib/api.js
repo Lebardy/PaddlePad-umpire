@@ -23,10 +23,17 @@ const TOKEN_KEY = 'paddlepad.player.token'
 const PLAYER_KEY = 'paddlepad.player'
 
 export class ApiError extends Error {
-  constructor(message, status) {
+  /**
+   * `details` is the whole error body, because some refusals carry more
+   * than a sentence. `needsCode` on a registration is the clearest case:
+   * it is not really a failure, it is the server asking for proof, and
+   * the form has to be able to tell the difference.
+   */
+  constructor(message, status, details = {}) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.details = details
   }
 }
 
@@ -92,10 +99,25 @@ async function apiFetch(path, { method = 'GET', body, auth = true, signal } = {}
 
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
-    throw new ApiError(data.error ?? `Request failed (${response.status})`, response.status)
+    throw new ApiError(
+      data.error ?? `Request failed (${response.status})`,
+      response.status,
+      data,
+    )
   }
   return data
 }
+
+// ============================================================
+// Getting in
+//
+// Two ways, both meant to exist. The claim code is the fast one -- an
+// umpire hands over a QR and there is nothing to fill in. A username and
+// password is the durable one, surviving a lost code and a new phone.
+//
+// All three land in the same place: a token and a player, stored the
+// same way, so nothing downstream knows or cares which door was used.
+// ============================================================
 
 /** Exchanges a claim code for a player session. */
 export async function claim(code) {
@@ -106,6 +128,51 @@ export async function claim(code) {
   })
   storeSession(data.token, data.player)
   return data.player
+}
+
+/**
+ * Signs up. `code` is only needed when the name is already on the
+ * roster, which the server tells us by answering with `needsCode`.
+ */
+export async function registerPlayer({ name, username, password, code }) {
+  const data = await apiFetch('/auth/player/register', {
+    method: 'POST',
+    auth: false,
+    body: { name, username, password, code: code || undefined },
+  })
+  storeSession(data.token, data.player)
+  return data.player
+}
+
+export async function loginPlayer({ username, password }) {
+  const data = await apiFetch('/auth/player/login', {
+    method: 'POST',
+    auth: false,
+    body: { username, password },
+  })
+  storeSession(data.token, data.player)
+  return data.player
+}
+
+/**
+ * Adds (or changes) sign-in details from inside the app -- the path for
+ * someone who arrived by code and wants to stop depending on it.
+ *
+ * Returns the updated player so the caller can put it straight into
+ * state; the stored copy is patched here so a reload agrees.
+ */
+export async function setCredentials({ username, password, currentPassword }) {
+  const data = await apiFetch('/auth/player/credentials', {
+    method: 'POST',
+    body: { username, password, currentPassword: currentPassword || undefined },
+  })
+  const player = { ...(getStoredPlayer() ?? {}), username: data.username }
+  try {
+    localStorage.setItem(PLAYER_KEY, JSON.stringify(player))
+  } catch {
+    // Private mode. State in memory is still correct for this tab.
+  }
+  return player
 }
 
 /** Profile plus headline totals. */

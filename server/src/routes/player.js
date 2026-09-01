@@ -18,7 +18,7 @@ router.use(requirePlayer)
 
 router.get('/me', async (req, res) => {
   const { rows } = await query(
-    'SELECT id, name, claimed_at FROM players WHERE id = $1',
+    'SELECT id, name, claimed_at, username FROM players WHERE id = $1',
     [req.player.id],
   )
   if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
@@ -34,7 +34,14 @@ router.get('/me', async (req, res) => {
   const rating = await getRatingState(query, req.player.id, matches.length)
 
   res.json({
-    player: { id: rows[0].id, name: rows[0].name, claimedAt: rows[0].claimed_at },
+    player: {
+      id: rows[0].id,
+      name: rows[0].name,
+      claimedAt: rows[0].claimed_at,
+      // Null for a player who came in by claim code and has not set up
+      // sign-in yet -- the profile screen reads this to offer it.
+      username: rows[0].username,
+    },
     summary: summarisePlayer(matches),
     // Lets the empty state say "being scored right now" rather than the
     // flatly discouraging "no matches".

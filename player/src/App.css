@@ -36,29 +36,104 @@
 
 /* ============ Claim ============ */
 
-.claim { padding-top: 3rem; }
-.claim h1 { font-size: 2.1rem; letter-spacing: -0.03em; }
-.lede { color: var(--text-secondary); margin: 0.5rem 0 2rem; line-height: 1.5; }
-.claim label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.4rem; }
-.claim input {
+/* ============ The way in ============ */
+
+.gate { padding-top: 2.5rem; }
+.gate h1 { font-size: 2.1rem; letter-spacing: -0.03em; }
+.lede { color: var(--text-secondary); margin: 0.5rem 0 1.5rem; line-height: 1.5; }
+
+/* All three ways in, shown at once. Registration behind a link is what
+   made this app look like it had none. */
+.gate-tabs {
+  display: flex;
+  gap: 0.2rem;
+  padding: 0.25rem;
+  margin-bottom: 1.5rem;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+}
+.gate-tab {
+  flex: 1;
+  padding: 0.55rem 0.25rem;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-sm) - 0.2rem);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.gate-tab[aria-selected='true'] {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.gate label,
+.signin-form label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+}
+.gate input,
+.signin-form input {
   width: 100%;
-  padding: 0.9rem;
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-align: center;
+  padding: 0.8rem;
+  font: inherit;
+  font-size: 1rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
 }
-.claim input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
-.hint { font-size: 0.82rem; color: var(--text-muted); margin: 0.6rem 0 1.25rem; line-height: 1.45; }
-.claim button[type='submit'] {
+/* The code is read off a screen and typed a character at a time, so it
+   keeps the large, spaced, centred treatment. A name or a password is
+   ordinary typing and reads better as an ordinary field. */
+.gate input.code-input {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-align: center;
+  padding: 0.9rem;
+}
+.gate input:focus,
+.signin-form input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+.hint { font-size: 0.82rem; color: var(--text-muted); margin: 0.5rem 0 1.1rem; line-height: 1.45; }
+.gate button[type='submit'],
+.signin-form button[type='submit'] {
   width: 100%; padding: 0.95rem; border: none; border-radius: var(--radius-sm);
   background: var(--primary); color: #fff; font-size: 1rem; font-weight: 600; cursor: pointer;
 }
-.claim button[type='submit']:disabled { opacity: 0.45; cursor: not-allowed; }
+.gate button[type='submit']:disabled,
+.signin-form button[type='submit']:disabled { opacity: 0.45; cursor: not-allowed; }
+.gate .hint:last-child { margin-bottom: 0; margin-top: 1rem; }
+
+/* Setting up sign-in from the profile. */
+.you-signin { margin-bottom: 1.5rem; }
+.you-signin h2 { font-size: 0.9rem; margin-bottom: 0.4rem; }
+.you-signin p { font-size: 0.84rem; color: var(--text-secondary); line-height: 1.55; margin-bottom: 0.6rem; }
+.signin-done { color: var(--status-good); font-weight: 600; }
+.signin-start {
+  width: 100%;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.signin-form { margin-top: 0.5rem; }
+.signin-form .link { display: block; width: 100%; margin-top: 0.5rem; text-align: center; }
 
 /* ============ Profile ============ */
 

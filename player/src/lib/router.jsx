@@ -84,6 +84,20 @@ export function restoreScroll() {
  *
  * @returns {object|null} the captured params, or null if it doesn't match
  */
+/**
+ * The claim code a QR landed on, or '' for any other URL.
+ *
+ * A QR encodes the claim URL rather than the raw code, so a phone's
+ * camera opens it directly and no scanner is needed inside the app.
+ * Lives here with the other reads of location, and is used in two
+ * places: the code panel prefills from it, and the gate opens on that
+ * panel because of it.
+ */
+export function claimCodeFromUrl() {
+  const match = window.location.pathname.match(/^\/claim\/(.+)$/)
+  return match ? decodeURIComponent(match[1]) : ''
+}
+
 export function matchPath(pattern, path) {
   const patternParts = pattern.split('/').filter(Boolean)
   const pathParts = path.split('/').filter(Boolean)

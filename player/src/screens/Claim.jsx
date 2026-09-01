@@ -1,30 +1,29 @@
 import { useEffect, useState } from 'react'
 import { claim } from '../lib/api'
+import { claimCodeFromUrl } from '../lib/router'
 
 /**
  * Where a player enters the code their umpire gave them.
  *
- * The code is the whole credential -- no email, no password. That is a
- * deliberate trade: the data is a person's own pickleball stats, and an
- * extra signup step is exactly the friction that would leave records
+ * One of the panels in SignIn, and the FAST way in: no name to pick, no
+ * password to invent. That speed is deliberate -- the data is a person's
+ * own pickleball stats, and a signup form at the moment someone is
+ * handed a QR courtside is exactly the friction that leaves records
  * unclaimed and this app pointless.
  *
- * Prefilled from /claim/CODE so a QR code lands straight here with the
- * field already filled and nothing to type.
+ * It is no longer the ONLY way in. A player can create a proper account
+ * instead, or add one afterwards from their profile. This panel stays
+ * because a code takes three seconds and an account does not.
+ *
+ * Prefilled from /claim/CODE so a QR lands straight here with the field
+ * already filled and nothing to type.
  */
-// A QR encodes the claim URL, not the raw code, so a phone's camera can
-// open it directly and no scanner is needed inside this app.
-function codeFromUrl() {
-  const match = window.location.pathname.match(/^\/claim\/(.+)$/)
-  return match ? decodeURIComponent(match[1]) : ''
-}
-
 function Claim({ onClaimed }) {
   // Derived when state is first created rather than set from an effect,
   // which would render once with an empty field and then again with the
   // code -- visible as a flicker on the one screen that must feel like
   // it just worked.
-  const [code, setCode] = useState(codeFromUrl)
+  const [code, setCode] = useState(claimCodeFromUrl)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
@@ -51,37 +50,31 @@ function Claim({ onClaimed }) {
   }
 
   return (
-    <div className="claim">
-      <h1>PaddlePad</h1>
-      <p className="lede">
-        See the matches your umpire has been recording for you.
+    <form onSubmit={handleSubmit}>
+      <label htmlFor="code">Your code</label>
+      <input
+        id="code"
+        className="code-input"
+        type="text"
+        value={code}
+        onChange={(event) => setCode(event.target.value)}
+        placeholder="PAD-7K3M-9QXR"
+        autoCapitalize="characters"
+        autoCorrect="off"
+        spellCheck={false}
+        required
+      />
+      <p className="hint">
+        Ask whoever scored your match — they can show you a code or a QR to
+        scan. You can set up a username and password afterwards.
       </p>
 
-      <form onSubmit={handleSubmit}>
-        <label htmlFor="code">Your code</label>
-        <input
-          id="code"
-          type="text"
-          value={code}
-          onChange={(event) => setCode(event.target.value)}
-          placeholder="PAD-7K3M-9QXR"
-          autoCapitalize="characters"
-          autoCorrect="off"
-          spellCheck={false}
-          required
-        />
-        <p className="hint">
-          Ask whoever scored your match — they can show you a code or a QR to
-          scan.
-        </p>
+      {error && <p className="error">{error}</p>}
 
-        {error && <p className="error">{error}</p>}
-
-        <button type="submit" disabled={busy || !code.trim()}>
-          {busy ? 'Checking…' : 'See my matches'}
-        </button>
-      </form>
-    </div>
+      <button type="submit" disabled={busy || !code.trim()}>
+        {busy ? 'Checking…' : 'See my matches'}
+      </button>
+    </form>
   )
 }
 

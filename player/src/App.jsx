@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import Claim from './screens/Claim'
+import SignIn from './screens/SignIn'
 import Overview from './screens/Overview'
 import Matches from './screens/Matches'
 import MatchDetail from './screens/MatchDetail'
@@ -32,7 +32,7 @@ const TITLES = {
  * sentence on another is exactly the inconsistency that reads as
  * unfinished.
  */
-function SignedIn({ player, onSignOut }) {
+function SignedIn({ player, onSignOut, onPlayerChange }) {
   const path = useRoute()
   const { summary, loading, error, refresh, matches } = usePlayerData()
 
@@ -82,7 +82,8 @@ function SignedIn({ player, onSignOut }) {
   else if (matchRoute) screen = <MatchDetail id={matchRoute.id} />
   else if (path === '/people') screen = <People />
   else if (personRoute) screen = <PersonDetail name={personRoute.name} />
-  else if (path === '/you') screen = <You player={player} onSignOut={onSignOut} />
+  else if (path === '/you')
+    screen = <You player={player} onSignOut={onSignOut} onPlayerChange={onPlayerChange} />
   else screen = <NotFound />
 
   return (
@@ -151,10 +152,14 @@ function App() {
   }, [])
 
   function handleSignOut() {
-    // Asked first because this is genuinely hard to undo: the claim code
-    // is the only credential, and a player who has lost it has to find
-    // an umpire to get another.
-    if (!confirm('Sign out? You’ll need your code again to get back in.')) return
+    // Only worth asking about when getting back in is genuinely hard.
+    // Someone who has set up a username and password can sign in again
+    // themselves; someone who came in by code has to find an umpire, so
+    // they get warned first.
+    const warning = player?.username
+      ? null
+      : 'Sign out? You’ll need your code again to get back in.'
+    if (warning && !confirm(warning)) return
     clearSession()
     setPlayer(null)
     navigate('/', { replace: true })
@@ -171,7 +176,7 @@ function App() {
   if (!player) {
     return (
       <main className="app">
-        <Claim onClaimed={setPlayer} />
+        <SignIn onSignedIn={setPlayer} />
       </main>
     )
   }
@@ -179,7 +184,11 @@ function App() {
   return (
     <main className="app app-tabbed">
       <PlayerDataProvider>
-        <SignedIn player={player} onSignOut={handleSignOut} />
+        <SignedIn
+          player={player}
+          onSignOut={handleSignOut}
+          onPlayerChange={setPlayer}
+        />
       </PlayerDataProvider>
     </main>
   )

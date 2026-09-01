@@ -88,6 +88,49 @@ ALTER TABLE players ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
 CREATE UNIQUE INDEX IF NOT EXISTS players_claim_code_idx
     ON players (claim_code) WHERE claim_code IS NOT NULL;
 
+-- ============================================================
+-- Player accounts
+--
+-- A player can get in two ways, and both are meant to exist.
+--
+--   1. The claim code above -- an umpire hands over a code or a QR and
+--      the player is looking at their stats seconds later. That speed is
+--      the whole reason records get claimed at all, so it is not being
+--      replaced.
+--   2. A username and password they chose themselves, which survives a
+--      lost code, a new phone and a cleared browser.
+--
+-- The code proves who you are; the password keeps you in.
+--
+-- Credentials live HERE rather than in a separate accounts table,
+-- because a player and their account are the same thing. A join table
+-- would only earn its keep if one human could hold several player
+-- records -- which is exactly what players_name_lower_idx exists to
+-- prevent.
+--
+-- There is deliberately NO email column. Nothing in this app has
+-- anything to send, so an address would be a username in disguise:
+-- never verified, never used, and inviting the question of why it was
+-- collected. Add one when something actually needs sending.
+--
+-- SECURITY: the claim code KEEPS WORKING after a password is set. That
+-- is deliberate, not an oversight. With no email there is no reset
+-- link, so an umpire regenerating the code is the recovery path for a
+-- forgotten password -- and unlike a reset email it has a trusted human
+-- in the loop. Do not "fix" this by invalidating codes on registration.
+-- ============================================================
+
+ALTER TABLE players ADD COLUMN IF NOT EXISTS username      TEXT;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS password_hash TEXT;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS registered_at TIMESTAMPTZ;
+
+-- Partial, because the overwhelming majority of players are created by
+-- an umpire and never register. Usernames are compared case-insensitively
+-- for the same reason umpire emails are: "Maria" and "maria" must not be
+-- able to become two accounts.
+CREATE UNIQUE INDEX IF NOT EXISTS players_username_lower_idx
+    ON players (lower(username)) WHERE username IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS sessions (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name       TEXT NOT NULL,

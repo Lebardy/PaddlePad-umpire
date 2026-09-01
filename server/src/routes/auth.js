@@ -9,12 +9,32 @@ import {
   signToken,
   verifyPassword,
 } from '../auth.js'
-import { normalizeInviteCode } from '../invites.js'
+import { generateInviteCode, normalizeInviteCode } from '../invites.js'
+import {
+  USERNAME_RULE,
+  isValidUsername,
+  normalizeUsername,
+} from '../validate.js'
 
 const router = Router()
 
 function normalizeEmail(value) {
   return String(value ?? '').trim().toLowerCase()
+}
+
+// Verified against when no account matches, so a missing account and a
+// wrong password take similar time to answer. Well-formed (`salt:key`
+// with a 64-byte key) so verifyPassword does the real scrypt work rather
+// than bailing early on a malformed hash, which would give the timing
+// away again.
+const NO_SUCH_ACCOUNT_HASH = `${'0'.repeat(32)}:${'0'.repeat(128)}`
+
+/** An error carrying the status and extra fields a handler should return. */
+function refusal(statusCode, message, extra = {}) {
+  const error = new Error(message)
+  error.statusCode = statusCode
+  error.extra = extra
+  return error
 }
 
 // Lets the very first umpire register before any invite can exist.
@@ -103,9 +123,7 @@ router.post('/register', async (req, res) => {
       const inviteError = await claimInvite(client, invite, created.id)
       if (inviteError) {
         // Rolls back the umpire insert above.
-        const failure = new Error(inviteError)
-        failure.statusCode = 403
-        throw failure
+        throw refusal(403, inviteError)
       }
 
       // Re-read is_admin rather than using the INSERT's value: the
@@ -149,7 +167,7 @@ router.post('/login', async (req, res) => {
   // email is registered.
   const ok = found
     ? await verifyPassword(password, found.password_hash)
-    : await verifyPassword(password, `${'0'.repeat(32)}:${'0'.repeat(128)}`)
+    : await verifyPassword(password, NO_SUCH_ACCOUNT_HASH)
 
   if (!found || !ok) {
     return res.status(401).json({ error: 'Incorrect email or password' })
@@ -184,13 +202,17 @@ router.get('/me', requireAuth, async (req, res) => {
  * token yet, which is the entire point. Mounting it there would reject
  * the request before it ever reached this handler.
  *
- * There is no password. The data is a player's own pickleball stats,
- * and an extra signup step is exactly the friction that stops people
- * bothering at all -- which would leave the records unclaimed and the
- * app pointless. The code is the credential.
+ * The FAST path in, and the reason it asks for no password: the data is
+ * a player's own pickleball stats, and a signup step at the moment
+ * someone is handed a QR courtside is exactly the friction that leaves
+ * records unclaimed and the app pointless. Here the code is the whole
+ * credential.
  *
- * The code stays valid after claiming, so a player can sign in again on
- * a new phone. An umpire can regenerate it, which invalidates the old.
+ * It is not the only way in any more -- see /player/register below for
+ * the durable one. The code stays valid after claiming, and stays valid
+ * after a password is set, which makes an umpire regenerating it the
+ * recovery path for a forgotten password. An umpire regenerating it
+ * invalidates the old one.
  */
 router.post('/player/claim', async (req, res) => {
   // Codes get read aloud and typed on phones, so accept any casing or
@@ -204,7 +226,7 @@ router.post('/player/claim', async (req, res) => {
     `UPDATE players
         SET claimed_at = COALESCE(claimed_at, now())
       WHERE claim_code = $1
-      RETURNING id, name, claimed_at`,
+      RETURNING id, name, claimed_at, username`,
     [code],
   )
 
@@ -215,17 +237,295 @@ router.post('/player/claim', async (req, res) => {
   const player = rows[0]
   res.json({
     token: signPlayerToken(player),
-    player: { id: player.id, name: player.name, claimedAt: player.claimed_at },
+    player: {
+      id: player.id,
+      name: player.name,
+      claimedAt: player.claimed_at,
+      // Null unless they have already set up sign-in. Carried so a
+      // registered player recovering with their code is not shown the
+      // prompt to set up something they already have.
+      username: player.username,
+    },
   })
+})
+
+// ============================================================
+// Player accounts
+//
+// A player has two ways in and both are meant to exist. The claim code
+// above is the fast one: an umpire hands over a QR and the player is
+// looking at their stats seconds later. A username and password is the
+// durable one, surviving a lost code, a new phone and a cleared browser.
+//
+// The code proves who you are; the password keeps you in.
+//
+// No email is collected anywhere here. Nothing in this app has anything
+// to send, so an address would be a username in disguise -- never
+// verified, never used. See the schema comment on players.username.
+// ============================================================
+
+/**
+ * Refuses a registration that would take over someone else's record.
+ *
+ * Throws on refusal and returns nothing on success -- the caller may
+ * link the account to `existing` only if this does not throw.
+ *
+ * Players live in ONE table keyed by a case-insensitive unique name,
+ * because the ML pipeline aggregates by player_id and the same human
+ * has to resolve to the same row whichever umpire logged the match. So
+ * a name that already exists is never simply handed over -- otherwise
+ * registering as "Maria Santos" would inherit the real Maria's whole
+ * history and her skill rating.
+ *
+ * The claim code is what settles it. Holding it is proof an umpire gave
+ * it to you, which is the only evidence this system has about who
+ * someone actually is.
+ *
+ * `needsCode` tells the app to REVEAL the code field rather than show a
+ * dead end -- that is the entire user experience of this branch, and
+ * the moment the two ways in become one flow.
+ */
+function assertMayLinkTo(existing, code) {
+  if (existing.password_hash) {
+    throw refusal(
+      409,
+      `Someone called ${existing.name} already has an account. ` +
+        'If that is you, sign in instead.',
+    )
+  }
+
+  // Codes are minted lazily, so a player created before that was
+  // routine can still have none. Nothing can match, and the umpire
+  // mints one from the roster -- correct, if briefly puzzling.
+  if (!existing.claim_code || !code || code !== existing.claim_code) {
+    throw refusal(
+      409,
+      `${existing.name} is already on the roster. Enter the code whoever ` +
+        'scores your matches gave you and this account will pick up all ' +
+        'the matches already recorded for you.',
+      { needsCode: true },
+    )
+  }
+}
+
+/**
+ * Sign up as a player: either a brand-new person, or someone an umpire
+ * has already been recording matches for.
+ *
+ * Both cases end at the same place -- one row in `players` carrying a
+ * username and a password hash -- which is why they are one endpoint
+ * rather than a register and a separate link step.
+ */
+router.post('/player/register', async (req, res) => {
+  const name = String(req.body?.name ?? '').trim()
+  const username = normalizeUsername(req.body?.username)
+  const password = String(req.body?.password ?? '')
+  const code = normalizeInviteCode(req.body?.code)
+
+  if (!name) return res.status(400).json({ error: 'Your name is required' })
+  if (name.length > 80) {
+    return res.status(400).json({ error: 'That name is too long' })
+  }
+  if (!isValidUsername(username)) {
+    return res.status(400).json({ error: USERNAME_RULE })
+  }
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({
+      error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+    })
+  }
+
+  const password_hash = await hashPassword(password)
+
+  try {
+    const player = await withTransaction(async (client) => {
+      // Attempt the new-person case first, and let the unique index
+      // decide. A SELECT-then-INSERT would let two people registering
+      // the same new name at the same moment both pass the check --
+      // the same reasoning as POST /players.
+      const inserted = await client.query(
+        `INSERT INTO players (name, username, password_hash, claim_code,
+                              claimed_at, registered_at)
+         VALUES ($1, $2, $3, $4, now(), now())
+         ON CONFLICT (lower(name)) DO NOTHING
+         RETURNING id, name, claimed_at, username`,
+        [name, username, password_hash, generateInviteCode()],
+      )
+      if (inserted.rowCount === 1) return inserted.rows[0]
+
+      // The name is taken. Either this is the person an umpire has been
+      // recording matches for, or it is not.
+      const { rows } = await client.query(
+        `SELECT id, name, claim_code, password_hash
+           FROM players
+          WHERE lower(name) = lower($1)`,
+        [name],
+      )
+      // The insert conflicted, so a row with this name is committed --
+      // unless a concurrent delete removed it in between. Refuse
+      // rather than throw a TypeError into a 500.
+      if (!rows[0]) throw refusal(409, 'That name is taken. Try again.')
+      assertMayLinkTo(rows[0], code)
+
+      const updated = await client.query(
+        `UPDATE players
+            SET username      = $2,
+                password_hash = $3,
+                registered_at = now(),
+                claimed_at    = COALESCE(claimed_at, now())
+          WHERE id = $1
+          RETURNING id, name, claimed_at, username`,
+        [rows[0].id, username, password_hash],
+      )
+      return updated.rows[0]
+    })
+
+    res.status(201).json({
+      token: signPlayerToken(player),
+      player: {
+        id: player.id,
+        name: player.name,
+        claimedAt: player.claimed_at,
+        username: player.username,
+      },
+    })
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        error: error.message,
+        ...error.extra,
+      })
+    }
+    // 23505 = unique_violation. Named per index so the app can point at
+    // the field that actually needs changing; the name collision is
+    // handled above and never reaches here.
+    if (error.constraint === 'players_username_lower_idx') {
+      return res.status(409).json({
+        error: 'That username is taken',
+        usernameTaken: true,
+      })
+    }
+    throw error
+  }
+})
+
+/** Sign in with the username and password a player chose themselves. */
+router.post('/player/login', async (req, res) => {
+  const username = normalizeUsername(req.body?.username)
+  const password = String(req.body?.password ?? '')
+
+  const { rows } = await query(
+    `SELECT id, name, claimed_at, username, password_hash
+       FROM players
+      WHERE lower(username) = $1`,
+    [username],
+  )
+  const found = rows[0]
+
+  // An unregistered player row has a username of NULL and so cannot be
+  // found here at all, but check the hash anyway rather than relying on
+  // that -- and do the scrypt work in every branch so an unknown
+  // username and a wrong password cost the same. One message for both.
+  const ok = found?.password_hash
+    ? await verifyPassword(password, found.password_hash)
+    : await verifyPassword(password, NO_SUCH_ACCOUNT_HASH)
+
+  if (!found || !found.password_hash || !ok) {
+    return res.status(401).json({ error: 'Incorrect username or password' })
+  }
+
+  res.json({
+    token: signPlayerToken(found),
+    player: {
+      id: found.id,
+      name: found.name,
+      claimedAt: found.claimed_at,
+      username: found.username,
+    },
+  })
+})
+
+/**
+ * Turns a code-only session into a real account, from inside the app.
+ *
+ * This is the endpoint that actually retires "you'll need your code
+ * again to get back in": someone who scanned a QR courtside can pick a
+ * username and password afterwards, at their leisure, without ever
+ * seeing a sign-up form first.
+ *
+ * Changing an EXISTING password requires the current one. Without that,
+ * a phone left unlocked on the profile screen is a full account
+ * takeover, and the person who owns it would never know.
+ */
+router.post('/player/credentials', requirePlayer, async (req, res) => {
+  const username = normalizeUsername(req.body?.username)
+  const password = String(req.body?.password ?? '')
+  const currentPassword = String(req.body?.currentPassword ?? '')
+
+  if (!isValidUsername(username)) {
+    return res.status(400).json({ error: USERNAME_RULE })
+  }
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({
+      error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+    })
+  }
+
+  const { rows } = await query(
+    'SELECT password_hash FROM players WHERE id = $1',
+    [req.player.id],
+  )
+  if (!rows[0]) {
+    return res.status(401).json({ error: 'That player no longer exists' })
+  }
+
+  const existing = rows[0].password_hash
+  if (existing && !(await verifyPassword(currentPassword, existing))) {
+    return res.status(403).json({
+      error: 'Enter your current password to change it',
+      needsCurrentPassword: true,
+    })
+  }
+
+  try {
+    await query(
+      `UPDATE players
+          SET username      = $2,
+              password_hash = $3,
+              registered_at = COALESCE(registered_at, now())
+        WHERE id = $1`,
+      [req.player.id, username, await hashPassword(password)],
+    )
+  } catch (error) {
+    if (error.constraint === 'players_username_lower_idx') {
+      return res.status(409).json({
+        error: 'That username is taken',
+        usernameTaken: true,
+      })
+    }
+    throw error
+  }
+
+  res.json({ username })
 })
 
 /** Confirms a stored player token is still good, on app launch. */
 router.get('/player/me', requirePlayer, async (req, res) => {
-  const { rows } = await query('SELECT id, name FROM players WHERE id = $1', [
-    req.player.id,
-  ])
+  const { rows } = await query(
+    'SELECT id, name, claimed_at, username FROM players WHERE id = $1',
+    [req.player.id],
+  )
   if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
-  res.json({ player: rows[0] })
+  // `username` is null for a player who came in by code and has not set
+  // one up. The app reads that to decide whether to offer the prompt.
+  res.json({
+    player: {
+      id: rows[0].id,
+      name: rows[0].name,
+      claimedAt: rows[0].claimed_at,
+      username: rows[0].username,
+    },
+  })
 })
 
 export default router
