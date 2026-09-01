@@ -1,7 +1,7 @@
 import cors from 'cors'
 import express from 'express'
 import { migrate, pool } from './db.js'
-import { rateLimit } from './ratelimit.js'
+import { RATE_LIMITS_DISABLED, rateLimit } from './ratelimit.js'
 import { requestLog } from './requestlog.js'
 import authRoutes from './routes/auth.js'
 import inviteRoutes from './routes/invites.js'
@@ -21,7 +21,20 @@ const app = express()
 // Railway sits in front of this, so req.ip would otherwise be the
 // proxy's address for every caller and the rate limiter would treat
 // the whole internet as one client.
+//
+// The hop count matters: it is how Express knows which X-Forwarded-For
+// entry is the real client rather than one the caller wrote themselves.
+// Raising it without adding a real proxy hands anyone a free bypass of
+// every rate limit below.
 app.set('trust proxy', 1)
+
+if (RATE_LIMITS_DISABLED) {
+  console.warn(
+    '\n*** RATE LIMITS ARE DISABLED (DANGEROUSLY_DISABLE_RATE_LIMITS=1) ***\n' +
+      '*** Password, invite-code and claim-code guessing are unthrottled. ***\n' +
+      '*** This is for automated tests only. Never set it on a deploy.  ***\n',
+  )
+}
 
 app.use(express.json({ limit: '1mb' }))
 app.use(requestLog)

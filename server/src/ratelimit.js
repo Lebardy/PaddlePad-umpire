@@ -18,23 +18,39 @@ function sweep(now) {
   }
 }
 
+// Test suites make dozens of deliberately-failing sign-in attempts in a
+// few seconds, which is precisely the traffic these limits exist to
+// stop. Named to be unmistakable in a Railway variables list: anyone
+// setting this on a deployed service has to type the word DANGEROUSLY.
+// index.js shouts about it at boot so it cannot be on quietly.
+export const RATE_LIMITS_DISABLED =
+  process.env.DANGEROUSLY_DISABLE_RATE_LIMITS === '1'
+
 /**
  * @param {object} options
  * @param {number} options.max      allowed requests per window
  * @param {number} options.windowMs window length in milliseconds
  */
 export function rateLimit({ max, windowMs }) {
+  if (RATE_LIMITS_DISABLED) return (_req, _res, next) => next()
+
   return function rateLimitMiddleware(req, res, next) {
     const now = Date.now()
     if (buckets.size > 5000) sweep(now)
 
-    // Railway terminates TLS upstream, so the client address arrives in
-    // X-Forwarded-For. Only the first entry is meaningful; the rest can
-    // be spoofed by the caller.
-    const forwarded = req.get('x-forwarded-for')
-    const ip = forwarded ? forwarded.split(',')[0].trim() : req.ip
-
-    const key = `${req.path}:${ip}`
+    // Railway terminates TLS upstream and appends the real client to
+    // X-Forwarded-For, so req.ip -- which Express resolves using the
+    // `trust proxy` hop count set in index.js -- is the trustworthy
+    // entry.
+    //
+    // This used to read the header directly and take the FIRST entry,
+    // which is exactly the one a caller can write for themselves:
+    // proxies APPEND, so `X-Forwarded-For: 1.2.3.4` arrives as
+    // `1.2.3.4, <real client>`. Every limit here was one header away
+    // from being bypassed, on password guessing, invite codes and claim
+    // codes alike. Do not reintroduce manual parsing; the hop count is
+    // the only place that knowledge belongs.
+    const key = `${req.path}:${req.ip}`
     const bucket = buckets.get(key)
 
     if (!bucket || bucket.resetAt <= now) {

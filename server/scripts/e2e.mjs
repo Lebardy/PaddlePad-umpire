@@ -159,6 +159,11 @@ async function startApi() {
       JWT_SECRET: TEST_JWT_SECRET,
       BOOTSTRAP_INVITE_CODE: TEST_INVITE,
       INTERNAL_API_KEY: TEST_INTERNAL_KEY,
+      // The suite makes dozens of deliberately-failing sign-in and
+      // registration attempts in a few seconds -- exactly the traffic
+      // the limiter exists to stop. Safe here and nowhere else: this
+      // stack is local, empty and thrown away.
+      DANGEROUSLY_DISABLE_RATE_LIMITS: '1',
       CORS_ORIGIN: 'http://localhost:5173',
       PORT: String(TEST_PORT),
     },

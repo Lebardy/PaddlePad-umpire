@@ -34,3 +34,10 @@ __pycache__/
 *.njsproj
 *.sln
 *.sw?
+
+# Database dumps from scripts/backup-data.mjs. These contain umpire
+# password hashes and player CLAIM CODES, which are bearer credentials
+# -- anyone holding one can sign in as that player. One was committed
+# once already; never again.
+paddlepad-backup.json
+*-backup.json
