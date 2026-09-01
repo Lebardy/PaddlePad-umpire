@@ -298,14 +298,24 @@ after the fact. See the comment above those tables in `schema.sql`.
   cannot be used to discover which usernames exist. Registration
   necessarily reveals that a username is taken — unavoidable if
   usernames are unique — but nothing else.
-- **Rate limits key on `req.ip`**, which Express resolves from the
-  `trust proxy` hop count set in `index.js`. They previously read
-  `X-Forwarded-For` directly and took the *first* entry, which is the
-  one a caller writes for themselves: proxies **append**, so a request
-  sent with `X-Forwarded-For: 1.2.3.4` arrives as `1.2.3.4, <real
-  client>`. Every limit was one header away from being bypassed. Do not
-  reintroduce manual parsing of that header, and do not raise the hop
-  count without adding a real proxy hop.
+- **Rate limits key on the first `X-Forwarded-For` entry, not `req.ip`,
+  and that is deliberate.** `req.ip` is the principled choice on paper;
+  it was tried and it silently disabled the limiter in production.
+  Railway's edge does not present as a single hop, so with
+  `trust proxy: 1` Express resolved `req.ip` to a rotating pool of
+  Railway's own addresses rather than the caller — every request got a
+  fresh bucket and nothing was limited. Railway **overwrites**
+  `X-Forwarded-For` rather than appending, so its first entry is the
+  true client and a caller cannot inject a value that survives.
+  That is a fact about this deployment, not about proxies in general:
+  behind a proxy that appends, the first entry is attacker-controlled
+  and this becomes a free bypass. **If the API ever moves off Railway or
+  is exposed without a proxy, revisit that line first.**
+- **Each limiter gets its own bucket**, keyed on `req.baseUrl`. Using
+  `req.path` shared one bucket across every endpoint, because Express
+  strips the mount path inside `app.use(path, mw)` — spending the ten
+  attempts on `/auth/login` left `/auth/register` returning 429 on its
+  first call.
 - `DANGEROUSLY_DISABLE_RATE_LIMITS=1` turns every limit off, for tests
   against a disposable database only. The API prints a loud warning at
   boot whenever it is set, so it cannot be on quietly.

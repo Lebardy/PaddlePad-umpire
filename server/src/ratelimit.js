@@ -38,18 +38,28 @@ export function rateLimit({ max, windowMs }) {
     const now = Date.now()
     if (buckets.size > 5000) sweep(now)
 
-    // Railway terminates TLS upstream and appends the real client to
-    // X-Forwarded-For, so req.ip -- which Express resolves using the
-    // `trust proxy` hop count set in index.js -- is the trustworthy
-    // entry.
+    // The FIRST X-Forwarded-For entry, deliberately, and NOT req.ip.
     //
-    // This used to read the header directly and take the FIRST entry,
-    // which is exactly the one a caller can write for themselves:
-    // proxies APPEND, so `X-Forwarded-For: 1.2.3.4` arrives as
-    // `1.2.3.4, <real client>`. Every limit here was one header away
-    // from being bypassed, on password guessing, invite codes and claim
-    // codes alike. Do not reintroduce manual parsing; the hop count is
-    // the only place that knowledge belongs.
+    // req.ip looks like the principled choice -- let Express resolve the
+    // client from the `trust proxy` hop count. It was tried, deployed,
+    // and silently disabled this limiter in production. Railway's edge
+    // does not present as one hop: req.ip came back as a rotating pool
+    // of Railway's own addresses (152.233.15.120/121/123,
+    // 152.233.68.97/98) rather than the caller. Every request therefore
+    // got its own bucket and nothing was ever limited. Eleven attempts
+    // against a limit of ten all passed.
+    //
+    // Railway OVERWRITES X-Forwarded-For rather than appending to it, so
+    // its first entry is the real client and a caller cannot inject a
+    // value that survives -- verified from the production request log,
+    // where requests sent with a spoofed header were recorded under the
+    // true address.
+    //
+    // That last sentence is the load-bearing one, and it is a fact about
+    // THIS deployment, not about proxies generally. Behind a proxy that
+    // appends, the first entry is attacker-controlled and this becomes a
+    // free bypass. If this app ever moves off Railway, or is exposed
+    // without a proxy in front, revisit this line first.
     // req.baseUrl, NOT req.path. Express strips the mount path inside a
     // middleware added with app.use(path, mw), so req.path is '/' for
     // every limiter here -- meaning they all shared ONE bucket per IP.
@@ -61,7 +71,10 @@ export function rateLimit({ max, windowMs }) {
     // which for a player typing a claim code looks like the app being
     // broken. req.baseUrl is the mount path itself, so each limiter
     // gets its own namespace with no call-site changes.
-    const key = `${req.baseUrl || req.path}:${req.ip}`
+    const forwarded = req.get('x-forwarded-for')
+    const ip = forwarded ? forwarded.split(',')[0].trim() : req.ip
+
+    const key = `${req.baseUrl || req.path}:${ip}`
     const bucket = buckets.get(key)
 
     if (!bucket || bucket.resetAt <= now) {
