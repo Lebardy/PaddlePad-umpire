@@ -41,8 +41,12 @@ export function requestLog(req, res, next) {
         ? `player:${req.player.id}`
         : 'anon'
 
-    const forwarded = req.get('x-forwarded-for')
-    const ip = forwarded ? forwarded.split(',')[0].trim() : req.ip
+    // req.ip, resolved from the `trust proxy` hop count, rather than the
+    // first X-Forwarded-For entry -- that entry is whatever the caller
+    // chose to send. Railway's edge overwrites the header, so the values
+    // logged here were accurate in practice, but an audit trail is the
+    // last place to keep a field the subject of the audit can set.
+    const ip = req.ip
 
     console.log(
       JSON.stringify({

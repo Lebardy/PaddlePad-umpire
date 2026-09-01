@@ -50,7 +50,18 @@ export function rateLimit({ max, windowMs }) {
     // from being bypassed, on password guessing, invite codes and claim
     // codes alike. Do not reintroduce manual parsing; the hop count is
     // the only place that knowledge belongs.
-    const key = `${req.path}:${req.ip}`
+    // req.baseUrl, NOT req.path. Express strips the mount path inside a
+    // middleware added with app.use(path, mw), so req.path is '/' for
+    // every limiter here -- meaning they all shared ONE bucket per IP.
+    // Spending the 10 on /auth/login left /auth/register, untouched,
+    // returning 429 on its first request. Verified before and after.
+    //
+    // The limits are per IP, so this could never let one caller exhaust
+    // another's budget; it made unrelated endpoints starve each other,
+    // which for a player typing a claim code looks like the app being
+    // broken. req.baseUrl is the mount path itself, so each limiter
+    // gets its own namespace with no call-site changes.
+    const key = `${req.baseUrl || req.path}:${req.ip}`
     const bucket = buckets.get(key)
 
     if (!bucket || bucket.resetAt <= now) {
