@@ -131,6 +131,41 @@ export function requirePlayer(req, res, next) {
 }
 
 /**
+ * Express middleware: requires the player's record still to exist and
+ * still to be active. Must run after requirePlayer.
+ *
+ * Same reasoning as requireAdmin below, for the same reason: a player
+ * token is valid for 30 days and requirePlayer is stateless, so without
+ * this a player who has just deleted their profile would keep getting
+ * in for a month with the token already in their browser -- which would
+ * make "you won't be able to get back in" a lie on the very screen that
+ * says it.
+ *
+ * One primary-key lookup. The routes behind it were already querying
+ * this table.
+ */
+export function requireActivePlayer(queryFn) {
+  return async function requireActivePlayerMiddleware(req, res, next) {
+    try {
+      const { rows } = await queryFn(
+        'SELECT deactivated_at FROM players WHERE id = $1',
+        [req.player.id],
+      )
+      // One message for both cases. Whether the record was deleted
+      // outright or the account was closed is not the holder of a dead
+      // token's business, and the app treats a 401 the same way either
+      // way -- clear the session, show the gate.
+      if (!rows[0] || rows[0].deactivated_at) {
+        return res.status(401).json({ error: 'That player no longer exists' })
+      }
+      next()
+    } catch (error) {
+      next(error)
+    }
+  }
+}
+
+/**
  * Express middleware: requires the caller to be an admin. Must run
  * after requireAuth.
  *

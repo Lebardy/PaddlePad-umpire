@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { query } from '../db.js'
 import { requireAuth } from '../auth.js'
 import { generateInviteCode } from '../invites.js'
+import { normalizePlayerName, playerNameError } from '../validate.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -86,12 +87,12 @@ router.get('/:id', async (req, res) => {
  * second round trip.
  */
 router.post('/', async (req, res) => {
-  const name = String(req.body?.name ?? '').trim()
+  const name = normalizePlayerName(req.body?.name)
 
-  if (!name) return res.status(400).json({ error: 'A player name is required' })
-  if (name.length > 80) {
-    return res.status(400).json({ error: 'That name is too long' })
-  }
+  // The same rule the player's own rename uses, so an umpire and a
+  // player cannot disagree about what a valid name is.
+  const nameError = playerNameError(name)
+  if (nameError) return res.status(400).json({ error: nameError })
 
   const inserted = await query(
     `INSERT INTO players (name, created_by, claim_code)

@@ -4,6 +4,7 @@ import {
   MIN_PASSWORD_LENGTH,
   hashPassword,
   requireAuth,
+  requireActivePlayer,
   requirePlayer,
   signPlayerToken,
   signToken,
@@ -13,7 +14,9 @@ import { generateInviteCode, normalizeInviteCode } from '../invites.js'
 import {
   USERNAME_RULE,
   isValidUsername,
+  normalizePlayerName,
   normalizeUsername,
+  playerNameError,
 } from '../validate.js'
 
 const router = Router()
@@ -222,9 +225,15 @@ router.post('/player/claim', async (req, res) => {
 
   if (!code) return res.status(400).json({ error: 'Enter your code to continue' })
 
+  // Clearing deactivated_at is the whole recovery path for a deleted
+  // profile. Deleting an account wipes its claim code, so holding a
+  // working one means an umpire minted a fresh one and handed it over --
+  // the same trusted human in the loop as the forgotten-password case.
+  // Without this a closed account would be unreachable forever.
   const { rows } = await query(
     `UPDATE players
-        SET claimed_at = COALESCE(claimed_at, now())
+        SET claimed_at     = COALESCE(claimed_at, now()),
+            deactivated_at = NULL
       WHERE claim_code = $1
       RETURNING id, name, claimed_at, username`,
     [code],
@@ -317,15 +326,13 @@ function assertMayLinkTo(existing, code) {
  * rather than a register and a separate link step.
  */
 router.post('/player/register', async (req, res) => {
-  const name = String(req.body?.name ?? '').trim()
+  const name = normalizePlayerName(req.body?.name)
   const username = normalizeUsername(req.body?.username)
   const password = String(req.body?.password ?? '')
   const code = normalizeInviteCode(req.body?.code)
 
-  if (!name) return res.status(400).json({ error: 'Your name is required' })
-  if (name.length > 80) {
-    return res.status(400).json({ error: 'That name is too long' })
-  }
+  const nameError = playerNameError(name)
+  if (nameError) return res.status(400).json({ error: nameError })
   if (!isValidUsername(username)) {
     return res.status(400).json({ error: USERNAME_RULE })
   }
@@ -367,12 +374,17 @@ router.post('/player/register', async (req, res) => {
       if (!rows[0]) throw refusal(409, 'That name is taken. Try again.')
       assertMayLinkTo(rows[0], code)
 
+      // deactivated_at is cleared for the same reason /player/claim
+      // clears it: a closed account whose code was re-minted is being
+      // legitimately recovered, and assertMayLinkTo has already checked
+      // that code.
       const updated = await client.query(
         `UPDATE players
-            SET username      = $2,
-                password_hash = $3,
-                registered_at = now(),
-                claimed_at    = COALESCE(claimed_at, now())
+            SET username       = $2,
+                password_hash  = $3,
+                registered_at  = now(),
+                claimed_at     = COALESCE(claimed_at, now()),
+                deactivated_at = NULL
           WHERE id = $1
           RETURNING id, name, claimed_at, username`,
         [rows[0].id, username, password_hash],
@@ -446,71 +458,106 @@ router.post('/player/login', async (req, res) => {
 })
 
 /**
- * Turns a code-only session into a real account, from inside the app.
+ * Sets up sign-in, or changes it afterwards.
  *
  * This is the endpoint that actually retires "you'll need your code
  * again to get back in": someone who scanned a QR courtside can pick a
  * username and password afterwards, at their leisure, without ever
- * seeing a sign-up form first.
+ * seeing a sign-up form first. It doubles as the edit path on the
+ * profile screen, which is why it takes partial updates.
  *
- * Changing an EXISTING password requires the current one. Without that,
- * a phone left unlocked on the profile screen is a full account
- * takeover, and the person who owns it would never know.
+ * What is required depends on what the account already has:
+ *
+ *   no password yet  -> BOTH username and password. Half an account is
+ *                       not a state worth being able to reach.
+ *   password already -> at least one of username / password, plus
+ *                       currentPassword.
+ *
+ * currentPassword gates a USERNAME change as well as a password change,
+ * which is not obvious and is deliberate. Without it, a phone left
+ * unlocked on the profile screen is an account takeover -- silently
+ * changing the username someone signs in with locks them out just as
+ * effectively as changing the password, and they would never know.
  */
-router.post('/player/credentials', requirePlayer, async (req, res) => {
-  const username = normalizeUsername(req.body?.username)
-  const password = String(req.body?.password ?? '')
-  const currentPassword = String(req.body?.currentPassword ?? '')
+router.post(
+  '/player/credentials',
+  requirePlayer,
+  requireActivePlayer(query),
+  async (req, res) => {
+    const wantsUsername = req.body?.username !== undefined
+    const wantsPassword = req.body?.password !== undefined
+    const username = normalizeUsername(req.body?.username)
+    const password = String(req.body?.password ?? '')
+    const currentPassword = String(req.body?.currentPassword ?? '')
 
-  if (!isValidUsername(username)) {
-    return res.status(400).json({ error: USERNAME_RULE })
-  }
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    return res.status(400).json({
-      error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
-    })
-  }
-
-  const { rows } = await query(
-    'SELECT password_hash FROM players WHERE id = $1',
-    [req.player.id],
-  )
-  if (!rows[0]) {
-    return res.status(401).json({ error: 'That player no longer exists' })
-  }
-
-  const existing = rows[0].password_hash
-  if (existing && !(await verifyPassword(currentPassword, existing))) {
-    return res.status(403).json({
-      error: 'Enter your current password to change it',
-      needsCurrentPassword: true,
-    })
-  }
-
-  try {
-    await query(
-      `UPDATE players
-          SET username      = $2,
-              password_hash = $3,
-              registered_at = COALESCE(registered_at, now())
-        WHERE id = $1`,
-      [req.player.id, username, await hashPassword(password)],
+    const { rows } = await query(
+      'SELECT username, password_hash FROM players WHERE id = $1',
+      [req.player.id],
     )
-  } catch (error) {
-    if (error.constraint === 'players_username_lower_idx') {
-      return res.status(409).json({
-        error: 'That username is taken',
-        usernameTaken: true,
+    if (!rows[0]) {
+      return res.status(401).json({ error: 'That player no longer exists' })
+    }
+    const existing = rows[0].password_hash
+
+    if (!existing && !(wantsUsername && wantsPassword)) {
+      return res.status(400).json({
+        error: 'Pick both a username and a password to set up sign-in',
       })
     }
-    throw error
-  }
+    if (!wantsUsername && !wantsPassword) {
+      return res.status(400).json({ error: 'Nothing to change' })
+    }
+    if (wantsUsername && !isValidUsername(username)) {
+      return res.status(400).json({ error: USERNAME_RULE })
+    }
+    if (wantsPassword && password.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({
+        error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+      })
+    }
 
-  res.json({ username })
-})
+    if (existing && !(await verifyPassword(currentPassword, existing))) {
+      return res.status(403).json({
+        error: 'Enter your current password to change it',
+        needsCurrentPassword: true,
+      })
+    }
+
+    // COALESCE would not do here: the point is to leave the untouched
+    // column alone entirely, and only the caller knows which that is.
+    const sets = ['registered_at = COALESCE(registered_at, now())']
+    const values = [req.player.id]
+    if (wantsUsername) {
+      values.push(username)
+      sets.push(`username = $${values.length}`)
+    }
+    if (wantsPassword) {
+      values.push(await hashPassword(password))
+      sets.push(`password_hash = $${values.length}`)
+    }
+
+    let updated
+    try {
+      ;({ rows: updated } = await query(
+        `UPDATE players SET ${sets.join(', ')} WHERE id = $1 RETURNING username`,
+        values,
+      ))
+    } catch (error) {
+      if (error.constraint === 'players_username_lower_idx') {
+        return res.status(409).json({
+          error: 'That username is taken',
+          usernameTaken: true,
+        })
+      }
+      throw error
+    }
+
+    res.json({ username: updated[0].username })
+  },
+)
 
 /** Confirms a stored player token is still good, on app launch. */
-router.get('/player/me', requirePlayer, async (req, res) => {
+router.get('/player/me', requirePlayer, requireActivePlayer(query), async (req, res) => {
   const { rows } = await query(
     'SELECT id, name, claimed_at, username FROM players WHERE id = $1',
     [req.player.id],

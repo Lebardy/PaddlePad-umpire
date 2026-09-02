@@ -200,9 +200,11 @@ If you ever recreate it, verify these before trusting it:
 | `POST` | `/auth/player/claim` | — | Exchange an umpire-issued code for a player session |
 | `POST` | `/auth/player/register` | — | Sign up as a player |
 | `POST` | `/auth/player/login` | — | Sign in as a player, username + password |
-| `POST` | `/auth/player/credentials` | Bearer (player) | Add or change sign-in details |
+| `POST` | `/auth/player/credentials` | Bearer (player) | Set up sign-in, or change the username or password |
 | `GET` | `/export/match-logs.csv` | Bearer (umpire) | The club-wide ML export |
 | `GET` | `/player/me` | Bearer (player) | A player's own summary, plus their rating or its gate state |
+| `PATCH` | `/player/me` | Bearer (player) | Rename yourself |
+| `DELETE` | `/player/me` | Bearer (player) | Delete your profile — see below |
 | `GET` | `/internal/match-logs.json` | `x-internal-key` | Same rows as the export, for the ML service |
 | `POST` | `/internal/ratings` | `x-internal-key` | Records one pipeline run as a snapshot |
 
@@ -260,6 +262,65 @@ an umpire regenerating it is how a locked-out player gets back in. That
 is a decision, not an oversight — it is written into the schema comment
 and pinned by a test. Unlike a reset email it has a trusted human in the
 loop.
+
+### Editing your own profile
+
+A player owns three things and can change all of them from the You tab.
+
+**Their name.** Allowed, and worth saying why, because an earlier
+version of this code refused it. The identity guard this app is built
+around is about one human ending up with *two* player rows — matches
+point at `players.id`, so renaming a single row moves no data and splits
+no history. What renaming genuinely costs is that the umpire's roster
+label changes under them, and the umpire is the person who has to find
+you at the net. So the form says so in plain words, and the rule itself
+(trim, non-empty, at most 80 characters, unique case-insensitively) is
+the same one `POST /players` uses — one validator in `src/validate.js`,
+not two that agree today.
+
+**Their username and password.** Either can be changed without the
+other, but once an account exists both require the current password.
+Gating a *username* change that way is deliberate: changing the username
+someone signs in with locks them out exactly as effectively as changing
+the password, and a phone left unlocked on the profile screen would
+otherwise be a silent takeover.
+
+### What deleting your profile does
+
+Two outcomes, and which one happens is not a preference:
+
+| Situation | Result |
+|---|---|
+| Never appeared in a match | The record is really deleted. Nothing points at it |
+| Has appeared in a match | The **account** is destroyed; the record stays |
+
+The second case is the honest answer rather than a soft one. A player's
+matches are not solely theirs: their name appears in every partner's and
+opponent's history — `player-stats.js` resolves each id on court to a
+name from the `players` table — `matches.first_server_player` is a
+foreign key with no `ON DELETE`, and `team_a`/`team_b` are bare `UUID[]`
+with no foreign key at all. Deleting the row would either be refused by
+Postgres or leave dangling ids in other people's match records.
+
+So the account is destroyed properly: `username`, `password_hash`,
+`claim_code`, `claimed_at` and `registered_at` are all cleared, and
+`deactivated_at` is stamped. Freeing the username for someone else to
+take is intended. The screen states which of the two will happen
+*before* asking for confirmation, and reports whichever the server
+actually did rather than guessing.
+
+Because player tokens last 30 days and are stateless, `requireActivePlayer`
+re-reads the row on every player request — otherwise "you won't be able
+to get back in" would be false for a month for the person who just read
+it. Same reasoning as `requireAdmin` reading `is_admin` from the
+database rather than the token.
+
+**Coming back** works the same way a forgotten password does: an umpire
+mints a fresh claim code (the old one was wiped), and claiming it clears
+`deactivated_at`. The trusted human in the loop is the whole mechanism.
+
+The ML pipeline is unaffected either way — it aggregates by `player_id`
+over `matches`, and none of this touches a match.
 
 ### The `/internal` routes
 

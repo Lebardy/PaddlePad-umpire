@@ -32,7 +32,7 @@ const TITLES = {
  * sentence on another is exactly the inconsistency that reads as
  * unfinished.
  */
-function SignedIn({ player, onSignOut, onPlayerChange }) {
+function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
   const path = useRoute()
   const { summary, loading, error, refresh, matches } = usePlayerData()
 
@@ -83,7 +83,14 @@ function SignedIn({ player, onSignOut, onPlayerChange }) {
   else if (path === '/people') screen = <People />
   else if (personRoute) screen = <PersonDetail name={personRoute.name} />
   else if (path === '/you')
-    screen = <You player={player} onSignOut={onSignOut} onPlayerChange={onPlayerChange} />
+    screen = (
+      <You
+        player={player}
+        onSignOut={onSignOut}
+        onSignedOut={onSignedOut}
+        onPlayerChange={onPlayerChange}
+      />
+    )
   else screen = <NotFound />
 
   return (
@@ -151,6 +158,16 @@ function App() {
     }
   }, [])
 
+  // The state reset on its own, with nothing to confirm. Deleting a
+  // profile ends here too: that flow has already asked for a password
+  // and said what it would destroy, and following it with "are you
+  // sure you want to sign out?" would be absurd.
+  function handleSignedOut() {
+    clearSession()
+    setPlayer(null)
+    navigate('/', { replace: true })
+  }
+
   function handleSignOut() {
     // Only worth asking about when getting back in is genuinely hard.
     // Someone who has set up a username and password can sign in again
@@ -160,9 +177,7 @@ function App() {
       ? null
       : 'Sign out? You’ll need your code again to get back in.'
     if (warning && !confirm(warning)) return
-    clearSession()
-    setPlayer(null)
-    navigate('/', { replace: true })
+    handleSignedOut()
   }
 
   if (!player && !checked) {
@@ -187,6 +202,7 @@ function App() {
         <SignedIn
           player={player}
           onSignOut={handleSignOut}
+          onSignedOut={handleSignedOut}
           onPlayerChange={setPlayer}
         />
       </PlayerDataProvider>

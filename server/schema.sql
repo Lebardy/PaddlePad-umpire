@@ -131,6 +131,39 @@ ALTER TABLE players ADD COLUMN IF NOT EXISTS registered_at TIMESTAMPTZ;
 CREATE UNIQUE INDEX IF NOT EXISTS players_username_lower_idx
     ON players (lower(username)) WHERE username IS NOT NULL;
 
+-- A player who deleted their profile.
+--
+-- The row survives, and that is the whole point of this column. A
+-- player's matches are not solely theirs: their name appears in every
+-- partner's and opponent's history (player-stats.js resolves each id on
+-- court to a name from THIS table), matches.first_server_player is a
+-- foreign key with no ON DELETE, and team_a/team_b are plain UUID[] with
+-- no foreign key at all. Deleting the row would either be refused by
+-- Postgres or leave dangling ids in other people's match records.
+--
+-- So deleting an account clears username, password_hash, claim_code,
+-- claimed_at and registered_at, and stamps this. Wiping the credentials
+-- rather than merely flagging the row is what makes the account
+-- genuinely unusable; freeing the username for someone else to take is
+-- intended. A player who has never appeared in a match IS hard-deleted
+-- instead -- nothing points at them.
+--
+-- This has to be its own state rather than being inferred from
+-- "username IS NULL AND password_hash IS NULL", because that is exactly
+-- what an ordinary umpire-created player who never registered looks
+-- like, and the two must be told apart: player tokens are valid for 30
+-- days, so a closed account needs something for requireActivePlayer to
+-- read.
+--
+-- Claiming a fresh code REVIVES the account (see routes/auth.js), the
+-- same trusted-human recovery path as the forgotten password above: an
+-- umpire mints a new code with GET /players/:id/claim-code, which mints
+-- lazily and so works on a row whose code was just wiped.
+--
+-- The ML pipeline is unaffected. It aggregates by player_id over
+-- `matches`, and none of this touches a match.
+ALTER TABLE players ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMPTZ;
+
 CREATE TABLE IF NOT EXISTS sessions (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name       TEXT NOT NULL,

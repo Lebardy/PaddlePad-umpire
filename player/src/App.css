@@ -115,25 +115,70 @@
 .signin-form button[type='submit']:disabled { opacity: 0.45; cursor: not-allowed; }
 .gate .hint:last-child { margin-bottom: 0; margin-top: 1rem; }
 
-/* Setting up sign-in from the profile. */
-.you-signin { margin-bottom: 1.5rem; }
-.you-signin h2 { font-size: 0.9rem; margin-bottom: 0.4rem; }
-.you-signin p { font-size: 0.84rem; color: var(--text-secondary); line-height: 1.55; margin-bottom: 0.6rem; }
-.signin-done { color: var(--status-good); font-weight: 600; }
-.signin-start {
-  width: 100%;
-  padding: 0.7rem;
+/* Editing the profile: one row per field, each opening its own form. */
+.you-details { margin-bottom: 1.5rem; }
+.you-details h2 { font-size: 0.9rem; margin-bottom: 0.6rem; }
+.detail-note {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin-top: 0.6rem;
+}
+.detail-row {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: 0.88rem;
-  font-weight: 600;
-  cursor: pointer;
+  padding: 0.7rem 0.85rem;
+  margin-bottom: 0.5rem;
 }
-.signin-form { margin-top: 0.5rem; }
+.detail-row.is-open { background: var(--surface-sunken); }
+.detail-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.detail-head .link { padding: 0.3rem 0; flex: none; }
+.detail-label {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.detail-value {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+  /* A long name must wrap rather than push the Edit button off. */
+  overflow-wrap: anywhere;
+}
+.signin-done { color: var(--status-good); font-weight: 600; font-size: 0.8rem; margin-top: 0.4rem; }
+.signin-form { margin-top: 0.75rem; }
 .signin-form .link { display: block; width: 100%; margin-top: 0.5rem; text-align: center; }
+
+/* Deleting the profile. Set apart and coloured because it is the one
+   irreversible thing on the screen -- everything above it can be
+   changed back. */
+.you-danger {
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+.you-danger h2 { font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--status-critical); }
+.you-danger p {
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin-bottom: 0.6rem;
+}
+.you-danger .link.danger { color: var(--status-critical); padding: 0; }
+.you-danger.is-open {
+  background: var(--status-critical-soft);
+  border: 1px solid var(--status-critical);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+}
+.signin-form button[type='submit'].danger {
+  background: var(--status-critical);
+  border-color: var(--status-critical);
+  color: #fff;
+}
 
 /* ============ Profile ============ */
 

@@ -155,24 +155,74 @@ export async function loginPlayer({ username, password }) {
 }
 
 /**
- * Adds (or changes) sign-in details from inside the app -- the path for
- * someone who arrived by code and wants to stop depending on it.
+ * Merges fields into the stored player and returns the result, so a
+ * reload agrees with what is on screen.
  *
- * Returns the updated player so the caller can put it straight into
- * state; the stored copy is patched here so a reload agrees.
+ * Every profile edit needs this, which is why it is not inlined: a
+ * rename that updated React state but not localStorage would revert the
+ * moment the app was reopened, and look like the save had failed.
  */
-export async function setCredentials({ username, password, currentPassword }) {
-  const data = await apiFetch('/auth/player/credentials', {
-    method: 'POST',
-    body: { username, password, currentPassword: currentPassword || undefined },
-  })
-  const player = { ...(getStoredPlayer() ?? {}), username: data.username }
+function patchStoredPlayer(fields) {
+  const player = { ...(getStoredPlayer() ?? {}), ...fields }
   try {
     localStorage.setItem(PLAYER_KEY, JSON.stringify(player))
   } catch {
     // Private mode. State in memory is still correct for this tab.
   }
   return player
+}
+
+// ============================================================
+// Your profile
+// ============================================================
+
+/**
+ * Adds (or changes) sign-in details from inside the app -- the path for
+ * someone who arrived by code and wants to stop depending on it, and
+ * the edit path once they have.
+ *
+ * Only the fields passed are sent. The server takes a username change
+ * without a password change and vice versa, but it wants
+ * `currentPassword` for either once an account exists.
+ */
+export async function setCredentials({ username, password, currentPassword }) {
+  const body = {}
+  if (username !== undefined) body.username = username
+  if (password !== undefined) body.password = password
+  if (currentPassword) body.currentPassword = currentPassword
+
+  const data = await apiFetch('/auth/player/credentials', {
+    method: 'POST',
+    body,
+  })
+  return patchStoredPlayer({ username: data.username })
+}
+
+/** Renames the player. The umpire's roster shows the new name too. */
+export async function updateProfile({ name }) {
+  const data = await apiFetch('/player/me', { method: 'PATCH', body: { name } })
+  return patchStoredPlayer(data.player)
+}
+
+/**
+ * Deletes the profile.
+ *
+ * Resolves to `{ deleted, matches }`: `deleted` is true only when the
+ * record was genuinely removed, which the server allows only for a
+ * player who has never appeared in a match. Otherwise the account is
+ * destroyed and the match record stays. The caller reports whichever
+ * came back rather than guessing from its own match count.
+ *
+ * The session is cleared here, unconditionally on success: whichever
+ * branch ran, this token is dead.
+ */
+export async function deleteProfile({ password } = {}) {
+  const data = await apiFetch('/player/me', {
+    method: 'DELETE',
+    body: { password: password || undefined },
+  })
+  clearSession()
+  return data
 }
 
 /** Profile plus headline totals. */

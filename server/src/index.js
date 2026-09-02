@@ -91,6 +91,10 @@ app.use('/auth/player/claim', rateLimit({ max: 10, windowMs: 60_000 }))
 // answered differently from a free one.
 app.use('/auth/player/register', rateLimit({ max: 5, windowMs: 60_000 }))
 app.use('/auth/player/login', rateLimit({ max: 10, windowMs: 60_000 }))
+// Login-grade too, and for the same reason: this endpoint now takes a
+// `currentPassword` to authorise a change, which makes it a password-
+// guessing surface even though it needs a valid token to reach.
+app.use('/auth/player/credentials', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/player', rateLimit({ max: 60, windowMs: 60_000 }))
 app.use('/export', rateLimit({ max: 5, windowMs: 60_000 }))
 // One caller, a handful of calls per run. Tight enough that a leaked

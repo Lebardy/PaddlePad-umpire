@@ -66,3 +66,28 @@ export function isValidUsername(value) {
   return USERNAME_RE.test(value)
 }
 
+// A player's display name -- what the roster, the People screen and
+// every match detail call them.
+//
+// The rule lives here rather than inline in the create-player route
+// because two places now write a name: an umpire adding someone to the
+// roster (POST /players) and the player themselves renaming (PATCH
+// /player/me). Two copies of "trim it, don't allow empty, cap the
+// length" would agree today and drift by next month.
+//
+// Uniqueness is NOT checked here. It is enforced by
+// players_name_lower_idx and caught from the constraint violation,
+// because a check-then-insert loses to two people submitting the same
+// name at the same moment.
+export const PLAYER_NAME_MAX = 80
+
+export function normalizePlayerName(value) {
+  return String(value ?? '').trim()
+}
+
+/** The message to refuse a name with, or null when it is fine. */
+export function playerNameError(name) {
+  if (!name) return 'A player name is required'
+  if (name.length > PLAYER_NAME_MAX) return 'That name is too long'
+  return null
+}

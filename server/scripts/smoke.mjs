@@ -65,6 +65,26 @@ async function call(path, { method = 'GET', body, raw = false } = {}) {
   return { status: response.status, body: json }
 }
 
+/**
+ * A request carrying a PLAYER token (or none), rather than the umpire
+ * token `call` sends. Module-scoped because more than one section needs
+ * it now.
+ */
+async function asPlayer(path, { method = 'GET', body, bearer } = {}) {
+  const response = await fetch(API + path, {
+    method,
+    headers: {
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  const text = await response.text()
+  let json
+  try { json = JSON.parse(text) } catch { json = { raw: text } }
+  return { status: response.status, body: json }
+}
+
 const uuid = () => crypto.randomUUID()
 const DEVICE = `smoke-${uuid().slice(0, 8)}`
 
@@ -538,21 +558,6 @@ async function main() {
 
   section('player accounts — sign up alongside the claim code')
   {
-    // A player token, not the umpire one `call` carries.
-    async function asPlayer(path, { method = 'GET', body, bearer } = {}) {
-      const response = await fetch(API + path, {
-        method,
-        headers: {
-          ...(body ? { 'Content-Type': 'application/json' } : {}),
-          ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      })
-      const text = await response.text()
-      let json
-      try { json = JSON.parse(text) } catch { json = { raw: text } }
-      return { status: response.status, body: json }
-    }
     const register = (body) =>
       asPlayer('/auth/player/register', { method: 'POST', body })
 
@@ -776,6 +781,197 @@ async function main() {
     check('the roster never carries a username or a hash',
       !rosterText.includes('username') && !rosterText.includes('password') &&
       !rosterText.includes('claim_code'), rosterText.slice(0, 120))
+  }
+
+  // ============================================================
+  section('player profile — editing it, and deleting it')
+  // ============================================================
+  {
+    const stamp2 = Date.now()
+    const PASSWORD = 'not-a-real-password'
+    const login = (body) => asPlayer('/auth/player/login', { method: 'POST', body })
+    const register = (body) =>
+      asPlayer('/auth/player/register', { method: 'POST', body })
+
+    // Someone with an account and no matches, for the edit cases.
+    const editorName = `Smoke Editor ${stamp2}`
+    const editorUser = `smk_ed_${stamp2}`.slice(0, 20)
+    const editor = await register({
+      name: editorName,
+      username: editorUser,
+      password: PASSWORD,
+    })
+    check('a player to edit -> 201', editor.status === 201,
+      JSON.stringify(editor.body).slice(0, 120))
+    if (editor.body.player?.id) selfRegistered.push(editor.body.player.id)
+    const editorToken = editor.body.token
+
+    const rename = (body, bearer = editorToken) =>
+      asPlayer('/player/me', { method: 'PATCH', bearer, body })
+
+    // --- renaming ---
+    const newName = `Smoke Renamed ${stamp2}`
+    const renamed = await rename({ name: newName })
+    check('rename to a free name -> 200', renamed.status === 200,
+      JSON.stringify(renamed.body).slice(0, 120))
+    check('the response carries the new name', renamed.body.player?.name === newName,
+      String(renamed.body.player?.name))
+    check('and /player/me agrees',
+      (await asPlayer('/player/me', { bearer: editorToken })).body.player?.name === newName)
+
+    // The unique index is on lower(name), so a row renaming itself to a
+    // different capitalisation collides with its OWN index entry unless
+    // Postgres handles it -- and fixing your own capitalisation is the
+    // single most likely real edit.
+    const recased = await rename({ name: newName.toUpperCase() })
+    check('renaming to a different CAPITALISATION of your own name -> 200',
+      recased.status === 200, JSON.stringify(recased.body).slice(0, 120))
+    await rename({ name: newName })
+
+    const stealName = await rename({ name: nameA })
+    check("renaming to someone else's name -> 409", stealName.status === 409,
+      String(stealName.status))
+    check('and it says which field is wrong', stealName.body.nameTaken === true,
+      JSON.stringify(stealName.body))
+
+    check('an empty name -> 400', (await rename({ name: '   ' })).status === 400)
+    check('an 81-character name -> 400',
+      (await rename({ name: 'x'.repeat(81) })).status === 400)
+    check('the roster shows the umpire the new name',
+      JSON.stringify((await call(`/players?q=${encodeURIComponent(newName)}`)).body)
+        .includes(newName))
+
+    // --- editing one credential at a time ---
+    const creds = (body, bearer = editorToken) =>
+      asPlayer('/auth/player/credentials', { method: 'POST', bearer, body })
+
+    const nextUser = `smk_ed2_${stamp2}`.slice(0, 20)
+    check('changing the username WITHOUT the current password -> 403',
+      (await creds({ username: nextUser })).status === 403)
+    check('and the old username still signs in',
+      (await login({ username: editorUser, password: PASSWORD })).status === 200)
+
+    const userOnly = await creds({ username: nextUser, currentPassword: PASSWORD })
+    check('changing only the username -> 200', userOnly.status === 200,
+      JSON.stringify(userOnly.body))
+    check('the new username signs in',
+      (await login({ username: nextUser, password: PASSWORD })).status === 200)
+    check('the old one no longer does',
+      (await login({ username: editorUser, password: PASSWORD })).status === 401)
+
+    const NEW_PASSWORD = 'another-not-real-password'
+    const pwOnly = await creds({ password: NEW_PASSWORD, currentPassword: PASSWORD })
+    check('changing only the password -> 200', pwOnly.status === 200,
+      JSON.stringify(pwOnly.body))
+    check('the username is untouched by a password-only change',
+      pwOnly.body.username === nextUser, String(pwOnly.body.username))
+    check('the new password signs in',
+      (await login({ username: nextUser, password: NEW_PASSWORD })).status === 200)
+    check('the old password does not',
+      (await login({ username: nextUser, password: PASSWORD })).status === 401)
+    check('sending neither field -> 400',
+      (await creds({ currentPassword: NEW_PASSWORD })).status === 400)
+
+    // Half an account is not a state worth being able to reach.
+    const halfName = `Smoke Half ${stamp2}`
+    const half = await call('/players', { method: 'POST', body: { name: halfName } })
+    const halfCode = await call(`/players/${half.body.player.id}/claim-code`)
+    const halfSession = await asPlayer('/auth/player/claim', {
+      method: 'POST',
+      body: { code: halfCode.body.claimCode },
+    })
+    check('a code-only player setting a username with no password -> 400',
+      (await creds({ username: `smk_h_${stamp2}`.slice(0, 20) }, halfSession.body.token))
+        .status === 400)
+
+    // --- deleting a profile that has no matches ---
+    const goneName = `Smoke Gone ${stamp2}`
+    const gone = await register({
+      name: goneName,
+      username: `smk_gn_${stamp2}`.slice(0, 20),
+      password: PASSWORD,
+    })
+    const goneToken = gone.body.token
+    check('deleting without the password when one is set -> 403',
+      (await asPlayer('/player/me', { method: 'DELETE', bearer: goneToken })).status === 403)
+
+    const hardDelete = await asPlayer('/player/me', {
+      method: 'DELETE',
+      bearer: goneToken,
+      body: { password: PASSWORD },
+    })
+    check('a player who never played is deleted outright -> 200',
+      hardDelete.status === 200, JSON.stringify(hardDelete.body))
+    check('and the response says so, rather than leaving the app to guess',
+      hardDelete.body.deleted === true, JSON.stringify(hardDelete.body))
+    check('the record is gone from the roster',
+      !JSON.stringify((await call(`/players?q=${encodeURIComponent(goneName)}`)).body)
+        .includes(goneName))
+    check('and the token they still hold is dead',
+      (await asPlayer('/player/me', { bearer: goneToken })).status === 401)
+
+    // --- deleting a profile that HAS matches ---
+    // playerA has real matches, a rating, and partners whose history
+    // names them. This is the case the whole design turns on.
+    const aUser = `smk_a_${stamp}`.slice(0, 20)
+    const aSession = await login({ username: aUser, password: PASSWORD })
+    check('the player with history signs in first -> 200', aSession.status === 200,
+      String(aSession.status))
+    const aToken = aSession.body.token
+
+    const softDelete = await asPlayer('/player/me', {
+      method: 'DELETE',
+      bearer: aToken,
+      body: { password: PASSWORD },
+    })
+    check('a player WITH matches -> 200', softDelete.status === 200,
+      JSON.stringify(softDelete.body))
+    check('but the record is NOT deleted', softDelete.body.deleted === false,
+      JSON.stringify(softDelete.body))
+    check('and it reports how many matches are staying',
+      (softDelete.body.matches ?? 0) > 0, JSON.stringify(softDelete.body))
+
+    check('the token is refused the moment the account is closed',
+      (await asPlayer('/player/me', { bearer: aToken })).status === 401)
+    check('/auth/player/me refuses it too, so credentials cannot be re-set',
+      (await asPlayer('/auth/player/me', { bearer: aToken })).status === 401)
+    check('the old username no longer signs in',
+      (await login({ username: aUser, password: PASSWORD })).status === 401)
+
+    // The point of keeping the row: other people's history still reads.
+    const rosterAfter = await call(`/players?q=${encodeURIComponent(nameA)}`)
+    check('the umpire roster still lists them',
+      JSON.stringify(rosterAfter.body).includes(nameA),
+      JSON.stringify(rosterAfter.body).slice(0, 120))
+    check('and shows them as unclaimed again, so a new code can be minted',
+      rosterAfter.body.players?.[0]?.claimed === false,
+      JSON.stringify(rosterAfter.body.players?.[0] ?? null).slice(0, 120))
+    check('their match count is untouched',
+      (rosterAfter.body.players?.[0]?.match_count ?? 0) > 0,
+      String(rosterAfter.body.players?.[0]?.match_count))
+
+    // --- coming back, the same way a forgotten password comes back ---
+    const freshCode = await call(`/players/${playerA}/claim-code`)
+    check('the umpire can mint a fresh code for a closed account',
+      freshCode.status === 200 && Boolean(freshCode.body.claimCode),
+      JSON.stringify(freshCode.body).slice(0, 80))
+    check('the wiped code is not the old one',
+      freshCode.body.claimCode !== claim.body.claimCode)
+
+    const revived = await asPlayer('/auth/player/claim', {
+      method: 'POST',
+      body: { code: freshCode.body.claimCode },
+    })
+    check('claiming it revives the account -> 200', revived.status === 200,
+      JSON.stringify(revived.body).slice(0, 120))
+    check('as the same player', revived.body.player?.id === playerA,
+      `${revived.body.player?.id} vs ${playerA}`)
+    const revivedMe = await asPlayer('/player/me', { bearer: revived.body.token })
+    check('with every match still there', (revivedMe.body.summary?.matches ?? 0) > 0,
+      JSON.stringify(revivedMe.body.summary ?? null))
+    check('and no username, because deleting really did remove the sign-in',
+      revivedMe.body.player?.username === null,
+      String(revivedMe.body.player?.username))
   }
 
   if (selfRegistered.length > 0) {
