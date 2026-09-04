@@ -82,6 +82,68 @@ export function opponentRecords(matches) {
   return tallyBy(matches, (m) => m.opponents ?? [])
 }
 
+/**
+ * How often a record was actually decided, and how much of it was won.
+ *
+ * The denominator is won + lost, NOT played. A match stopped early is
+ * stored as completed with no winner (see player-stats.js), so tallyBy
+ * counts it as played while counting it as neither -- dividing by
+ * `played` would quietly score every retirement as a loss.
+ *
+ * Null rather than 0 when nothing has been decided, the same
+ * distinction Meter relies on to render a dash instead of claiming 0%.
+ */
+export function decidedRate(person) {
+  const decided = person.won + person.lost
+  return decided > 0 ? person.won / decided : null
+}
+
+// Below this, a win rate is noise dressed as insight: at one match
+// together everybody is either 100% or 0%. The app already reasons this
+// way -- ratings gate at five matches, and personalBests refuses a
+// "cleanest match" that never made a mistake.
+const MIN_SHARED = 3
+
+/**
+ * The two people worth naming at the top of the People tab.
+ *
+ * Deliberately a DIFFERENT fact from the overview's "Most played with"
+ * (topPartner, below). That one is a count, this is a rate, and they are
+ * frequently different people -- the partner you play every week is not
+ * necessarily the one you win with. Do not collapse them into one.
+ *
+ * Either may be null when nobody has played enough, in which case the
+ * screen leaves the card out rather than showing a best of nothing --
+ * the same shape personalBests uses.
+ */
+export function peopleHighlights(matches) {
+  const eligible = (people) =>
+    people.filter((p) => p.won + p.lost >= MIN_SHARED)
+
+  const partners = eligible(partnerRecords(matches))
+  const opponents = eligible(opponentRecords(matches))
+
+  // Two candidates, not one. "Best" and "toughest" are superlatives, and
+  // a superlative over a set of one says nothing -- it would happily
+  // label the only person you have faced your "toughest opponent" while
+  // showing 6-1 and 86% underneath it, which reads as a broken app
+  // rather than a thin history. With nobody to compare against, the
+  // lists below already say everything there is to say.
+  const pick = (people, better) =>
+    people.length >= 2 ? people.reduce(better) : null
+
+  const bestPartner = pick(partners, (a, b) =>
+    decidedRate(b) > decidedRate(a) ? b : a,
+  )
+
+  // "Toughest" is the one you win LEAST against, so this is a minimum.
+  const toughestOpponent = pick(opponents, (a, b) =>
+    decidedRate(b) < decidedRate(a) ? b : a,
+  )
+
+  return { bestPartner, toughestOpponent }
+}
+
 /** Who this player has partnered most, and how it went. */
 export function topPartner(matches) {
   return partnerRecords(matches)[0] ?? null
