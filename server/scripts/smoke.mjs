@@ -153,6 +153,59 @@ async function main() {
     process.exit(1)
   }
 
+  // ============================================================
+  section('google sign-in — the refusals')
+  // ============================================================
+  // The success path needs a real Google account and cannot run here.
+  // What CAN be pinned is every way in that must be refused, which is
+  // where the security of this actually lives: a token this server
+  // accepts without checking who it was minted for would sign anyone in
+  // as anyone.
+  {
+    const g = (body) => asPlayer('/auth/google', { method: 'POST', body })
+
+    // The endpoint refuses everything with 503 until GOOGLE_CLIENT_ID is
+    // set, because an unset audience would mean no audience check at
+    // all. That is correct behaviour, not a failure -- so on a server
+    // where Google is not configured these assertions are skipped
+    // rather than reported as broken.
+    const probe = await g({ credential: 'anything' })
+    if (probe.status === 503) {
+      console.log('  ...  Google sign-in not configured here; refusal checks skipped')
+    } else {
+
+    check('no credential -> 400', (await g({})).status === 400)
+    check('a credential that is not a token at all -> 401',
+      (await g({ credential: 'not-a-jwt' })).status === 401)
+    check('a syntactically valid JWT with no kid -> 401',
+      (await g({
+        credential: [
+          Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url'),
+          Buffer.from(JSON.stringify({ sub: '1', email: 'x@example.com' })).toString('base64url'),
+          'not-a-real-signature',
+        ].join('.'),
+      })).status === 401)
+    // The shape an attacker would actually try: everything Google sends,
+    // an unrecognised signing key, and a signature that is simply wrong.
+    check('a forged token naming an unknown key -> 401',
+      (await g({
+        credential: [
+          Buffer.from(JSON.stringify({ alg: 'RS256', kid: 'made-up', typ: 'JWT' })).toString('base64url'),
+          Buffer.from(JSON.stringify({
+            iss: 'https://accounts.google.com',
+            sub: '999', email: 'attacker@example.com', email_verified: true,
+            exp: Math.floor(Date.now() / 1000) + 3600,
+          })).toString('base64url'),
+          'forged',
+        ].join('.'),
+      })).status === 401)
+    check('none of that created an umpire',
+      (await asPlayer('/auth/login', {
+        method: 'POST', body: { email: 'attacker@example.com', password: 'anything' },
+      })).status === 401)
+    }
+  }
+
   section('players — the identity guard')
   const stamp = Date.now()
   const nameA = `Smoke Alpha ${stamp}`

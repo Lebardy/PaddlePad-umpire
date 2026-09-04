@@ -1696,3 +1696,29 @@ section h3 {
   cursor: pointer;
 }
 .link-btn:hover { text-decoration: underline; }
+
+/* ============ Google sign-in ============ */
+
+.google-signin { margin-bottom: 1.25rem; }
+.google-signin > div { display: flex; justify-content: center; }
+.google-signin .is-disabled { opacity: 0.6; pointer-events: none; }
+
+/* "or" on a rule, so it reads as a choice between two ways in rather
+   than two unrelated blocks stacked up. */
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.1rem 0 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.or-divider::before,
+.or-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.google-invite { display: flex; flex-direction: column; gap: 0.75rem; }

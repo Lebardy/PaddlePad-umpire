@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { login, register } from '../lib/api'
+import { login, loginWithGoogle, register } from '../lib/api'
+import GoogleButton from '../components/GoogleButton'
 
 // Sign-in / sign-up gate shown when no umpire is authenticated.
 //
@@ -14,6 +15,11 @@ function Login({ onSignedIn }) {
   const [invite, setInvite] = useState('')
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  // Set when the server refuses a new Google account for want of an
+  // invite. The credential is kept so supplying one does not mean
+  // signing in with Google a second time.
+  const [needsInvite, setNeedsInvite] = useState(false)
+  const [googleCredential, setGoogleCredential] = useState(null)
 
   const isRegister = mode === 'register'
 
@@ -33,6 +39,41 @@ function Login({ onSignedIn }) {
     }
   }
 
+  /**
+   * Google has proved who they are; the server decides whether they may
+   * have an account. A brand-new Google account still needs an invite,
+   * and the server says so with `needsInvite` -- which reveals the
+   * field and keeps the credential so the second attempt does not make
+   * them sign in with Google all over again.
+   */
+  async function handleGoogle(credential) {
+    setError(null)
+    setBusy(true)
+    setGoogleCredential(credential)
+    try {
+      onSignedIn(await loginWithGoogle({ credential, invite }))
+    } catch (err) {
+      setError(err.message)
+      if (err.details?.needsInvite) setNeedsInvite(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Retries the Google sign-in now that an invite has been typed. */
+  async function submitGoogleInvite(e) {
+    e.preventDefault()
+    setError(null)
+    setBusy(true)
+    try {
+      onSignedIn(await loginWithGoogle({ credential: googleCredential, invite }))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   function switchMode() {
     setMode(isRegister ? 'login' : 'register')
     setError(null)
@@ -41,6 +82,32 @@ function Login({ onSignedIn }) {
   return (
     <div className="login">
       <h2>{isRegister ? 'Create umpire account' : 'Umpire sign in'}</h2>
+
+      {needsInvite ? (
+        <form className="google-invite" onSubmit={submitGoogleInvite}>
+          <p className="login-note">
+            Almost there. New accounts need an invite code from whoever runs
+            this club — signing in with Google proves who you are, not that
+            you belong here.
+          </p>
+          <input
+            type="text"
+            placeholder="Invite code"
+            value={invite}
+            onChange={(e) => setInvite(e.target.value)}
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            required
+          />
+          {error && <p className="form-error">{error}</p>}
+          <button type="submit" disabled={busy || !invite.trim()}>
+            {busy ? 'Checking…' : 'Continue'}
+          </button>
+        </form>
+      ) : (
+        <GoogleButton onCredential={handleGoogle} disabled={busy} />
+      )}
       <p className="login-note">
         Matches are recorded against your account, so scores can be traced
         back to whoever logged them.

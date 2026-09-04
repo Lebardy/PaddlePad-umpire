@@ -127,6 +127,7 @@ you expect is actually in the served bundle.
    |---|---|
    | `JWT_SECRET` | A fresh random 48-byte hex string — **not** the one from your local `.env` |
    | `CORS_ORIGIN` | Comma-separated list of every app origin, e.g. `https://paddlepad-umpire.up.railway.app,https://paddlepad.up.railway.app` |
+   | `GOOGLE_CLIENT_ID` | The OAuth 2.0 Web client id from Google Cloud Console. Unset disables Google sign-in rather than weakening it. Not a secret. |
    | `INTERNAL_API_KEY` | A fresh random 48-byte hex string, shared only with the `ml` service in the **same** environment. Different per environment. |
 
    `PORT` is provided by Railway; the server reads it automatically.
@@ -197,6 +198,7 @@ If you ever recreate it, verify these before trusting it:
 | `POST` | `/auth/register` | — | Create an umpire account (needs an invite) |
 | `POST` | `/auth/login` | — | Sign in as an umpire, returns a token |
 | `GET` | `/auth/me` | Bearer | Validate a stored token on app launch |
+| `POST` | `/auth/google` | — | Sign in an umpire with Google; an invite is still required to register |
 | `POST` | `/auth/player/claim` | — | Exchange an umpire-issued code for a player session |
 | `POST` | `/auth/player/register` | — | Sign up as a player |
 | `POST` | `/auth/player/login` | — | Sign in as a player, username + password |
@@ -210,6 +212,42 @@ If you ever recreate it, verify these before trusting it:
 | `POST` | `/internal/ratings` | `x-internal-key` | Records one pipeline run as a snapshot |
 
 Tokens are JWTs valid for 30 days, sent as `Authorization: Bearer <token>`.
+
+### Signing in with Google
+
+Umpires can sign in with Google as well as with an email and password.
+Google is only a second way to prove who someone is; once past it the
+server issues exactly the token it always did, and nothing downstream
+knows which door was used.
+
+**Registration is still invite-only.** Signing *in* with Google is free;
+the first time an unknown Google account appears it must present an
+invite, claimed in the same transaction that creates the umpire, exactly
+as `/auth/register` does. The refusal comes back as
+`{ needsInvite: true }` so the app reveals the field instead of showing a
+dead end.
+
+Three security points, each of which is load-bearing:
+
+- **The token's audience is pinned to our own client id.** A Google ID
+  token is a signed statement from Google, and tokens minted for every
+  other application on the internet are signed just as validly by the
+  same keys. Without that check, a token from any Google-connected app
+  would sign its bearer in here. `GOOGLE_CLIENT_ID` being unset is a
+  refusal, not a skipped check.
+- **An unverified email address is refused**, because a matching email
+  links a Google account to an existing umpire. Without it, anyone could
+  take over an account by claiming its address.
+- **`umpires.password_hash` is now nullable**, meaning "Google only". So
+  `/auth/login` verifies against `NO_SUCH_ACCOUNT_HASH` whenever there is
+  no usable hash rather than returning early: `verifyPassword` bails
+  instantly on a malformed hash without doing the scrypt work, so
+  short-circuiting would make a Google-only account answer measurably
+  faster than a wrong password and reveal which accounts are which.
+
+No client secret exists in this flow. The browser is handed a signed
+token and the server checks the signature, so `GOOGLE_CLIENT_ID` is the
+only setting and it is not confidential.
 
 ### The two ways a player gets in
 

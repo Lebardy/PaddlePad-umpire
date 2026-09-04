@@ -11,6 +11,7 @@ import {
   verifyPassword,
 } from '../auth.js'
 import { generateInviteCode, normalizeInviteCode } from '../invites.js'
+import { verifyGoogleToken } from '../google.js'
 import {
   USERNAME_RULE,
   isValidUsername,
@@ -152,6 +153,95 @@ router.post('/register', async (req, res) => {
   }
 })
 
+/**
+ * Signing in with Google.
+ *
+ * Google proves who someone is; it does not decide whether they may
+ * have an account here. Registration stays invite-only whichever door
+ * is used, because this API is on the public internet and an umpire
+ * account can write into the club's match data. Signing IN is free; the
+ * first appearance of an unknown Google account still needs an invite.
+ *
+ * Three outcomes, in this order:
+ *
+ *   1. Google account already linked  -> sign in.
+ *   2. Email matches an existing umpire -> link and sign in. Safe only
+ *      because verifyGoogleToken refuses an unverified address, so
+ *      Google has proved they own it. Without that check this branch
+ *      would be a way to take over any account by claiming its email.
+ *   3. Nobody yet -> invite required, and claimed in the same
+ *      transaction that creates the umpire, exactly as /auth/register
+ *      does. That keeps the single-use guarantee and the
+ *      BOOTSTRAP_INVITE_CODE founding-admin path working unchanged.
+ *
+ * The response is the same shape login and register return, so nothing
+ * downstream can tell which door was used.
+ */
+router.post('/google', async (req, res) => {
+  let profile
+  try {
+    profile = await verifyGoogleToken(req.body?.credential)
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message })
+    }
+    throw error
+  }
+
+  const linked = await query(
+    'SELECT id, email, name, is_admin FROM umpires WHERE google_sub = $1',
+    [profile.sub],
+  )
+  if (linked.rows[0]) {
+    return res.json({ token: signToken(linked.rows[0]), umpire: linked.rows[0] })
+  }
+
+  const byEmail = await query(
+    `UPDATE umpires SET google_sub = $2
+      WHERE lower(email) = $1 AND google_sub IS NULL
+      RETURNING id, email, name, is_admin`,
+    [profile.email, profile.sub],
+  )
+  if (byEmail.rows[0]) {
+    return res.json({ token: signToken(byEmail.rows[0]), umpire: byEmail.rows[0] })
+  }
+
+  try {
+    const umpire = await withTransaction(async (client) => {
+      const { rows } = await client.query(
+        `INSERT INTO umpires (email, name, google_sub)
+         VALUES ($1, $2, $3)
+         RETURNING id, email, name`,
+        [profile.email, profile.name, profile.sub],
+      )
+      const created = rows[0]
+
+      const inviteError = await claimInvite(client, req.body?.invite, created.id)
+      // Rolls back the insert above, so a refused invite leaves no
+      // half-made account behind.
+      if (inviteError) throw refusal(403, inviteError)
+
+      const { rows: flags } = await client.query(
+        'SELECT is_admin FROM umpires WHERE id = $1',
+        [created.id],
+      )
+      return { ...created, is_admin: flags[0].is_admin }
+    })
+
+    res.status(201).json({ token: signToken(umpire), umpire })
+  } catch (error) {
+    if (error.statusCode === 403) {
+      // Tells the app to REVEAL the invite field rather than show a dead
+      // end -- the same move /auth/player/register makes with needsCode.
+      return res.status(403).json({ error: error.message, needsInvite: true })
+    }
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'That email is already registered' })
+    }
+    throw error
+  }
+})
+
 router.post('/login', async (req, res) => {
   const email = normalizeEmail(req.body?.email)
   const password = String(req.body?.password ?? '')
@@ -168,11 +258,20 @@ router.post('/login', async (req, res) => {
   // missing account and a wrong password take similar time to answer,
   // and both return the same message -- neither reveals whether an
   // email is registered.
-  const ok = found
+  //
+  // `found?.password_hash` rather than `found`, because an umpire who
+  // signs in with Google has none. verifyPassword returns false the
+  // instant it is handed a malformed hash, WITHOUT doing the scrypt
+  // work -- so passing NULL here would make a Google-only account
+  // answer measurably faster than a wrong password, and that timing
+  // difference tells an attacker which accounts exist and how they
+  // sign in. The same shape as /auth/player/login below, for the same
+  // reason.
+  const ok = found?.password_hash
     ? await verifyPassword(password, found.password_hash)
     : await verifyPassword(password, NO_SUCH_ACCOUNT_HASH)
 
-  if (!found || !ok) {
+  if (!found || !found.password_hash || !ok) {
     return res.status(401).json({ error: 'Incorrect email or password' })
   }
 

@@ -21,6 +21,31 @@ CREATE TABLE IF NOT EXISTS umpires (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Signing in with Google.
+--
+-- google_sub is the account identifier Google issues -- stable for the
+-- life of that Google account, and never the email address, which a
+-- person can change.
+--
+-- password_hash loses its NOT NULL because an umpire who only ever
+-- signs in with Google has no password to store. A NULL there now means
+-- exactly that: Google only.
+--
+-- SECURITY: /auth/login must therefore keep verifying against
+-- NO_SUCH_ACCOUNT_HASH when it finds no usable hash, rather than
+-- returning early. Short-circuiting would make a Google-only account
+-- answer faster than a wrong password, which tells an attacker which
+-- accounts exist and how they sign in.
+--
+-- Registration stays invite-only whichever door is used. Signing IN with
+-- Google is free; the first time an unknown Google account appears it
+-- still has to present an invite. See routes/auth.js.
+ALTER TABLE umpires ALTER COLUMN password_hash DROP NOT NULL;
+ALTER TABLE umpires ADD COLUMN IF NOT EXISTS google_sub TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS umpires_google_sub_idx
+    ON umpires (google_sub) WHERE google_sub IS NOT NULL;
+
 -- Emails are compared case-insensitively so "Alex@x.com" and
 -- "alex@x.com" cannot become two accounts.
 CREATE UNIQUE INDEX IF NOT EXISTS umpires_email_lower_idx

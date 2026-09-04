@@ -77,6 +77,10 @@ app.get('/health', async (_req, res) => {
 // notice, tight enough that scripted guessing is useless.
 app.use('/auth/login', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/auth/register', rateLimit({ max: 5, windowMs: 60_000 }))
+// Login-grade, and it does real work per request: verifying a Google
+// token can mean fetching Google's public keys. Also the door to
+// creating an umpire account, so it gets register's scrutiny too.
+app.use('/auth/google', rateLimit({ max: 10, windowMs: 60_000 }))
 
 // Mistyped player names are the realistic spam vector on an otherwise
 // trusted API, and the export is the only genuinely expensive query.

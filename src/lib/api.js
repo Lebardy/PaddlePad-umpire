@@ -146,6 +146,24 @@ export function revokeInvite(code) {
   return apiFetch(`/invites/${encodeURIComponent(code)}`, { method: 'DELETE' })
 }
 
+/**
+ * Signs in with Google.
+ *
+ * `invite` is only needed the first time an unknown Google account
+ * appears -- registration stays invite-only whichever door is used. The
+ * server answers that case with `needsInvite`, which the login screen
+ * reads to reveal the field rather than showing a dead end.
+ */
+export async function loginWithGoogle({ credential, invite }) {
+  const data = await apiFetch('/auth/google', {
+    method: 'POST',
+    auth: false,
+    body: { credential, invite: invite || undefined },
+  })
+  storeSession(data.token, data.umpire)
+  return data.umpire
+}
+
 export async function login({ email, password }) {
   const data = await apiFetch('/auth/login', {
     method: 'POST',
