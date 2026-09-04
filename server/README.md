@@ -205,6 +205,7 @@ If you ever recreate it, verify these before trusting it:
 | `GET` | `/player/me` | Bearer (player) | A player's own summary, plus their rating or its gate state |
 | `PATCH` | `/player/me` | Bearer (player) | Rename yourself |
 | `DELETE` | `/player/me` | Bearer (player) | Delete your profile — see below |
+| `POST` | `/player/link` | Bearer (player) | Attach an umpire's record to the account you already have — see below |
 | `GET` | `/internal/match-logs.json` | `x-internal-key` | Same rows as the export, for the ML service |
 | `POST` | `/internal/ratings` | `x-internal-key` | Records one pipeline run as a snapshot |
 
@@ -257,6 +258,13 @@ code field rather than showing a dead end.
 #### Recovery
 
 There is no password reset, because there is no email to send one to.
+A player who arrives by code is now **asked** to pick a username and
+password, in a skippable pop-up right after claiming. Nothing used to
+offer it: the form existed only on the profile tab, and a player with no
+finished matches could not reach that tab at all. That mattered because
+a token lasts 30 days and there is no email, so until a password exists
+"ask your umpire" is the entire recovery story.
+
 **The claim code deliberately keeps working after a password is set**, so
 an umpire regenerating it is how a locked-out player gets back in. That
 is a decision, not an oversight — it is written into the schema comment
@@ -284,6 +292,66 @@ Gating a *username* change that way is deliberate: changing the username
 someone signs in with locks them out exactly as effectively as changing
 the password, and a phone left unlocked on the profile screen would
 otherwise be a silent takeover.
+
+### Linking a code to an account you already made
+
+A claim code used to be usable only by someone with **no** account:
+`/auth/player/claim` and the `needsCode` branch of
+`/auth/player/register` both run without a token. That left a real gap.
+Someone signs up on their own, and only later does an umpire start
+recording matches for them — under "Maria S" when they registered as
+"Maria Santos". Two rows, one human, and nowhere to enter the code.
+Signing out to claim it made things worse rather than better: that
+issues a token for the *other* row and strands the username and password
+on the one they left behind, where the unique index then stops them ever
+reusing either.
+
+`POST /player/link` merges the two. It is called twice: once without
+`confirm` for a dry run that evaluates every refusal and writes nothing,
+so the app can state what is about to happen using real numbers, and
+once with `confirm: true` to do it.
+
+**The umpire's row is the survivor.** That direction is not arbitrary —
+it is the row every partner's and opponent's history already names, the
+row the umpire keeps typing on the roster, and the row far more likely
+to carry rating snapshots. The caller's *account* (username, password,
+registration) moves onto it and their own row is deleted. The visible
+cost is that their display name becomes the umpire's spelling, so the
+confirm screen says so before it happens and offers `PATCH /player/me`
+immediately afterwards.
+
+The player id changes, so the response carries a new token. The old one
+dies on its own: it names a row that no longer exists, and
+`requireActivePlayer` refuses it.
+
+What the merge rewrites, all in one transaction: `team_a` and `team_b`
+(via `array_replace`), `matches.first_server_player`, `session_players`,
+and **the player ids inside `match_events.payload`**. That last one is
+the half that fails silently — every per-player stat is derived by
+replaying those payloads, so leaving them pointing at a deleted id would
+zero the merged player's winners, errors and drop rate while the match
+list still looked perfectly correct. A smoke assertion pins it.
+
+This is the only place in the app that edits recorded events, and it
+should stay the only one.
+
+Two refusals are worth knowing:
+
+- **A code belonging to a registered account is refused.** Codes keep
+  working after a password is set, because that is the recovery path —
+  so holding one must not be enough to absorb somebody's real account.
+- **A code for someone you have shared a match with is refused.** If two
+  ids ever appeared in the same match they partnered or played each
+  other, which makes them two people. Merging anyway would put one id in
+  two slots of one team, where `deriveMatchState`'s `indexOf` would
+  silently mis-attribute every rally from then on.
+
+Ratings computed against the absorbed id go with it, by cascade. Those
+snapshots were measured against a pool and an id that no longer exist,
+and the next pipeline run recomputes. A merge is invisible to the umpire
+— two roster entries quietly become one — which a club where the umpire
+knows everyone can absorb, and which a `merged_from` audit column would
+fix if it ever bites.
 
 ### What deleting your profile does
 

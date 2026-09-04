@@ -23,29 +23,13 @@ import { useState } from 'react'
 import Claim from './Claim'
 import { loginPlayer, registerPlayer } from '../lib/api'
 import { claimCodeFromUrl } from '../lib/router'
+import { suggestUsername } from '../lib/username'
 
 const TABS = [
   { id: 'signin', label: 'Sign in' },
   { id: 'create', label: 'Create account' },
   { id: 'code', label: 'Have a code' },
 ]
-
-/**
- * Turns a display name into a username worth offering.
- *
- * Picking a handle is the one step an account adds over a code, so the
- * field arrives already filled rather than empty. Mirrors the server's
- * rule in validate.js -- if the two ever drift, the server is right and
- * the worst case is a suggestion the player has to edit.
- */
-function suggestUsername(name) {
-  return name
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '_')
-    .replace(/[^a-z0-9_]/g, '')
-    .slice(0, 20)
-}
 
 function SignInPanel({ onSignedIn }) {
   const [username, setUsername] = useState('')

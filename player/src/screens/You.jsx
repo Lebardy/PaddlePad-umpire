@@ -18,6 +18,7 @@ import { setCredentials, updateProfile } from '../lib/api'
 import { currentStreak, longestWinStreak } from '../lib/derive'
 import Avatar from '../components/Avatar'
 import DeleteProfile from './DeleteProfile'
+import LinkCode from './LinkCode'
 
 const VERSION = __APP_VERSION__
 
@@ -356,6 +357,8 @@ function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
       )}
 
       <Details player={player} onPlayerChange={onPlayerChange} />
+
+      <LinkCode onPlayerChange={onPlayerChange} />
 
       <section className="you-about" aria-label="About">
         <h2>About</h2>

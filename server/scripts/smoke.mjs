@@ -45,24 +45,60 @@ let token = null
 // the point they are registered.
 const selfRegistered = []
 
-async function call(path, { method = 'GET', body, raw = false } = {}) {
-  const response = await fetch(API + path, {
-    method,
-    headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  })
-  if (raw) return { status: response.status, text: await response.text() }
-  const text = await response.text()
-  let json
-  try {
-    json = JSON.parse(text)
-  } catch {
-    json = { raw: text }
+// How many times to wait out a rate-limit window before giving up.
+const RATE_LIMIT_RETRIES = 4
+
+/**
+ * One request, with the rate limiter waited out rather than worked
+ * around.
+ *
+ * This suite makes far more sign-in and sign-up attempts in a minute
+ * than any person would -- which is exactly the traffic those limits
+ * exist to stop, so being throttled here is the limiter working. Backing
+ * off and retrying is what lets this run against a DEPLOYED environment
+ * without anyone being asked to set DANGEROUSLY_DISABLE_RATE_LIMITS on
+ * a public host, which is a thing no staging or production service
+ * should ever have done to it. (e2e.mjs still sets it against its
+ * throwaway local database, purely for speed.)
+ *
+ * No assertion in this file expects a 429, so nothing is being masked.
+ * If one is ever added, it must call fetch directly.
+ */
+async function request(path, { method = 'GET', body, bearer, raw = false } = {}) {
+  for (let attempt = 0; ; attempt += 1) {
+    const response = await fetch(API + path, {
+      method,
+      headers: {
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+        ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    })
+
+    if (response.status === 429 && attempt < RATE_LIMIT_RETRIES) {
+      // The limiter sets Retry-After to the seconds left in the window.
+      // One extra second so the retry lands after the reset, not on it.
+      const wait = (Number(response.headers.get('retry-after')) || 60) + 1
+      console.log(`  ...  rate limited on ${path}, waiting ${wait}s`)
+      await new Promise((resolve) => setTimeout(resolve, wait * 1000))
+      continue
+    }
+
+    if (raw) return { status: response.status, text: await response.text() }
+    const text = await response.text()
+    let json
+    try {
+      json = JSON.parse(text)
+    } catch {
+      json = { raw: text }
+    }
+    return { status: response.status, body: json }
   }
-  return { status: response.status, body: json }
+}
+
+/** A request carrying the umpire token this run signed in with. */
+function call(path, options = {}) {
+  return request(path, { ...options, bearer: token })
 }
 
 /**
@@ -70,19 +106,8 @@ async function call(path, { method = 'GET', body, raw = false } = {}) {
  * token `call` sends. Module-scoped because more than one section needs
  * it now.
  */
-async function asPlayer(path, { method = 'GET', body, bearer } = {}) {
-  const response = await fetch(API + path, {
-    method,
-    headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-      ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  })
-  const text = await response.text()
-  let json
-  try { json = JSON.parse(text) } catch { json = { raw: text } }
-  return { status: response.status, body: json }
+function asPlayer(path, options = {}) {
+  return request(path, options)
 }
 
 const uuid = () => crypto.randomUUID()
@@ -972,6 +997,185 @@ async function main() {
     check('and no username, because deleting really did remove the sign-in',
       revivedMe.body.player?.username === null,
       String(revivedMe.body.player?.username))
+  }
+
+  // ============================================================
+  section('linking a code to an account you already have')
+  // ============================================================
+  // The case none of the sections above covers: someone signs up FIRST,
+  // and only later is handed a code for the record an umpire has been
+  // keeping under a different spelling of their name. Two rows, one
+  // human. These assert the merge moves everything -- including the tap
+  // log, which is the half that fails silently if it is skipped.
+  {
+    const stamp3 = Date.now()
+    const PASSWORD = 'not-a-real-password'
+    const register = (body) =>
+      asPlayer('/auth/player/register', { method: 'POST', body })
+
+    const newPlayer = async (name) =>
+      (await call('/players', { method: 'POST', body: { name } })).body.player.id
+
+    async function newSession(name, playerIds) {
+      const sid = uuid()
+      await call('/sessions', { method: 'POST', body: { id: sid, name } })
+      await call(`/sessions/${sid}/players`, { method: 'PUT', body: { playerIds } })
+      return sid
+    }
+
+    // A finished game to 11 with a[0] winning every rally, so there are
+    // real derived stats to move rather than empty rows -- which is what
+    // makes the tap-log assertion below mean anything.
+    async function playMatch(sid, a, b) {
+      const id = uuid()
+      await call('/matches', {
+        method: 'POST',
+        body: {
+          id, sessionId: sid, teamA: a, teamB: b,
+          stacking: { A: false, B: false },
+          firstServer: { team: 'A', playerId: a[0] },
+          startedAt: Date.now() - 40 * 60_000,
+        },
+      })
+      const done = await call(`/matches/${id}/log`, {
+        method: 'PUT',
+        body: {
+          deviceId: DEVICE,
+          events: Array.from({ length: 11 }, (_, i) => rally(i, a[0])),
+        },
+      })
+      return { id, status: done.body.match?.status }
+    }
+
+    // --- the umpire's record, under a spelling only they use ---
+    const spellingName = `Smoke Ump Spelling ${stamp3}`
+    const spelling = await newPlayer(spellingName)
+    const mates = []
+    for (const s of ['Mate1', 'Mate2', 'Mate3']) {
+      mates.push(await newPlayer(`Smoke ${s} ${stamp3}`))
+    }
+    const sid1 = await newSession(`Smoke Link Night ${stamp3}`, [spelling, ...mates])
+    const m1 = await playMatch(sid1, [spelling, mates[0]], [mates[1], mates[2]])
+    check('the umpire has a finished match under their own spelling',
+      m1.status === 'completed', String(m1.status))
+    const spellingCode = (await call(`/players/${spelling}/claim-code`)).body.claimCode
+
+    // --- the account, made before any umpire knew them ---
+    const ownName = `Smoke Own Name ${stamp3}`
+    const ownUser = `smk_own_${stamp3}`.slice(0, 20)
+    const own = await register({ name: ownName, username: ownUser, password: PASSWORD })
+    check('an account created before the umpire had anything -> 201',
+      own.status === 201, JSON.stringify(own.body).slice(0, 120))
+    const ownId = own.body.player?.id
+    if (ownId) selfRegistered.push(ownId)
+    const ownToken = own.body.token
+
+    // Give the account history of its own, so the merge has to move
+    // matches in both directions rather than just adopting a row.
+    const sid2 = await newSession(`Smoke Own Night ${stamp3}`, [ownId, ...mates])
+    const m2 = await playMatch(sid2, [ownId, mates[0]], [mates[1], mates[2]])
+    check('and a match recorded against that account too',
+      m2.status === 'completed', String(m2.status))
+
+    const link = (body, bearer = ownToken) =>
+      asPlayer('/player/link', { method: 'POST', bearer, body })
+
+    // --- the refusals, each before anything is written ---
+    check('linking a code that matches nobody -> 404',
+      (await link({ code: 'PAD-0000-0000' })).status === 404)
+
+    const ownCode = (await call(`/players/${ownId}/claim-code`)).body.claimCode
+    const mine = await link({ code: ownCode })
+    check('your own code is not an error, just nothing to do',
+      mine.status === 200 && mine.body.alreadyYours === true,
+      JSON.stringify(mine.body).slice(0, 120))
+
+    // A claim code keeps working after its owner sets a password,
+    // because that is the forgotten-password path -- so holding one must
+    // NOT be enough to absorb a real account.
+    const rivalUser = `smk_rival_${stamp3}`.slice(0, 20)
+    const rival = await register({
+      name: `Smoke Rival ${stamp3}`, username: rivalUser, password: PASSWORD,
+    })
+    if (rival.body.player?.id) selfRegistered.push(rival.body.player.id)
+    const rivalCode = (await call(`/players/${rival.body.player?.id}/claim-code`)).body.claimCode
+    check('a code belonging to a REGISTERED account is refused -> 409',
+      (await link({ code: rivalCode })).status === 409)
+
+    // mates[0] played alongside the account in m2, so the two ids are
+    // demonstrably two people and no rewrite of that match is safe.
+    const mateCode = (await call(`/players/${mates[0]}/claim-code`)).body.claimCode
+    const sharedRefusal = await link({ code: mateCode })
+    check('a code for someone you have shared a match with -> 409',
+      sharedRefusal.status === 409, JSON.stringify(sharedRefusal.body).slice(0, 140))
+    check('and it says how many matches gave it away',
+      sharedRefusal.body.sharedMatches >= 1, String(sharedRefusal.body.sharedMatches))
+
+    // --- the dry run ---
+    const preview = await link({ code: spellingCode })
+    check('a link without confirm previews rather than merges -> 200',
+      preview.status === 200 && preview.body.preview === true,
+      JSON.stringify(preview.body).slice(0, 140))
+    check('the preview names the umpire\'s spelling',
+      preview.body.name === spellingName, String(preview.body.name))
+    check('and counts both sides', preview.body.theirs === 1 && preview.body.yours === 1,
+      `${preview.body.theirs}/${preview.body.yours}`)
+    check('totalling what one account would hold', preview.body.matches === 2,
+      String(preview.body.matches))
+    check('the preview WROTE NOTHING -- the name is untouched',
+      (await asPlayer('/player/me', { bearer: ownToken })).body.player?.name === ownName)
+
+    // --- the merge ---
+    const merged = await link({ code: spellingCode, confirm: true })
+    check('confirming the link -> 200', merged.status === 200,
+      JSON.stringify(merged.body).slice(0, 140))
+    check('every match ends up on one account', merged.body.matches === 2,
+      String(merged.body.matches))
+    check('the umpire\'s spelling is the one that survives',
+      merged.body.player?.name === spellingName, String(merged.body.player?.name))
+    check('the account came with it', merged.body.player?.username === ownUser,
+      String(merged.body.player?.username))
+    check('and the name being left behind is reported back',
+      merged.body.previousName === ownName, String(merged.body.previousName))
+
+    const mergedToken = merged.body.token
+    check('the old token dies with the row it named -> 401',
+      (await asPlayer('/player/me', { bearer: ownToken })).status === 401)
+
+    const mergedMe = await asPlayer('/player/me', { bearer: mergedToken })
+    check('the new token works -> 200', mergedMe.status === 200)
+    check('and shows both matches', mergedMe.body.summary?.matches === 2,
+      JSON.stringify(mergedMe.body.summary ?? null))
+
+    const rosterAfter = await call(`/players?q=${encodeURIComponent(`Smoke Own Name ${stamp3}`)}`)
+    check('the roster no longer carries the duplicate',
+      (rosterAfter.body.players ?? []).every((p) => p.name !== ownName),
+      JSON.stringify((rosterAfter.body.players ?? []).map((p) => p.name)))
+    const survivor = await call(`/players/${spelling}`)
+    check('and the surviving entry now has both matches',
+      survivor.body.player?.match_count === 2, String(survivor.body.player?.match_count))
+
+    // --- the half that fails silently ---
+    const history = await asPlayer('/player/matches', { bearer: mergedToken })
+    const played = history.body.matches ?? []
+    check('both matches are in the merged history', played.length === 2, String(played.length))
+    // If the team arrays were rewritten but the event payloads were not,
+    // every one of these would be zero while the match list still looked
+    // perfectly correct. This is the assertion that catches it.
+    check('the TAP LOG followed the merge -- stats survive on both matches',
+      played.length === 2 && played.every((m) => (m.stats?.clean_winners ?? 0) === 11),
+      JSON.stringify(played.map((m) => m.stats?.clean_winners ?? null)))
+    // A botched array_replace leaves dangling ids that resolve to no name.
+    check('every player on court still resolves to a name',
+      played.every((m) => !m.opponents?.includes('Unknown') && m.partner !== 'Unknown'),
+      JSON.stringify(played.map((m) => [m.partner, m.opponents])))
+
+    const backIn = await asPlayer('/auth/player/login', {
+      method: 'POST', body: { username: ownUser, password: PASSWORD },
+    })
+    check('the username they chose still signs them in -> 200', backIn.status === 200)
+    check('and lands on the surviving record', backIn.body.player?.id === spelling,
+      `${backIn.body.player?.id} vs ${spelling}`)
   }
 
   if (selfRegistered.length > 0) {

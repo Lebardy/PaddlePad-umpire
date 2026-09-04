@@ -21,6 +21,10 @@ const API_URL = (
 // umpire's session.
 const TOKEN_KEY = 'paddlepad.player.token'
 const PLAYER_KEY = 'paddlepad.player'
+// Set when someone taps "Not now" on the sign-in setup prompt. Cleared
+// with the session, so the next person to use a shared phone is still
+// asked rather than inheriting a stranger's dismissal.
+const SETUP_DISMISSED_KEY = 'paddlepad.player.setupDismissed'
 
 export class ApiError extends Error {
   /**
@@ -67,8 +71,33 @@ export function clearSession() {
   try {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(PLAYER_KEY)
+    localStorage.removeItem(SETUP_DISMISSED_KEY)
   } catch {
     // nothing useful to do
+  }
+}
+
+/**
+ * Whether the setup prompt has been waved away for this session.
+ *
+ * Only the POP-UP honours this. The cards on the overview and empty
+ * state stay regardless, so "not now" postpones the interruption
+ * without ever withdrawing the offer.
+ */
+export function isSetupDismissed() {
+  try {
+    return localStorage.getItem(SETUP_DISMISSED_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function dismissSetup() {
+  try {
+    localStorage.setItem(SETUP_DISMISSED_KEY, '1')
+  } catch {
+    // Private mode. It will ask again next launch, which is the better
+    // way for this to fail.
   }
 }
 
@@ -222,6 +251,33 @@ export async function deleteProfile({ password } = {}) {
     body: { password: password || undefined },
   })
   clearSession()
+  return data
+}
+
+/**
+ * Attaches the record an umpire built to the account you already have.
+ *
+ * Called twice. Without `confirm` it is a dry run: every refusal is
+ * evaluated and nothing is written, so the confirm screen can state
+ * what will happen using real numbers -- `{ preview, name, theirs,
+ * yours, matches }`. With it, the merge runs and the result carries the
+ * merged `player`, the `matches` it now holds and the `previousName`
+ * being left behind.
+ *
+ * Either call can come back `{ alreadyYours }` for someone entering
+ * their own code, which is not a failure.
+ *
+ * The player id changes, which is why this stores a new session: the old
+ * token names a row the server has just deleted and would be refused on
+ * the very next request.
+ */
+export async function linkCode(code, { confirm = false } = {}) {
+  const data = await apiFetch('/player/link', {
+    method: 'POST',
+    body: { code, confirm },
+  })
+  if (data.alreadyYours || data.preview) return data
+  storeSession(data.token, data.player)
   return data
 }
 

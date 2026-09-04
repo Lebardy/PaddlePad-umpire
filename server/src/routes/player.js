@@ -1,12 +1,18 @@
 import { Router } from 'express'
 import { query, withTransaction } from '../db.js'
-import { requireActivePlayer, requirePlayer, verifyPassword } from '../auth.js'
+import {
+  requireActivePlayer,
+  requirePlayer,
+  signPlayerToken,
+  verifyPassword,
+} from '../auth.js'
 import {
   countMatchesInProgress,
   getPlayerMatches,
   getRatingState,
   summarisePlayer,
 } from '../player-stats.js'
+import { normalizeInviteCode } from '../invites.js'
 import { normalizePlayerName, playerNameError } from '../validate.js'
 
 const router = Router()
@@ -188,6 +194,223 @@ router.delete('/me', async (req, res) => {
       [req.player.id],
     )
     return { status: 200, body: { deleted: false, matches } }
+  })
+
+  res.status(result.status).json(result.body)
+})
+
+/**
+ * Links a claim code to the account the caller already has.
+ *
+ * The gap this fills: the two ways into this app only ever met BEFORE
+ * you had one. /auth/player/claim and the needsCode branch of
+ * /auth/player/register both run with no token. So a player who signed
+ * up first, and was later handed a code for the record an umpire had
+ * been building under a different spelling of their name, had nowhere
+ * to enter it. Signing out and claiming made it worse rather than
+ * better: that issues a token for the OTHER row and strands the
+ * username and password on the one they left behind, where the unique
+ * index then stops them ever reusing either.
+ *
+ * So the two rows become one. Which survives is not arbitrary -- the
+ * umpire's does. It is the row every partner's and opponent's history
+ * already names, the row the umpire keeps typing on the roster, and the
+ * row far more likely to carry rating snapshots. The caller's ACCOUNT
+ * moves onto it and their own row is deleted.
+ *
+ * The visible cost is that the caller's display name becomes the
+ * umpire's spelling. The app states that before confirming and offers
+ * the rename above straight afterwards, so it is a choice rather than a
+ * surprise.
+ */
+router.post('/link', async (req, res) => {
+  const code = normalizeInviteCode(req.body?.code)
+  if (!code) return res.status(400).json({ error: 'Enter your code to continue' })
+
+  const result = await withTransaction(async (client) => {
+    // Locked because this rewrites match history: two links racing on
+    // the same pair would interleave into a half-merge that no single
+    // statement could undo.
+    const { rows: sources } = await client.query(
+      'SELECT id, name, password_hash FROM players WHERE claim_code = $1 FOR UPDATE',
+      [code],
+    )
+    const source = sources[0]
+    if (!source) {
+      return { status: 404, body: { error: "That code doesn't match any player" } }
+    }
+
+    // Someone pasting their own code has simply done nothing. That is
+    // not a mistake worth an error screen.
+    if (source.id === req.player.id) {
+      return { status: 200, body: { alreadyYours: true } }
+    }
+
+    // A claim code deliberately keeps working after its owner sets a
+    // password, because an umpire re-minting it is the whole
+    // forgotten-password path (see schema.sql). Holding one is
+    // therefore NOT permission to absorb a real account.
+    if (source.password_hash) {
+      return {
+        status: 409,
+        body: {
+          error:
+            `${source.name} already has an account. ` +
+            "If that's you, sign in as them instead.",
+        },
+      }
+    }
+
+    const { rows: targets } = await client.query(
+      `SELECT id, name, username, password_hash, registered_at
+         FROM players WHERE id = $1 FOR UPDATE`,
+      [req.player.id],
+    )
+    const target = targets[0]
+    if (!target) return { status: 401, body: { error: 'That player no longer exists' } }
+
+    // If the two ids ever shared a match they partnered or played each
+    // other, which makes them two people rather than one. Merging
+    // anyway would put a single id in two slots of one team, where
+    // deriveMatchState's indexOf (pickleball.js) would silently
+    // mis-attribute every rally from that point on. No rewrite is safe,
+    // so this one is refused.
+    const { rows: shared } = await client.query(
+      `SELECT count(*)::int AS n FROM matches
+        WHERE (team_a @> ARRAY[$1]::uuid[] OR team_b @> ARRAY[$1]::uuid[])
+          AND (team_a @> ARRAY[$2]::uuid[] OR team_b @> ARRAY[$2]::uuid[])`,
+      [target.id, source.id],
+    )
+    if (shared[0].n > 0) {
+      return {
+        status: 409,
+        body: {
+          error:
+            `You and ${source.name} have played in the same match, so you ` +
+            "can't be the same person. Ask whoever scores your matches to check.",
+          sharedMatches: shared[0].n,
+        },
+      }
+    }
+
+    // Counted before anything moves, because the confirm screen has to
+    // be able to state what will happen using real numbers rather than
+    // its own guess. Disjoint by the check above, so they simply add.
+    const countMatches = async (id) => {
+      const { rows } = await client.query(
+        `SELECT count(*)::int AS n FROM matches
+          WHERE team_a @> ARRAY[$1]::uuid[] OR team_b @> ARRAY[$1]::uuid[]`,
+        [id],
+      )
+      return rows[0].n
+    }
+    const theirs = await countMatches(source.id)
+    const yours = await countMatches(target.id)
+
+    // A dry run. Every refusal above has already been evaluated, so a
+    // preview that comes back clean is a merge that will go through --
+    // which is the point of offering one at all.
+    if (req.body?.confirm !== true) {
+      return {
+        status: 200,
+        body: {
+          preview: true,
+          name: source.name,
+          previousName: target.name,
+          theirs,
+          yours,
+          matches: theirs + yours,
+        },
+      }
+    }
+
+    // --- Everything that can hold a player id, in order. ---
+
+    await client.query(
+      `UPDATE matches
+          SET team_a = array_replace(team_a, $1, $2),
+              team_b = array_replace(team_b, $1, $2)
+        WHERE team_a @> ARRAY[$1]::uuid[] OR team_b @> ARRAY[$1]::uuid[]`,
+      [target.id, source.id],
+    )
+
+    // The foreign key with no ON DELETE, which would otherwise refuse
+    // the delete below outright.
+    await client.query(
+      'UPDATE matches SET first_server_player = $2 WHERE first_server_player = $1',
+      [target.id, source.id],
+    )
+
+    // The tap log. This is the ONE place in the app that rewrites
+    // recorded events, and it should stay the only one -- but skipping
+    // it is not an option: every per-player stat is derived by replaying
+    // these payloads, so leaving them pointing at a deleted id would
+    // quietly zero the merged player's winners, errors and drop rate
+    // while the match list still looked right.
+    //
+    // `payload || jsonb_build_object(...)` overwrites the key and needs
+    // no branching per event type. Neither key is indexed, so both
+    // statements scan match_events -- accepted, because a merge is rare
+    // and deliberate and nothing on the scoring path waits on it.
+    await client.query(
+      `UPDATE match_events
+          SET payload = payload || jsonb_build_object('actingPlayerId', $2::text)
+        WHERE payload->>'actingPlayerId' = $1::text`,
+      [target.id, source.id],
+    )
+    await client.query(
+      `UPDATE match_events
+          SET payload = payload || jsonb_build_object('playerId', $2::text)
+        WHERE payload->>'playerId' = $1::text`,
+      [target.id, source.id],
+    )
+
+    await client.query(
+      `INSERT INTO session_players (session_id, player_id)
+       SELECT session_id, $2 FROM session_players WHERE player_id = $1
+       ON CONFLICT DO NOTHING`,
+      [target.id, source.id],
+    )
+
+    // Re-counted after the rewrite rather than trusting theirs + yours:
+    // this is the number the app tells the player they now have, and it
+    // should come from the rows as they actually stand.
+    const total = await countMatches(source.id)
+
+    // Order matters. The account row still holds the username, and
+    // players_username_lower_idx would reject the UPDATE below while it
+    // does. Deleting also drops that row's player_ratings by cascade,
+    // which is correct rather than lossy: those snapshots were computed
+    // against a pool and an id that no longer exist, and the next
+    // pipeline run recomputes. Where both ids scored in the same run the
+    // survivor's row is the one kept, and it was drawn from more matches.
+    await client.query('DELETE FROM players WHERE id = $1', [target.id])
+
+    const { rows: merged } = await client.query(
+      `UPDATE players
+          SET username       = $2,
+              password_hash  = $3,
+              registered_at  = COALESCE(registered_at, $4),
+              claimed_at     = COALESCE(claimed_at, now()),
+              deactivated_at = NULL
+        WHERE id = $1
+        RETURNING id, name, claimed_at, username`,
+      [source.id, target.username, target.password_hash, target.registered_at],
+    )
+
+    return {
+      status: 200,
+      body: {
+        // The caller's player id has changed, so their old token now
+        // names a row that is gone -- requireActivePlayer will refuse it
+        // on the next request. This is the replacement.
+        token: signPlayerToken(merged[0]),
+        player: profileOf(merged[0]),
+        matches: total,
+        // Said out loud by the app rather than left to be discovered.
+        previousName: target.name,
+      },
+    }
   })
 
   res.status(result.status).json(result.body)

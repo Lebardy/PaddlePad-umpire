@@ -13,6 +13,8 @@ import { OverviewSkeleton } from './components/Skeleton'
 import { PlayerDataProvider, usePlayerData } from './lib/PlayerData'
 import { matchPath, navigate, restoreScroll, useRoute } from './lib/router'
 import { clearSession, getStoredPlayer, verifySession } from './lib/api'
+import { SetupCard, SetupPrompt } from './components/SetupSignIn'
+import LinkCode from './screens/LinkCode'
 import { useState } from 'react'
 import './App.css'
 
@@ -65,10 +67,21 @@ function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
 
   // A player with no finished matches has nothing to navigate between,
   // so they get the one honest screen rather than four empty tabs.
-  if (summary && summary.matches === 0) {
+  //
+  // `/you` is exempt, and that exemption is load-bearing. Without it
+  // this branch swallows the tab bar too, so the profile -- and with it
+  // setting up sign-in and linking a code -- was unreachable for
+  // precisely the person who had just arrived with a code and nothing
+  // else. Matches and People stay collapsed; there is genuinely nothing
+  // on them.
+  if (summary && summary.matches === 0 && path !== '/you') {
     return (
       <div className="app-body">
-        <EmptyStateScreen player={player} onSignOut={onSignOut} />
+        <EmptyStateScreen
+          player={player}
+          onSignOut={onSignOut}
+          onPlayerChange={onPlayerChange}
+        />
       </div>
     )
   }
@@ -77,7 +90,8 @@ function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
   const personRoute = matchPath('/people/:name', path)
 
   let screen
-  if (path === '/') screen = <Overview player={player} />
+  if (path === '/')
+    screen = <Overview player={player} onPlayerChange={onPlayerChange} />
   else if (path === '/matches') screen = <Matches />
   else if (matchRoute) screen = <MatchDetail id={matchRoute.id} />
   else if (path === '/people') screen = <People />
@@ -107,16 +121,29 @@ function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
   )
 }
 
-function EmptyStateScreen({ player, onSignOut }) {
+function EmptyStateScreen({ player, onSignOut, onPlayerChange }) {
   const { inProgress } = usePlayerData()
   return (
     <>
       <div className="profile-top">
+        <button className="link" onClick={() => navigate('/you')}>
+          Your profile
+        </button>
         <button className="link" onClick={onSignOut}>
           Sign out
         </button>
       </div>
       <EmptyState name={player.name} inProgress={inProgress} />
+      {/* One card, whichever this person actually needs. Someone who
+          came in by code already has their umpire's record, so linking
+          is meaningless to them -- what they lack is a way back in.
+          Someone with an account and an empty page is being told why it
+          is empty. */}
+      {player.username ? (
+        <LinkCode onPlayerChange={onPlayerChange} />
+      ) : (
+        <SetupCard player={player} onPlayerChange={onPlayerChange} />
+      )}
     </>
   )
 }
@@ -198,6 +225,11 @@ function App() {
 
   return (
     <main className="app app-tabbed">
+      {/* Mounted here rather than inside SignedIn on purpose: SignedIn
+          returns early three times before its main render, and a prompt
+          that only appears on some of those branches is the bug this is
+          meant to fix. */}
+      <SetupPrompt player={player} onPlayerChange={setPlayer} />
       <PlayerDataProvider>
         <SignedIn
           player={player}

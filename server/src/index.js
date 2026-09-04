@@ -95,6 +95,11 @@ app.use('/auth/player/login', rateLimit({ max: 10, windowMs: 60_000 }))
 // `currentPassword` to authorise a change, which makes it a password-
 // guessing surface even though it needs a valid token to reach.
 app.use('/auth/player/credentials', rateLimit({ max: 10, windowMs: 60_000 }))
+// Takes a claim code, so it is a bearer-credential guessing surface and
+// gets the same login-grade limit /auth/player/claim does -- the 60/min
+// below would be far too generous. Mounted first so it keys its own
+// bucket rather than sharing /player's.
+app.use('/player/link', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/player', rateLimit({ max: 60, windowMs: 60_000 }))
 app.use('/export', rateLimit({ max: 5, windowMs: 60_000 }))
 // One caller, a handful of calls per run. Tight enough that a leaked

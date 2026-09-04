@@ -24,11 +24,12 @@ import PersonalBests from '../components/PersonalBests'
 import TrendChart from '../components/TrendChart'
 import SkillRating from '../components/SkillRating'
 import LiveNote from '../components/LiveNote'
+import { SetupCard } from '../components/SetupSignIn'
 
 const TREND_WINDOW = 5
 const RECENT_COUNT = 5
 
-function Overview({ player }) {
+function Overview({ player, onPlayerChange }) {
   const { summary, matches, inProgress, rating } = usePlayerData()
   const trend = rollingWinRate(matches, TREND_WINDOW)
   const bests = personalBests(matches)
@@ -39,6 +40,11 @@ function Overview({ player }) {
       <Hero player={player} summary={summary} matches={matches} />
 
       {inProgress > 0 && <LiveNote count={inProgress} />}
+
+      {/* Renders itself away once a username exists. Sits here, above
+          the stats, because a player who dismissed the pop-up has no
+          other reason to go looking for it. */}
+      <SetupCard player={player} onPlayerChange={onPlayerChange} />
 
       <StatGrid summary={summary} />
 
