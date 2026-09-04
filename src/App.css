@@ -1553,3 +1553,104 @@ section h3 {
   margin: 0.75rem 0;
   font-size: 1.2rem;
 }
+
+/* ============ The guide ============ */
+
+/* A permanent way in, sitting with the other header controls rather
+   than being a one-time tour that vanishes once dismissed. */
+.help-btn {
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.help-btn:hover { color: var(--text); border-color: var(--primary); }
+
+/* Shown until waved away. Dismissing costs nothing, because the ? in
+   the header opens the same screen whenever they want it. */
+.guide-nudge {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--primary-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+}
+.guide-nudge p { margin: 0.2rem 0 0; font-size: 0.85rem; color: var(--text-muted); }
+.guide-nudge-actions { display: flex; align-items: center; gap: 0.35rem; flex: none; }
+.guide-nudge-open {
+  background: var(--primary);
+  color: var(--primary-contrast);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.guide-nudge-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 0.25rem 0.35rem;
+  cursor: pointer;
+}
+
+.guide { max-width: 40rem; }
+.guide h2 { margin: 0.25rem 0 0.35rem; }
+.guide-lede { color: var(--text-muted); margin: 0 0 1.5rem; }
+.guide-section { margin-bottom: 1.75rem; }
+.guide-section h3 { font-size: 0.95rem; margin: 0 0 0.6rem; }
+.guide-section p { font-size: 0.9rem; line-height: 1.6; margin: 0 0 0.7rem; }
+.guide-note {
+  font-size: 0.85rem !important;
+  color: var(--text-muted);
+  border-left: 2px solid var(--border);
+  padding-left: 0.7rem;
+}
+
+.guide-steps { list-style: none; margin: 0; padding: 0; }
+.guide-steps li { display: flex; gap: 0.7rem; margin-bottom: 0.9rem; }
+.guide-steps p { margin: 0.15rem 0 0; color: var(--text-muted); }
+.guide-step-n {
+  flex: none;
+  width: 1.6rem;
+  height: 1.6rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-contrast);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.guide-terms { margin: 0; }
+.guide-terms > div {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 0.85rem;
+  margin-bottom: 0.5rem;
+}
+.guide-terms dt { font-weight: 600; font-size: 0.9rem; }
+.guide-terms dd {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}

@@ -5,6 +5,7 @@ import MatchSetup from './screens/MatchSetup'
 import LiveMatch from './screens/LiveMatch'
 import Login from './screens/Login'
 import Invites from './screens/Invites'
+import Guide from './screens/Guide'
 import { clearSession, fetchCurrentUmpire, getStoredUmpire } from './lib/api'
 import SyncIndicator from './components/SyncIndicator'
 import UpdateNotice from './components/UpdateNotice'
@@ -120,6 +121,18 @@ function App() {
           <div className="header-right">
             <UpdateNotice />
             <SyncIndicator />
+            {/* Permanent, not a one-time tour. Most of what the guide
+                explains is as useful on the second night as the first,
+                and someone who dismissed a walkthrough would have no
+                way back to it. */}
+            <button
+              className="help-btn"
+              onClick={() => setView({ name: 'guide' })}
+              aria-label="How this works"
+              title="How this works"
+            >
+              ?
+            </button>
             <button className="sign-out" onClick={handleSignOut}>
               <span className="umpire-name">{umpire.name}</span>
               <span className="sign-out-label">Sign out</span>
@@ -142,6 +155,7 @@ function App() {
             {view.name === 'home' && (
               <Home
                 onOpenSession={openSession}
+                onOpenGuide={() => setView({ name: 'guide' })}
                 // Only admins can issue invites. Hiding the button is a
                 // convenience, not the control -- the API refuses the
                 // request regardless of what the app shows.
@@ -150,6 +164,7 @@ function App() {
                 }
               />
             )}
+            {view.name === 'guide' && <Guide onBack={goHome} />}
             {view.name === 'invites' && umpire.is_admin && (
               <Invites onBack={goHome} />
             )}

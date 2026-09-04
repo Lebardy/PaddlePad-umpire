@@ -7,7 +7,9 @@ import { useSessions } from '../lib/useLocalStore'
 // match history as the CSV the separate PaddlePad ML pipeline
 // consumes (export is global, not per-session, since the ML pipeline
 // aggregates a player's stats across every match they've ever played).
-function Home({ onOpenSession, onOpenInvites }) {
+const GUIDE_NUDGE_KEY = 'paddlepad.umpire.guideDismissed'
+
+function Home({ onOpenSession, onOpenInvites, onOpenGuide }) {
   // Subscribed rather than read during render: previously this never
   // updated after a write, and only looked correct because navigating
   // away unmounted the screen.
@@ -15,6 +17,26 @@ function Home({ onOpenSession, onOpenInvites }) {
   const [name, setName] = useState('')
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState(null)
+
+  // Persisted, so it does not reappear on every launch. Read through a
+  // try/catch because private mode throws on localStorage, and a nudge
+  // is never worth failing a screen over.
+  const [guideDismissed, setGuideDismissed] = useState(() => {
+    try {
+      return localStorage.getItem(GUIDE_NUDGE_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+
+  function dismissGuideNudge() {
+    setGuideDismissed(true)
+    try {
+      localStorage.setItem(GUIDE_NUDGE_KEY, '1')
+    } catch {
+      // It will ask once more next launch. Harmless.
+    }
+  }
 
   function handleCreate(e) {
     e.preventDefault()
@@ -60,6 +82,30 @@ function Home({ onOpenSession, onOpenInvites }) {
 
   return (
     <div className="home">
+      {/* Shown until it is waved away, and only then. The guide itself
+          never goes anywhere -- the ? in the header opens it whenever
+          they want it -- so dismissing this costs nothing. */}
+      {onOpenGuide && !guideDismissed && (
+        <div className="guide-nudge">
+          <div>
+            <strong>New to this?</strong>
+            <p>Two minutes on what the buttons record and how a night runs.</p>
+          </div>
+          <div className="guide-nudge-actions">
+            <button className="guide-nudge-open" onClick={onOpenGuide}>
+              How this works
+            </button>
+            <button
+              className="guide-nudge-close"
+              onClick={dismissGuideNudge}
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       <form className="new-session-form" onSubmit={handleCreate}>
         <input
           type="text"
