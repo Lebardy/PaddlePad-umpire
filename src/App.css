@@ -1703,7 +1703,21 @@ section h3 {
    The button itself is sized in JS from this element's measured width --
    Google draws it in an iframe and will not take a percentage. */
 .google-signin { display: block; margin-bottom: 0.25rem; }
-.google-signin > div:first-child { min-height: 44px; }
+
+/* Google's button is 40px tall and 4px-cornered, and neither is
+   configurable. The app's own buttons are ~48px on an 8px radius, so
+   the wrapper makes up the difference: it carries the app's radius and
+   clips the button to it, and the padding brings the block to the same
+   height. Without this it sits shorter and squarer than everything
+   around it and looks bolted on. */
+.google-signin > div:first-child {
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  min-height: 40px;
+}
+.google-signin > div:first-child > div { border-radius: var(--radius-sm); }
 .google-signin .is-disabled { opacity: 0.6; pointer-events: none; }
 .google-signin .login-note { margin: 0.5rem 0 0; text-align: center; }
 

@@ -54,19 +54,28 @@ function GoogleButton({ onCredential, disabled, caption }) {
   useEffect(() => {
     if (!CLIENT_ID) return
     let cancelled = false
+    const darkQuery = window.matchMedia?.('(prefers-color-scheme: dark)')
 
-    loadGoogleScript().then((ok) => {
-      if (!ok || cancelled || !holder.current) return
-      window.google.accounts.id.initialize({
-        client_id: CLIENT_ID,
-        callback: (response) => handler.current(response.credential),
-      })
-      // Measured rather than fixed, so it lines up with the email
-      // form's inputs below it instead of sitting narrower than
-      // everything else. Google takes pixels and caps them at 400.
+    /**
+     * Draws Google's button to suit the current theme.
+     *
+     * The theme matters more than it sounds. 'outline' is a white
+     * button with a grey border, which on this app's dark background
+     * (--bg: #15111f) reads as a foreign object pasted onto the page.
+     * 'filled_black' is what Google provides for dark surfaces.
+     *
+     * Height is Google's to decide -- 'large' is 40px and there is no
+     * option for more -- so the CSS pads the wrapper to bring the whole
+     * thing up to the height of the app's own buttons instead.
+     */
+    const render = () => {
+      if (cancelled || !holder.current) return
+      // renderButton appends; without this a theme change would leave
+      // two buttons stacked.
+      holder.current.innerHTML = ''
       const width = Math.min(400, Math.round(holder.current.clientWidth) || 320)
       window.google.accounts.id.renderButton(holder.current, {
-        theme: 'outline',
+        theme: darkQuery?.matches ? 'filled_black' : 'outline',
         size: 'large',
         text: 'continue_with',
         shape: 'rectangular',
@@ -74,10 +83,23 @@ function GoogleButton({ onCredential, disabled, caption }) {
         width,
       })
       setReady(true)
+    }
+
+    loadGoogleScript().then((ok) => {
+      if (!ok || cancelled || !holder.current) return
+      window.google.accounts.id.initialize({
+        client_id: CLIENT_ID,
+        callback: (response) => handler.current(response.credential),
+      })
+      render()
+      // Following the system the way the rest of the app does, rather
+      // than staying whatever it was when the page loaded.
+      darkQuery?.addEventListener('change', render)
     })
 
     return () => {
       cancelled = true
+      darkQuery?.removeEventListener('change', render)
     }
   }, [])
 
