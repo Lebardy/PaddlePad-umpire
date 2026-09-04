@@ -61,11 +61,17 @@ function GoogleButton({ onCredential, disabled }) {
         client_id: CLIENT_ID,
         callback: (response) => handler.current(response.credential),
       })
+      // Measured rather than fixed, so it lines up with the email
+      // form's inputs below it instead of sitting narrower than
+      // everything else. Google takes pixels and caps them at 400.
+      const width = Math.min(400, Math.round(holder.current.clientWidth) || 320)
       window.google.accounts.id.renderButton(holder.current, {
         theme: 'outline',
         size: 'large',
         text: 'continue_with',
-        width: 280,
+        shape: 'rectangular',
+        logo_alignment: 'center',
+        width,
       })
       setReady(true)
     })

@@ -74,6 +74,14 @@ function Login({ onSignedIn }) {
     }
   }
 
+  /** Backs out of a half-finished Google sign-up. */
+  function cancelGoogle() {
+    setNeedsInvite(false)
+    setGoogleCredential(null)
+    setInvite('')
+    setError(null)
+  }
+
   function switchMode() {
     setMode(isRegister ? 'login' : 'register')
     setError(null)
@@ -83,36 +91,51 @@ function Login({ onSignedIn }) {
     <div className="login">
       <h2>{isRegister ? 'Create umpire account' : 'Umpire sign in'}</h2>
 
+      {/* Mid-Google-signup this takes over the screen. Leaving the
+          email form below it would offer a second, unrelated way in at
+          the exact moment someone is halfway through the first. */}
       {needsInvite ? (
-        <form className="google-invite" onSubmit={submitGoogleInvite}>
+        <>
           <p className="login-note">
             Almost there. New accounts need an invite code from whoever runs
             this club — signing in with Google proves who you are, not that
             you belong here.
           </p>
-          <input
-            type="text"
-            placeholder="Invite code"
-            value={invite}
-            onChange={(e) => setInvite(e.target.value)}
-            autoCapitalize="characters"
-            autoCorrect="off"
-            spellCheck={false}
-            required
-          />
-          {error && <p className="form-error">{error}</p>}
-          <button type="submit" disabled={busy || !invite.trim()}>
-            {busy ? 'Checking…' : 'Continue'}
-          </button>
-        </form>
+          <form className="google-invite" onSubmit={submitGoogleInvite}>
+            <label>
+              Invite code
+              <input
+                type="text"
+                placeholder="PAD-7K3M-9QXR"
+                value={invite}
+                onChange={(e) => setInvite(e.target.value)}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                required
+              />
+            </label>
+            {error && <p className="form-error">{error}</p>}
+            <button type="submit" className="start-match" disabled={busy || !invite.trim()}>
+              {busy ? 'Checking…' : 'Continue'}
+            </button>
+            <button type="button" className="link-btn" onClick={cancelGoogle}>
+              Use an email and password instead
+            </button>
+          </form>
+        </>
       ) : (
-        <GoogleButton onCredential={handleGoogle} disabled={busy} />
-      )}
-      <p className="login-note">
-        Matches are recorded against your account, so scores can be traced
-        back to whoever logged them.
-      </p>
+        <>
+          <p className="login-note">
+            Matches are recorded against your account, so scores can be traced
+            back to whoever logged them.
+          </p>
 
+          <GoogleButton onCredential={handleGoogle} disabled={busy} />
+        </>
+      )}
+
+      {!needsInvite && (
       <form onSubmit={handleSubmit}>
         {isRegister && (
           <label>
@@ -175,12 +198,15 @@ function Login({ onSignedIn }) {
           {busy ? 'Please wait…' : isRegister ? 'Create account' : 'Sign in'}
         </button>
       </form>
+      )}
 
-      <button className="link-button" onClick={switchMode}>
-        {isRegister
-          ? 'Already have an account? Sign in'
-          : 'Have an invite code? Create an account'}
-      </button>
+      {!needsInvite && (
+        <button className="link-button" onClick={switchMode}>
+          {isRegister
+            ? 'Already have an account? Sign in'
+            : 'Have an invite code? Create an account'}
+        </button>
+      )}
     </div>
   )
 }

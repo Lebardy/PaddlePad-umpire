@@ -1699,17 +1699,21 @@ section h3 {
 
 /* ============ Google sign-in ============ */
 
-.google-signin { margin-bottom: 1.25rem; }
-.google-signin > div { display: flex; justify-content: center; }
+/* Full width, so Google's button lines up with the inputs under it.
+   The button itself is sized in JS from this element's measured width --
+   Google draws it in an iframe and will not take a percentage. */
+.google-signin { display: block; margin-bottom: 0.25rem; }
+.google-signin > div:first-child { min-height: 44px; }
 .google-signin .is-disabled { opacity: 0.6; pointer-events: none; }
+.google-signin .login-note { margin: 0.5rem 0 0; text-align: center; }
 
-/* "or" on a rule, so it reads as a choice between two ways in rather
-   than two unrelated blocks stacked up. */
+/* "or" on a rule, so the two ways in read as a choice rather than as
+   two unrelated blocks stacked up. */
 .or-divider {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin: 1.1rem 0 0.25rem;
+  margin: 1.25rem 0;
   color: var(--text-muted);
   font-size: 0.8rem;
 }
@@ -1721,4 +1725,4 @@ section h3 {
   background: var(--border);
 }
 
-.google-invite { display: flex; flex-direction: column; gap: 0.75rem; }
+.google-invite .link-btn { align-self: center; margin-top: 0.4rem; }
