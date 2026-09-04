@@ -1740,3 +1740,21 @@ section h3 {
 .google-choice .field-hint { margin: -0.3rem 0 0.7rem; }
 .google-invite { display: flex; flex-direction: column; }
 .google-invite .start-match { margin-top: 0.9rem; }
+
+/* The invite code, above both ways of creating an account because it
+   feeds both. Boxed so it reads as belonging to the pair below it
+   rather than as a stray field. */
+.invite-block {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem 0.6rem;
+  margin-bottom: 1.1rem;
+}
+.invite-block .field-hint { margin: 0.45rem 0 0; }
+.google-caption {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 0.45rem 0 0;
+}

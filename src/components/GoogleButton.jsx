@@ -39,7 +39,7 @@ function loadGoogleScript() {
   })
 }
 
-function GoogleButton({ onCredential, disabled }) {
+function GoogleButton({ onCredential, disabled, caption }) {
   const holder = useRef(null)
   const [ready, setReady] = useState(false)
   // Held in a ref so re-rendering (which happens on every keystroke in
@@ -89,6 +89,10 @@ function GoogleButton({ onCredential, disabled }) {
           it is ready, because the node has to exist for renderButton. */}
       <div ref={holder} className={disabled ? 'is-disabled' : ''} />
       {!ready && <p className="login-note">Loading Google sign-in…</p>}
+      {/* States the connection to the invite field above rather than
+          leaving someone to infer it -- inferring it was the whole
+          problem this screen had. */}
+      {ready && caption && <p className="google-caption">{caption}</p>}
       <div className="or-divider">
         <span>or</span>
       </div>

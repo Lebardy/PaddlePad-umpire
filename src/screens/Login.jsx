@@ -204,27 +204,45 @@ function Login({ onSignedIn }) {
             back to whoever logged them.
           </p>
 
-          <GoogleButton onCredential={handleGoogle} disabled={busy} />
+          {/* Above BOTH ways of creating an account, because it feeds
+              both. It used to sit inside the email form below, so
+              someone holding a code pasted it there and then reached
+              for the Google button -- which worked, since the two read
+              the same state, but nothing said so. */}
+          {isRegister && (
+            <div className="invite-block">
+              <label>
+                Invite code
+                <input
+                  type="text"
+                  value={invite}
+                  onChange={(e) => setInvite(e.target.value)}
+                  placeholder="PAD-7K3M-9QXR"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
+              </label>
+              <p className="field-hint">
+                From whoever runs this club. Needed either way.
+              </p>
+            </div>
+          )}
+
+          {/* Deliberately NOT disabled on an empty invite. An umpire who
+              already exists is recognised by Google alone and signed
+              straight in; the code is only consulted when Google
+              presents an account nobody here knows. */}
+          <GoogleButton
+            onCredential={handleGoogle}
+            disabled={busy}
+            caption={isRegister ? 'Uses the invite code above' : null}
+          />
         </>
       )}
 
       {!needsInvite && (
       <form onSubmit={handleSubmit}>
-        {isRegister && (
-          <label>
-            Invite code
-            <input
-              type="text"
-              value={invite}
-              onChange={(e) => setInvite(e.target.value)}
-              placeholder="PAD-7K3M-9QXR"
-              autoCapitalize="characters"
-              spellCheck={false}
-              required
-            />
-          </label>
-        )}
-
         <label>
           Email
           <input
@@ -267,7 +285,14 @@ function Login({ onSignedIn }) {
 
         {error && <p className="form-error">{error}</p>}
 
-        <button type="submit" className="start-match" disabled={busy}>
+        {/* The invite input moved above the Google button, which took
+            it out of this form's native validation -- so the check has
+            to be here rather than on the field. */}
+        <button
+          type="submit"
+          className="start-match"
+          disabled={busy || (isRegister && !invite.trim())}
+        >
           {busy ? 'Please wait…' : isRegister ? 'Create account' : 'Sign in'}
         </button>
       </form>
