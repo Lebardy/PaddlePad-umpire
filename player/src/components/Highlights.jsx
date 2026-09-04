@@ -1,41 +1,53 @@
-import { bestWin, topPartner } from '../lib/derive'
+import { biggestComeback, topPartner } from '../lib/derive'
+import { Link } from '../lib/router'
 
 /**
  * Two small facts that make a history feel like it belongs to someone.
  *
- * Both are plain lookups over the player's own matches -- the biggest
- * winning margin, and who they play with most -- so neither depends on
- * the rest of the club existing, and neither can shift because someone
- * else played.
+ * Both are plain lookups over the player's own matches, so neither
+ * depends on the rest of the club existing, and neither can shift
+ * because someone else played.
+ *
+ * The first card used to be "Best win", which called bestWin() -- the
+ * exact function behind "Biggest win" in Your best, rendered directly
+ * below this. The overview showed one score twice under two labels. A
+ * comeback is the honest counterpart rather than a second telling of the
+ * same match: biggest win is how well it can go, this is how badly it
+ * can go and still be won.
+ *
+ * Both cards open the thing they name, which the old inert version did
+ * not -- a card that shows a match and cannot be tapped is the thing
+ * that made this app feel like a page rather than an app.
  */
 function Highlights({ matches }) {
-  const best = bestWin(matches)
+  const comeback = biggestComeback(matches)
   const partner = topPartner(matches)
 
-  if (!best && !partner) return null
+  if (!comeback && !partner) return null
 
   return (
     <section className="highlights" aria-label="Highlights">
-      {best && (
-        <div className="highlight">
-          <span className="highlight-label">Best win</span>
-          <span className="highlight-value">
-            {best.yourScore}–{best.theirScore}
-          </span>
+      {comeback && (
+        <Link className="highlight" to={`/matches/${comeback.match.id}`}>
+          <span className="highlight-label">Biggest comeback</span>
+          <span className="highlight-value">{comeback.deficit} down</span>
           <span className="highlight-note">
-            against {best.opponents.join(' & ')}
+            won {comeback.match.yourScore}&ndash;{comeback.match.theirScore}
           </span>
-        </div>
+        </Link>
       )}
 
       {partner && (
-        <div className="highlight">
+        <Link
+          className="highlight"
+          to={`/people/${encodeURIComponent(partner.name)}`}
+        >
           <span className="highlight-label">Most played with</span>
           <span className="highlight-value">{partner.name}</span>
           <span className="highlight-note">
             {partner.won} of {partner.played} won together
           </span>
-        </div>
+        </Link>
       )}
     </section>
   )

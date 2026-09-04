@@ -65,6 +65,40 @@ function tallyBy(matches, namesOf) {
   return [...tally.values()].sort((a, b) => b.played - a.played || a.name.localeCompare(b.name))
 }
 
+/**
+ * The match won from furthest behind.
+ *
+ * Read off `progression`, the per-point score margin from this player's
+ * side that the server already sends with every match, so this costs no
+ * request and no new endpoint.
+ *
+ * It exists because the card it replaced showed the same number as
+ * "Biggest win" in Your best -- both called bestWin(), and the two sat
+ * next to each other on the overview showing one score twice under two
+ * labels. A comeback is the honest opposite of a biggest win: one is how
+ * well it can go, the other is how badly it can go and still be won.
+ *
+ * Null when no won match was ever behind, rather than a comeback of
+ * zero, so the card is left out instead of claiming one.
+ */
+export function biggestComeback(matches) {
+  let best = null
+
+  for (const match of matches) {
+    if (match.won !== true) continue
+    const margins = match.progression ?? []
+    if (margins.length === 0) continue
+
+    const lowest = Math.min(...margins)
+    // Never actually trailed, so nothing was come back from.
+    if (lowest >= 0) continue
+
+    if (!best || -lowest > best.deficit) best = { match, deficit: -lowest }
+  }
+
+  return best
+}
+
 /** Everyone this player has partnered, most-played first. */
 export function partnerRecords(matches) {
   return tallyBy(matches, (m) => [m.partner])
