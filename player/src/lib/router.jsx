@@ -124,8 +124,14 @@ export function matchPath(pattern, path) {
  * role for free, and it still works if JavaScript hasn't hydrated.
  * Modifier-clicks and middle-clicks fall through to the browser so
  * "open in new tab" keeps working.
+ *
+ * `replace` swaps the current history entry instead of stacking a new
+ * one. Use it when a link moves BETWEEN SIBLINGS rather than deeper in:
+ * stepping match to match should not bury the list you opened them
+ * from. It must be pulled out of the props rather than spread, or React
+ * warns about an unknown attribute on the anchor.
  */
-export function Link({ to, children, className, ...rest }) {
+export function Link({ to, children, className, replace = false, ...rest }) {
   const onClick = useCallback(
     (event) => {
       if (
@@ -139,9 +145,9 @@ export function Link({ to, children, className, ...rest }) {
         return
       }
       event.preventDefault()
-      navigate(to)
+      navigate(to, { replace })
     },
-    [to],
+    [to, replace],
   )
 
   return (

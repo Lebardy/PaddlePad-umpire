@@ -166,16 +166,25 @@ function MatchDetail({ id }) {
         </ul>
       </section>
 
+      {/* `replace`, not a push. Stepping between matches is movement
+          BETWEEN SIBLINGS, not deeper into the app, so it must not
+          stack history entries: without this, walking 5 -> 4 -> 3 left
+          [list, 5, 4, 3] behind, and Back retraced that stack one match
+          at a time -- doing exactly what "Next match" already does, and
+          taking three presses to escape a screen you entered once.
+          Replacing keeps the stack at [list, currentMatch], so Back
+          means "leave the match", which is what BackLink below promises
+          and what returns you to the list with its scroll intact. */}
       <nav className="detail-nav" aria-label="Other matches">
         {older ? (
-          <Link className="detail-nav-link" to={`/matches/${older.id}`}>
+          <Link className="detail-nav-link" replace to={`/matches/${older.id}`}>
             &larr; Previous match
           </Link>
         ) : (
           <span />
         )}
         {newer && (
-          <Link className="detail-nav-link" to={`/matches/${newer.id}`}>
+          <Link className="detail-nav-link" replace to={`/matches/${newer.id}`}>
             Next match &rarr;
           </Link>
         )}
