@@ -1,10 +1,7 @@
 import Sparkline from './Sparkline'
 import { Link } from '../lib/router'
 import { matchStory } from '../lib/story'
-
-function formatDate(iso) {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
+import { formatDate } from '../lib/format'
 
 /**
  * A player's matches, newest first, written entirely from their side --

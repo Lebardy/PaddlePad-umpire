@@ -83,65 +83,104 @@ export function opponentRecords(matches) {
 }
 
 /**
- * How often a record was actually decided, and how much of it was won.
+ * Everyone this player has shared a court with, each appearing ONCE.
  *
- * The denominator is won + lost, NOT played. A match stopped early is
- * stored as completed with no winner (see player-stats.js), so tallyBy
- * counts it as played while counting it as neither -- dividing by
- * `played` would quietly score every retirement as a loss.
+ * Replaces the old partner list plus opponent list, which drew anybody
+ * who had been both -- four of twenty-four people in real data -- twice,
+ * and which together produced twenty-eight near-identical rows out of
+ * fifteen matches.
  *
- * Null rather than 0 when nothing has been decided, the same
- * distinction Meter relies on to render a dash instead of claiming 0%.
+ * Both roles travel on one entry because they are facts about the same
+ * relationship: "we won two together, and you beat me once" is a
+ * sentence about one person, not two list items.
+ *
+ * Keyed by NAME, with the same caveat tallyBy carries: the server
+ * resolves ids to names before responding, so two players sharing a name
+ * are counted as one person. Written down as a known limit rather than
+ * left to be discovered.
  */
-export function decidedRate(person) {
-  const decided = person.won + person.lost
-  return decided > 0 ? person.won / decided : null
+export function peopleTogether(matches) {
+  const blank = () => ({ played: 0, won: 0, lost: 0 })
+  const people = new Map()
+
+  const entry = (name) => {
+    if (!people.has(name)) {
+      people.set(name, {
+        name,
+        together: blank(),
+        faced: blank(),
+        total: 0,
+        lastPlayed: null,
+        form: [],
+      })
+    }
+    return people.get(name)
+  }
+
+  const record = (side, match) => {
+    side.played += 1
+    if (match.won === true) side.won += 1
+    else if (match.won === false) side.lost += 1
+  }
+
+  // Matches arrive newest first, so `form` comes out newest first for
+  // free and lastPlayed is simply the first one seen.
+  for (const match of matches) {
+    const roles = [
+      [match.partner, 'together'],
+      ...(match.opponents ?? []).map((name) => [name, 'faced']),
+    ]
+    for (const [name, role] of roles) {
+      if (!name) continue
+      const person = entry(name)
+      record(person[role], match)
+      person.total += 1
+      if (!person.lastPlayed) person.lastPlayed = match.endedAt
+      person.form.push({ id: match.id, won: match.won })
+    }
+  }
+
+  return [...people.values()].sort(
+    (a, b) =>
+      b.total - a.total ||
+      String(b.lastPlayed ?? '').localeCompare(String(a.lastPlayed ?? '')) ||
+      a.name.localeCompare(b.name),
+  )
 }
 
-// Below this, a win rate is noise dressed as insight: at one match
-// together everybody is either 100% or 0%. The app already reasons this
-// way -- ratings gate at five matches, and personalBests refuses a
-// "cleanest match" that never made a mistake.
-const MIN_SHARED = 3
-
 /**
- * The two people worth naming at the top of the People tab.
+ * The facts that survive a long tail of one-match relationships.
  *
- * Deliberately a DIFFERENT fact from the overview's "Most played with"
- * (topPartner, below). That one is a count, this is a rate, and they are
- * frequently different people -- the partner you play every week is not
- * necessarily the one you win with. Do not collapse them into one.
+ * This is what replaced a "best partner" win rate. In a club where
+ * partners rotate every match almost nobody reaches three matches with
+ * the same person, so a rate was either meaningless or -- once gated to
+ * stop it being meaningless -- absent entirely, which is exactly what
+ * happened. A count is true and worth reading at any sample size.
  *
- * Either may be null when nobody has played enough, in which case the
- * screen leaves the card out rather than showing a best of nothing --
- * the same shape personalBests uses.
+ * `beaten` and `lostTo` count distinct PEOPLE, not matches: "you have
+ * beaten nine people" is the fact, and beating one of them four times
+ * does not make it nine.
  */
-export function peopleHighlights(matches) {
-  const eligible = (people) =>
-    people.filter((p) => p.won + p.lost >= MIN_SHARED)
+export function peopleSummary(matches) {
+  const people = peopleTogether(matches)
+  const beaten = new Set()
+  const lostTo = new Set()
 
-  const partners = eligible(partnerRecords(matches))
-  const opponents = eligible(opponentRecords(matches))
+  for (const match of matches) {
+    for (const name of match.opponents ?? []) {
+      if (match.won === true) beaten.add(name)
+      else if (match.won === false) lostTo.add(name)
+    }
+  }
 
-  // Two candidates, not one. "Best" and "toughest" are superlatives, and
-  // a superlative over a set of one says nothing -- it would happily
-  // label the only person you have faced your "toughest opponent" while
-  // showing 6-1 and 86% underneath it, which reads as a broken app
-  // rather than a thin history. With nobody to compare against, the
-  // lists below already say everything there is to say.
-  const pick = (people, better) =>
-    people.length >= 2 ? people.reduce(better) : null
-
-  const bestPartner = pick(partners, (a, b) =>
-    decidedRate(b) > decidedRate(a) ? b : a,
-  )
-
-  // "Toughest" is the one you win LEAST against, so this is a minimum.
-  const toughestOpponent = pick(opponents, (a, b) =>
-    decidedRate(b) < decidedRate(a) ? b : a,
-  )
-
-  return { bestPartner, toughestOpponent }
+  return {
+    people: people.length,
+    partners: people.filter((p) => p.together.played > 0).length,
+    faced: people.filter((p) => p.faced.played > 0).length,
+    beaten: beaten.size,
+    lostTo: lostTo.size,
+    playedMost: people[0] ?? null,
+  }
 }
 
 /** Who this player has partnered most, and how it went. */

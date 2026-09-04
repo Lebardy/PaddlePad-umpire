@@ -1,40 +1,47 @@
 // ============================================================
-// Who you play with, and who you play against.
+// Everyone you've shared a court with.
 //
 // Worth being precise about why this does not cross the line the app
 // draws around other people's data: every name here comes out of THIS
 // player's own match rows, which the server already sends. It answers
-// "how do I do when I partner Gemma" -- a fact about the viewer's own
+// "who do I play, and how does it go" -- a fact about the viewer's own
 // history. It is not a roster, not a leaderboard, and there is no way
 // from here to see anyone else's statistics.
 //
-// The two cards and the bars are here because the numbers alone were
-// correct and unreadable: a column of "5-1" tells you nothing at a
-// glance about who you actually do well with, which is the one question
-// this tab exists to answer.
+// One list, not two. Splitting partners from opponents drew anyone who
+// had been both -- four of twenty-four people in real data -- twice, and
+// turned fifteen matches into twenty-eight near-identical rows. Both
+// roles now travel on one row, because "we won two together, and you
+// beat me once" is a sentence about one person.
+//
+// The numbers are counts and W/L marks rather than percentages. Most
+// relationships here are a single match, where a percentage can only
+// ever read 0%, 50% or 100% -- three pills for three matches say the
+// same thing honestly.
 // ============================================================
 
+import { useState } from 'react'
 import { Link } from '../lib/router'
 import { usePlayerData } from '../lib/PlayerData'
-import { decidedRate, opponentRecords, partnerRecords, peopleHighlights } from '../lib/derive'
+import { peopleSummary, peopleTogether } from '../lib/derive'
+import { lastPlayedLabel } from '../lib/format'
 import Avatar from '../components/Avatar'
 
-function percent(rate) {
-  return rate === null ? '—' : `${Math.round(rate * 100)}%`
+// Enough to see a run without a regular partner's row running off the
+// side of a phone.
+const FORM_SHOWN = 6
+// 28 rows was the complaint. The rest are one tap away.
+const ROWS_SHOWN = 8
+
+/** "2 together · 1 faced", with a side that never happened left out. */
+function roleLine(person) {
+  const parts = []
+  if (person.together.played > 0) parts.push(`${person.together.played} together`)
+  if (person.faced.played > 0) parts.push(`${person.faced.played} faced`)
+  return parts.join(' · ')
 }
 
-/**
- * A named person with the record behind the name.
- *
- * The bar borrows the track-and-fill shape and the --seq tokens from
- * Meter rather than using Meter itself: that component is a label row, a
- * track and a caption, which is taller than the list row it would have
- * to live in. Same visual language, no block component forced into a
- * list.
- */
-function PersonRow({ person, verb }) {
-  const rate = decidedRate(person)
-
+function PersonRow({ person }) {
   return (
     <li>
       <Link className="person-row" to={`/people/${encodeURIComponent(person.name)}`}>
@@ -43,110 +50,102 @@ function PersonRow({ person, verb }) {
         <div className="person-main">
           <div className="person-line">
             <span className="person-name">{person.name}</span>
-            <span className="person-record">
-              {person.won}&ndash;{person.lost}
-            </span>
-            <span className="person-rate">{percent(rate)}</span>
+            <span className="person-when">{lastPlayedLabel(person.lastPlayed)}</span>
           </div>
 
-          {/* Only once something has been decided. A dash already said
-              "no data"; an empty track would say "0%". */}
-          {rate !== null && (
-            <div
-              className="person-bar"
-              role="img"
-              aria-label={`Won ${Math.round(rate * 100)} percent`}
-            >
-              <span className="person-bar-fill" style={{ width: `${rate * 100}%` }} />
-            </div>
-          )}
+          <span className="person-roles">{roleLine(person)}</span>
 
-          <span className="person-played">
-            {person.played} {verb}
-          </span>
+          {/* The same form guide the overview draws, at list size.
+              Reversed so it reads oldest to newest, left to right, and
+              carrying the letter as well as the colour -- a status
+              colour must never be the only thing saying what happened. */}
+          <ol className="person-form" aria-label="Recent results">
+            {[...person.form.slice(0, FORM_SHOWN)].reverse().map((entry) => (
+              <li
+                key={entry.id}
+                className={`pill pill-sm ${
+                  entry.won === null
+                    ? 'pill-none'
+                    : entry.won
+                      ? 'pill-won'
+                      : 'pill-lost'
+                }`}
+              >
+                {entry.won === null ? '–' : entry.won ? 'W' : 'L'}
+              </li>
+            ))}
+          </ol>
         </div>
       </Link>
     </li>
   )
 }
 
-/** Best partner or toughest opponent, as a card into that person. */
-function PersonHighlight({ label, person }) {
-  return (
-    <Link className="highlight" to={`/people/${encodeURIComponent(person.name)}`}>
-      <span className="highlight-label">{label}</span>
-      <span className="highlight-value">{person.name}</span>
-      <span className="highlight-note">
-        {person.won}&ndash;{person.lost} &middot; {percent(decidedRate(person))}
-      </span>
-    </Link>
-  )
-}
-
 function People() {
   const { matches } = usePlayerData()
-  const partners = partnerRecords(matches)
-  const opponents = opponentRecords(matches)
-  const { bestPartner, toughestOpponent } = peopleHighlights(matches)
+  const people = peopleTogether(matches)
+  const summary = peopleSummary(matches)
+  const [showAll, setShowAll] = useState(false)
 
-  // Opponents and partners overlap -- the same person can be both -- so
-  // this counts distinct names rather than adding the two lists.
-  const everyone = new Set([...partners, ...opponents].map((p) => p.name))
+  if (people.length === 0) {
+    return (
+      <div className="people-screen">
+        <h1>People</h1>
+        <p className="muted">Play a match and the people in it appear here.</p>
+      </div>
+    )
+  }
+
+  const shown = showAll ? people : people.slice(0, ROWS_SHOWN)
 
   return (
     <div className="people-screen">
       <h1>People</h1>
 
-      {everyone.size > 0 && (
-        <p className="people-summary">
-          {everyone.size} {everyone.size === 1 ? 'person' : 'people'}
-          {partners.length > 0 && (
-            <>
-              {' '}
-              &middot; {partners.length}{' '}
-              {partners.length === 1 ? 'partner' : 'partners'}
-            </>
-          )}
-        </p>
-      )}
+      <p className="people-summary">
+        {summary.people} {summary.people === 1 ? 'person' : 'people'}
+        {summary.partners > 0 && ` · ${summary.partners} partnered`}
+      </p>
 
-      {(bestPartner || toughestOpponent) && (
-        <section className="highlights" aria-label="Standouts">
-          {bestPartner && (
-            <PersonHighlight label="Best partner" person={bestPartner} />
-          )}
-          {toughestOpponent && (
-            <PersonHighlight label="Toughest opponent" person={toughestOpponent} />
-          )}
-        </section>
-      )}
+      {/* Both cards are counts, deliberately. The win rates that stood
+          here before needed three matches with the same person to mean
+          anything, and in a club where partners rotate every match
+          nobody reached three -- so the cards were gated out of
+          existence and the screen gained nothing. */}
+      <section className="highlights" aria-label="Standouts">
+        {summary.playedMost && (
+          <Link
+            className="highlight"
+            to={`/people/${encodeURIComponent(summary.playedMost.name)}`}
+          >
+            <span className="highlight-label">Played most</span>
+            <span className="highlight-value">{summary.playedMost.name}</span>
+            <span className="highlight-note">
+              {summary.playedMost.total}{' '}
+              {summary.playedMost.total === 1 ? 'match' : 'matches'}
+            </span>
+          </Link>
+        )}
 
-      {partners.length > 0 && (
-        <section aria-label="Partners">
-          <h2>You play with</h2>
-          <ul className="person-list">
-            {partners.map((person) => (
-              <PersonRow key={person.name} person={person} verb="together" />
-            ))}
-          </ul>
-        </section>
-      )}
+        <div className="highlight">
+          <span className="highlight-label">You&rsquo;ve beaten</span>
+          <span className="highlight-value">
+            {summary.beaten} {summary.beaten === 1 ? 'person' : 'people'}
+          </span>
+          <span className="highlight-note">of {summary.faced} faced</span>
+        </div>
+      </section>
 
-      {opponents.length > 0 && (
-        <section aria-label="Opponents">
-          <h2>You play against</h2>
-          {/* A doubles match counts for both opponents, so these add up
-              to more than the matches played. "faced" says that. */}
-          <ul className="person-list">
-            {opponents.map((person) => (
-              <PersonRow key={person.name} person={person} verb="faced" />
-            ))}
-          </ul>
-        </section>
-      )}
+      <ul className="person-list">
+        {shown.map((person) => (
+          <PersonRow key={person.name} person={person} />
+        ))}
+      </ul>
 
-      {partners.length === 0 && opponents.length === 0 && (
-        <p className="muted">Play a match and the people in it appear here.</p>
+      {people.length > ROWS_SHOWN && !showAll && (
+        <button type="button" className="show-all" onClick={() => setShowAll(true)}>
+          Show all {people.length}
+        </button>
       )}
     </div>
   )
