@@ -3,7 +3,7 @@
  *
  * Two forms, chosen by what each piece of data is doing:
  *
- * - Winners split by where they were hit is PART-TO-WHOLE, so it is a
+ * - Winning shots split by where they were hit is PART-TO-WHOLE, so it is a
  *   horizontal stacked bar with two categorical series, each directly
  *   labelled and separated by a surface-coloured gap.
  * - Drop success is a single ratio against a limit, so it is a METER on
@@ -41,7 +41,7 @@ function ShotProfile({ summary }) {
           ]}
         />
       ) : (
-        <p className="muted-inline">No winners logged yet.</p>
+        <p className="muted-inline">No winning shots yet.</p>
       )}
 
       <div className="meters">

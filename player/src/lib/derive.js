@@ -169,7 +169,7 @@ export function personalBests(matches) {
     mostWinners &&
       winnersIn(mostWinners) > 0 && {
         key: 'winners',
-        label: 'Most winners',
+        label: 'Most winning shots',
         value: String(winnersIn(mostWinners)),
         detail: `in one match`,
         matchId: mostWinners.id,
@@ -178,7 +178,7 @@ export function personalBests(matches) {
       key: 'ratio',
       label: 'Cleanest match',
       value: (winnersIn(bestRatio) / errorsIn(bestRatio)).toFixed(1),
-      detail: 'winners per error',
+      detail: 'winning shots per mistake',
       matchId: bestRatio.id,
     },
   ].filter(Boolean)

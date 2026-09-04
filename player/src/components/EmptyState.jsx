@@ -24,7 +24,7 @@ const WHAT_YOU_GET = [
   },
   {
     title: 'How you play',
-    body: 'Winners and errors, and how many of your drops actually landed.',
+    body: 'Winning shots and mistakes, and how many of your drops actually landed.',
   },
 ]
 

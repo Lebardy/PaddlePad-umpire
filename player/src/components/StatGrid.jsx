@@ -15,17 +15,20 @@ function percent(value) {
 function StatGrid({ summary }) {
   const tiles = [
     { label: 'Win rate', value: percent(summary.winRate), note: `${summary.wins} of ${summary.wins + summary.losses}` },
-    { label: 'Winners', value: summary.totalWinners, note: 'points you finished' },
-    { label: 'Errors', value: summary.totalErrors, note: 'points you gave away' },
+    // "Winners" and "errors" are how tennis commentary talks, not how
+    // anyone at a court does -- and neither word says the number counts
+    // SHOTS, which is what let it be misread as the player's score.
+    { label: 'Winning shots', value: summary.totalWinners, note: 'shots that won you the point' },
+    { label: 'Mistakes', value: summary.totalErrors, note: 'shots you put out or in the net' },
     {
-      label: 'Winners per error',
+      label: 'Winning shots per mistake',
       // The single most telling ratio in the set: are you creating more
       // than you're giving away? Guarded so zero errors reads as a dash
       // rather than Infinity.
       value: summary.totalErrors > 0
         ? (summary.totalWinners / summary.totalErrors).toFixed(2)
         : summary.totalWinners > 0 ? '—' : '0',
-      note: summary.totalErrors === 0 && summary.totalWinners > 0 ? 'no errors yet' : 'above 1.00 is good',
+      note: summary.totalErrors === 0 && summary.totalWinners > 0 ? 'no mistakes yet' : 'above 1.00 is good',
     },
   ]
 

@@ -3,7 +3,7 @@
 //
 // Extracted from ShotProfile so a single match can be described in
 // exactly the same visual language as a whole career. Two different
-// looking charts for "your winners" and "your winners in this match"
+// looking charts for "your winning shots" and the same for one match
 // would make the app feel assembled rather than designed.
 //
 // Colours come from --series-1/--series-2 in index.css, which are a

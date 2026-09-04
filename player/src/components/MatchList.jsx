@@ -60,8 +60,10 @@ function MatchList({ matches }) {
                 {story && <p className="match-story">{story}</p>}
 
                 <div className="match-chips">
-                  <span className="chip">{winners}W</span>
-                  <span className="chip">{errors}E</span>
+                  {/* Spelled out rather than "3W / 2E": on a row that
+                      already says won or lost, a bare W reads as a win. */}
+                  <span className="chip">{winners} winning shots</span>
+                  <span className="chip">{errors} mistakes</span>
                   {match.stats.drop_attempts > 0 && (
                     <span className="chip">
                       {match.stats.drop_successes}/{match.stats.drop_attempts} drops
