@@ -19,7 +19,7 @@ function Login({ onSignedIn }) {
   // invite. The credential is kept so supplying one does not mean
   // signing in with Google a second time.
   const [needsInvite, setNeedsInvite] = useState(false)
-  const [googleCredential, setGoogleCredential] = useState(null)
+  const [googleToken, setGoogleToken] = useState(null)
 
   const isRegister = mode === 'register'
 
@@ -46,12 +46,12 @@ function Login({ onSignedIn }) {
    * field and keeps the credential so the second attempt does not make
    * them sign in with Google all over again.
    */
-  async function handleGoogle(credential) {
+  async function handleGoogle(accessToken) {
     setError(null)
     setBusy(true)
-    setGoogleCredential(credential)
+    setGoogleToken(accessToken)
     try {
-      onSignedIn(await loginWithGoogle({ credential, invite }))
+      onSignedIn(await loginWithGoogle({ accessToken, invite }))
     } catch (err) {
       setError(err.message)
       if (err.details?.needsInvite) setNeedsInvite(true)
@@ -72,7 +72,7 @@ function Login({ onSignedIn }) {
     setBusy(true)
     try {
       onSignedIn(
-        await linkGoogleAccount({ credential: googleCredential, email, password }),
+        await linkGoogleAccount({ accessToken: googleToken, email, password }),
       )
     } catch (err) {
       setError(err.message)
@@ -87,7 +87,7 @@ function Login({ onSignedIn }) {
     setError(null)
     setBusy(true)
     try {
-      onSignedIn(await loginWithGoogle({ credential: googleCredential, invite }))
+      onSignedIn(await loginWithGoogle({ accessToken: googleToken, invite }))
     } catch (err) {
       setError(err.message)
     } finally {
@@ -98,7 +98,7 @@ function Login({ onSignedIn }) {
   /** Backs out of a half-finished Google sign-up. */
   function cancelGoogle() {
     setNeedsInvite(false)
-    setGoogleCredential(null)
+    setGoogleToken(null)
     setInvite('')
     setError(null)
   }

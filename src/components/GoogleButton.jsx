@@ -1,25 +1,41 @@
 // ============================================================
-// The Sign in with Google button.
+// Sign in with Google — our button, not Google's.
+//
+// Google's own rendered button was replaced because it could not be
+// made to fit. It is drawn inside an element we do not control: fixed
+// at 40px tall against this app's ~48px, its own 4px corners against
+// our 8px, its own typeface, and a width that has to be handed to it in
+// pixels -- which is what made it overflow its container on a narrow
+// phone when that measurement came back wrong.
+//
+// So this is an ordinary <button> wearing the app's own styles, and the
+// sign-in runs through Google's token client instead. The trade is one
+// round trip on the server: an access token is opaque, so the only way
+// to learn who it belongs to is to ask Google, where the ID token the
+// old button produced could be verified locally. See
+// verifyGoogleAccessToken in server/src/google.js.
 //
 // Renders nothing at all when VITE_GOOGLE_CLIENT_ID is unset, so a
 // checkout without the variable -- or a deploy where it was forgotten --
-// still runs and still signs in by password. A button that cannot work
-// is worse than no button.
+// still signs in by password. A button that cannot work is worse than
+// no button.
 //
-// Google's script is loaded on mount rather than from index.html so
-// that a browser which cannot reach Google delays nothing else: the
-// password form is already usable while this is still loading, and if
-// it never loads the form is all there is.
+// The G mark and the wording follow Google's branding guidelines, which
+// allow a custom button provided the logo is unaltered and the label is
+// one of their approved phrases.
 // ============================================================
 
 import { useEffect, useRef, useState } from 'react'
 
 const CLIENT_ID = import.meta.env?.VITE_GOOGLE_CLIENT_ID ?? ''
 const SRC = 'https://accounts.google.com/gsi/client'
+// openid and email are what the server actually reads. `profile` is
+// only for the display name, and the sign-in survives without it.
+const SCOPE = 'openid email profile'
 
 /** Loads Google's script once, however many times this mounts. */
 function loadGoogleScript() {
-  if (window.google?.accounts?.id) return Promise.resolve(true)
+  if (window.google?.accounts?.oauth2) return Promise.resolve(true)
 
   const existing = document.querySelector(`script[src="${SRC}"]`)
   if (existing) {
@@ -39,13 +55,36 @@ function loadGoogleScript() {
   })
 }
 
+/** Google's G, unaltered, as their guidelines require. */
+function GoogleMark() {
+  return (
+    <svg className="google-mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+      <path
+        fill="#EA4335"
+        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+      />
+      <path
+        fill="#4285F4"
+        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+      />
+    </svg>
+  )
+}
+
 function GoogleButton({ onCredential, disabled, caption }) {
-  const holder = useRef(null)
   const [ready, setReady] = useState(false)
-  // Held in a ref so re-rendering (which happens on every keystroke in
-  // the invite field) never re-initialises Google's button underneath
-  // the user. Written in an effect rather than during render, which is
-  // what React actually guarantees is safe.
+  const [failed, setFailed] = useState(false)
+  const client = useRef(null)
+  // Held in a ref so a re-render -- which happens on every keystroke in
+  // the invite field above -- never rebuilds the token client.
   const handler = useRef(onCredential)
   useEffect(() => {
     handler.current = onCredential
@@ -54,70 +93,53 @@ function GoogleButton({ onCredential, disabled, caption }) {
   useEffect(() => {
     if (!CLIENT_ID) return
     let cancelled = false
-    const darkQuery = window.matchMedia?.('(prefers-color-scheme: dark)')
-
-    /**
-     * Draws Google's button to suit the current theme.
-     *
-     * The theme matters more than it sounds. 'outline' is a white
-     * button with a grey border, which on this app's dark background
-     * (--bg: #15111f) reads as a foreign object pasted onto the page.
-     * 'filled_black' is what Google provides for dark surfaces.
-     *
-     * Height is Google's to decide -- 'large' is 40px and there is no
-     * option for more -- so the CSS pads the wrapper to bring the whole
-     * thing up to the height of the app's own buttons instead.
-     */
-    const render = () => {
-      if (cancelled || !holder.current) return
-      // renderButton appends; without this a theme change would leave
-      // two buttons stacked.
-      holder.current.innerHTML = ''
-      const width = Math.min(400, Math.round(holder.current.clientWidth) || 320)
-      window.google.accounts.id.renderButton(holder.current, {
-        theme: darkQuery?.matches ? 'filled_black' : 'outline',
-        size: 'large',
-        text: 'continue_with',
-        shape: 'rectangular',
-        logo_alignment: 'center',
-        width,
-      })
-      setReady(true)
-    }
 
     loadGoogleScript().then((ok) => {
-      if (!ok || cancelled || !holder.current) return
-      window.google.accounts.id.initialize({
+      if (cancelled) return
+      if (!ok || !window.google?.accounts?.oauth2) {
+        setFailed(true)
+        return
+      }
+      client.current = window.google.accounts.oauth2.initTokenClient({
         client_id: CLIENT_ID,
-        callback: (response) => handler.current(response.credential),
+        scope: SCOPE,
+        callback: (response) => {
+          if (response.access_token) handler.current(response.access_token)
+        },
       })
-      render()
-      // Following the system the way the rest of the app does, rather
-      // than staying whatever it was when the page loaded.
-      darkQuery?.addEventListener('change', render)
+      setReady(true)
     })
 
     return () => {
       cancelled = true
-      darkQuery?.removeEventListener('change', render)
     }
   }, [])
 
   if (!CLIENT_ID) return null
 
+  // Said plainly rather than left as a button that does nothing. A
+  // blocked or unreachable Google is not the end of signing in -- the
+  // password form below still works.
+  if (failed) {
+    return (
+      <p className="login-note google-unavailable">
+        Google sign-in couldn&rsquo;t load. Use your email and password below.
+      </p>
+    )
+  }
+
   return (
     <div className="google-signin">
-      {/* Google draws its own button in here. Kept mounted even before
-          it is ready, because the node has to exist for renderButton. */}
-      <div ref={holder} className={disabled ? 'is-disabled' : ''} />
-      {!ready && <p className="login-note">Loading Google sign-in…</p>}
-      {/* States the connection to the invite field above rather than
-          leaving someone to infer it -- inferring it was the whole
-          problem this screen had. */}
-      {ready && caption && <p className="google-caption">{caption}</p>}
-      <div className="or-divider">
-        <span>or</span>
-      </div>
+      <button
+        type="button"
+        className="google-btn"
+        disabled={disabled || !ready}
+        onClick={() => client.current?.requestAccessToken()}
+      >
+        <GoogleMark />
+        <span>{ready ? 'Continue with Google' : 'Loading…'}</span>
+      </button>
+      {caption && <p className="google-caption">{caption}</p>}
     </div>
   )
 }

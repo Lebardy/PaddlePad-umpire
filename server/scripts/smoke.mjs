@@ -213,6 +213,14 @@ async function main() {
       (await link({ credential: 'junk', email: 'a@b.c', password: 'x' })).status === 401)
     check('linking with no credential at all -> 400',
       (await link({ email: 'a@b.c', password: 'x' })).status === 400)
+
+    // The custom button sends an access token rather than the signed ID
+    // token Google's own button produced. Both doors are open; both
+    // must refuse a token that was not issued for this client.
+    check('a made-up access token -> 401',
+      (await g({ accessToken: 'ya29.not-a-real-token' })).status === 401)
+    check('an empty access token -> 400',
+      (await g({ accessToken: '' })).status === 400)
     }
   }
 

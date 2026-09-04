@@ -1704,25 +1704,32 @@ section h3 {
    Google draws it in an iframe and will not take a percentage. */
 .google-signin { display: block; margin-bottom: 0.25rem; }
 
-/* Google's button is 40px tall and 4px-cornered, and neither is
-   configurable. The app's own buttons are ~48px on an 8px radius, so
-   the wrapper makes up the difference: it carries the app's radius and
-   clips the button to it, and the padding brings the block to the same
-   height. Without this it sits shorter and squarer than everything
-   around it and looks bolted on. */
-.google-signin > div:first-child {
-  border-radius: var(--radius-sm);
-  overflow: hidden;
+/* Our button, not Google's -- so it can simply match .start-match above
+   and below it instead of being a fixed 40px on 4px corners in a
+   typeface we do not choose. Neutral rather than --primary, because
+   this and "Create account" are alternatives and two filled purple
+   buttons would compete for the same tap. */
+.google-btn {
+  width: 100%;
   display: flex;
+  align-items: center;
   justify-content: center;
-  min-height: 40px;
+  gap: 0.6rem;
+  padding: 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
 }
-.google-signin > div:first-child > div { border-radius: var(--radius-sm); }
-.google-signin .is-disabled { opacity: 0.6; pointer-events: none; }
-.google-signin .login-note { margin: 0.5rem 0 0; text-align: center; }
+.google-btn:hover:not(:disabled) { border-color: var(--primary); }
+.google-btn:disabled { opacity: 0.6; cursor: default; }
+.google-mark { width: 1.15rem; height: 1.15rem; flex: none; }
+.google-unavailable { text-align: center; margin: 0 0 1rem; }
 
-/* "or" on a rule, so the two ways in read as a choice rather than as
-   two unrelated blocks stacked up. */
 .or-divider {
   display: flex;
   align-items: center;

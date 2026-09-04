@@ -246,6 +246,18 @@ Three security points, each of which is load-bearing:
   short-circuiting would make a Google-only account answer measurably
   faster than a wrong password and reveal which accounts are which.
 
+**Two kinds of token are accepted.** The app draws its own sign-in
+button rather than Google's, because Google's is rendered in an element
+the page does not control — fixed height, its own corners and typeface,
+and a width handed to it in pixels that could overflow its container on
+a narrow phone. A custom button means Google returns an *access* token
+instead of a signed ID token. An access token is opaque, so it cannot be
+verified locally the way an ID token can; the server asks Google who it
+belongs to, and **checks `aud` against our client id exactly as the ID
+token path checks `audience`**. That check is what stops a token minted
+for any other application signing its bearer in here. The ID-token path
+remains and both end in the same three facts.
+
 **Linking a Google account whose address differs.** `/auth/google` links
 automatically when the Google address matches an umpire's email, which
 covers most people. It cannot help someone whose account here is one

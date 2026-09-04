@@ -154,11 +154,11 @@ export function revokeInvite(code) {
  * server answers that case with `needsInvite`, which the login screen
  * reads to reveal the field rather than showing a dead end.
  */
-export async function loginWithGoogle({ credential, invite }) {
+export async function loginWithGoogle({ accessToken, invite }) {
   const data = await apiFetch('/auth/google', {
     method: 'POST',
     auth: false,
-    body: { credential, invite: invite || undefined },
+    body: { accessToken, invite: invite || undefined },
   })
   storeSession(data.token, data.umpire)
   return data.umpire
@@ -172,11 +172,11 @@ export async function loginWithGoogle({ credential, invite }) {
  * Their password proves the account here is theirs; Google has already
  * proved the other half.
  */
-export async function linkGoogleAccount({ credential, email, password }) {
+export async function linkGoogleAccount({ accessToken, email, password }) {
   const data = await apiFetch('/auth/google/link', {
     method: 'POST',
     auth: false,
-    body: { credential, email, password },
+    body: { accessToken, email, password },
   })
   storeSession(data.token, data.umpire)
   return data.umpire

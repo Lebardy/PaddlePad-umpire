@@ -18,6 +18,8 @@ import crypto from 'node:crypto'
 import jwt from 'jsonwebtoken'
 
 const CERTS_URL = 'https://www.googleapis.com/oauth2/v3/certs'
+const TOKENINFO_URL = 'https://oauth2.googleapis.com/tokeninfo'
+const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
 
 // Google signs with one of a small set of keys and rotates them. Which
 // key signed a given token is named in its header (`kid`).
@@ -127,6 +129,75 @@ export async function verifyGoogleToken(credential) {
     email: String(payload.email).toLowerCase(),
     name: payload.name || payload.email,
   }
+}
+
+/**
+ * Checks a Google ACCESS token and returns who it names.
+ *
+ * The custom sign-in button hands back an access token rather than the
+ * signed ID token Google's own button produces, so this is the other
+ * half. An access token carries no signature we can check ourselves --
+ * it is an opaque string -- so the only way to learn anything about it
+ * is to ask Google, which is why this costs a round trip where
+ * verifyGoogleToken costs none.
+ *
+ * SECURITY: `aud` is the whole security of this, exactly as the
+ * audience check is for an ID token. An access token minted for any
+ * other application is just as real; without confirming it was issued
+ * to OUR client id, anyone could present a token from any Google app
+ * and be signed in here as whoever it names.
+ *
+ * @returns {Promise<{sub: string, email: string, name: string}>}
+ */
+export async function verifyGoogleAccessToken(accessToken) {
+  const clientId = process.env.GOOGLE_CLIENT_ID
+  if (!clientId) throw refusal(503, 'Google sign-in is not configured on this server')
+  if (!accessToken) throw refusal(400, 'Missing Google credential')
+
+  const res = await fetch(
+    `${TOKENINFO_URL}?access_token=${encodeURIComponent(accessToken)}`,
+  )
+  if (!res.ok) throw refusal(401, 'That Google sign-in could not be verified')
+
+  const info = await res.json()
+  if (info.aud !== clientId) {
+    throw refusal(401, 'That Google sign-in could not be verified')
+  }
+  // tokeninfo answers with strings, not JSON booleans, so `=== true`
+  // alone would silently reject every verified address.
+  const verified = info.email_verified === true || info.email_verified === 'true'
+  if (!verified || !info.email) {
+    throw refusal(401, 'That Google account has no verified email address')
+  }
+
+  // The display name is not in tokeninfo, and it is the only reason to
+  // make a second call -- so a failure here falls back to the address
+  // rather than failing the sign-in over a nicety.
+  let name = info.email
+  try {
+    const who = await fetch(USERINFO_URL, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (who.ok) {
+      const profile = await who.json()
+      if (profile.name) name = profile.name
+    }
+  } catch {
+    // Keep the email as the name.
+  }
+
+  return { sub: info.sub, email: String(info.email).toLowerCase(), name }
+}
+
+/**
+ * Whichever kind of token the app sent.
+ *
+ * Both doors end in the same three facts, so nothing downstream has to
+ * know which button someone pressed.
+ */
+export async function resolveGoogleProfile({ credential, accessToken }) {
+  if (accessToken) return verifyGoogleAccessToken(accessToken)
+  return verifyGoogleToken(credential)
 }
 
 /** Whether the server can do Google sign-in at all. */

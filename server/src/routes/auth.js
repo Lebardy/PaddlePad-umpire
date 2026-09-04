@@ -11,7 +11,7 @@ import {
   verifyPassword,
 } from '../auth.js'
 import { generateInviteCode, normalizeInviteCode } from '../invites.js'
-import { verifyGoogleToken } from '../google.js'
+import { resolveGoogleProfile } from '../google.js'
 import {
   USERNAME_RULE,
   isValidUsername,
@@ -180,7 +180,7 @@ router.post('/register', async (req, res) => {
 router.post('/google', async (req, res) => {
   let profile
   try {
-    profile = await verifyGoogleToken(req.body?.credential)
+    profile = await resolveGoogleProfile(req.body ?? {})
   } catch (error) {
     if (error.statusCode) {
       return res.status(error.statusCode).json({ error: error.message })
@@ -263,7 +263,7 @@ router.post('/google', async (req, res) => {
 router.post('/google/link', async (req, res) => {
   let profile
   try {
-    profile = await verifyGoogleToken(req.body?.credential)
+    profile = await resolveGoogleProfile(req.body ?? {})
   } catch (error) {
     if (error.statusCode) {
       return res.status(error.statusCode).json({ error: error.message })
