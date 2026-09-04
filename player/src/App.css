@@ -116,6 +116,13 @@
 .gate .hint:last-child { margin-bottom: 0; margin-top: 1rem; }
 
 /* Editing the profile: one row per field, each opening its own form. */
+/* Every block on the settings page is one of these, so the page reads
+   as a list of sections rather than a stack of unrelated cards. */
+.you-section { margin-bottom: 1.75rem; }
+.you-section h2 { font-size: 0.9rem; margin-bottom: 0.6rem; }
+.you-section p { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.55; margin: 0 0 0.6rem; }
+.you-section .filter-row { margin-bottom: 0; }
+
 .you-details { margin-bottom: 1.5rem; }
 .you-details h2 { font-size: 0.9rem; margin-bottom: 0.6rem; }
 .detail-note {

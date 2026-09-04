@@ -34,7 +34,7 @@
   --radius-sm: 10px;
   --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
 
-  color-scheme: light dark;
+  color-scheme: light;
   font: 16px/1.5 var(--sans);
   color: var(--text);
   background: var(--bg);
@@ -42,32 +42,40 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #131019;
-    --surface: #1e1928;
-    --surface-sunken: #171320;
-    --text: #f3f0f9;
-    --text-secondary: #b8b0c9;
-    --text-muted: #8d85a0;
-    --border: #302940;
+/* The dark palette, in ONE place.
 
-    --primary: #3987e5;
-    --primary-soft: rgba(57, 135, 229, 0.16);
+   It used to live in @media (prefers-color-scheme: dark), and cannot
+   stay there now the theme can be overridden: keeping the media query
+   AND adding an attribute rule would mean writing all fifteen values
+   twice, and two copies drift. lib/theme.js resolves 'system' itself and
+   always writes a real light/dark value to data-theme, which leaves the
+   media query nothing to do -- so please don't add it back. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
 
-    /* The same two hues stepped for the dark surface -- a selected dark
-       palette, not an automatic flip of the light one. */
-    --series-1: #3987e5;
-    --series-2: #d95926;
+  --bg: #131019;
+  --surface: #1e1928;
+  --surface-sunken: #171320;
+  --text: #f3f0f9;
+  --text-secondary: #b8b0c9;
+  --text-muted: #8d85a0;
+  --border: #302940;
 
-    --seq-track: #26314a;
-    --seq-fill: #3987e5;
+  --primary: #3987e5;
+  --primary-soft: rgba(57, 135, 229, 0.16);
 
-    --status-good: #0ca30c;
-    --status-good-soft: rgba(12, 163, 12, 0.2);
-    --status-critical: #d03b3b;
-    --status-critical-soft: rgba(208, 59, 59, 0.2);
-  }
+  /* The same two hues stepped for the dark surface -- a selected dark
+     palette, not an automatic flip of the light one. */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+
+  --seq-track: #26314a;
+  --seq-fill: #3987e5;
+
+  --status-good: #0ca30c;
+  --status-good-soft: rgba(12, 163, 12, 0.2);
+  --status-critical: #d03b3b;
+  --status-critical-soft: rgba(208, 59, 59, 0.2);
 }
 
 * { box-sizing: border-box; }

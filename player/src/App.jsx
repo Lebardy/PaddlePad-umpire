@@ -14,6 +14,7 @@ import { PlayerDataProvider, usePlayerData } from './lib/PlayerData'
 import { matchPath, navigate, restoreScroll, useRoute } from './lib/router'
 import { clearSession, getStoredPlayer, verifySession } from './lib/api'
 import { SetupCard, SetupPrompt } from './components/SetupSignIn'
+import { applyTheme, getThemeChoice, watchSystemTheme } from './lib/theme'
 import LinkCode from './screens/LinkCode'
 import { useState } from 'react'
 import './App.css'
@@ -165,6 +166,12 @@ function App() {
   // screen while their token is being re-checked.
   const [player, setPlayer] = useState(getStoredPlayer)
   const [checked, setChecked] = useState(false)
+
+  // The inline script in index.html has already painted the right
+  // colour; this only keeps it right afterwards. Picking "System" and
+  // then switching the phone to dark has to change the app there and
+  // then, or the setting reads as broken.
+  useEffect(() => watchSystemTheme(() => applyTheme(getThemeChoice())), [])
 
   useEffect(() => {
     let cancelled = false

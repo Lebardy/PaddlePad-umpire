@@ -6,9 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <!-- Matches --primary and --bg in index.css. These were a different
          blue from the app itself, so the browser chrome and the page
-         disagreed on what colour PaddlePad is. -->
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#2a78d6" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#131019" />
+         disagreed on what colour PaddlePad is.
+         One meta, not a pair keyed on prefers-color-scheme: the theme can
+         now be overridden, so the OS is no longer what decides. applyTheme
+         in lib/theme.js keeps this in step. -->
+    <meta name="theme-color" content="#2a78d6" />
     <meta
       name="description"
       content="See the pickleball matches your umpire recorded for you — your record, your shots, and how every game went."
@@ -24,6 +26,29 @@
       rel="stylesheet"
     />
     <title>PaddlePad</title>
+    <!-- Runs before anything paints, so a dark-mode player does not get a
+         white flash on every launch. Deliberately duplicates a few lines
+         of lib/theme.js rather than importing it: the module graph loads
+         far too late to prevent the flash, which is the entire point.
+         Kept tiny so the two cannot meaningfully drift. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('paddlepad.player.theme')
+          var dark =
+            stored === 'dark' ||
+            (stored !== 'light' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches)
+          var root = document.documentElement
+          root.dataset.theme = dark ? 'dark' : 'light'
+          root.style.colorScheme = dark ? 'dark' : 'light'
+          var meta = document.querySelector('meta[name="theme-color"]')
+          if (meta) meta.setAttribute('content', dark ? '#131019' : '#2a78d6')
+        } catch (e) {
+          /* Private mode, or no matchMedia. Light is a safe first paint. */
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -72,6 +72,9 @@ export function clearSession() {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(PLAYER_KEY)
     localStorage.removeItem(SETUP_DISMISSED_KEY)
+    // The theme (lib/theme.js) deliberately does NOT belong here. It is
+    // a preference about this device, not about this account, and
+    // signing out should not flip someone's phone back to light.
   } catch {
     // nothing useful to do
   }

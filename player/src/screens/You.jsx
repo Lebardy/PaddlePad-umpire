@@ -1,21 +1,26 @@
 // ============================================================
-// The profile screen.
+// The settings screen.
 //
 // This used to say a player administers nothing here, because for a
 // long time that was true: an umpire created the person, handed over a
 // claim code, and typing that code WAS the login. There was no account
 // to edit and no way to leave.
 //
-// There is now. A player has a name they can correct, a username and
-// password they can change, and a way to delete the whole thing. What
-// stays true is that the match record is not solely theirs -- see
-// DeleteProfile for what that costs and why it is the honest answer.
+// There is now, and this is where all of it lives: how the app looks,
+// who you are, how you sign in, and how you leave. What stays true is
+// that the match record is not solely theirs -- see DeleteProfile for
+// what that costs and why it is the honest answer.
+//
+// The record tiles that used to open this screen have gone. Every one
+// of them -- record, matches, current streak, best win streak -- is on
+// the overview already, in the hero and the stat grid, and a settings
+// page is not where anyone looks for their form.
 // ============================================================
 
 import { useState } from 'react'
 import { usePlayerData } from '../lib/PlayerData'
 import { setCredentials, updateProfile } from '../lib/api'
-import { currentStreak, longestWinStreak } from '../lib/derive'
+import { THEMES, getThemeChoice, setThemeChoice } from '../lib/theme'
 import Avatar from '../components/Avatar'
 import DeleteProfile from './DeleteProfile'
 import LinkCode from './LinkCode'
@@ -315,11 +320,48 @@ function Details({ player, onPlayerChange }) {
   )
 }
 
+/**
+ * Light, dark, or follow the phone.
+ *
+ * The same segmented control the Matches filters use, rather than a
+ * switch: a two-state toggle cannot express "follow the system", which
+ * is the right default and the one most people should stay on.
+ */
+function ThemeChoice() {
+  const [choice, setChoice] = useState(getThemeChoice)
+
+  function pick(next) {
+    setChoice(next)
+    setThemeChoice(next)
+  }
+
+  return (
+    <section className="you-section" aria-label="Appearance">
+      <h2>Appearance</h2>
+      <div className="filter-row" role="group" aria-label="Theme">
+        {THEMES.map((theme) => (
+          <button
+            key={theme.key}
+            type="button"
+            className={`filter ${choice === theme.key ? 'filter-active' : ''}`}
+            aria-pressed={choice === theme.key}
+            onClick={() => pick(theme.key)}
+          >
+            {theme.label}
+          </button>
+        ))}
+      </div>
+      {choice === 'system' && (
+        <p className="detail-note">
+          Following your phone&rsquo;s setting. It changes when your phone does.
+        </p>
+      )}
+    </section>
+  )
+}
+
 function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
-  const { summary, matches } = usePlayerData()
   const joined = joinedLabel(player.claimedAt)
-  const streak = currentStreak(matches)
-  const best = longestWinStreak(matches)
 
   return (
     <div className="you-screen">
@@ -329,49 +371,19 @@ function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
         {joined && <p className="muted-inline">Playing since {joined}</p>}
       </header>
 
-      {summary && summary.matches > 0 && (
-        <section className="you-record" aria-label="Your record">
-          <ul>
-            <li>
-              <span className="yr-value">
-                {summary.wins}&ndash;{summary.losses}
-              </span>
-              <span className="yr-label">Record</span>
-            </li>
-            <li>
-              <span className="yr-value">{summary.matches}</span>
-              <span className="yr-label">Matches</span>
-            </li>
-            <li>
-              <span className="yr-value">
-                {streak ? `${streak.length}${streak.won ? 'W' : 'L'}` : '—'}
-              </span>
-              <span className="yr-label">Current streak</span>
-            </li>
-            <li>
-              <span className="yr-value">{best || '—'}</span>
-              <span className="yr-label">Best win streak</span>
-            </li>
-          </ul>
-        </section>
-      )}
+      <ThemeChoice />
 
       <Details player={player} onPlayerChange={onPlayerChange} />
 
       <LinkCode onPlayerChange={onPlayerChange} />
 
-      <section className="you-about" aria-label="About">
-        <h2>About</h2>
+      <section className="you-section" aria-label="This app">
+        <h2>This app</h2>
         <p>
           PaddlePad shows the matches an umpire recorded for you. Every number
           here is a plain count of what was tapped courtside — nothing is
           estimated, and nothing is compared against anyone else.
         </p>
-        <p className="muted-inline">Version {VERSION}</p>
-      </section>
-
-      <section className="you-install" aria-label="Install">
-        <h2>Keep it handy</h2>
         {/* Written out rather than a custom install button: the browser
             prompt never fires on iOS and only fires on Android under
             heuristics nobody controls, so a button that may never appear
@@ -380,21 +392,25 @@ function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
           Add PaddlePad to your home screen from your browser&rsquo;s share menu
           and it opens like any other app.
         </p>
+        <p className="muted-inline">Version {VERSION}</p>
       </section>
 
-      <button type="button" className="sign-out" onClick={onSignOut}>
-        Sign out
-      </button>
-      {/* Only a warning while it is actually true. Someone with a
-          password can let themselves back in. */}
-      {!player.username && (
-        <p className="sign-out-note">
-          You&rsquo;ll need your code again to sign back in — ask whoever scores
-          your matches if you don&rsquo;t have it.
-        </p>
-      )}
+      <section className="you-section" aria-label="Account">
+        <h2>Account</h2>
+        <button type="button" className="sign-out" onClick={onSignOut}>
+          Sign out
+        </button>
+        {/* Only a warning while it is actually true. Someone with a
+            password can let themselves back in. */}
+        {!player.username && (
+          <p className="sign-out-note">
+            You&rsquo;ll need your code again to sign back in — ask whoever
+            scores your matches if you don&rsquo;t have it.
+          </p>
+        )}
 
-      <DeleteProfile player={player} onDeleted={onSignedOut} />
+        <DeleteProfile player={player} onDeleted={onSignedOut} />
+      </section>
     </div>
   )
 }
