@@ -199,6 +199,7 @@ If you ever recreate it, verify these before trusting it:
 | `POST` | `/auth/login` | — | Sign in as an umpire, returns a token |
 | `GET` | `/auth/me` | Bearer | Validate a stored token on app launch |
 | `POST` | `/auth/google` | — | Sign in an umpire with Google; an invite is still required to register |
+| `POST` | `/auth/google/link` | — | Attach a Google account to an existing umpire account, proved with its password |
 | `POST` | `/auth/player/claim` | — | Exchange an umpire-issued code for a player session |
 | `POST` | `/auth/player/register` | — | Sign up as a player |
 | `POST` | `/auth/player/login` | — | Sign in as a player, username + password |
@@ -244,6 +245,19 @@ Three security points, each of which is load-bearing:
   instantly on a malformed hash without doing the scrypt work, so
   short-circuiting would make a Google-only account answer measurably
   faster than a wrong password and reveal which accounts are which.
+
+**Linking a Google account whose address differs.** `/auth/google` links
+automatically when the Google address matches an umpire's email, which
+covers most people. It cannot help someone whose account here is one
+address and whose Google account is another — a work email and a
+personal one — who would otherwise be asked for an invite they do not
+need, having been an umpire all along. `/auth/google/link` takes the
+Google credential *and* that account's own email and password: Google
+proves one half, the password proves the other, and neither alone is
+enough. The Google token is verified **before** the password is looked
+at, so the endpoint cannot be used as a password oracle by someone
+without a Google account, and it refuses rather than silently replacing
+a Google account that is already attached.
 
 No client secret exists in this flow. The browser is handed a signed
 token and the server checks the signature, so `GOOGLE_CLIENT_ID` is the

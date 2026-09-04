@@ -80,6 +80,10 @@ app.use('/auth/register', rateLimit({ max: 5, windowMs: 60_000 }))
 // Login-grade, and it does real work per request: verifying a Google
 // token can mean fetching Google's public keys. Also the door to
 // creating an umpire account, so it gets register's scrutiny too.
+// Mounted before /auth/google so it keys its own bucket rather than
+// sharing one -- it takes a password, which /auth/google does not, and
+// that makes it a guessing surface in its own right.
+app.use('/auth/google/link', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/auth/google', rateLimit({ max: 10, windowMs: 60_000 }))
 
 // Mistyped player names are the realistic spam vector on an otherwise

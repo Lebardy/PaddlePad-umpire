@@ -164,6 +164,24 @@ export async function loginWithGoogle({ credential, invite }) {
   return data.umpire
 }
 
+/**
+ * Attaches a Google account to an umpire account that already exists.
+ *
+ * For the person whose Google address is not the address they signed up
+ * with -- /auth/google links those automatically, this is the rest.
+ * Their password proves the account here is theirs; Google has already
+ * proved the other half.
+ */
+export async function linkGoogleAccount({ credential, email, password }) {
+  const data = await apiFetch('/auth/google/link', {
+    method: 'POST',
+    auth: false,
+    body: { credential, email, password },
+  })
+  storeSession(data.token, data.umpire)
+  return data.umpire
+}
+
 export async function login({ email, password }) {
   const data = await apiFetch('/auth/login', {
     method: 'POST',

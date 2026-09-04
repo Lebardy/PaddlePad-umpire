@@ -242,6 +242,86 @@ router.post('/google', async (req, res) => {
   }
 })
 
+/**
+ * Connects a Google account to an umpire account that already exists,
+ * proved with that account's own password.
+ *
+ * The gap this closes: /auth/google links automatically when the Google
+ * address matches an umpire's email, which covers most people. It
+ * cannot help someone whose account here is one address and whose
+ * Google account is another -- a work email and a personal Gmail, say.
+ * They would have been asked for an invite they do not need, having
+ * been an umpire all along, and would have gone on typing a password
+ * forever.
+ *
+ * The password is what makes this safe. Google has proved they own the
+ * Google account; the password proves they own the one here. Neither
+ * alone would be enough, and an endpoint that linked on the strength of
+ * a Google sign-in alone would let anyone attach themselves to any
+ * account whose email they could guess.
+ */
+router.post('/google/link', async (req, res) => {
+  let profile
+  try {
+    profile = await verifyGoogleToken(req.body?.credential)
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message })
+    }
+    throw error
+  }
+
+  const email = normalizeEmail(req.body?.email)
+  const password = String(req.body?.password ?? '')
+
+  const { rows } = await query(
+    `SELECT id, email, name, password_hash, google_sub, is_admin
+       FROM umpires WHERE lower(email) = $1`,
+    [email],
+  )
+  const found = rows[0]
+
+  // Same constant-time shape as /auth/login: do the scrypt work in
+  // every branch, because verifyPassword returns instantly on a
+  // malformed hash and a fast "no" would say which accounts exist and
+  // which are Google-only.
+  const ok = found?.password_hash
+    ? await verifyPassword(password, found.password_hash)
+    : await verifyPassword(password, NO_SUCH_ACCOUNT_HASH)
+
+  if (!found || !found.password_hash || !ok) {
+    return res.status(401).json({ error: 'Incorrect email or password' })
+  }
+
+  // Already wearing a different Google account. Silently replacing it
+  // would quietly lock out whoever had been using the old one.
+  if (found.google_sub && found.google_sub !== profile.sub) {
+    return res.status(409).json({
+      error: 'That account is already connected to a different Google account.',
+    })
+  }
+
+  let linked
+  try {
+    ;({ rows: linked } = await query(
+      `UPDATE umpires SET google_sub = $2 WHERE id = $1
+        RETURNING id, email, name, is_admin`,
+      [found.id, profile.sub],
+    ))
+  } catch (error) {
+    // 23505 on umpires_google_sub_idx: this Google account is already
+    // attached to somebody else here.
+    if (error.code === '23505') {
+      return res.status(409).json({
+        error: 'That Google account is already connected to another umpire.',
+      })
+    }
+    throw error
+  }
+
+  res.json({ token: signToken(linked[0]), umpire: linked[0] })
+})
+
 router.post('/login', async (req, res) => {
   const email = normalizeEmail(req.body?.email)
   const password = String(req.body?.password ?? '')

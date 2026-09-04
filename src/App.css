@@ -1726,3 +1726,17 @@ section h3 {
 }
 
 .google-invite .link-btn { align-self: center; margin-top: 0.4rem; }
+
+/* The two ways past an unrecognised Google account: an invite for
+   someone new, or an existing account to attach it to. Boxed so they
+   read as a choice between two, not one long form. */
+.google-choice {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1rem;
+}
+.google-choice h3 { font-size: 0.9rem; margin: 0 0 0.6rem; }
+.google-choice .field-hint { margin: -0.3rem 0 0.7rem; }
+.google-invite { display: flex; flex-direction: column; }
+.google-invite .start-match { margin-top: 0.9rem; }

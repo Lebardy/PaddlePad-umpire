@@ -203,6 +203,16 @@ async function main() {
       (await asPlayer('/auth/login', {
         method: 'POST', body: { email: 'attacker@example.com', password: 'anything' },
       })).status === 401)
+
+    // Linking needs BOTH halves: Google proves one account, the password
+    // proves the other. A bad Google token must fail before the password
+    // is even looked at, or this becomes a password oracle that does not
+    // need a Google account at all.
+    const link = (body) => asPlayer('/auth/google/link', { method: 'POST', body })
+    check('linking with a junk Google token -> 401',
+      (await link({ credential: 'junk', email: 'a@b.c', password: 'x' })).status === 401)
+    check('linking with no credential at all -> 400',
+      (await link({ email: 'a@b.c', password: 'x' })).status === 400)
     }
   }
 

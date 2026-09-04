@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { login, loginWithGoogle, register } from '../lib/api'
+import { login, linkGoogleAccount, loginWithGoogle, register } from '../lib/api'
 import GoogleButton from '../components/GoogleButton'
 
 // Sign-in / sign-up gate shown when no umpire is authenticated.
@@ -60,6 +60,27 @@ function Login({ onSignedIn }) {
     }
   }
 
+  /**
+   * Attaches this Google account to an account they already have,
+   * proved with its password. For the umpire whose Google address is
+   * not the one they signed up with -- matching addresses are linked
+   * automatically and never reach this screen.
+   */
+  async function submitGoogleLink(e) {
+    e.preventDefault()
+    setError(null)
+    setBusy(true)
+    try {
+      onSignedIn(
+        await linkGoogleAccount({ credential: googleCredential, email, password }),
+      )
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   /** Retries the Google sign-in now that an invite has been typed. */
   async function submitGoogleInvite(e) {
     e.preventDefault()
@@ -97,32 +118,84 @@ function Login({ onSignedIn }) {
       {needsInvite ? (
         <>
           <p className="login-note">
-            Almost there. New accounts need an invite code from whoever runs
-            this club — signing in with Google proves who you are, not that
-            you belong here.
+            We don&rsquo;t recognise that Google account yet. Signing in with
+            Google proves who you are, not that you belong to this club.
           </p>
-          <form className="google-invite" onSubmit={submitGoogleInvite}>
-            <label>
-              Invite code
-              <input
-                type="text"
-                placeholder="PAD-7K3M-9QXR"
-                value={invite}
-                onChange={(e) => setInvite(e.target.value)}
-                autoCapitalize="characters"
-                autoCorrect="off"
-                spellCheck={false}
-                required
-              />
-            </label>
-            {error && <p className="form-error">{error}</p>}
-            <button type="submit" className="start-match" disabled={busy || !invite.trim()}>
-              {busy ? 'Checking…' : 'Continue'}
-            </button>
-            <button type="button" className="link-btn" onClick={cancelGoogle}>
-              Use an email and password instead
-            </button>
-          </form>
+
+          {/* Two genuinely different people arrive here. Someone new,
+              who needs an invite, and an existing umpire whose Google
+              address simply is not the one they signed up with --
+              matching addresses are linked automatically and never
+              reach this screen. Offering only the invite would send the
+              second person looking for a code they do not need. */}
+          <section className="google-choice">
+            <h3>I have an invite code</h3>
+            <form className="google-invite" onSubmit={submitGoogleInvite}>
+              <label>
+                Invite code
+                <input
+                  type="text"
+                  placeholder="PAD-7K3M-9QXR"
+                  value={invite}
+                  onChange={(e) => setInvite(e.target.value)}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
+              </label>
+              <button
+                type="submit"
+                className="start-match"
+                disabled={busy || !invite.trim()}
+              >
+                {busy ? 'Checking…' : 'Create my account'}
+              </button>
+            </form>
+          </section>
+
+          <div className="or-divider">
+            <span>or</span>
+          </div>
+
+          <section className="google-choice">
+            <h3>I&rsquo;m already an umpire here</h3>
+            <p className="field-hint">
+              Sign in once with your existing details and this Google account
+              will be attached to them.
+            </p>
+            <form className="google-invite" onSubmit={submitGoogleLink}>
+              <label>
+                Email
+                <input
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </label>
+              <button
+                type="submit"
+                className="start-match"
+                disabled={busy || !email.trim() || !password}
+              >
+                {busy ? 'Linking…' : 'Link my account'}
+              </button>
+            </form>
+          </section>
+
+          {error && <p className="form-error">{error}</p>}
+          <button type="button" className="link-btn" onClick={cancelGoogle}>
+            Start over
+          </button>
         </>
       ) : (
         <>
