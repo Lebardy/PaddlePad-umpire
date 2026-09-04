@@ -179,6 +179,26 @@ CREATE TABLE IF NOT EXISTS sessions (
 -- restoring a session brings back only the matches that were fine,
 -- leaving any individually-voided ones still excluded. A cascade would
 -- quietly un-void those too.
+-- A session that is finished -- the night is over, everyone has gone
+-- home.
+--
+-- Deliberately NOT the same thing as voiding. A voided session is one
+-- that should never have counted and is excluded from the export; an
+-- ended session counted perfectly well and is simply over. Every match
+-- in it stays in the data.
+--
+-- It exists because "is this session still running" was otherwise
+-- unanswerable. Sessions had a name, a creation time and a roster, so
+-- the app could only guess from the clock -- and every umpire sees
+-- every umpire's sessions (see the security notes in README), which
+-- made a list of other people's nights grow without limit and with no
+-- way to tell which were live.
+--
+-- Reversible, because the honest reason to end a session is usually
+-- "we're done" and occasionally people are wrong about that.
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ended_at TIMESTAMPTZ;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ended_by UUID REFERENCES umpires (id) ON DELETE SET NULL;
+
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS voided_at   TIMESTAMPTZ;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS voided_by   UUID REFERENCES umpires (id) ON DELETE SET NULL;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS void_reason TEXT;

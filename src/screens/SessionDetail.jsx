@@ -7,6 +7,7 @@ import {
   deleteSession,
   voidSession,
   unvoidSession,
+  setSessionEnded,
 } from '../lib/storage'
 import PlayerPicker from '../components/PlayerPicker'
 import PlayerCodeCard from '../components/PlayerCodeCard'
@@ -77,6 +78,7 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
   if (!session) return <NotFound what="session" onBack={onBack} />
 
   const finishedCount = matches.filter((m) => m.status === 'completed').length
+  const inProgressCount = matches.filter((m) => m.status === 'in_progress').length
 
   const roster = session.playerIds
     .map((id) => knownPlayers.find((p) => p.id === id))
@@ -89,6 +91,44 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
         &larr; Sessions
       </button>
       <h2>{session.name}</h2>
+
+      {/* Deliberately NOT in the danger zone below. Ending a night is
+          the ordinary way a session finishes, not a destructive act --
+          every match in it still counts. Voiding is the destructive
+          one, and it stays where it is. */}
+      {!session.voidedAt && (
+        <div className="session-state">
+          {session.endedAt ? (
+            <>
+              <span className="session-ended-tag">Ended</span>
+              <button
+                className="link-btn"
+                onClick={() => setSessionEnded(sessionId, false)}
+              >
+                Reopen
+              </button>
+            </>
+          ) : (
+            <button
+              className="link-btn"
+              onClick={() => {
+                if (
+                  inProgressCount > 0 &&
+                  !confirm(
+                    `${inProgressCount} match${inProgressCount === 1 ? ' is' : 'es are'} ` +
+                      'still being scored. End the session anyway?',
+                  )
+                ) {
+                  return
+                }
+                setSessionEnded(sessionId, true)
+              }}
+            >
+              End session
+            </button>
+          )}
+        </div>
+      )}
 
       {sharing && (
         <PlayerCodeCard player={sharing} onClose={() => setSharing(null)} />

@@ -156,6 +156,7 @@ function App() {
               <Home
                 onOpenSession={openSession}
                 onOpenGuide={() => setView({ name: 'guide' })}
+                umpire={umpire}
                 // Only admins can issue invites. Hiding the button is a
                 // convenience, not the control -- the API refuses the
                 // request regardless of what the app shows.

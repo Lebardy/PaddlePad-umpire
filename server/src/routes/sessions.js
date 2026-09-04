@@ -12,6 +12,10 @@ const SESSION_SELECT = `
          s.created_at,
          s.voided_at,
          s.void_reason,
+         s.ended_at,
+         -- Both the id and the name: the app groups by id, because two
+         -- umpires can share a display name, and shows the name.
+         s.created_by,
          u.name AS created_by_name,
          (SELECT count(*)::int FROM session_players sp WHERE sp.session_id = s.id) AS player_count,
          (SELECT count(*)::int FROM matches m WHERE m.session_id = s.id)           AS match_count
@@ -197,6 +201,37 @@ router.post('/:id/void', async (req, res) => {
       WHERE id = $1
       RETURNING id`,
     [req.params.id, voided, req.umpire.id, reason],
+  )
+  if (rows.length === 0) return res.status(404).json({ error: 'No such session' })
+
+  const updated = await query(`${SESSION_SELECT} WHERE s.id = $1`, [req.params.id])
+  res.json({ session: updated.rows[0] })
+})
+
+/**
+ * Ends a session, or reopens one.
+ *
+ * Distinct from voiding, and the two must not be conflated. Voiding
+ * says this should never have counted and pulls it out of the export.
+ * Ending says the night is over: every match in it still counts, and
+ * nothing about the data changes. The only thing it affects is whether
+ * other umpires still see it listed as running.
+ *
+ * Not restricted to the umpire who created it, for the same reason
+ * editing a match is not (see the security notes in README): courts and
+ * phones change hands mid-session, and whoever is still there at the
+ * end is often not whoever started it. `ended_by` records who did it.
+ */
+router.post('/:id/end', async (req, res) => {
+  const ended = req.body?.ended !== false
+
+  const { rows } = await query(
+    `UPDATE sessions
+        SET ended_at = CASE WHEN $2 THEN now() END,
+            ended_by = CASE WHEN $2 THEN $3::uuid END
+      WHERE id = $1
+      RETURNING id`,
+    [req.params.id, ended, req.umpire.id],
   )
   if (rows.length === 0) return res.status(404).json({ error: 'No such session' })
 

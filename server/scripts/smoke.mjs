@@ -196,6 +196,34 @@ async function main() {
   check('roster replace SHRINKS as well as grows', put2.body.playerIds?.length === 2)
   await call(`/sessions/${sessionId}/players`, { method: 'PUT', body: { playerIds: roster } })
 
+  // Ending is not voiding: the night is over, but every match in it
+  // still counts. The two states have to stay independent.
+  const listed = await call('/sessions')
+  const before = (listed.body.sessions ?? []).find((x) => x.id === sessionId)
+  check('a session lists who created it', typeof before?.created_by === 'string',
+    String(before?.created_by))
+  check('and carries its created_by_name for display',
+    typeof before?.created_by_name === 'string', String(before?.created_by_name))
+  check('a fresh session is not ended', before?.ended_at === null,
+    String(before?.ended_at))
+
+  const ended = await call(`/sessions/${sessionId}/end`, { method: 'POST', body: {} })
+  check('end a session -> 200', ended.status === 200, JSON.stringify(ended.body).slice(0, 120))
+  check('ended_at is stamped', Boolean(ended.body.session?.ended_at),
+    String(ended.body.session?.ended_at))
+  check('ending does NOT void it', ended.body.session?.voided_at === null,
+    String(ended.body.session?.voided_at))
+
+  const reopened = await call(`/sessions/${sessionId}/end`, {
+    method: 'POST', body: { ended: false },
+  })
+  check('reopen a session -> 200', reopened.status === 200)
+  check('and ended_at is cleared', reopened.body.session?.ended_at === null,
+    String(reopened.body.session?.ended_at))
+
+  check('ending a session that does not exist -> 404',
+    (await call(`/sessions/${uuid()}/end`, { method: 'POST', body: {} })).status === 404)
+
   section('matches')
   const matchId = uuid()
   const teamA = [roster[0], roster[1]]

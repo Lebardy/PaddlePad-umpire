@@ -356,6 +356,14 @@ export function replaceServerState({
         createdAt: new Date(s.created_at).getTime(),
         voidedAt: s.voided_at ? new Date(s.voided_at).getTime() : null,
         voidReason: s.void_reason ?? null,
+        endedAt: s.ended_at ? new Date(s.ended_at).getTime() : null,
+        // Kept so the home screen can group "yours" from "everyone
+        // else's" and say whose a session is. The server has always sent
+        // these; the local mirror used to drop them, which is why the
+        // app could show you another umpire's session with nothing
+        // saying it was theirs.
+        createdBy: s.created_by ?? null,
+        createdByName: s.created_by_name ?? null,
         playerIds: mine?.playerIds ?? [],
       }
     })
@@ -638,6 +646,24 @@ export function voidSession(sessionId, reason = '') {
   )
   writeJSON(SESSIONS_KEY, updated)
   markDirty('sessionVoid', sessionId)
+  return true
+}
+
+/**
+ * Ends a session, or reopens it.
+ *
+ * Mirrors voidSession exactly -- local write first, then a dirty mark
+ * so the outbox pushes it -- because ending a night is something that
+ * happens courtside, where there is frequently no signal.
+ */
+export function setSessionEnded(sessionId, ended = true) {
+  const session = getSession(sessionId)
+  if (!session) return false
+  const updated = getSessions().map((s) =>
+    s.id === sessionId ? { ...s, endedAt: ended ? Date.now() : null } : s,
+  )
+  writeJSON(SESSIONS_KEY, updated)
+  markDirty('sessionEnd', sessionId)
   return true
 }
 

@@ -9,7 +9,33 @@ import { useSessions } from '../lib/useLocalStore'
 // aggregates a player's stats across every match they've ever played).
 const GUIDE_NUDGE_KEY = 'paddlepad.umpire.guideDismissed'
 
-function Home({ onOpenSession, onOpenInvites, onOpenGuide }) {
+/** One group of sessions. `showOwner` names whose they are. */
+function SessionList({ sessions, onOpenSession, showOwner = false }) {
+  if (sessions.length === 0) return null
+  return (
+    <ul className="session-list">
+      {sessions.map((s) => (
+        <li key={s.id}>
+          <button className="session-item" onClick={() => onOpenSession(s.id)}>
+            <span className="session-name">
+              {s.name}
+              {s.voidedAt && <span className="voided-tag">voided</span>}
+              {s.endedAt && !s.voidedAt && (
+                <span className="ended-tag">ended</span>
+              )}
+            </span>
+            <span className="session-meta">
+              {s.playerIds.length} players
+              {showOwner && s.createdByName ? ` \u00b7 by ${s.createdByName}` : ''}
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function Home({ onOpenSession, onOpenInvites, onOpenGuide, umpire }) {
   // Subscribed rather than read during render: previously this never
   // updated after a write, and only looked correct because navigating
   // away unmounted the screen.
@@ -80,6 +106,15 @@ function Home({ onOpenSession, onOpenInvites, onOpenGuide }) {
     }
   }
 
+  // A session with no createdBy has been made on this device and not yet
+  // reached the server, so it is definitionally this umpire's. Grouped
+  // by id rather than name, because two umpires can share a name.
+  const isMine = (s) => !s.createdBy || s.createdBy === umpire?.id
+  const mine = sessions.filter(isMine)
+  const theirs = sessions.filter(
+    (s) => !isMine(s) && !s.endedAt && !s.voidedAt,
+  )
+
   return (
     <div className="home">
       {/* Shown until it is waved away, and only then. The guide itself
@@ -116,24 +151,23 @@ function Home({ onOpenSession, onOpenInvites, onOpenGuide }) {
         <button type="submit">New Session</button>
       </form>
 
-      <h2>Sessions</h2>
-      {sessions.length === 0 && <p className="empty">No sessions yet.</p>}
-      <ul className="session-list">
-        {sessions.map((s) => (
-          <li key={s.id}>
-            <button
-              className="session-item"
-              onClick={() => onOpenSession(s.id)}
-            >
-              <span className="session-name">
-                {s.name}
-                {s.voidedAt && <span className="voided-tag">voided</span>}
-              </span>
-              <span className="session-meta">{s.playerIds.length} players</span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      <h2>Your sessions</h2>
+      {mine.length === 0 && <p className="empty">No sessions yet.</p>}
+      <SessionList sessions={mine} onOpenSession={onOpenSession} />
+
+      {/* Every umpire account sees the whole club's records -- that is
+          deliberate, because courts and phones change hands mid-session
+          and players must resolve to one identity whoever scored them.
+          What was missing was any way to tell whose was whose, so a
+          session someone else started looked like it had appeared from
+          nowhere. Only the ones still running are listed: a finished
+          night is theirs to look back on, not yours to wade through. */}
+      {theirs.length > 0 && (
+        <>
+          <h2>Still running, other umpires</h2>
+          <SessionList sessions={theirs} onOpenSession={onOpenSession} showOwner />
+        </>
+      )}
 
       {exportError && <p className="form-error">{exportError}</p>}
       <button className="export-btn" onClick={handleExport} disabled={exporting}>

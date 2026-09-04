@@ -321,3 +321,17 @@ export function setSessionVoided(sessionId, { voided, reason }) {
     body: { voided, reason },
   }).then((d) => d.session)
 }
+
+/**
+ * Ends a session, or reopens it.
+ *
+ * Separate from voiding on purpose: voiding says a session should never
+ * have counted, ending says the night is over and every match in it
+ * still counts.
+ */
+export function setSessionEnded(sessionId, { ended = true } = {}) {
+  return apiFetch(`/sessions/${sessionId}/end`, {
+    method: 'POST',
+    body: { ended },
+  }).then((d) => d.session)
+}

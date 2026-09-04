@@ -1654,3 +1654,45 @@ section h3 {
   line-height: 1.55;
   color: var(--text-muted);
 }
+
+/* ============ Session state ============ */
+
+/* "Ended" is not a warning. It reads in the muted colour, unlike
+   .voided-tag which uses --danger, because a finished night is the
+   normal end of a session and a voided one is a mistake being undone. */
+.ended-tag {
+  margin-left: 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.session-state {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: -0.35rem 0 1rem;
+}
+.session-ended-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+}
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.link-btn:hover { text-decoration: underline; }

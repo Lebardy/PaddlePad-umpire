@@ -176,6 +176,23 @@ function Guide({ onBack }) {
         </p>
       </section>
 
+      <section className="guide-section" aria-label="Whose sessions">
+        <h3>Whose sessions you can see</h3>
+        <p>
+          All of them. Every umpire account sees the whole club&rsquo;s
+          records, because courts and phones change hands mid-session and a
+          player has to be the same person whoever scored them. Your own
+          sessions are listed first; below them are the ones other umpires
+          still have running, with their name against each.
+        </p>
+        <p>
+          <strong>End session</strong> when the night is over. That is what
+          takes it off everyone else&rsquo;s list — it is not the same as
+          voiding, and every match in it still counts. Reopen it if you end it
+          too early.
+        </p>
+      </section>
+
       <section className="guide-section" aria-label="Players">
         <h3>Players and their codes</h3>
         <p>

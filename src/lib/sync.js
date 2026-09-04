@@ -133,7 +133,7 @@ function payloadFor(entry) {
     const session = getSession(entry.entityId)
     return session ? { id: session.id, name: session.name } : null
   }
-  if (entry.kind === 'sessionVoid') {
+  if (entry.kind === 'sessionVoid' || entry.kind === 'sessionEnd') {
     return getSession(entry.entityId)
   }
   if (entry.kind === 'roster') {
@@ -182,6 +182,10 @@ async function push(entry, payload) {
       voided: Boolean(payload.voidedAt),
       reason: payload.voidReason ?? '',
     })
+    return
+  }
+  if (entry.kind === 'sessionEnd') {
+    await api.setSessionEnded(payload.id, { ended: Boolean(payload.endedAt) })
     return
   }
   if (entry.kind === 'matchVoid') {
