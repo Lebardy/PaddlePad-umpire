@@ -204,6 +204,9 @@ If you ever recreate it, verify these before trusting it:
 | `POST` | `/auth/player/register` | — | Sign up as a player |
 | `POST` | `/auth/player/login` | — | Sign in as a player, username + password |
 | `POST` | `/auth/player/credentials` | Bearer (player) | Set up sign-in, or change the username or password |
+| `POST` | `/auth/player/google` | — | Sign in a player with Google; a first-time account has to say who it is |
+| `POST` | `/auth/player/google/link` | Bearer (player) | Connect Google to the account you already have |
+| `POST` | `/auth/player/google/unlink` | Bearer (player) | Disconnect it, unless that would leave no way back in |
 | `GET` | `/export/match-logs.csv` | Bearer (umpire) | The club-wide ML export |
 | `GET` | `/player/me` | Bearer (player) | A player's own summary, plus their rating or its gate state |
 | `PATCH` | `/player/me` | Bearer (player) | Rename yourself |
@@ -270,6 +273,38 @@ enough. The Google token is verified **before** the password is looked
 at, so the endpoint cannot be used as a password oracle by someone
 without a Google account, and it refuses rather than silently replacing
 a Google account that is already attached.
+
+**Google for players is not the same endpoint, and could not be.**
+`/auth/google` can attach a Google account to an umpire on sight,
+because umpires have an `email` column holding the address they signed
+up with and a matching address is decent evidence of the same person.
+Players have no such column and never did — there is nothing to send
+them, so an address collected at signup would be a username in disguise.
+Google hands back a display name and an address, and neither is evidence
+about *which row on a club roster* this human is.
+
+So `/auth/player/google` resolves identity the way `/auth/player/register`
+already does, and shares `assertMayLinkTo` with it. A Google account it
+has seen before is signed in on the strength of `google_sub` alone. One
+it has not is answered `403 needsName`, and the app reveals a name field
+prefilled with Google's version; a free name creates a player, and a name
+already on the roster requires the claim code, at which point the account
+picks up every match recorded under it. Matching players on the Google
+*address* instead would hand one person's whole history to whoever turned
+up holding the same address — the identity guard in `schema.sql` running
+backwards.
+
+`google_email` is stored, but only so the settings screen can say which
+Google account is attached. It is never a login key and never matched on.
+
+Two consequences are easy to miss and both are handled. Deleting a
+profile wipes `google_sub` alongside the username, password and claim
+code, or a closed account would sign straight back in with one tap. And
+`POST /player/link` **moves** `google_sub` onto the surviving row, since
+the row it deletes is the one holding it; the same merge now refuses a
+source account that has a Google account attached, for the same reason
+it already refused one with a password — holding someone's claim code is
+not permission to absorb their live account.
 
 No client secret exists in this flow. The browser is handed a signed
 token and the server checks the signature, so `GOOGLE_CLIENT_ID` is the

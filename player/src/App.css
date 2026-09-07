@@ -1052,3 +1052,64 @@ a.highlight:active { background: var(--surface); }
   border-radius: var(--radius-sm);
   margin-top: 0.5rem;
 }
+
+/* ============ Google sign-in ============ */
+
+/* Our own button rather than the one Google renders, for the reasons in
+   components/GoogleButton.jsx: theirs is drawn inside an element we do
+   not control, at a height and corner radius and typeface that are not
+   this app's. Neutral rather than --primary, because this and the panel
+   below it are alternatives and two filled buttons would compete for
+   the same tap. */
+.google-signin { display: block; }
+.google-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.google-btn:hover:not(:disabled) { border-color: var(--primary); }
+.google-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.google-mark { width: 1.15rem; height: 1.15rem; flex: none; }
+.google-unavailable { text-align: center; margin: 0 0 1rem; }
+.google-caption {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 0.45rem 0 0;
+}
+
+/* Google is neither of the two things below it until the server has
+   looked, so it is separated from them rather than stacked on top. */
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.or-divider::before,
+.or-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.gate-cancel { display: block; width: 100%; margin-top: 0.75rem; text-align: center; }
+
+/* Inside a settings row the button is one control among several rather
+   than the headline, so it loses the full-width prominence it has on
+   the way in. */
+.signin-form .google-signin { margin-top: 0.25rem; }

@@ -36,12 +36,17 @@ function profileOf(row) {
     // Null for a player who came in by claim code and has not set up
     // sign-in yet -- the profile screen reads this to offer it.
     username: row.username,
+    // Null unless a Google account is connected. Display only: the
+    // settings screen says which account it is so someone can tell
+    // whether it is still theirs. Never matched on -- see schema.sql.
+    googleEmail: row.google_email,
   }
 }
 
 router.get('/me', async (req, res) => {
   const { rows } = await query(
-    'SELECT id, name, claimed_at, username FROM players WHERE id = $1',
+    `SELECT id, name, claimed_at, username, google_email
+       FROM players WHERE id = $1`,
     [req.player.id],
   )
   if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
@@ -182,10 +187,15 @@ router.delete('/me', async (req, res) => {
       return { status: 200, body: { deleted: true, matches: 0 } }
     }
 
+    // google_sub goes with the rest of it. Leaving it behind would
+    // make "delete my profile" mean "delete every way in except the
+    // one-tap one", and the closed account would sign straight back in.
     await client.query(
       `UPDATE players
           SET username       = NULL,
               password_hash  = NULL,
+              google_sub     = NULL,
+              google_email   = NULL,
               claim_code     = NULL,
               claimed_at     = NULL,
               registered_at  = NULL,
@@ -232,7 +242,8 @@ router.post('/link', async (req, res) => {
     // the same pair would interleave into a half-merge that no single
     // statement could undo.
     const { rows: sources } = await client.query(
-      'SELECT id, name, password_hash FROM players WHERE claim_code = $1 FOR UPDATE',
+      `SELECT id, name, password_hash, google_sub
+         FROM players WHERE claim_code = $1 FOR UPDATE`,
       [code],
     )
     const source = sources[0]
@@ -250,7 +261,12 @@ router.post('/link', async (req, res) => {
     // password, because an umpire re-minting it is the whole
     // forgotten-password path (see schema.sql). Holding one is
     // therefore NOT permission to absorb a real account.
-    if (source.password_hash) {
+    //
+    // google_sub counts as a real account for exactly the same reason a
+    // password does: somebody signs in as this player. Checking only
+    // the password would have left a Google-only account absorbable by
+    // anyone holding its code.
+    if (source.password_hash || source.google_sub) {
       return {
         status: 409,
         body: {
@@ -262,7 +278,8 @@ router.post('/link', async (req, res) => {
     }
 
     const { rows: targets } = await client.query(
-      `SELECT id, name, username, password_hash, registered_at
+      `SELECT id, name, username, password_hash, google_sub, google_email,
+              registered_at
          FROM players WHERE id = $1 FOR UPDATE`,
       [req.player.id],
     )
@@ -390,12 +407,26 @@ router.post('/link', async (req, res) => {
       `UPDATE players
           SET username       = $2,
               password_hash  = $3,
+              google_sub     = $5,
+              google_email   = $6,
               registered_at  = COALESCE(registered_at, $4),
               claimed_at     = COALESCE(claimed_at, now()),
               deactivated_at = NULL
         WHERE id = $1
-        RETURNING id, name, claimed_at, username`,
-      [source.id, target.username, target.password_hash, target.registered_at],
+        RETURNING id, name, claimed_at, username, google_email`,
+      // Google moves across with the username and password because the
+      // row being deleted is the one holding it. The guard above
+      // guarantees the surviving row has none of its own, so nothing is
+      // overwritten. Left behind, it would vanish with the DELETE and
+      // the player's one-tap sign-in would simply stop working.
+      [
+        source.id,
+        target.username,
+        target.password_hash,
+        target.registered_at,
+        target.google_sub,
+        target.google_email,
+      ],
     )
 
     return {

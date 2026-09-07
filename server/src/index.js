@@ -103,6 +103,18 @@ app.use('/auth/player/login', rateLimit({ max: 10, windowMs: 60_000 }))
 // `currentPassword` to authorise a change, which makes it a password-
 // guessing surface even though it needs a valid token to reach.
 app.use('/auth/player/credentials', rateLimit({ max: 10, windowMs: 60_000 }))
+// Register-grade rather than login-grade, because this is the door to
+// CREATING a player account as well as returning to one, and its
+// refusals distinguish a free name from one already on the roster --
+// the same roster-probing surface /auth/player/register has. Verifying
+// a Google token also costs a call out to Google per request.
+//
+// link and unlink are mounted first so they key their own buckets: they
+// take a currentPassword, which makes them password-guessing surfaces
+// that the sign-in endpoint is not.
+app.use('/auth/player/google/link', rateLimit({ max: 10, windowMs: 60_000 }))
+app.use('/auth/player/google/unlink', rateLimit({ max: 10, windowMs: 60_000 }))
+app.use('/auth/player/google', rateLimit({ max: 5, windowMs: 60_000 }))
 // Takes a claim code, so it is a bearer-credential guessing surface and
 // gets the same login-grade limit /auth/player/claim does -- the 60/min
 // below would be far too generous. Mounted first so it keys its own

@@ -19,7 +19,8 @@
 
 import { useState } from 'react'
 import { usePlayerData } from '../lib/PlayerData'
-import { setCredentials, updateProfile } from '../lib/api'
+import { linkGoogle, setCredentials, unlinkGoogle, updateProfile } from '../lib/api'
+import GoogleButton from '../components/GoogleButton'
 import { THEMES, getThemeChoice, setThemeChoice } from '../lib/theme'
 import Avatar from '../components/Avatar'
 import DeleteProfile from './DeleteProfile'
@@ -90,6 +91,126 @@ function EditForm({ onSubmit, canSubmit, label, children }) {
         {busy ? 'Saving…' : label}
       </button>
     </form>
+  )
+}
+
+/**
+ * Connecting Google, and disconnecting it again.
+ *
+ * This is where most Google sign-ins will actually be set up, because
+ * most people arrive by scanning a code courtside and only think about
+ * getting back in days later. Tapping "Continue with Google" on the way
+ * in would not have found them — their record has no Google account
+ * attached until this row attaches one.
+ *
+ * Not an EditForm like its neighbours, because there is nothing to
+ * submit: Google's popup is the submit, and the password field beside
+ * it is a condition of it rather than the thing being saved.
+ *
+ * The password is asked for whenever the account has one, and it is not
+ * bureaucracy. Attaching a stranger's Google account to a phone left
+ * unlocked on this screen would hand them permanent one-tap access
+ * without locking the owner out to notice — worse than a changed
+ * password, not better.
+ */
+function GoogleRow({ player, onPlayerChange, isOpen, onToggle, saved, onSaved }) {
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+
+  const connected = Boolean(player.googleEmail)
+  // Username and password are always set together, here and on the way
+  // in, so one standing in for the other is safe. The server asks again
+  // with needsCurrentPassword if it disagrees.
+  const hasPassword = Boolean(player.username)
+
+  function finish(next) {
+    onPlayerChange(next)
+    setCurrentPassword('')
+    onSaved()
+  }
+
+  async function connect(accessToken) {
+    setBusy(true)
+    setError(null)
+    try {
+      finish(await linkGoogle({ accessToken, currentPassword }))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function disconnect(event) {
+    event.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      finish(await unlinkGoogle({ currentPassword }))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const passwordField = hasPassword && (
+    <>
+      <label htmlFor="you-google-password">Your password</label>
+      <input
+        id="you-google-password"
+        type="password"
+        autoComplete="current-password"
+        value={currentPassword}
+        onChange={(event) => setCurrentPassword(event.target.value)}
+      />
+      <p className="hint">
+        Asked for because this changes how you sign in.
+      </p>
+    </>
+  )
+
+  return (
+    <DetailRow
+      label="Google"
+      value={connected ? player.googleEmail : 'Not connected'}
+      action={connected ? 'Disconnect' : 'Connect'}
+      isOpen={isOpen}
+      saved={saved}
+      onToggle={onToggle}
+    >
+      {connected ? (
+        <form className="signin-form" onSubmit={disconnect}>
+          <p className="hint">
+            You&rsquo;ll sign in with your username and password, or with a
+            code from whoever scores your matches.
+          </p>
+          {passwordField}
+          {error && <p className="error">{error}</p>}
+          <button
+            type="submit"
+            className="danger"
+            disabled={busy || (hasPassword && !currentPassword)}
+          >
+            {busy ? 'Disconnecting…' : 'Disconnect Google'}
+          </button>
+        </form>
+      ) : (
+        <div className="signin-form">
+          {passwordField}
+          <GoogleButton
+            onToken={connect}
+            disabled={busy || (hasPassword && !currentPassword)}
+            label={busy ? 'Connecting…' : 'Connect Google'}
+          />
+          {error && <p className="error">{error}</p>}
+          <p className="hint">
+            One tap to get back in, on any phone, with nothing to remember.
+          </p>
+        </div>
+      )}
+    </DetailRow>
   )
 }
 
@@ -309,6 +430,15 @@ function Details({ player, onPlayerChange }) {
           </EditForm>
         </DetailRow>
       )}
+
+      <GoogleRow
+        player={player}
+        onPlayerChange={onPlayerChange}
+        isOpen={open === 'google'}
+        saved={saved === 'google'}
+        onToggle={() => toggle('google')}
+        onSaved={() => done('google')}
+      />
 
       {!player.username && open !== 'signin' && (
         <p className="detail-note">

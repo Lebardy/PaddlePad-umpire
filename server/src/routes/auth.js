@@ -414,7 +414,7 @@ router.post('/player/claim', async (req, res) => {
         SET claimed_at     = COALESCE(claimed_at, now()),
             deactivated_at = NULL
       WHERE claim_code = $1
-      RETURNING id, name, claimed_at, username`,
+      RETURNING id, name, claimed_at, username, google_email`,
     [code],
   )
 
@@ -423,18 +423,11 @@ router.post('/player/claim', async (req, res) => {
   }
 
   const player = rows[0]
-  res.json({
-    token: signPlayerToken(player),
-    player: {
-      id: player.id,
-      name: player.name,
-      claimedAt: player.claimed_at,
-      // Null unless they have already set up sign-in. Carried so a
-      // registered player recovering with their code is not shown the
-      // prompt to set up something they already have.
-      username: player.username,
-    },
-  })
+  // The payload carries `username`, which is null unless they have
+  // already set up sign-in -- so a registered player recovering with
+  // their code is not shown the prompt to set up something they
+  // already have.
+  res.json({ token: signPlayerToken(player), player: playerPayload(player) })
 })
 
 // ============================================================
@@ -451,6 +444,24 @@ router.post('/player/claim', async (req, res) => {
 // to send, so an address would be a username in disguise -- never
 // verified, never used. See the schema comment on players.username.
 // ============================================================
+
+/**
+ * The player facts the app is given back, whichever door was used.
+ *
+ * `username` is null for someone who came in by code and has not set
+ * up sign-in; `googleEmail` is null unless a Google account is
+ * connected. The settings screen reads both to decide what to offer,
+ * so every response that hands back a player has to carry them.
+ */
+function playerPayload(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    claimedAt: row.claimed_at,
+    username: row.username,
+    googleEmail: row.google_email,
+  }
+}
 
 /**
  * Refuses a registration that would take over someone else's record.
@@ -534,7 +545,7 @@ router.post('/player/register', async (req, res) => {
                               claimed_at, registered_at)
          VALUES ($1, $2, $3, $4, now(), now())
          ON CONFLICT (lower(name)) DO NOTHING
-         RETURNING id, name, claimed_at, username`,
+         RETURNING id, name, claimed_at, username, google_email`,
         [name, username, password_hash, generateInviteCode()],
       )
       if (inserted.rowCount === 1) return inserted.rows[0]
@@ -565,7 +576,7 @@ router.post('/player/register', async (req, res) => {
                 claimed_at     = COALESCE(claimed_at, now()),
                 deactivated_at = NULL
           WHERE id = $1
-          RETURNING id, name, claimed_at, username`,
+          RETURNING id, name, claimed_at, username, google_email`,
         [rows[0].id, username, password_hash],
       )
       return updated.rows[0]
@@ -573,12 +584,7 @@ router.post('/player/register', async (req, res) => {
 
     res.status(201).json({
       token: signPlayerToken(player),
-      player: {
-        id: player.id,
-        name: player.name,
-        claimedAt: player.claimed_at,
-        username: player.username,
-      },
+      player: playerPayload(player),
     })
   } catch (error) {
     if (error.statusCode) {
@@ -606,7 +612,7 @@ router.post('/player/login', async (req, res) => {
   const password = String(req.body?.password ?? '')
 
   const { rows } = await query(
-    `SELECT id, name, claimed_at, username, password_hash
+    `SELECT id, name, claimed_at, username, google_email, password_hash
        FROM players
       WHERE lower(username) = $1`,
     [username],
@@ -625,16 +631,303 @@ router.post('/player/login', async (req, res) => {
     return res.status(401).json({ error: 'Incorrect username or password' })
   }
 
-  res.json({
-    token: signPlayerToken(found),
-    player: {
-      id: found.id,
-      name: found.name,
-      claimedAt: found.claimed_at,
-      username: found.username,
-    },
-  })
+  res.json({ token: signPlayerToken(found), player: playerPayload(found) })
 })
+
+/**
+ * The third way in: Google.
+ *
+ * Everything hard about this is in the FIRST sign-in, and it is worth
+ * being clear about why it cannot be one tap the way the umpire app's
+ * is. /auth/google can attach a Google account to an umpire on sight,
+ * because umpires have an email column holding the address they signed
+ * up with, and a matching address is decent evidence of the same
+ * person. Players have no such column and never did. Google hands us a
+ * display name and an address; neither is evidence about which row on
+ * a club roster this human is.
+ *
+ * So this endpoint resolves identity exactly the way /player/register
+ * does, and shares assertMayLinkTo with it:
+ *
+ *   Google account already known  -> signed in, one tap, forever after.
+ *   Not known, no name given      -> 403 needsName, and the app reveals
+ *                                    a name field prefilled with what
+ *                                    Google calls them.
+ *   Name is free                  -> a new player row is created.
+ *   Name is on the roster         -> the claim code is required, and
+ *                                    the account picks up every match
+ *                                    already recorded under that name.
+ *
+ * Only the first of those is a "sign in". The rest are the same
+ * registration this app already had, wearing a different credential.
+ */
+router.post('/player/google', async (req, res) => {
+  let profile
+  try {
+    profile = await resolveGoogleProfile(req.body ?? {})
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message })
+    }
+    throw error
+  }
+
+  // The returning case. Matched on the sub and nothing else -- see the
+  // schema comment on players.google_sub for why an address must never
+  // be used here.
+  //
+  // The address is refreshed on the way through because people do
+  // change them, and a stale one on the profile screen would name a
+  // Google account that no longer exists. It is display only, so
+  // overwriting it settles nothing about who this is.
+  const linked = await query(
+    `UPDATE players SET google_email = $2
+      WHERE google_sub = $1
+      RETURNING id, name, claimed_at, username, google_email`,
+    [profile.sub, profile.email],
+  )
+  if (linked.rows[0]) {
+    const player = linked.rows[0]
+    return res.json({ token: signPlayerToken(player), player: playerPayload(player) })
+  }
+
+  const name = normalizePlayerName(req.body?.name)
+
+  // Not a dead end, and not an error the app should print raw: it is
+  // the moment the app asks who this is, with Google's own idea of the
+  // answer already typed in. The same shape as needsInvite and
+  // needsCode elsewhere in this file.
+  if (!name) {
+    return res.status(403).json({
+      error: 'Tell us the name your matches are scored under',
+      needsName: true,
+      suggestedName: profile.name ?? '',
+    })
+  }
+
+  const nameError = playerNameError(name)
+  if (nameError) return res.status(400).json({ error: nameError })
+
+  const code = normalizeInviteCode(req.body?.code)
+
+  try {
+    const player = await withTransaction(async (client) => {
+      // Try the new-person case and let the unique index decide, for
+      // the same reason /player/register does: a SELECT first would let
+      // two people registering the same new name at the same instant
+      // both pass the check.
+      const inserted = await client.query(
+        `INSERT INTO players (name, google_sub, google_email, claim_code,
+                              claimed_at, registered_at)
+         VALUES ($1, $2, $3, $4, now(), now())
+         ON CONFLICT (lower(name)) DO NOTHING
+         RETURNING id, name, claimed_at, username, google_email`,
+        [name, profile.sub, profile.email, generateInviteCode()],
+      )
+      if (inserted.rowCount === 1) return inserted.rows[0]
+
+      const { rows } = await client.query(
+        `SELECT id, name, claim_code, password_hash, google_sub
+           FROM players
+          WHERE lower(name) = lower($1)`,
+        [name],
+      )
+      if (!rows[0]) throw refusal(409, 'That name is taken. Try again.')
+
+      // Someone already signs in as this player with a DIFFERENT Google
+      // account. A claim code is not enough to override that: codes
+      // stay valid after an account is set up (see schema.sql), so
+      // holding one is not permission to take over a live account.
+      // assertMayLinkTo says the same thing about a password below.
+      if (rows[0].google_sub) {
+        throw refusal(
+          409,
+          `${rows[0].name} already signs in with Google. If that is you, ` +
+            'use that Google account.',
+        )
+      }
+
+      assertMayLinkTo(rows[0], code)
+
+      // deactivated_at clears for the same reason it does in
+      // /player/claim and /player/register: assertMayLinkTo has just
+      // checked a working claim code, which only exists because an
+      // umpire minted one and handed it over.
+      const updated = await client.query(
+        `UPDATE players
+            SET google_sub     = $2,
+                google_email   = $3,
+                registered_at  = COALESCE(registered_at, now()),
+                claimed_at     = COALESCE(claimed_at, now()),
+                deactivated_at = NULL
+          WHERE id = $1
+          RETURNING id, name, claimed_at, username, google_email`,
+        [rows[0].id, profile.sub, profile.email],
+      )
+      return updated.rows[0]
+    })
+
+    res.status(201).json({
+      token: signPlayerToken(player),
+      player: playerPayload(player),
+    })
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message, ...error.extra })
+    }
+    // Two requests racing with the same Google account and different
+    // new names: the name index let both through, this one did not.
+    if (error.constraint === 'players_google_sub_idx') {
+      return res.status(409).json({
+        error: 'That Google account is already connected to another player',
+      })
+    }
+    throw error
+  }
+})
+
+/**
+ * Connects Google to the account the caller already has.
+ *
+ * This is the path most people will actually take, because most people
+ * arrive by scanning a code courtside and only think about signing in
+ * again days later. Without it they would have to guess that "sign in
+ * with Google" on the gate would find them, and it would not -- their
+ * row has no Google account attached yet.
+ *
+ * currentPassword is required when the account HAS a password, and the
+ * reasoning is /player/credentials' word for word: a phone left
+ * unlocked on the settings screen must not be an account takeover.
+ * Attaching a stranger's Google account here would hand them permanent
+ * one-tap access, which is worse than changing the password, not
+ * better -- the owner would not even be locked out to notice.
+ *
+ * Where there is no password there is nothing to ask for and the token
+ * is the proof, the same rule DELETE /player/me already follows.
+ */
+router.post(
+  '/player/google/link',
+  requirePlayer,
+  requireActivePlayer(query),
+  async (req, res) => {
+    let profile
+    try {
+      profile = await resolveGoogleProfile(req.body ?? {})
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({ error: error.message })
+      }
+      throw error
+    }
+
+    const { rows } = await query(
+      `SELECT id, name, claimed_at, username, password_hash, google_sub
+         FROM players WHERE id = $1`,
+      [req.player.id],
+    )
+    if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
+    const found = rows[0]
+
+    if (found.password_hash) {
+      const currentPassword = String(req.body?.currentPassword ?? '')
+      if (!(await verifyPassword(currentPassword, found.password_hash))) {
+        return res.status(403).json({
+          error: 'Enter your password to connect a Google account',
+          needsCurrentPassword: true,
+        })
+      }
+    }
+
+    // Already wearing a different Google account. Replacing it silently
+    // would quietly cut off whoever had been signing in with the old
+    // one -- /auth/google/link refuses this for umpires for the same
+    // reason.
+    if (found.google_sub && found.google_sub !== profile.sub) {
+      return res.status(409).json({
+        error: 'This account is already connected to a different Google account.',
+      })
+    }
+
+    let updated
+    try {
+      ;({ rows: updated } = await query(
+        `UPDATE players
+            SET google_sub    = $2,
+                google_email  = $3,
+                registered_at = COALESCE(registered_at, now())
+          WHERE id = $1
+          RETURNING id, name, claimed_at, username, google_email`,
+        [found.id, profile.sub, profile.email],
+      ))
+    } catch (error) {
+      if (error.constraint === 'players_google_sub_idx') {
+        return res.status(409).json({
+          error: 'That Google account is already connected to another player.',
+        })
+      }
+      throw error
+    }
+
+    res.json({ player: playerPayload(updated[0]) })
+  },
+)
+
+/**
+ * Disconnects Google.
+ *
+ * Refused when it would leave no way back in. An account whose only
+ * credential is Google, and whose claim code has been wiped by a
+ * previous deletion, would be unreachable the moment this succeeded --
+ * there is no email here and so no reset link, and the honest answer is
+ * to say so rather than to strand someone politely.
+ *
+ * A claim code IS enough to allow it: an umpire re-minting one is this
+ * app's whole recovery path, and unlike a reset email it has a trusted
+ * human in the loop.
+ */
+router.post(
+  '/player/google/unlink',
+  requirePlayer,
+  requireActivePlayer(query),
+  async (req, res) => {
+    const { rows } = await query(
+      `SELECT id, name, claimed_at, username, password_hash, claim_code, google_sub
+         FROM players WHERE id = $1`,
+      [req.player.id],
+    )
+    if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
+    const found = rows[0]
+
+    if (!found.google_sub) {
+      return res.status(409).json({ error: 'No Google account is connected' })
+    }
+
+    if (found.password_hash) {
+      const currentPassword = String(req.body?.currentPassword ?? '')
+      if (!(await verifyPassword(currentPassword, found.password_hash))) {
+        return res.status(403).json({
+          error: 'Enter your password to disconnect Google',
+          needsCurrentPassword: true,
+        })
+      }
+    } else if (!found.claim_code) {
+      return res.status(409).json({
+        error:
+          'Google is the only way into this account. Set up a username and ' +
+          'password first, or ask whoever scores your matches for a code.',
+      })
+    }
+
+    const { rows: updated } = await query(
+      `UPDATE players SET google_sub = NULL, google_email = NULL
+        WHERE id = $1
+        RETURNING id, name, claimed_at, username, google_email`,
+      [found.id],
+    )
+
+    res.json({ player: playerPayload(updated[0]) })
+  },
+)
 
 /**
  * Sets up sign-in, or changes it afterwards.
@@ -738,20 +1031,12 @@ router.post(
 /** Confirms a stored player token is still good, on app launch. */
 router.get('/player/me', requirePlayer, requireActivePlayer(query), async (req, res) => {
   const { rows } = await query(
-    'SELECT id, name, claimed_at, username FROM players WHERE id = $1',
+    `SELECT id, name, claimed_at, username, google_email
+       FROM players WHERE id = $1`,
     [req.player.id],
   )
   if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
-  // `username` is null for a player who came in by code and has not set
-  // one up. The app reads that to decide whether to offer the prompt.
-  res.json({
-    player: {
-      id: rows[0].id,
-      name: rows[0].name,
-      claimedAt: rows[0].claimed_at,
-      username: rows[0].username,
-    },
-  })
+  res.json({ player: playerPayload(rows[0]) })
 })
 
 export default router

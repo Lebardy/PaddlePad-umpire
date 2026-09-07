@@ -13,6 +13,12 @@
 //   Create    — you have not, and nobody has scored you yet either.
 //   Have a code — an umpire just handed you one. Fastest path by far.
 //
+// Google sits ABOVE all three rather than inside one of them, and that
+// placement is the whole argument: it is neither signing in nor
+// creating an account until the server has looked, and burying it in
+// one tab would make the other tab's users think it was not for them.
+// The umpire app's login screen was rearranged for exactly this reason.
+//
 // The code panel is opened DIRECTLY when the URL is /claim/CODE, so a
 // QR still lands one tap from being signed in. Making a scanned QR
 // arrive on a tab strip and wait to be told what it was for would be a
@@ -21,7 +27,8 @@
 
 import { useState } from 'react'
 import Claim from './Claim'
-import { loginPlayer, registerPlayer } from '../lib/api'
+import GoogleButton from '../components/GoogleButton'
+import { googleSignIn, loginPlayer, registerPlayer } from '../lib/api'
 import { claimCodeFromUrl } from '../lib/router'
 import { suggestUsername } from '../lib/username'
 
@@ -202,14 +209,150 @@ function CreatePanel({ onSignedIn }) {
   )
 }
 
+/**
+ * Where a Google account nobody recognises has to say who it is.
+ *
+ * Google has proved an account exists and that this person owns it. It
+ * has not said anything about which player on a club roster they are,
+ * and it cannot: the only name it knows is the one on their Google
+ * profile, which may be nothing like the name an umpire writes on a
+ * scoresheet. So this asks, with Google's version already filled in as
+ * a starting point.
+ *
+ * The code field appears only if the server says the name is taken.
+ * That refusal is really a question — "prove it's you and take your
+ * matches with you" — and is the same one CreatePanel handles.
+ */
+function GooglePending({ pending, onSignedIn, onCancel }) {
+  const [name, setName] = useState(pending.suggestedName)
+  const [code, setCode] = useState('')
+  const [needsCode, setNeedsCode] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      // The same access token as the first attempt. Google's are good
+      // for an hour, so there is no need to send anyone back through
+      // the popup to answer a question about their own name.
+      onSignedIn(await googleSignIn({ accessToken: pending.accessToken, name, code }))
+    } catch (err) {
+      setError(err.message)
+      if (err.details?.needsCode) setNeedsCode(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <label htmlFor="google-name">Your name</label>
+      <input
+        id="google-name"
+        type="text"
+        autoComplete="name"
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        required
+      />
+      <p className="hint">
+        The name an umpire would write on the scoresheet, so your matches
+        find you. Change it if Google&rsquo;s version isn&rsquo;t what they
+        call you.
+      </p>
+
+      {needsCode && (
+        <>
+          <label htmlFor="google-code">Your code</label>
+          <input
+            id="google-code"
+            className="code-input"
+            type="text"
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+            placeholder="PAD-7K3M-9QXR"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            required
+          />
+          <p className="hint">
+            Someone is already playing under that name, so we need to know
+            it&rsquo;s you. Whoever scores your matches can show you a code —
+            your matches so far will come with the account.
+          </p>
+        </>
+      )}
+
+      {error && <p className="error">{error}</p>}
+
+      <button type="submit" disabled={busy || !name.trim()}>
+        {busy ? 'Finishing…' : 'Finish signing in'}
+      </button>
+
+      <button type="button" className="link gate-cancel" onClick={onCancel}>
+        Use something else instead
+      </button>
+    </form>
+  )
+}
+
 function SignIn({ onSignedIn }) {
   // A scanned QR goes straight to the code panel with the field filled.
   const [tab, setTab] = useState(() => (claimCodeFromUrl() ? 'code' : 'signin'))
+  // Set only when Google has answered and the server did not recognise
+  // the account. Holding the token here rather than in GooglePending
+  // keeps it alive across that form's re-renders.
+  const [pending, setPending] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function handleGoogle(accessToken) {
+    setBusy(true)
+    setError(null)
+    try {
+      onSignedIn(await googleSignIn({ accessToken }))
+    } catch (err) {
+      // Not a failure: the server has never seen this Google account and
+      // is asking who it belongs to.
+      if (err.details?.needsName) {
+        setPending({ accessToken, suggestedName: err.details.suggestedName ?? '' })
+      } else {
+        setError(err.message)
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (pending) {
+    return (
+      <div className="gate">
+        <h1>Almost there</h1>
+        <p className="lede">
+          Google knows who you are. We still need to know which player that
+          is.
+        </p>
+        <GooglePending
+          pending={pending}
+          onSignedIn={onSignedIn}
+          onCancel={() => setPending(null)}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="gate">
       <h1>PaddlePad</h1>
       <p className="lede">See the matches your umpire has been recording for you.</p>
+
+      <GoogleButton onToken={handleGoogle} disabled={busy} />
+      {error && <p className="error">{error}</p>}
+      <div className="or-divider">or</div>
 
       <div className="gate-tabs" role="tablist" aria-label="How to get in">
         {TABS.map((entry) => (

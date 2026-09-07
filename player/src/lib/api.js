@@ -143,11 +143,12 @@ async function apiFetch(path, { method = 'GET', body, auth = true, signal } = {}
 // ============================================================
 // Getting in
 //
-// Two ways, both meant to exist. The claim code is the fast one -- an
+// Three ways, all meant to exist. The claim code is the fast one -- an
 // umpire hands over a QR and there is nothing to fill in. A username and
 // password is the durable one, surviving a lost code and a new phone.
+// Google is the one with nothing to remember at all.
 //
-// All three land in the same place: a token and a player, stored the
+// All of them land in the same place: a token and a player, stored the
 // same way, so nothing downstream knows or cares which door was used.
 // ============================================================
 
@@ -171,6 +172,26 @@ export async function registerPlayer({ name, username, password, code }) {
     method: 'POST',
     auth: false,
     body: { name, username, password, code: code || undefined },
+  })
+  storeSession(data.token, data.player)
+  return data.player
+}
+
+/**
+ * Signs in with Google.
+ *
+ * `name` and `code` are absent on the first call and that is the normal
+ * case, not a mistake. The server answers a Google account it has never
+ * seen with `needsName` -- Google proves an ACCOUNT, never which player
+ * on a club roster this is -- and the screen calls this again with the
+ * name typed in, and once more with a claim code if that name turns out
+ * to be on the roster already.
+ */
+export async function googleSignIn({ accessToken, name, code }) {
+  const data = await apiFetch('/auth/player/google', {
+    method: 'POST',
+    auth: false,
+    body: { accessToken, name: name || undefined, code: code || undefined },
   })
   storeSession(data.token, data.player)
   return data.player
@@ -228,6 +249,32 @@ export async function setCredentials({ username, password, currentPassword }) {
     body,
   })
   return patchStoredPlayer({ username: data.username })
+}
+
+/**
+ * Connects Google to the account already signed in.
+ *
+ * The path most people will take, because most people arrive by
+ * scanning a code and only think about getting back in days later.
+ * `currentPassword` is wanted only by accounts that have a password;
+ * the server asks for it with `needsCurrentPassword` rather than the
+ * screen guessing.
+ */
+export async function linkGoogle({ accessToken, currentPassword }) {
+  const body = { accessToken }
+  if (currentPassword) body.currentPassword = currentPassword
+
+  const data = await apiFetch('/auth/player/google/link', { method: 'POST', body })
+  return patchStoredPlayer(data.player)
+}
+
+/** Disconnects it again. Refused if it would leave no way back in. */
+export async function unlinkGoogle({ currentPassword } = {}) {
+  const body = {}
+  if (currentPassword) body.currentPassword = currentPassword
+
+  const data = await apiFetch('/auth/player/google/unlink', { method: 'POST', body })
+  return patchStoredPlayer(data.player)
 }
 
 /** Renames the player. The umpire's roster shows the new name too. */

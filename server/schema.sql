@@ -133,10 +133,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS players_claim_code_idx
 -- records -- which is exactly what players_name_lower_idx exists to
 -- prevent.
 --
--- There is deliberately NO email column. Nothing in this app has
--- anything to send, so an address would be a username in disguise:
--- never verified, never used, and inviting the question of why it was
--- collected. Add one when something actually needs sending.
+-- There is still no email column that this app ASKS anyone for.
+-- Nothing here has anything to send, so an address typed into a signup
+-- form would be a username in disguise: never verified, never used,
+-- and inviting the question of why it was collected.
+--
+-- google_email further down is not that, and does not reopen it. It is
+-- a label Google hands back with a sign-in, kept so the profile screen
+-- can say WHICH Google account is attached -- "signed in as
+-- maria@gmail.com, not you?" -- which is otherwise unanswerable. It is
+-- never a login key and never matched against.
 --
 -- SECURITY: the claim code KEEPS WORKING after a password is set. That
 -- is deliberate, not an oversight. With no email there is no reset
@@ -155,6 +161,42 @@ ALTER TABLE players ADD COLUMN IF NOT EXISTS registered_at TIMESTAMPTZ;
 -- able to become two accounts.
 CREATE UNIQUE INDEX IF NOT EXISTS players_username_lower_idx
     ON players (lower(username)) WHERE username IS NOT NULL;
+
+-- ============================================================
+-- The third way in: Google
+--
+-- google_sub is the account identifier Google issues. It is stable for
+-- the life of that Google account, is never the email address (which a
+-- person can change), and is the ONLY thing a Google sign-in is
+-- matched on here.
+--
+-- Why this is not simply what /auth/google does for umpires: an umpire
+-- HAS an email column, and it is the address they signed up with, so a
+-- Google account whose address matches can be attached to it on sight.
+-- A player has no such address. There is nothing to match, and nothing
+-- is attempted -- an unrecognised Google account is asked for a name,
+-- and if that name is already on the roster it is asked for a claim
+-- code, exactly as /auth/player/register is.
+--
+-- Matching a player on a Google address instead would hand one
+-- person's whole history to whoever turned up holding the same address
+-- -- the identity guard at the top of this file running backwards.
+--
+-- SECURITY: deleting a profile must wipe BOTH columns along with the
+-- username, password and claim code, or a closed account still signs
+-- back in with one tap. routes/player.js DELETE /me does. The merge in
+-- POST /player/link must MOVE them onto the surviving row for the same
+-- reason it moves the username -- the row it deletes is the one
+-- holding them.
+-- ============================================================
+
+ALTER TABLE players ADD COLUMN IF NOT EXISTS google_sub   TEXT;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS google_email TEXT;
+
+-- Partial for the same reason the username index is: the overwhelming
+-- majority of players are created by an umpire and never sign in at all.
+CREATE UNIQUE INDEX IF NOT EXISTS players_google_sub_idx
+    ON players (google_sub) WHERE google_sub IS NOT NULL;
 
 -- A player who deleted their profile.
 --
