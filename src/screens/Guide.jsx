@@ -7,6 +7,13 @@
 // record or when to tap which, and a match setup asking about stacking
 // and first server as bare labels.
 //
+// This is the long version. The short one now sits on the scoring
+// screen itself: the same 2x2 of won/lost against dink/not, built from
+// the same list in lib/outcomes.js, so an umpire who is unsure
+// mid-rally does not have to leave the match to find out. What is here
+// and not there is everything that is not urgent -- how a night runs,
+// fixing mistakes, signal, codes.
+//
 // Reachable from the header at any time, not shown once and lost. Most
 // of what is here is needed on the second night as much as the first,
 // and someone who dismissed a tour has no way back to it.
@@ -19,6 +26,9 @@
 // description of scoring. If the buttons in LiveMatch or the fields in
 // MatchSetup change, this has to change with them.
 // ============================================================
+
+import { Fragment } from 'react'
+import { OUTCOMES, RALLY_RULE, outcomeFor } from '../lib/outcomes'
 
 const STEPS = [
   {
@@ -39,33 +49,14 @@ const STEPS = [
   },
 ]
 
-const OUTCOMES = [
-  {
-    label: 'Clean Winner',
-    body: 'They ended the rally with a shot away from the net.',
-  },
-  {
-    label: 'Dink Winner',
-    body: 'They ended it with a soft shot at the net.',
-  },
-  {
-    label: 'Unforced Error',
-    body: 'They ended it themselves — out, or into the net — away from the net.',
-  },
-  {
-    label: 'Dink Error',
-    body: 'The same, but on a dink at the net.',
-  },
-]
-
 const TERMS = [
   {
     term: 'Dink or clean',
-    body: 'Dink means the soft game at the net. Clean means everything else. It is about where the shot was played, not how good it was.',
+    body: 'A dink is a soft shot at the net. Clean means every other shot. It is about where the shot was played, not how good it was.',
   },
   {
     term: 'Third shot',
-    body: 'Only the serving side gets these buttons, and only they can play a third shot. Drop ✓ if the drop landed, Drop ✗ if it did not, Drive if they drove instead. It is recorded separately from how the rally ended, so a rally can have both.',
+    body: 'Only the serving side gets these buttons, and only for their third shot of the rally. Drop ✓ it landed soft at the net, Drop ✗ they tried and missed it, Drive they hit it hard instead. It is recorded separately from how the rally ended, so one rally can have both.',
   },
   {
     term: 'Stacking',
@@ -111,15 +102,32 @@ function Guide({ onBack }) {
 
       <section className="guide-section" aria-label="The four buttons">
         <h3>The four buttons</h3>
-        <p>
-          Every player has these. Tap the one under the player who hit the shot
-          that <em>ended</em> the rally — whether they won it or lost it.
-        </p>
+        <p>{RALLY_RULE}</p>
+        <div className="rally-legend-grid guide-legend-grid">
+          <span />
+          <span className="rally-legend-head">Won the rally</span>
+          <span className="rally-legend-head">Lost the rally</span>
+          {[true, false].map((dink) => (
+            <Fragment key={String(dink)}>
+              <span className="rally-legend-row">
+                {dink ? 'Soft shot at the net' : 'Any other shot'}
+              </span>
+              {[true, false].map((won) => (
+                <span
+                  key={String(won)}
+                  className={`rally-legend-cell ${won ? 'winner' : 'error'}`}
+                >
+                  {outcomeFor(won, dink).label}
+                </span>
+              ))}
+            </Fragment>
+          ))}
+        </div>
         <dl className="guide-terms">
           {OUTCOMES.map((o) => (
             <div key={o.label}>
               <dt>{o.label}</dt>
-              <dd>{o.body}</dd>
+              <dd>{o.help}</dd>
             </div>
           ))}
         </dl>

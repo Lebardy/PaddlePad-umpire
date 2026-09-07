@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import {
   addRallyEvent,
   addThirdShotEvent,
@@ -14,21 +14,76 @@ import TakeoverNotice from '../components/TakeoverNotice'
 import * as sync from '../lib/sync'
 import { getDeviceId } from '../lib/outbox'
 import { deriveMatchState, currentServerPlayerId } from '../lib/pickleball'
+import { OUTCOMES, RALLY_RULE, THIRD_SHOT_RULE, outcomeFor } from '../lib/outcomes'
 
-// The four rally-ending outcomes an umpire can tap, and the exact
-// (outcome, zone) pair addRallyEvent needs to file each into the right
-// ML stat bucket -- see deriveMatchState in pickleball.js.
 // How often a device that is only WATCHING a match re-reads it. Slow
 // enough to be negligible, fast enough that a watcher isn't looking at
 // a score several rallies out of date.
 const WATCH_POLL_MS = 8_000
 
-const OUTCOMES = [
-  { outcome: 'winner', zone: 'open', label: 'Clean Winner' },
-  { outcome: 'winner', zone: 'dink', label: 'Dink Winner' },
-  { outcome: 'error', zone: 'open', label: 'Unforced Error' },
-  { outcome: 'error', zone: 'dink', label: 'Dink Error' },
-]
+// Remembered so the legend is open for someone's first night and out
+// of the way by their tenth -- the same bargain as the guide nudge on
+// the home screen.
+const LEGEND_KEY = 'paddlepad.umpire.legendCollapsed'
+
+function readLegendCollapsed() {
+  try {
+    return localStorage.getItem(LEGEND_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+// The four buttons as the 2x2 they actually are: won or lost the
+// rally, crossed with dink or not. Built from the shared list so it
+// cannot describe buttons the screen no longer has.
+function RallyLegend() {
+  const [collapsed, setCollapsed] = useState(readLegendCollapsed)
+
+  function toggle() {
+    const next = !collapsed
+    setCollapsed(next)
+    try {
+      localStorage.setItem(LEGEND_KEY, next ? '1' : '0')
+    } catch {
+      // A phone with storage blocked still scores matches; it just
+      // gets the legend open again next time.
+    }
+  }
+
+  return (
+    <section className="rally-legend-wrap">
+      <button className="collapsible-toggle" onClick={toggle}>
+        {collapsed ? '\u25b8' : '\u25be'} What do these mean?
+      </button>
+      {!collapsed && (
+        <div className="rally-legend">
+          <p className="rally-legend-rule">{RALLY_RULE}</p>
+          <div className="rally-legend-grid">
+            <span />
+            <span className="rally-legend-head">Won the rally</span>
+            <span className="rally-legend-head">Lost the rally</span>
+            {[true, false].map((dink) => (
+              <Fragment key={String(dink)}>
+                <span className="rally-legend-row">
+                  {dink ? 'Soft shot at the net' : 'Any other shot'}
+                </span>
+                {[true, false].map((won) => (
+                  <span
+                    key={String(won)}
+                    className={`rally-legend-cell ${won ? 'winner' : 'error'}`}
+                  >
+                    {outcomeFor(won, dink).label}
+                  </span>
+                ))}
+              </Fragment>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
 
 // Turns one logged event into the plain-English line shown in the
 // history panel, so an umpire can glance back and confirm what was
@@ -216,6 +271,8 @@ function LiveMatch({ matchId, onBack }) {
             </button>
           </div>
 
+          <RallyLegend />
+
           <section className="rally-log">
             <div className="rally-grid">
               {players.map((id) => (
@@ -240,6 +297,7 @@ function LiveMatch({ matchId, onBack }) {
           {/* Only the serving team ever hits the 3rd shot of a rally. */}
           <section className="third-shot-log">
             <h3>3rd shot (optional)</h3>
+            <p className="third-shot-rule">{THIRD_SHOT_RULE}</p>
             <div className="rally-grid">
               {servingTeamPlayers.map((id) => (
                 <div className="player-panel" key={id}>

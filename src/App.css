@@ -900,6 +900,82 @@ section h3 {
   background: var(--accent-soft);
 }
 
+/* The courtside legend. The guide is two taps and a screen away, so
+   the one thing an umpire actually asks mid-rally -- which of these
+   four -- is answered above the buttons themselves. Same panel
+   treatment as .player-panel so it reads as part of the scoring area
+   rather than a banner pasted over it. */
+
+.rally-legend-wrap { margin-bottom: 0.5rem; }
+
+.rally-legend {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.rally-legend-rule {
+  margin: 0 0 0.7rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* Row label plus the two outcome columns. The cells carry button
+   names only -- never sentences -- so this survives a 390px phone
+   without wrapping into a wall. */
+.rally-legend-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.35rem;
+  align-items: stretch;
+}
+
+.rally-legend-head,
+.rally-legend-row {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  align-self: center;
+}
+
+.rally-legend-head { text-align: center; }
+
+.rally-legend-cell {
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.3rem;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+/* Deliberately the same tints as .outcome-btn.winner / .error below,
+   so a cell and the button it names are the same colour. */
+.rally-legend-cell.winner {
+  color: var(--primary);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary);
+}
+
+.rally-legend-cell.error {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger);
+}
+
+/* Same grid in the guide, which has no surrounding panel of its own. */
+.guide-legend-grid { margin: 0 0 0.9rem; }
+
+.third-shot-rule {
+  margin: 0 0 0.2rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
 /* Collapsible sections (3rd shot, history) -- kept out of the way by
    default so they never compete for space with the rally panels. */
 
