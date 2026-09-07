@@ -46,22 +46,32 @@
    made this app look like it had none. */
 .gate-tabs {
   display: flex;
-  gap: 0.2rem;
-  padding: 0.25rem;
+  gap: 0.3rem;
+  padding: 0.3rem;
   margin-bottom: 1.5rem;
   background: var(--surface-sunken);
   border-radius: var(--radius-sm);
 }
+/* Three labels sharing one row, and the longest of them is "Create
+   account". On a 360px phone each pill gets about 96px, which 0.8rem
+   semibold very nearly fills -- so the text pressed against the pill
+   edges and, at the narrow end, wrapped onto two lines and made the
+   whole strip taller than the fields below it.
+   The size now scales with the viewport instead of being fixed, and
+   nowrap makes a wrap impossible rather than unlikely, so the padding
+   below is real breathing room at every width. */
 .gate-tab {
   flex: 1;
-  padding: 0.55rem 0.25rem;
+  min-width: 0;
+  padding: 0.6rem 0.4rem;
   border: 1px solid transparent;
   border-radius: calc(var(--radius-sm) - 0.2rem);
   background: none;
   color: var(--text-muted);
   font: inherit;
-  font-size: 0.8rem;
+  font-size: clamp(0.72rem, 3vw, 0.82rem);
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
 }
 .gate-tab[aria-selected='true'] {
