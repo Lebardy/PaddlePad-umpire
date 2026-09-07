@@ -80,9 +80,13 @@ app.use('/auth/register', rateLimit({ max: 5, windowMs: 60_000 }))
 // Login-grade, and it does real work per request: verifying a Google
 // token can mean fetching Google's public keys. Also the door to
 // creating an umpire account, so it gets register's scrutiny too.
-// Mounted before /auth/google so it keys its own bucket rather than
-// sharing one -- it takes a password, which /auth/google does not, and
-// that makes it a guessing surface in its own right.
+//
+// A NESTED path runs both limiters, not one. app.use('/auth/google')
+// matches /auth/google/link as well, so a request there is counted in
+// its own bucket AND in the parent's, and the effective cap is the
+// tighter of the two. That is safe -- never looser than intended -- but
+// it means the parent's number is a ceiling on every path beneath it,
+// which is easy to forget when raising or lowering either one.
 app.use('/auth/google/link', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/auth/google', rateLimit({ max: 10, windowMs: 60_000 }))
 
@@ -103,18 +107,22 @@ app.use('/auth/player/login', rateLimit({ max: 10, windowMs: 60_000 }))
 // `currentPassword` to authorise a change, which makes it a password-
 // guessing surface even though it needs a valid token to reach.
 app.use('/auth/player/credentials', rateLimit({ max: 10, windowMs: 60_000 }))
-// Register-grade rather than login-grade, because this is the door to
-// CREATING a player account as well as returning to one, and its
-// refusals distinguish a free name from one already on the roster --
-// the same roster-probing surface /auth/player/register has. Verifying
-// a Google token also costs a call out to Google per request.
+// Login-grade rather than register-grade, even though this endpoint can
+// create a player account and its refusals distinguish a free name from
+// one already on the roster -- the same roster-probing surface
+// /auth/player/register has at 5/min. The difference is the cost of an
+// attempt: every request here has to carry a Google token that Google
+// itself will vouch for, where /auth/player/register needs nothing at
+// all.
 //
-// link and unlink are mounted first so they key their own buckets: they
-// take a currentPassword, which makes them password-guessing surfaces
-// that the sign-in endpoint is not.
+// It was 5, and that was wrong for a second reason. Per the note above,
+// a request to .../google/link is counted in the parent bucket too, so
+// 5 here would have been the real ceiling on connecting Google as well
+// as on signing in with it -- and a club sharing one wifi address
+// shares one bucket.
 app.use('/auth/player/google/link', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/auth/player/google/unlink', rateLimit({ max: 10, windowMs: 60_000 }))
-app.use('/auth/player/google', rateLimit({ max: 5, windowMs: 60_000 }))
+app.use('/auth/player/google', rateLimit({ max: 10, windowMs: 60_000 }))
 // Takes a claim code, so it is a bearer-credential guessing surface and
 // gets the same login-grade limit /auth/player/claim does -- the 60/min
 // below would be far too generous. Mounted first so it keys its own
