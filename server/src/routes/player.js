@@ -110,7 +110,7 @@ router.patch('/me', async (req, res) => {
     ;({ rows } = await query(
       `UPDATE players SET name = $2
         WHERE id = $1
-        RETURNING id, name, claimed_at, username`,
+        RETURNING id, name, claimed_at, username, google_email`,
       [req.player.id, name],
     ))
   } catch (err) {
