@@ -302,7 +302,8 @@ function GooglePending({ pending, onSignedIn, onCancel }) {
 
 function SignIn({ onSignedIn }) {
   // A scanned QR goes straight to the code panel with the field filled.
-  const [tab, setTab] = useState(() => (claimCodeFromUrl() ? 'code' : 'signin'))
+  const [scanned] = useState(() => Boolean(claimCodeFromUrl()))
+  const [tab, setTab] = useState(() => (scanned ? 'code' : 'signin'))
   // Set only when Google has answered and the server did not recognise
   // the account. Holding the token here rather than in GooglePending
   // keeps it alive across that form's re-renders.
@@ -350,9 +351,17 @@ function SignIn({ onSignedIn }) {
       <h1>PaddlePad</h1>
       <p className="lede">See the matches your umpire has been recording for you.</p>
 
-      <GoogleButton onToken={handleGoogle} disabled={busy} />
-      {error && <p className="error">{error}</p>}
-      <div className="or-divider">or</div>
+      {/* Withheld from someone who has just scanned a QR. They are one
+          tap from being signed in with the code already in the field
+          below, and offering a different way in above it would be the
+          exact regression this screen was built to avoid. */}
+      {!scanned && (
+        <>
+          <GoogleButton onToken={handleGoogle} disabled={busy} />
+          {error && <p className="error">{error}</p>}
+          <div className="or-divider">or</div>
+        </>
+      )}
 
       <div className="gate-tabs" role="tablist" aria-label="How to get in">
         {TABS.map((entry) => (
