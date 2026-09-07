@@ -15,6 +15,7 @@ import { matchPath, navigate, restoreScroll, useRoute } from './lib/router'
 import { clearSession, getStoredPlayer, verifySession } from './lib/api'
 import { SetupCard, SetupPrompt } from './components/SetupSignIn'
 import { applyTheme, getThemeChoice, watchSystemTheme } from './lib/theme'
+import { canReturnUnaided } from './lib/account'
 import LinkCode from './screens/LinkCode'
 import { useState } from 'react'
 import './App.css'
@@ -140,7 +141,7 @@ function EmptyStateScreen({ player, onSignOut, onPlayerChange }) {
           is meaningless to them -- what they lack is a way back in.
           Someone with an account and an empty page is being told why it
           is empty. */}
-      {player.username ? (
+      {canReturnUnaided(player) ? (
         <LinkCode onPlayerChange={onPlayerChange} />
       ) : (
         <SetupCard player={player} onPlayerChange={onPlayerChange} />
@@ -204,10 +205,10 @@ function App() {
 
   function handleSignOut() {
     // Only worth asking about when getting back in is genuinely hard.
-    // Someone who has set up a username and password can sign in again
-    // themselves; someone who came in by code has to find an umpire, so
-    // they get warned first.
-    const warning = player?.username
+    // Someone with a password, or with Google connected, can sign in
+    // again themselves; someone who came in by code has to find an
+    // umpire, so they get warned first.
+    const warning = canReturnUnaided(player)
       ? null
       : 'Sign out? You’ll need your code again to get back in.'
     if (warning && !confirm(warning)) return

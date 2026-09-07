@@ -25,6 +25,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { dismissSetup, isSetupDismissed, setCredentials } from '../lib/api'
 import { suggestUsername } from '../lib/username'
+import { canReturnUnaided } from '../lib/account'
 
 /**
  * The fields themselves, shared by the pop-up and the card so the two
@@ -109,7 +110,7 @@ export function SetupPrompt({ player, onPlayerChange }) {
   const ref = useRef(null)
   // Read once on mount. Reading it during render instead would reopen
   // the dialog on the re-render that dismissing it causes.
-  const [eligible] = useState(() => !player.username && !isSetupDismissed())
+  const [eligible] = useState(() => !canReturnUnaided(player) && !isSetupDismissed())
   const [done, setDone] = useState(false)
 
   useEffect(() => {
@@ -155,7 +156,7 @@ export function SetupPrompt({ player, onPlayerChange }) {
 export function SetupCard({ player, onPlayerChange }) {
   const [open, setOpen] = useState(false)
 
-  if (player.username) return null
+  if (canReturnUnaided(player)) return null
 
   return (
     <section className="setup-card" aria-label="Set up signing in">

@@ -21,6 +21,7 @@ import { useState } from 'react'
 import { usePlayerData } from '../lib/PlayerData'
 import { linkGoogle, setCredentials, unlinkGoogle, updateProfile } from '../lib/api'
 import GoogleButton from '../components/GoogleButton'
+import { canReturnUnaided } from '../lib/account'
 import { THEMES, getThemeChoice, setThemeChoice } from '../lib/theme'
 import Avatar from '../components/Avatar'
 import DeleteProfile from './DeleteProfile'
@@ -391,7 +392,7 @@ function Details({ player, onPlayerChange }) {
         // works and must not gain a step.
         <DetailRow
           label="Signing in"
-          value="Code only"
+          value={player.googleEmail ? 'Google' : 'Code only'}
           action="Set up"
           isOpen={open === 'signin'}
           saved={saved === 'username'}
@@ -440,7 +441,7 @@ function Details({ player, onPlayerChange }) {
         onSaved={() => done('google')}
       />
 
-      {!player.username && open !== 'signin' && (
+      {!canReturnUnaided(player) && open !== 'signin' && (
         <p className="detail-note">
           You got in with a code, so you need it again every time. Pick a
           username and password and you won&rsquo;t.
@@ -532,7 +533,7 @@ function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
         </button>
         {/* Only a warning while it is actually true. Someone with a
             password can let themselves back in. */}
-        {!player.username && (
+        {!canReturnUnaided(player) && (
           <p className="sign-out-note">
             You&rsquo;ll need your code again to sign back in — ask whoever
             scores your matches if you don&rsquo;t have it.
