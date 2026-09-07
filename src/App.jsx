@@ -6,6 +6,7 @@ import LiveMatch from './screens/LiveMatch'
 import Login from './screens/Login'
 import Invites from './screens/Invites'
 import Guide from './screens/Guide'
+import Players from './screens/Players'
 import { clearSession, fetchCurrentUmpire, getStoredUmpire } from './lib/api'
 import SyncIndicator from './components/SyncIndicator'
 import UpdateNotice from './components/UpdateNotice'
@@ -163,9 +164,11 @@ function App() {
                 onOpenInvites={
                   umpire.is_admin ? () => setView({ name: 'invites' }) : null
                 }
+                onOpenPlayers={() => setView({ name: 'players' })}
               />
             )}
             {view.name === 'guide' && <Guide onBack={goHome} />}
+            {view.name === 'players' && <Players onBack={goHome} />}
             {view.name === 'invites' && umpire.is_admin && (
               <Invites onBack={goHome} />
             )}

@@ -196,10 +196,17 @@ function Guide({ onBack }) {
       <section className="guide-section" aria-label="Players">
         <h3>Players and their codes</h3>
         <p>
-          Every player has a code you can show them from the session roster. It
-          signs them into the player app, where they see their own matches and
-          statistics. Only ever show someone their own — anyone holding a code
-          can claim that record.
+          Every player has a code that signs them into the player app, where
+          they see their own matches and statistics. Show it from{' '}
+          <strong>Players &amp; codes</strong> on the home screen, or from the
+          roster inside a session — the same code either way. Only ever show
+          someone their own: anyone holding a code can claim that record.
+        </p>
+        <p>
+          The code keeps working after they have used it, and after they set a
+          password. That is deliberate — there are no email addresses here, so
+          no reset links, and you handing them a fresh code is how someone
+          locked out gets back in.
         </p>
       </section>
     </div>

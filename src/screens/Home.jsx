@@ -35,7 +35,7 @@ function SessionList({ sessions, onOpenSession, showOwner = false }) {
   )
 }
 
-function Home({ onOpenSession, onOpenInvites, onOpenGuide, umpire }) {
+function Home({ onOpenSession, onOpenInvites, onOpenGuide, onOpenPlayers, umpire }) {
   // Subscribed rather than read during render: previously this never
   // updated after a write, and only looked correct because navigating
   // away unmounted the screen.
@@ -167,6 +167,17 @@ function Home({ onOpenSession, onOpenInvites, onOpenGuide, umpire }) {
           <h2>Still running, other umpires</h2>
           <SessionList sessions={theirs} onOpenSession={onOpenSession} showOwner />
         </>
+      )}
+
+      {/* First of the three, because it is the one an ordinary umpire
+          actually needs. The export is for the ML pipeline and the
+          invite is admin-only; a player asking for their code is a
+          Tuesday. It should not require building a session around them
+          first, which is what it used to. */}
+      {onOpenPlayers && (
+        <button className="export-btn" onClick={onOpenPlayers}>
+          Players &amp; codes
+        </button>
       )}
 
       {exportError && <p className="form-error">{exportError}</p>}
