@@ -42,6 +42,11 @@ function PlayerPicker({ excludeIds = [], onPick }) {
   const { reachable } = useSyncStatus()
 
   useEffect(() => {
+    // Nothing typed, nothing asked -- of the server, or of the offline
+    // fallback below, which would otherwise hand back this device's
+    // whole roster for an empty query.
+    if (!query.trim()) return
+
     const controller = new AbortController()
     const timer = setTimeout(async () => {
       setLoading(true)
@@ -77,7 +82,12 @@ function PlayerPicker({ excludeIds = [], onPick }) {
   }, [query])
 
   const trimmed = query.trim()
-  const visible = results.filter((p) => !excludeIds.includes(p.id))
+  // Derived, not stored: an empty box lists nobody whatever the last
+  // search left in state, and it empties on the keystroke rather than
+  // after a re-render.
+  const visible = trimmed
+    ? results.filter((p) => !excludeIds.includes(p.id))
+    : []
   const exactExists = results.some(
     (p) => p.name.toLowerCase() === trimmed.toLowerCase(),
   )
@@ -152,9 +162,11 @@ function PlayerPicker({ excludeIds = [], onPick }) {
         spellCheck={false}
       />
 
-      {error && <p className="form-error">{error}</p>}
+      {trimmed && error && <p className="form-error">{error}</p>}
 
-      {loading && visible.length === 0 && <p className="empty">Searching…</p>}
+      {trimmed && loading && visible.length === 0 && (
+        <p className="empty">Searching…</p>
+      )}
 
       {visible.length > 0 && (
         <ul className="picker-results">

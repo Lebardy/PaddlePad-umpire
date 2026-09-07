@@ -23,8 +23,11 @@ import PlayerCodeCard from '../components/PlayerCodeCard'
 // Deliberately search-first rather than a listed roster. The registry
 // is club-wide and grows without limit, the server caps a response at
 // 50 rows, and a screen that quietly showed the first 50 of 200 players
-// would be worse than one that asks who you are looking for. An empty
-// query still lists, so opening the screen is not a dead end.
+// would be worse than one that asks who you are looking for.
+//
+// So an empty box lists nothing and asks the server nothing -- only
+// what was typed comes back. What keeps that from reading as a dead end
+// is the line where the list would be, saying to type a name.
 // ============================================================
 
 const DEBOUNCE_MS = 250
@@ -43,11 +46,24 @@ function describePlayer(player) {
 function Players({ onBack }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [showing, setShowing] = useState(null)
 
+  const trimmed = query.trim()
+
+  // What is actually on screen, derived rather than stored: an empty
+  // box shows nothing at all, whatever the last search left behind.
+  // Emptying state from inside the effect would work too, but only
+  // after another render -- this way the list goes on the keystroke.
+  const shown = trimmed ? results : []
+  const searching = Boolean(trimmed) && loading
+  const shownError = trimmed ? error : null
+
   useEffect(() => {
+    // Nothing typed, nothing asked of the server.
+    if (!query.trim()) return
+
     const controller = new AbortController()
     const timer = setTimeout(async () => {
       setLoading(true)
@@ -88,8 +104,8 @@ function Players({ onBack }) {
       </button>
       <h2>Players</h2>
       <p className="login-note">
-        Everyone this club has ever recorded. Open one to show the code
-        that lets them see their own matches.
+        Search everyone this club has ever recorded. Open one to show the
+        code that lets them see their own matches.
       </p>
 
       <input
@@ -102,7 +118,7 @@ function Players({ onBack }) {
         autoCorrect="off"
       />
 
-      {error && <p className="form-error">{error}</p>}
+      {shownError && <p className="form-error">{shownError}</p>}
 
       {showing && (
         <PlayerCodeCard player={showing} onClose={() => setShowing(null)} />
@@ -111,18 +127,20 @@ function Players({ onBack }) {
       {/* Only while there is nothing to show. Replacing a list that is
           already on screen with "Searching…" on every keystroke makes
           the screen flicker and reads as slower than it is. */}
-      {loading && results.length === 0 && !error && (
+      {searching && shown.length === 0 && !shownError && (
         <p className="empty">Searching…</p>
       )}
 
-      {!loading && !error && results.length === 0 && (
+      {!searching && !shownError && shown.length === 0 && (
         <p className="empty">
-          {query ? `Nobody matching “${query}”.` : 'No players yet.'}
+          {trimmed
+            ? `Nobody matching “${trimmed}”.`
+            : 'Type a name to find someone.'}
         </p>
       )}
 
       <ul className="session-list">
-        {results.map((p) => (
+        {shown.map((p) => (
           <li key={p.id}>
             <button className="session-item" onClick={() => setShowing(p)}>
               <span className="session-name">
