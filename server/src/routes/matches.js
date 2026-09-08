@@ -25,6 +25,7 @@ const MATCH_SELECT = `
   SELECT m.id, m.session_id, m.team_a, m.team_b,
          m.stacking_a, m.stacking_b,
          m.first_server_team, m.first_server_player,
+         m.right_start_a, m.right_start_b,
          m.point_target,
          m.status, m.winner, m.ended_early,
          m.voided_at, m.void_reason,
@@ -45,6 +46,9 @@ function toClientMatch(row, events = undefined) {
     teamB: row.team_b,
     stacking: stackingFromColumns(row),
     firstServer: { team: row.first_server_team, playerId: row.first_server_player },
+    // Who began on the right, per team. Null on matches recorded before
+    // setup asked; the engine says what stands in for that.
+    rightStart: { A: row.right_start_a, B: row.right_start_b },
     pointTarget: row.point_target,
     status: row.status,
     winner: row.winner,
@@ -99,7 +103,8 @@ router.get('/:id', async (req, res) => {
  * version or a hand-made request reaches the same endpoint.
  */
 router.post('/', async (req, res) => {
-  const { id, sessionId, teamA, teamB, stacking, firstServer, startedAt } = req.body ?? {}
+  const { id, sessionId, teamA, teamB, stacking, firstServer, rightStart, startedAt } =
+    req.body ?? {}
   // An older app build sends no target; it only ever played to 11, so
   // that is the honest reading of what it recorded.
   const pointTarget = req.body?.pointTarget ?? DEFAULT_POINT_TARGET
@@ -131,20 +136,35 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'The first server must be on the team that serves first' })
   }
 
+  // Who started on the right, per team. Optional: an older app build
+  // sends none, and singles has no use for it. Whatever arrives must
+  // still name someone on that team, since a stray id here would make
+  // the app announce a server who is not on court.
+  const rightStartA = rightStart?.A ?? null
+  const rightStartB = rightStart?.B ?? null
+  if (rightStartA !== null && !teamA.includes(rightStartA)) {
+    return res.status(400).json({ error: "rightStart.A must be a player on team A" })
+  }
+  if (rightStartB !== null && !teamB.includes(rightStartB)) {
+    return res.status(400).json({ error: "rightStart.B must be a player on team B" })
+  }
+
   const { stacking_a, stacking_b } = stackingToColumns(stacking)
 
   await query(
     `INSERT INTO matches (id, session_id, recorded_by, team_a, team_b,
                           stacking_a, stacking_b,
                           first_server_team, first_server_player, point_target,
+                          right_start_a, right_start_b,
                           started_at)
-     VALUES ($1, $2, $3, $4::uuid[], $5::uuid[], $6, $7, $8, $9, $10,
-             COALESCE($11::timestamptz, now()))
+     VALUES ($1, $2, $3, $4::uuid[], $5::uuid[], $6, $7, $8, $9, $10, $11, $12,
+             COALESCE($13::timestamptz, now()))
      ON CONFLICT (id) DO NOTHING`,
     [
       id, sessionId, req.umpire.id, teamA, teamB,
       stacking_a, stacking_b,
       firstServer.team, firstServer.playerId, pointTarget,
+      rightStartA, rightStartB,
       startedAt ? new Date(startedAt).toISOString() : null,
     ],
   )
@@ -264,9 +284,15 @@ router.put('/:id/log', async (req, res) => {
     if (!isUuid(event.id)) {
       return res.status(400).json({ error: `Event ${index} needs a valid id` })
     }
-    if (event.type !== 'rally' && event.type !== 'thirdShot') {
+    if (
+      event.type !== 'rally' &&
+      event.type !== 'thirdShot' &&
+      event.type !== 'serverCorrection'
+    ) {
       return res.status(400).json({ error: `Event ${index} has unknown type ${event.type}` })
     }
+    // Both non-rally types name their player the same way, so the check
+    // below covers a correction naming someone outside the match too.
     const actor = event.type === 'rally' ? event.actingPlayerId : event.playerId
     if (!players.has(actor)) {
       return res.status(400).json({ error: `Event ${index} references a player not in this match` })
@@ -277,6 +303,7 @@ router.put('/:id/log', async (req, res) => {
     teamA: row.team_a,
     teamB: row.team_b,
     firstServer: { team: row.first_server_team, playerId: row.first_server_player },
+    rightStart: { A: row.right_start_a, B: row.right_start_b },
     // Without this the server would score a game played to 15 as though
     // it were to 11 and declare a winner partway through.
     pointTarget: row.point_target,

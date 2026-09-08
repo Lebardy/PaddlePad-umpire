@@ -32,6 +32,7 @@ export async function getPlayerMatches(query, playerId) {
             m.stacking_b,
             m.first_server_team,
             m.first_server_player,
+            m.right_start_a, m.right_start_b,
             m.point_target,
             m.winner,
             m.started_at,
@@ -87,6 +88,7 @@ export async function getPlayerMatches(query, playerId) {
         team: row.first_server_team,
         playerId: row.first_server_player,
       },
+      rightStart: { A: row.right_start_a, B: row.right_start_b },
       pointTarget: row.point_target,
       events: eventsByMatch.get(row.id) ?? [],
     })
@@ -152,6 +154,7 @@ function scoreProgression(row, events, team) {
       team: row.first_server_team,
       playerId: row.first_server_player,
     },
+    rightStart: { A: row.right_start_a, B: row.right_start_b },
     pointTarget: row.point_target,
   }
 

@@ -64,7 +64,11 @@ const TERMS = [
   },
   {
     term: 'First server',
-    body: 'Who puts the first ball in play. The app tracks the serve from there, so you never have to say whose serve it is again.',
+    body: 'Who puts the first ball in play. In doubles that player is on the right by rule, so setup then asks only which of the other pair starts on the right — from those two facts the app follows the serve for the rest of the game.',
+  },
+  {
+    term: 'Who starts on the right',
+    body: 'It decides who serves when the ball goes over. A pair swaps sides only when they score, so whoever is on the right when their team wins the serve is fixed by their own score: even, and it is whoever started there; odd, and it is their partner. If the app ever names the wrong one, tap “Not them?” next to the score — that sticks for the rest of the match.',
   },
   {
     term: 'Play to',

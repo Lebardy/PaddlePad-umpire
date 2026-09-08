@@ -76,6 +76,25 @@ function checkGameWon(score, target) {
 }
 
 /**
+ * Which of a doubles pair is standing on the RIGHT, and therefore
+ * serves when their team gains the serve.
+ *
+ * A pair swaps sides only when their own team scores, and in side-out
+ * scoring a team can only score while serving -- so the number of
+ * swaps they have made is exactly their score. Even score: whoever
+ * started the game on the right is still there. Odd: their partner is.
+ *
+ * This is the rule the engine used to miss. It served `serverIndex: 0`
+ * -- the first player listed on the team -- which is the order an
+ * umpire happened to tap names in, and has nothing to do with where
+ * anyone is standing.
+ */
+function incomingServerIndex(state, team) {
+  const right = state.rightStart[team]
+  return state.score[team] % 2 === 0 ? right : 1 - right
+}
+
+/**
  * Advances server state after the serving team loses a rally.
  *
  * Singles: serve just passes to the other team.
@@ -95,16 +114,23 @@ function sideOut(state, isDoubles) {
       ...state,
       servingTeam: otherTeam,
       serverNumber: 1,
-      serverIndex: 0,
+      serverIndex: incomingServerIndex(state, otherTeam),
       firstServiceOfGame: false,
     }
   }
 
+  // Server 2 is the partner of whoever just faulted, wherever they are
+  // standing -- not "the second player listed".
   if (state.serverNumber === 1) {
-    return { ...state, serverNumber: 2, serverIndex: 1 }
+    return { ...state, serverNumber: 2, serverIndex: 1 - state.serverIndex }
   }
 
-  return { ...state, servingTeam: otherTeam, serverNumber: 1, serverIndex: 0 }
+  return {
+    ...state,
+    servingTeam: otherTeam,
+    serverNumber: 1,
+    serverIndex: incomingServerIndex(state, otherTeam),
+  }
 }
 
 /**
@@ -124,16 +150,57 @@ function applyRallyResult(state, winningTeam, isDoubles, target) {
   return sideOut(state, isDoubles)
 }
 
-/** The score/server state a brand-new match starts in, before any events. */
-export function initialScoreState({ firstServerTeam, firstServerIndex, isDoubles }) {
+/**
+ * The score/server state a brand-new match starts in, before any events.
+ *
+ * `rightStart` is who began the game on the right for each team, as an
+ * index into that team's array. The serving team's is never in doubt --
+ * by rule the first server starts on the right -- but the receiving
+ * pair's is a fact only the umpire can supply, which is why match setup
+ * asks for it.
+ */
+export function initialScoreState({
+  firstServerTeam,
+  firstServerIndex,
+  rightStart,
+  isDoubles,
+}) {
   return {
     score: { A: 0, B: 0 },
     servingTeam: firstServerTeam,
     serverIndex: firstServerIndex,
     serverNumber: isDoubles ? 2 : null,
+    rightStart,
     firstServiceOfGame: true,
     completed: false,
     winner: null,
+  }
+}
+
+/**
+ * Reads each team's right-side starter off the match, as indices.
+ *
+ * Falls back to the best available guess when the field is absent --
+ * every match recorded before it existed, and anything sent by an older
+ * app build. The serving team's right-side starter IS its first server,
+ * which is known; the other pair's is not, so index 0 stands in, which
+ * is what this engine always used to assume for both.
+ *
+ * Nothing recorded depends on the answer: serverIndex reaches only the
+ * "Serving: ..." line, which a finished match does not show. So an old
+ * match deriving a different server than it once did changes nothing
+ * anyone can see, and changes no exported number.
+ */
+function rightStartIndices(match, firstServerTeam, firstServerIndex) {
+  const indexIn = (team, playerId) => {
+    const found = team.indexOf(playerId)
+    return found === -1 ? null : found
+  }
+  const fallback = (team) => (team === firstServerTeam ? firstServerIndex : 0)
+
+  return {
+    A: indexIn(match.teamA, match.rightStart?.A) ?? fallback('A'),
+    B: indexIn(match.teamB, match.rightStart?.B) ?? fallback('B'),
   }
 }
 
@@ -164,12 +231,16 @@ export function deriveMatchState(match) {
   // it was played under.
   const target = match.pointTarget ?? DEFAULT_POINT_TARGET
 
+  const firstServerTeam = match.firstServer.team
+  const firstServerIndex =
+    firstServerTeam === 'A'
+      ? match.teamA.indexOf(match.firstServer.playerId)
+      : match.teamB.indexOf(match.firstServer.playerId)
+
   let scoreState = initialScoreState({
-    firstServerTeam: match.firstServer.team,
-    firstServerIndex:
-      match.firstServer.team === 'A'
-        ? match.teamA.indexOf(match.firstServer.playerId)
-        : match.teamB.indexOf(match.firstServer.playerId),
+    firstServerTeam,
+    firstServerIndex,
+    rightStart: rightStartIndices(match, firstServerTeam, firstServerIndex),
     isDoubles,
   })
 
@@ -204,6 +275,30 @@ export function deriveMatchState(match) {
             : 'A'
 
       scoreState = applyRallyResult(scoreState, winningTeam, isDoubles, target)
+    } else if (event.type === 'serverCorrection') {
+      // The umpire saying the app has the wrong one of a pair serving.
+      //
+      // It moves the serve AND flips that team's starting sides,
+      // because the two are the same statement: if the wrong partner is
+      // serving now, the pair began the other way round from what setup
+      // recorded. Without the flip the same wrong guess would come back
+      // at their next side-out and need correcting again every time.
+      //
+      // Ignored unless it names someone on the team currently serving.
+      // The serving TEAM is derived from the rallies and is not in
+      // doubt; only which of the two partners is.
+      const team = scoreState.servingTeam === 'A' ? match.teamA : match.teamB
+      const index = team.indexOf(event.playerId)
+      if (isDoubles && index !== -1 && index !== scoreState.serverIndex) {
+        scoreState = {
+          ...scoreState,
+          serverIndex: index,
+          rightStart: {
+            ...scoreState.rightStart,
+            [scoreState.servingTeam]: 1 - scoreState.rightStart[scoreState.servingTeam],
+          },
+        }
+      }
     } else if (event.type === 'thirdShot') {
       ensure(event.playerId)
       if (event.shotType === 'drop') {

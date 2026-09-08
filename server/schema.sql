@@ -328,6 +328,22 @@ ALTER TABLE matches ADD COLUMN IF NOT EXISTS point_target INTEGER NOT NULL DEFAU
 -- -- it just stops play. Without storing it explicitly, every
 -- manually-ended match would silently reopen as "in progress" the
 -- moment a device re-synced its log.
+-- Who started the game on the RIGHT, per team.
+--
+-- Doubles serving order depends on it and cannot be derived without
+-- it. The player on the right serves when a team gains the serve, and
+-- a pair swaps sides only when their own team scores -- so the right
+-- side player is decided by that team's score being even or odd,
+-- measured from where they began. Team order in team_a/team_b is the
+-- order an umpire tapped names in and says nothing about position.
+--
+-- For the team that serves first this is the first server, by rule.
+-- For the other pair only the umpire knows, which is why match setup
+-- asks. NULL on every match recorded before that question existed; see
+-- rightStartIndices in src/pickleball.js for what stands in.
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS right_start_a UUID REFERENCES players (id);
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS right_start_b UUID REFERENCES players (id);
+
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS ended_early BOOLEAN NOT NULL DEFAULT false;
 
 -- A match the umpire has thrown out -- wrong pairing, wrong court,
@@ -376,7 +392,7 @@ CREATE TABLE IF NOT EXISTS match_events (
     id         UUID PRIMARY KEY,
     match_id   UUID NOT NULL REFERENCES matches (id) ON DELETE CASCADE,
     seq        INTEGER NOT NULL,
-    type       TEXT NOT NULL CHECK (type IN ('rally', 'thirdShot')),
+    type       TEXT NOT NULL CHECK (type IN ('rally', 'thirdShot', 'serverCorrection')),
     payload    JSONB NOT NULL,
     at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -386,6 +402,31 @@ CREATE TABLE IF NOT EXISTS match_events (
 -- same event position twice cannot duplicate it.
 CREATE UNIQUE INDEX IF NOT EXISTS match_events_match_seq_idx
     ON match_events (match_id, seq);
+
+-- 'serverCorrection' joined the list after the table already existed on
+-- staging and production, and a CHECK written inline on a CREATE TABLE
+-- IF NOT EXISTS does not update itself. So whatever type check is on
+-- the table is dropped and re-added on every boot.
+--
+-- Found by definition rather than by name. Dropping a guessed name that
+-- turns out to be wrong is a no-op, which would leave the OLD check in
+-- place alongside the new one and quietly reject every correction -- a
+-- failure that would show up on court rather than at boot.
+DO $$
+DECLARE existing record;
+BEGIN
+    FOR existing IN
+        SELECT conname FROM pg_constraint
+         WHERE conrelid = 'match_events'::regclass
+           AND contype = 'c'
+           AND pg_get_constraintdef(oid) ILIKE '%type%'
+    LOOP
+        EXECUTE format('ALTER TABLE match_events DROP CONSTRAINT %I', existing.conname);
+    END LOOP;
+END $$;
+
+ALTER TABLE match_events ADD CONSTRAINT match_events_type_allowed
+    CHECK (type IN ('rally', 'thirdShot', 'serverCorrection'));
 
 -- ============================================================
 -- ML pipeline results

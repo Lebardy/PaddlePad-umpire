@@ -914,6 +914,25 @@ section h3 {
   margin-bottom: 1.25rem;
 }
 
+/* Quiet on purpose. It is the answer to a question an umpire asks once
+   or twice a night, sitting where the question is asked -- not a
+   control competing with the rally buttons. */
+.swap-server {
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: none;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.swap-server:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
 .match-complete {
   font-weight: 600;
   color: var(--primary);

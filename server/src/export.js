@@ -79,6 +79,7 @@ export async function buildMatchLogRows(query) {
   const { rows: matches } = await query(
     `SELECT m.id, m.team_a, m.team_b, m.stacking_a, m.stacking_b,
             m.first_server_team, m.first_server_player, m.point_target,
+            m.right_start_a, m.right_start_b,
             m.winner, m.started_at, m.ended_at
        FROM matches m
        JOIN sessions s ON s.id = m.session_id
@@ -124,6 +125,7 @@ export async function buildMatchLogRows(query) {
         team: match.first_server_team,
         playerId: match.first_server_player,
       },
+      rightStart: { A: match.right_start_a, B: match.right_start_b },
       pointTarget: match.point_target,
       events: eventsByMatch.get(match.id) ?? [],
     })

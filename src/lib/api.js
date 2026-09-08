@@ -372,6 +372,7 @@ export function pushMatch(match) {
       teamB: match.teamB,
       stacking: match.stacking,
       firstServer: match.firstServer,
+      rightStart: match.rightStart ?? undefined,
       pointTarget: match.pointTarget,
       startedAt: match.startedAt,
     },

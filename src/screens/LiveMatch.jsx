@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import {
   addRallyEvent,
+  addServerCorrection,
   addThirdShotEvent,
   undoLastEvent,
   endMatchManually,
@@ -172,6 +173,17 @@ function LiveMatch({ matchId, onBack }) {
     addThirdShotEvent(matchId, { playerId, shotType, success })
   }
 
+  // The app works out the server from the rules, and gets it right so
+  // long as setup was told correctly who started on the right. This is
+  // the umpire overruling it -- logged as an event, so Undo reaches it
+  // like anything else, and it sticks for the rest of the game rather
+  // than needing repeating at every side-out.
+  function swapServer(currentServerId) {
+    const team = match.teamA.includes(currentServerId) ? match.teamA : match.teamB
+    const partner = team.find((id) => id !== currentServerId)
+    if (partner) addServerCorrection(matchId, partner)
+  }
+
   function handleUndo() {
     undoLastEvent(matchId)
   }
@@ -240,6 +252,11 @@ function LiveMatch({ matchId, onBack }) {
         <p className="serve-note">
           Serving: {name(serverId)}
           {derived.isDoubles ? ` (server ${derived.serverNumber})` : ''}
+          {derived.isDoubles && (
+            <button className="swap-server" onClick={() => swapServer(serverId)}>
+              Not them?
+            </button>
+          )}
           {' \u00b7 '}
           first to {derived.pointTarget}
         </p>

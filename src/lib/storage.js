@@ -168,8 +168,14 @@ function saveMatch(match) {
  *   stacking flag; recorded as `uses_stacking` on every player on that
  *   team when the match is exported.
  * @param {{team: 'A'|'B', playerId: string}} params.firstServer - who
- *   serves first; for doubles this also fixes which of the two
- *   teammates is "server 1" vs "server 2" for the rest of the game.
+ *   serves first. In doubles that player is, by rule, the one starting
+ *   on the right for their team.
+ * @param {{A: string, B: string}} [params.rightStart] - who begins the
+ *   game on the RIGHT for each team. Doubles serving order depends on
+ *   it: the player on the right serves when a team gains the serve, and
+ *   a pair swaps sides only when their own team scores. Nothing else in
+ *   the app can supply it, since team order is just the order names
+ *   were tapped in.
  * @param {number} [params.pointTarget] - 11, 15 or 21. Recorded on the
  *   match rather than assumed, because the winner is re-derived from
  *   the event log on every sync and deriving a game played to 15
@@ -184,6 +190,7 @@ export function createMatch({
   teamB,
   stacking,
   firstServer,
+  rightStart = null,
   pointTarget = DEFAULT_POINT_TARGET,
 }) {
   const match = {
@@ -197,6 +204,7 @@ export function createMatch({
     teamB,
     stacking, // { A: bool, B: bool }
     firstServer, // { team: 'A'|'B', playerId }
+    rightStart, // { A: playerId, B: playerId } | null for singles
     pointTarget, // 11 | 15 | 21; fixed for the life of the match
     events: [],
     winner: null,
@@ -246,6 +254,31 @@ export function addRallyEvent(matchId, { actingPlayerId, outcome, zone }) {
     events: [
       ...match.events,
       { type: 'rally', id: crypto.randomUUID(), at: Date.now(), actingPlayerId, outcome, zone },
+    ],
+  })
+}
+
+/**
+ * Records that the OTHER partner is the one serving.
+ *
+ * The app works out who serves from the rules, and it is right as long
+ * as it was told correctly which player started on the right. When it
+ * was not -- or when a pair sorts itself out mid-game -- this is the
+ * umpire overruling it.
+ *
+ * An event rather than an edit to the match: the score, the serve and
+ * every statistic are a fold over this log, so a correction that lives
+ * in the log is undone by Undo like anything else, syncs by the same
+ * path, and re-derives to the same answer on every device.
+ */
+export function addServerCorrection(matchId, playerId) {
+  const match = getMatch(matchId)
+  if (!match || match.status === 'completed') return match
+  return finalizeAfterEventChange({
+    ...match,
+    events: [
+      ...match.events,
+      { type: 'serverCorrection', id: crypto.randomUUID(), at: Date.now(), playerId },
     ],
   })
 }
@@ -408,6 +441,10 @@ export function replaceServerState({
         teamB: m.teamB,
         stacking: m.stacking,
         firstServer: m.firstServer,
+        // Carried across for the same reason as pointTarget below: a
+        // device that pulled the match rather than creating it would
+        // otherwise announce the wrong player as serving.
+        rightStart: m.rightStart,
         // Must be carried across, not defaulted: deriveMatchState falls
         // back to 11 without it, so a game played to 15 would be
         // declared won at 11 on every device that pulled the match

@@ -47,8 +47,18 @@ Every statement is idempotent, so there's no separate migration step.
 
 ```bash
 cd server
-pnpm test:e2e
+pnpm test:serving   # the scoring engine alone; no database, no network
+pnpm test:e2e       # the whole API, against a throwaway Postgres
 ```
+
+`pnpm test:serving` walks whole doubles games through
+`deriveMatchState` and names the expected server at every step, with
+the reason. It needs nothing running because the engine is pure, so it
+is the one check that can be made before anything is deployed
+anywhere. It exists because the engine used to hand every side-out to
+`team[0]` — the first player an umpire happened to tap in — where the
+rule is that the player on the RIGHT serves, and a pair swaps sides
+only when its own team scores.
 
 That is the whole loop. It starts a throwaway Postgres in Docker,
 resets it, boots the API against it on its own port, runs the smoke

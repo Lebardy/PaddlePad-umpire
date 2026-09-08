@@ -25,6 +25,12 @@ function MatchSetup({ sessionId, onBack, onStart }) {
   const [stackingA, setStackingA] = useState(false)
   const [stackingB, setStackingB] = useState(false)
   const [firstServerId, setFirstServerId] = useState('')
+  // Who starts on the RIGHT for the pair that does NOT serve first.
+  // The serving pair needs no question: by rule the first server is on
+  // the right at 0-0. Without this the app cannot know who serves when
+  // the ball first goes over, because team order is only the order
+  // names were tapped in.
+  const [receiverRightId, setReceiverRightId] = useState('')
   // 11 is the common case, so it stays the default and an umpire who
   // never touches this control gets the same behaviour as before.
   const [pointTarget, setPointTarget] = useState(DEFAULT_POINT_TARGET)
@@ -49,6 +55,7 @@ function MatchSetup({ sessionId, onBack, onStart }) {
     setTeamA([])
     setTeamB([])
     setFirstServerId('')
+    setReceiverRightId('')
   }
 
   function addToTeam(team, playerId) {
@@ -61,22 +68,33 @@ function MatchSetup({ sessionId, onBack, onStart }) {
     const setList = team === 'A' ? setTeamA : setTeamB
     setList((current) => current.filter((id) => id !== playerId))
     if (firstServerId === playerId) setFirstServerId('')
+    if (receiverRightId === playerId) setReceiverRightId('')
   }
+
+  const firstServerTeam = teamA.includes(firstServerId) ? 'A' : 'B'
+  const receivingTeam = firstServerTeam === 'A' ? teamB : teamA
 
   const readyToStart =
     teamA.length === maxPerTeam &&
     teamB.length === maxPerTeam &&
-    firstServerId !== ''
+    firstServerId !== '' &&
+    (!isDoubles || receiverRightId !== '')
 
   function handleStart() {
     if (!readyToStart) return
-    const firstServerTeam = teamA.includes(firstServerId) ? 'A' : 'B'
     const match = createMatch({
       sessionId,
       teamA,
       teamB,
       stacking: { A: isDoubles && stackingA, B: isDoubles && stackingB },
       firstServer: { team: firstServerTeam, playerId: firstServerId },
+      // The server's side is not asked for: whoever serves first is on
+      // the right at 0-0, by rule.
+      rightStart: isDoubles
+        ? firstServerTeam === 'A'
+          ? { A: firstServerId, B: receiverRightId }
+          : { A: receiverRightId, B: firstServerId }
+        : null,
       pointTarget,
     })
     onStart(match.id)
@@ -182,7 +200,39 @@ function MatchSetup({ sessionId, onBack, onStart }) {
               <button
                 key={id}
                 className={firstServerId === id ? 'active' : ''}
-                onClick={() => setFirstServerId(id)}
+                onClick={() => {
+                  setFirstServerId(id)
+                  // A different team now receives, so a right-side
+                  // choice made for the old receiving pair is about the
+                  // wrong pair. Re-tapping the same name changes
+                  // nothing and must not throw the answer away.
+                  if (id !== firstServerId) setReceiverRightId('')
+                }}
+              >
+                {playerName(id)}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* The one thing the app cannot work out for itself. When the
+          serve goes over, the player on the RIGHT serves -- and since a
+          pair only swaps sides when it scores, everything after that
+          follows from where these two started. */}
+      {isDoubles && firstServerId !== '' && (
+        <section>
+          <h3>Who starts on the right?</h3>
+          <p className="setup-note">
+            {playerName(firstServerId)} does, on the serving side. Say which
+            of the other pair is on the right as the ball is served to them.
+          </p>
+          <div className="server-choice">
+            {receivingTeam.map((id) => (
+              <button
+                key={id}
+                className={receiverRightId === id ? 'active' : ''}
+                onClick={() => setReceiverRightId(id)}
               >
                 {playerName(id)}
               </button>
