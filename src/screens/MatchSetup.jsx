@@ -222,10 +222,11 @@ function MatchSetup({ sessionId, onBack, onStart }) {
           follows from where these two started. */}
       {isDoubles && firstServerId !== '' && (
         <section>
-          <h3>Who starts on the right?</h3>
+          <h3>Who starts on the right, as they face the net?</h3>
           <p className="setup-note">
-            {playerName(firstServerId)} does, on the serving side. Say which
-            of the other pair is on the right as the ball is served to them.
+            {playerName(firstServerId)} does, on the serving side. Say which of
+            the other pair is on the right — their own right, looking across
+            the net. Watching them from behind, that is the one on your left.
           </p>
           <div className="server-choice">
             {receivingTeam.map((id) => (

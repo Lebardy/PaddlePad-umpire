@@ -68,6 +68,10 @@ const TERMS = [
   },
   {
     term: 'Who starts on the right',
+    body: 'Right means their own right, facing the net — so the two teams’ right-hand boxes are diagonally opposite, which is why a serve crosses. Watching a pair from behind them, their right is the player on your left. It is also called the even court, because that is the side you serve from when your team’s score is even.',
+  },
+  {
+    term: 'Why the app asks',
     body: 'It decides who serves when the ball goes over. A pair swaps sides only when they score, so whoever is on the right when their team wins the serve is fixed by their own score: even, and it is whoever started there; odd, and it is their partner. If the app ever names the wrong one, tap “Not them?” next to the score — that sticks for the rest of the match.',
   },
   {
