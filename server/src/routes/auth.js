@@ -456,8 +456,8 @@ async function confirmedWithPassword(row, req, res, action) {
 /**
  * Changes the name, the email, or both.
  *
- * The email is asked to be confirmed with the password, and the name is
- * not, because they are not the same kind of change. A name is what
+ * Changing the email is confirmed with the password and changing the
+ * name is not, because they are not the same kind of change. A name is what
  * other umpires see against a session. An email is a way in: /auth/google
  * links a Google account to an umpire whose email MATCHES, so an
  * attacker who could quietly move this account to an address they own
