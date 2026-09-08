@@ -54,7 +54,10 @@ function Login({ onSignedIn }) {
       onSignedIn(await loginWithGoogle({ accessToken, invite }))
     } catch (err) {
       setError(err.message)
-      if (err.details?.needsInvite) setNeedsInvite(true)
+      // `data`, not `details`: ApiError carries the response body on
+      // .data. Reading the wrong field meant the invite box never
+      // appeared, so a refused Google sign-in looked like a dead end.
+      if (err.data?.needsInvite) setNeedsInvite(true)
     } finally {
       setBusy(false)
     }

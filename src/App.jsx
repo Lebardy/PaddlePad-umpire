@@ -7,6 +7,7 @@ import Login from './screens/Login'
 import Invites from './screens/Invites'
 import Guide from './screens/Guide'
 import Players from './screens/Players'
+import Account from './screens/Account'
 import { clearSession, fetchCurrentUmpire, getStoredUmpire } from './lib/api'
 import SyncIndicator from './components/SyncIndicator'
 import UpdateNotice from './components/UpdateNotice'
@@ -134,9 +135,20 @@ function App() {
             >
               ?
             </button>
-            <button className="sign-out" onClick={handleSignOut}>
+            {/* The name and Sign out used to be one button, so the
+                only thing tapping your own name could do was end the
+                session. It opens the account screen now; signing out
+                keeps its own button, and its own confirm when there is
+                unsynced play. */}
+            <button
+              className="account-btn"
+              onClick={() => setView({ name: 'account' })}
+              title="Your account"
+            >
               <span className="umpire-name">{umpire.name}</span>
-              <span className="sign-out-label">Sign out</span>
+            </button>
+            <button className="sign-out" onClick={handleSignOut}>
+              Sign out
             </button>
           </div>
         )}
@@ -169,6 +181,14 @@ function App() {
             )}
             {view.name === 'guide' && <Guide onBack={goHome} />}
             {view.name === 'players' && <Players onBack={goHome} />}
+
+            {view.name === 'account' && (
+              <Account
+                umpire={umpire}
+                onUmpireChange={setUmpire}
+                onBack={goHome}
+              />
+            )}
             {view.name === 'invites' && umpire.is_admin && (
               <Invites onBack={goHome} />
             )}

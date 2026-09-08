@@ -28,24 +28,28 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #15111f;
-    --bg-elevated: #201a30;
-    --text: #f1edfa;
-    --text-muted: #a89bc0;
-    --border: #342a49;
-    --primary: #9d5cff;
-    --primary-hover: #b17dff;
-    --primary-contrast: #ffffff;
-    --primary-soft: rgba(157, 92, 255, 0.16);
-    --accent: #47bfff;
-    --accent-soft: rgba(71, 191, 255, 0.16);
-    --danger: #ff6b93;
-    --danger-soft: rgba(255, 107, 147, 0.14);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 8px 24px -6px rgba(0, 0, 0, 0.5);
-  }
+/* One copy of the dark palette, under an attribute rather than a media
+   query, because lib/theme.js always writes a resolved light/dark to
+   data-theme -- never "system". The OS preference is still honoured;
+   it is resolved in JS, and by the inline script in index.html before
+   the first paint. Fifteen colour values kept in two places are fifteen
+   values that will drift. */
+:root[data-theme='dark'] {
+  --bg: #15111f;
+  --bg-elevated: #201a30;
+  --text: #f1edfa;
+  --text-muted: #a89bc0;
+  --border: #342a49;
+  --primary: #9d5cff;
+  --primary-hover: #b17dff;
+  --primary-contrast: #ffffff;
+  --primary-soft: rgba(157, 92, 255, 0.16);
+  --accent: #47bfff;
+  --accent-soft: rgba(71, 191, 255, 0.16);
+  --danger: #ff6b93;
+  --danger-soft: rgba(255, 107, 147, 0.14);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px -6px rgba(0, 0, 0, 0.5);
 }
 
 * {

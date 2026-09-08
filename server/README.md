@@ -197,9 +197,13 @@ If you ever recreate it, verify these before trusting it:
 | `GET` | `/health` | — | Liveness + database reachability |
 | `POST` | `/auth/register` | — | Create an umpire account (needs an invite) |
 | `POST` | `/auth/login` | — | Sign in as an umpire, returns a token |
-| `GET` | `/auth/me` | Bearer | Validate a stored token on app launch |
+| `GET` | `/auth/me` | Bearer | The signed-in umpire's account; also validates a stored token on launch |
+| `PATCH` | `/auth/me` | Bearer | Change the name, the email, or both; the email needs the password |
+| `POST` | `/auth/me/password` | Bearer | Change the password, or set the first one |
 | `POST` | `/auth/google` | — | Sign in an umpire with Google; an invite is still required to register |
 | `POST` | `/auth/google/link` | — | Attach a Google account to an existing umpire account, proved with its password |
+| `POST` | `/auth/google/connect` | Bearer | Connect Google to the account already signed in |
+| `POST` | `/auth/google/disconnect` | Bearer | Disconnect it, unless that would leave no way back in |
 | `POST` | `/auth/player/claim` | — | Exchange an umpire-issued code for a player session |
 | `POST` | `/auth/player/register` | — | Sign up as a player |
 | `POST` | `/auth/player/login` | — | Sign in as a player, username + password |
@@ -260,6 +264,29 @@ belongs to, and **checks `aud` against our client id exactly as the ID
 token path checks `audience`**. That check is what stops a token minted
 for any other application signing its bearer in here. The ID-token path
 remains and both end in the same three facts.
+
+**Two ways to connect Google, and both are needed.** `/auth/google/link`
+is for someone standing at the sign-in gate: they type the email and
+password of the account they already have, and Google supplies the other
+half. `/auth/google/connect` is for someone already signed in, and it is
+the one an umpire will actually use — reaching the first from inside the
+app would mean signing out, and an umpire holding unsynced matches must
+not sign out. Neither can stand in for the other: the gate has no token,
+and the account screen should not have to ask for an email it already
+knows.
+
+Disconnecting is refused when the account has no password. A player who
+strands themselves can be let back in by an umpire re-minting their claim
+code; an umpire has no equivalent — no code, and no reset email anywhere
+in this system — so the honest answer is to refuse and say to set a
+password first.
+
+**Changing the email asks for the password; changing the name does not.**
+They are not the same kind of change. A name is what other umpires see
+against a session. An email is a way in: `/auth/google` attaches a Google
+account to an umpire whose address matches, so an account quietly moved
+to an address an attacker owns could then be walked into through Google
+without the password ever being known.
 
 **Linking a Google account whose address differs.** `/auth/google` links
 automatically when the Google address matches an umpire's email, which

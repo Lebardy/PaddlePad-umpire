@@ -88,7 +88,23 @@ app.use('/auth/register', rateLimit({ max: 5, windowMs: 60_000 }))
 // it means the parent's number is a ceiling on every path beneath it,
 // which is easy to forget when raising or lowering either one.
 app.use('/auth/google/link', rateLimit({ max: 10, windowMs: 60_000 }))
-app.use('/auth/google', rateLimit({ max: 10, windowMs: 60_000 }))
+// 20 rather than login's 10 because FOUR paths now share this bucket --
+// /auth/google, /link, /connect and /disconnect -- and a club behind one
+// wifi address shares it with each other. The same mistake was already
+// made and fixed on the player side: a parent limit sized for one
+// endpoint quietly became the ceiling on connecting Google at all.
+app.use('/auth/google', rateLimit({ max: 20, windowMs: 60_000 }))
+
+// Guessing a current password is the point of a limit here, exactly as
+// on /auth/login. The Google connect and disconnect routes sit under
+// /auth/google and are already covered by its ceiling above; this one
+// is not under anything, so it needs its own.
+app.use('/auth/me/password', rateLimit({ max: 10, windowMs: 60_000 }))
+// PATCH /auth/me asks for the password too when the email is changing,
+// so it cannot be left uncapped either. Looser than the one above
+// because GET /auth/me runs on every launch; the nested mount above
+// keeps password guessing at the tighter number.
+app.use('/auth/me', rateLimit({ max: 30, windowMs: 60_000 }))
 
 // Mistyped player names are the realistic spam vector on an otherwise
 // trusted API, and the export is the only genuinely expensive query.

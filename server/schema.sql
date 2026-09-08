@@ -43,6 +43,19 @@ CREATE TABLE IF NOT EXISTS umpires (
 ALTER TABLE umpires ALTER COLUMN password_hash DROP NOT NULL;
 ALTER TABLE umpires ADD COLUMN IF NOT EXISTS google_sub TEXT;
 
+-- The Google address, kept only so the account screen can say WHICH
+-- Google account is connected -- someone with two of them needs to be
+-- able to tell whether the one attached is still theirs.
+--
+-- SECURITY: display only. google_sub is the only thing a Google sign-in
+-- is ever resolved against, and this column must never become a second
+-- matching key. Umpires do have an email column and /auth/google links
+-- on it deliberately (Google having proved the address is verified),
+-- which is exactly why this one has to stay inert: two columns holding
+-- an address, only one of them a credential, is how the wrong one gets
+-- trusted later.
+ALTER TABLE umpires ADD COLUMN IF NOT EXISTS google_email TEXT;
+
 CREATE UNIQUE INDEX IF NOT EXISTS umpires_google_sub_idx
     ON umpires (google_sub) WHERE google_sub IS NOT NULL;
 

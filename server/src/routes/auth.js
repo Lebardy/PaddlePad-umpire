@@ -33,6 +33,28 @@ function normalizeEmail(value) {
 // away again.
 const NO_SUCH_ACCOUNT_HASH = `${'0'.repeat(32)}:${'0'.repeat(128)}`
 
+/**
+ * The umpire half of every auth response, built from a row.
+ *
+ * `hasPassword` rather than the hash: the account screen has to know
+ * whether to ask for a current password, and whether disconnecting
+ * Google would strand the account. Neither question needs the hash to
+ * leave the server.
+ *
+ * `googleEmail` is display only -- see the schema comment on
+ * umpires.google_email. Nothing signs in on the strength of it.
+ */
+function umpirePayload(row) {
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    is_admin: row.is_admin ?? false,
+    googleEmail: row.google_email ?? null,
+    hasPassword: Boolean(row.password_hash),
+  }
+}
+
 /** An error carrying the status and extra fields a handler should return. */
 function refusal(statusCode, message, extra = {}) {
   const error = new Error(message)
@@ -119,7 +141,7 @@ router.post('/register', async (req, res) => {
       const { rows } = await client.query(
         `INSERT INTO umpires (email, name, password_hash)
          VALUES ($1, $2, $3)
-         RETURNING id, email, name`,
+         RETURNING id, email, name, password_hash, google_email`,
         [email, name, password_hash],
       )
       const created = rows[0]
@@ -140,7 +162,7 @@ router.post('/register', async (req, res) => {
       return { ...created, is_admin: flags[0].is_admin }
     })
 
-    res.status(201).json({ token: signToken(umpire), umpire })
+    res.status(201).json({ token: signToken(umpire), umpire: umpirePayload(umpire) })
   } catch (error) {
     if (error.statusCode === 403) {
       return res.status(403).json({ error: error.message })
@@ -188,31 +210,44 @@ router.post('/google', async (req, res) => {
     throw error
   }
 
+  // An UPDATE rather than a SELECT so a Google address that has since
+  // changed is kept current -- it is shown on the account screen, and a
+  // stale one would have someone looking at an address that is no
+  // longer theirs. google_sub, which is what actually matched, never
+  // changes.
   const linked = await query(
-    'SELECT id, email, name, is_admin FROM umpires WHERE google_sub = $1',
-    [profile.sub],
+    `UPDATE umpires SET google_email = $2
+      WHERE google_sub = $1
+      RETURNING id, email, name, is_admin, password_hash, google_email`,
+    [profile.sub, profile.email],
   )
   if (linked.rows[0]) {
-    return res.json({ token: signToken(linked.rows[0]), umpire: linked.rows[0] })
+    return res.json({
+      token: signToken(linked.rows[0]),
+      umpire: umpirePayload(linked.rows[0]),
+    })
   }
 
   const byEmail = await query(
-    `UPDATE umpires SET google_sub = $2
+    `UPDATE umpires SET google_sub = $2, google_email = $3
       WHERE lower(email) = $1 AND google_sub IS NULL
-      RETURNING id, email, name, is_admin`,
-    [profile.email, profile.sub],
+      RETURNING id, email, name, is_admin, password_hash, google_email`,
+    [profile.email, profile.sub, profile.email],
   )
   if (byEmail.rows[0]) {
-    return res.json({ token: signToken(byEmail.rows[0]), umpire: byEmail.rows[0] })
+    return res.json({
+      token: signToken(byEmail.rows[0]),
+      umpire: umpirePayload(byEmail.rows[0]),
+    })
   }
 
   try {
     const umpire = await withTransaction(async (client) => {
       const { rows } = await client.query(
-        `INSERT INTO umpires (email, name, google_sub)
-         VALUES ($1, $2, $3)
-         RETURNING id, email, name`,
-        [profile.email, profile.name, profile.sub],
+        `INSERT INTO umpires (email, name, google_sub, google_email)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, email, name, password_hash, google_email`,
+        [profile.email, profile.name, profile.sub, profile.email],
       )
       const created = rows[0]
 
@@ -228,7 +263,7 @@ router.post('/google', async (req, res) => {
       return { ...created, is_admin: flags[0].is_admin }
     })
 
-    res.status(201).json({ token: signToken(umpire), umpire })
+    res.status(201).json({ token: signToken(umpire), umpire: umpirePayload(umpire) })
   } catch (error) {
     if (error.statusCode === 403) {
       // Tells the app to REVEAL the invite field rather than show a dead
@@ -275,7 +310,7 @@ router.post('/google/link', async (req, res) => {
   const password = String(req.body?.password ?? '')
 
   const { rows } = await query(
-    `SELECT id, email, name, password_hash, google_sub, is_admin
+    `SELECT id, email, name, password_hash, google_sub, google_email, is_admin
        FROM umpires WHERE lower(email) = $1`,
     [email],
   )
@@ -304,9 +339,9 @@ router.post('/google/link', async (req, res) => {
   let linked
   try {
     ;({ rows: linked } = await query(
-      `UPDATE umpires SET google_sub = $2 WHERE id = $1
-        RETURNING id, email, name, is_admin`,
-      [found.id, profile.sub],
+      `UPDATE umpires SET google_sub = $2, google_email = $3 WHERE id = $1
+        RETURNING id, email, name, is_admin, password_hash, google_email`,
+      [found.id, profile.sub, profile.email],
     ))
   } catch (error) {
     // 23505 on umpires_google_sub_idx: this Google account is already
@@ -319,7 +354,7 @@ router.post('/google/link', async (req, res) => {
     throw error
   }
 
-  res.json({ token: signToken(linked[0]), umpire: linked[0] })
+  res.json({ token: signToken(linked[0]), umpire: umpirePayload(linked[0]) })
 })
 
 router.post('/login', async (req, res) => {
@@ -327,7 +362,7 @@ router.post('/login', async (req, res) => {
   const password = String(req.body?.password ?? '')
 
   const { rows } = await query(
-    `SELECT id, email, name, password_hash, is_admin
+    `SELECT id, email, name, password_hash, google_email, is_admin
        FROM umpires
       WHERE lower(email) = $1`,
     [email],
@@ -355,13 +390,7 @@ router.post('/login', async (req, res) => {
     return res.status(401).json({ error: 'Incorrect email or password' })
   }
 
-  const umpire = {
-    id: found.id,
-    email: found.email,
-    name: found.name,
-    is_admin: found.is_admin,
-  }
-  res.json({ token: signToken(umpire), umpire })
+  res.json({ token: signToken(found), umpire: umpirePayload(found) })
 })
 
 // Lets the app confirm a stored token is still valid on launch, so an
@@ -369,11 +398,232 @@ router.post('/login', async (req, res) => {
 // the first real request mid-match.
 router.get('/me', requireAuth, async (req, res) => {
   const { rows } = await query(
-    'SELECT id, email, name, is_admin FROM umpires WHERE id = $1',
+    `SELECT id, email, name, is_admin, password_hash, google_email
+       FROM umpires WHERE id = $1`,
     [req.umpire.id],
   )
   if (!rows[0]) return res.status(401).json({ error: 'Account no longer exists' })
-  res.json({ umpire: rows[0] })
+  res.json({ umpire: umpirePayload(rows[0]) })
+})
+
+/**
+ * ============================================================
+ * The umpire's own account.
+ *
+ * Everything below acts on the token's own umpire and nothing else.
+ * Until these existed a signed-in umpire could change nothing at all:
+ * connecting Google meant signing OUT, taking the refusal branch on the
+ * gate and proving the account with its password -- and signing out is
+ * the one thing an umpire with unsynced matches must not do.
+ *
+ * The rule they share: when the account has a password, changing
+ * anything that could become a way in asks for that password first.
+ * Google has proved someone owns a Google account; only the password
+ * proves they own THIS one. Without that, a phone left unlocked on the
+ * account screen is an account takeover, and a quiet one -- the owner is
+ * never locked out, so nothing tells them it happened.
+ * ============================================================
+ */
+
+/** The signed-in umpire's row, or null if the account is gone. */
+async function loadUmpire(id) {
+  const { rows } = await query(
+    `SELECT id, email, name, is_admin, password_hash, google_sub, google_email
+       FROM umpires WHERE id = $1`,
+    [id],
+  )
+  return rows[0] ?? null
+}
+
+/**
+ * Verifies the current password when the account has one.
+ *
+ * Returns true when the caller may proceed. Where there is no password
+ * there is nothing to ask for and the token is the proof, the same rule
+ * /player/google/link follows.
+ */
+async function confirmedWithPassword(row, req, res, action) {
+  if (!row.password_hash) return true
+  const currentPassword = String(req.body?.currentPassword ?? '')
+  if (await verifyPassword(currentPassword, row.password_hash)) return true
+  res.status(403).json({
+    error: `Enter your password to ${action}`,
+    needsCurrentPassword: true,
+  })
+  return false
+}
+
+/**
+ * Changes the name, the email, or both.
+ *
+ * The email is asked to be confirmed with the password, and the name is
+ * not, because they are not the same kind of change. A name is what
+ * other umpires see against a session. An email is a way in: /auth/google
+ * links a Google account to an umpire whose email MATCHES, so an
+ * attacker who could quietly move this account to an address they own
+ * could then walk in through Google without ever knowing the password.
+ */
+router.patch('/me', requireAuth, async (req, res) => {
+  const found = await loadUmpire(req.umpire.id)
+  if (!found) return res.status(401).json({ error: 'Account no longer exists' })
+
+  const name =
+    req.body?.name === undefined ? found.name : String(req.body.name).trim()
+  const email =
+    req.body?.email === undefined ? found.email : normalizeEmail(req.body.email)
+
+  if (!name) return res.status(400).json({ error: 'Name is required' })
+  if (!email.includes('@')) {
+    return res.status(400).json({ error: 'Email looks invalid' })
+  }
+
+  const emailChanged = email !== normalizeEmail(found.email)
+  if (emailChanged && !(await confirmedWithPassword(found, req, res, 'change your email'))) {
+    return
+  }
+
+  let updated
+  try {
+    ;({ rows: updated } = await query(
+      `UPDATE umpires SET name = $2, email = $3 WHERE id = $1
+        RETURNING id, email, name, is_admin, password_hash, google_email`,
+      [found.id, name, email],
+    ))
+  } catch (error) {
+    // 23505 on umpires_email_lower_idx: somebody else already has it.
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'That email is already registered' })
+    }
+    throw error
+  }
+
+  // A fresh token because the old one carries the old name in its
+  // claims. Nothing authorises on that claim -- only `sub` is used --
+  // but a token that disagrees with the account it belongs to is a trap
+  // for whatever reads it next.
+  res.json({ token: signToken(updated[0]), umpire: umpirePayload(updated[0]) })
+})
+
+/**
+ * Changes the password, or sets the first one.
+ *
+ * An umpire who signed up through Google has no password at all, and
+ * this is how they get one -- which is also the only way they can ever
+ * disconnect Google, since that is refused while it is their only way
+ * in.
+ */
+router.post('/me/password', requireAuth, async (req, res) => {
+  const found = await loadUmpire(req.umpire.id)
+  if (!found) return res.status(401).json({ error: 'Account no longer exists' })
+
+  const password = String(req.body?.password ?? '')
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({
+      error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+    })
+  }
+
+  if (!(await confirmedWithPassword(found, req, res, 'change your password'))) return
+
+  const { rows: updated } = await query(
+    `UPDATE umpires SET password_hash = $2 WHERE id = $1
+      RETURNING id, email, name, is_admin, password_hash, google_email`,
+    [found.id, await hashPassword(password)],
+  )
+
+  res.json({ token: signToken(updated[0]), umpire: umpirePayload(updated[0]) })
+})
+
+/**
+ * Connects a Google account to the account already signed in.
+ *
+ * The same job as /auth/google/link, from the other side of the door:
+ * that one is for someone at the gate who has typed their email and
+ * password, this one for someone already inside. Both exist because
+ * neither can stand in for the other -- an umpire mid-session must not
+ * have to sign out, and someone who cannot get in has no token to use.
+ */
+router.post('/google/connect', requireAuth, async (req, res) => {
+  // Google first, before a single row is read, so this can never be
+  // used to ask questions about accounts.
+  let profile
+  try {
+    profile = await resolveGoogleProfile(req.body ?? {})
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message })
+    }
+    throw error
+  }
+
+  const found = await loadUmpire(req.umpire.id)
+  if (!found) return res.status(401).json({ error: 'Account no longer exists' })
+
+  if (!(await confirmedWithPassword(found, req, res, 'connect a Google account'))) return
+
+  // Already wearing a different one. Replacing it silently would cut
+  // off whoever had been signing in with the old one.
+  if (found.google_sub && found.google_sub !== profile.sub) {
+    return res.status(409).json({
+      error: 'This account is already connected to a different Google account.',
+    })
+  }
+
+  let updated
+  try {
+    ;({ rows: updated } = await query(
+      `UPDATE umpires SET google_sub = $2, google_email = $3 WHERE id = $1
+        RETURNING id, email, name, is_admin, password_hash, google_email`,
+      [found.id, profile.sub, profile.email],
+    ))
+  } catch (error) {
+    if (error.constraint === 'umpires_google_sub_idx') {
+      return res.status(409).json({
+        error: 'That Google account is already connected to another umpire.',
+      })
+    }
+    throw error
+  }
+
+  res.json({ token: signToken(updated[0]), umpire: umpirePayload(updated[0]) })
+})
+
+/**
+ * Disconnects Google.
+ *
+ * Refused outright when there is no password, and this is stricter than
+ * the player rule on purpose. A player who strands themselves can be
+ * let back in by an umpire re-minting their claim code -- a recovery
+ * path with a trusted human in it. An umpire has nothing of the kind:
+ * no code, and no password-reset email anywhere in this system. So a
+ * Google-only umpire who disconnected would be locked out for good, and
+ * the honest answer is to refuse and say what to do first.
+ */
+router.post('/google/disconnect', requireAuth, async (req, res) => {
+  const found = await loadUmpire(req.umpire.id)
+  if (!found) return res.status(401).json({ error: 'Account no longer exists' })
+
+  if (!found.google_sub) {
+    return res.status(409).json({ error: 'No Google account is connected.' })
+  }
+
+  if (!found.password_hash) {
+    return res.status(409).json({
+      error:
+        'Set a password first — Google is the only way into this account, and there are no reset emails here.',
+      needsPassword: true,
+    })
+  }
+
+  if (!(await confirmedWithPassword(found, req, res, 'disconnect Google'))) return
+
+  const { rows: updated } = await query(
+    `UPDATE umpires SET google_sub = NULL, google_email = NULL WHERE id = $1
+      RETURNING id, email, name, is_admin, password_hash, google_email`,
+    [found.id],
+  )
+
+  res.json({ token: signToken(updated[0]), umpire: umpirePayload(updated[0]) })
 })
 
 /**

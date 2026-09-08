@@ -39,6 +39,22 @@ function storeSession(token, umpire) {
   localStorage.setItem(UMPIRE_KEY, JSON.stringify(umpire))
 }
 
+/**
+ * Updates the stored umpire without touching the token.
+ *
+ * For /auth/me, which hands back the account as it now stands but no
+ * new token. Without this the stored copy keeps whatever the last
+ * sign-in wrote, so an account screen opened offline would show details
+ * that changed weeks ago.
+ */
+function storeUmpire(umpire) {
+  try {
+    localStorage.setItem(UMPIRE_KEY, JSON.stringify(umpire))
+  } catch {
+    // Private mode or a full disk. The in-memory copy is still right.
+  }
+}
+
 export function clearSession() {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(UMPIRE_KEY)
@@ -193,6 +209,66 @@ export async function login({ email, password }) {
 }
 
 /**
+ * ============================================================
+ * The umpire's own account.
+ *
+ * Every one of these returns a fresh token alongside the umpire, and
+ * every one of them stores it, so the header name and anything else
+ * reading the stored umpire follow immediately without a reload.
+ * ============================================================
+ */
+
+/** Changes the display name, the sign-in email, or both. */
+export async function updateUmpire({ name, email, currentPassword }) {
+  const data = await apiFetch('/auth/me', {
+    method: 'PATCH',
+    body: { name, email, currentPassword },
+  })
+  storeSession(data.token, data.umpire)
+  return data.umpire
+}
+
+/**
+ * Changes the password, or sets the first one for an umpire who signed
+ * up through Google and has never had one.
+ */
+export async function changeUmpirePassword({ currentPassword, password }) {
+  const data = await apiFetch('/auth/me/password', {
+    method: 'POST',
+    body: { currentPassword, password },
+  })
+  storeSession(data.token, data.umpire)
+  return data.umpire
+}
+
+/**
+ * Connects Google to the account already signed in.
+ *
+ * Not the same endpoint as linkGoogleAccount above, and it could not
+ * be: that one is for someone at the sign-in gate proving an account
+ * with its email and password, this one for someone already inside. An
+ * umpire mid-session must not have to sign out to connect Google.
+ */
+export async function connectGoogle({ accessToken, currentPassword }) {
+  const data = await apiFetch('/auth/google/connect', {
+    method: 'POST',
+    body: { accessToken, currentPassword },
+  })
+  storeSession(data.token, data.umpire)
+  return data.umpire
+}
+
+/** Disconnects it again. Refused when it would leave no way back in. */
+export async function disconnectGoogle({ currentPassword }) {
+  const data = await apiFetch('/auth/google/disconnect', {
+    method: 'POST',
+    body: { currentPassword },
+  })
+  storeSession(data.token, data.umpire)
+  return data.umpire
+}
+
+/**
  * Confirms a stored token is still valid. Called once on launch so an
  * expired session lands on the login screen immediately, rather than
  * failing on the first real request in the middle of a match.
@@ -205,6 +281,7 @@ export async function fetchCurrentUmpire() {
   if (!getToken()) return null
   try {
     const data = await apiFetch('/auth/me')
+    storeUmpire(data.umpire)
     return data.umpire
   } catch (error) {
     if (error.status === 401) {

@@ -12,6 +12,29 @@
       rel="stylesheet"
     />
     <title>PaddlePad Umpire</title>
+    <!-- Runs before anything paints, so a dark-mode umpire does not get a
+         white flash on every launch. Deliberately duplicates a few lines
+         of src/lib/theme.js rather than importing it: the module graph
+         loads far too late to prevent the flash, which is the entire
+         point. Kept tiny so the two cannot meaningfully drift. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('paddlepad.umpire.theme')
+          var dark =
+            stored === 'dark' ||
+            (stored !== 'light' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches)
+          var root = document.documentElement
+          root.dataset.theme = dark ? 'dark' : 'light'
+          root.style.colorScheme = dark ? 'dark' : 'light'
+          var meta = document.querySelector('meta[name="theme-color"]')
+          if (meta) meta.setAttribute('content', dark ? '#15111f' : '#7c3aed')
+        } catch (e) {
+          /* Private mode, or no matchMedia. Light is a safe first paint. */
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -221,6 +221,94 @@ async function main() {
       (await g({ accessToken: 'ya29.not-a-real-token' })).status === 401)
     check('an empty access token -> 400',
       (await g({ accessToken: '' })).status === 400)
+
+    // Connecting from INSIDE the app is a different endpoint, and it
+    // has the same obligation: Google must be checked before anything
+    // else, or a signed-in umpire could use it to test passwords.
+    const connect = (body) =>
+      call('/auth/google/connect', { method: 'POST', body })
+    check('connecting with a junk Google token -> 401',
+      (await connect({ credential: 'junk', currentPassword: 'wrong' })).status === 401)
+    check('connecting with no credential at all -> 400',
+      (await connect({ currentPassword: 'wrong' })).status === 400)
+    }
+  }
+
+  // ============================================================
+  section("the umpire's own account")
+  // ============================================================
+  // Nothing here changes the account it runs against. Every assertion
+  // is a refusal, which is where this endpoint group's security lives:
+  // an email quietly moved to an address someone else owns is a way in
+  // through Google that never needed the password.
+  {
+    const me = await call('/auth/me')
+    check('GET /auth/me -> 200', me.status === 200, JSON.stringify(me.body))
+    check('it says whether a password is set',
+      typeof me.body?.umpire?.hasPassword === 'boolean',
+      JSON.stringify(me.body?.umpire))
+    check('it never returns a password hash',
+      me.body?.umpire && !('password_hash' in me.body.umpire),
+      JSON.stringify(me.body?.umpire))
+    check('googleEmail is present as a field, connected or not',
+      me.body?.umpire && 'googleEmail' in me.body.umpire)
+
+    const hasPassword = me.body?.umpire?.hasPassword === true
+    const connected = Boolean(me.body?.umpire?.googleEmail)
+
+    check('PATCH /auth/me with no token -> 401',
+      (await asPlayer('/auth/me', { method: 'PATCH', body: { name: 'nope' } })).status === 401)
+
+    if (hasPassword) {
+      const moved = await call('/auth/me', {
+        method: 'PATCH',
+        body: { email: `hijack.${Date.now()}@example.com` },
+      })
+      check('changing the email without the password -> 403',
+        moved.status === 403, JSON.stringify(moved.body))
+      check('...and says which field is missing',
+        moved.body?.needsCurrentPassword === true)
+
+      const wrong = await call('/auth/me', {
+        method: 'PATCH',
+        body: {
+          email: `hijack.${Date.now()}@example.com`,
+          currentPassword: 'definitely-not-the-password',
+        },
+      })
+      check('changing the email with a WRONG password -> 403', wrong.status === 403)
+
+      check('changing the password without the current one -> 403',
+        (await call('/auth/me/password', {
+          method: 'POST', body: { password: 'a-long-enough-one' },
+        })).status === 403)
+    }
+
+    check('a too-short new password -> 400',
+      (await call('/auth/me/password', {
+        method: 'POST', body: { password: 'short', currentPassword: 'x' },
+      })).status === 400,
+      'length must be checked before the current password, or this is a password oracle')
+
+    // Renaming needs no password -- a display name is not a way in --
+    // so this one really does write, and writes the same value back.
+    const rename = await call('/auth/me', {
+      method: 'PATCH', body: { name: me.body?.umpire?.name },
+    })
+    check('renaming to the same name -> 200', rename.status === 200,
+      JSON.stringify(rename.body))
+    check('the account comes back unchanged',
+      rename.body?.umpire?.email === me.body?.umpire?.email &&
+      rename.body?.umpire?.name === me.body?.umpire?.name)
+    check('and a fresh token with it', typeof rename.body?.token === 'string')
+
+    const off = await call('/auth/google/disconnect', { method: 'POST' })
+    if (connected) {
+      check('disconnecting Google without the password -> 403', off.status === 403,
+        JSON.stringify(off.body))
+    } else {
+      check('disconnecting when nothing is connected -> 409', off.status === 409,
+        JSON.stringify(off.body))
     }
   }
 
