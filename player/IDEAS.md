@@ -1,0 +1,106 @@
+# Ideas: more of the ML pipeline, in the player app
+
+Notes from a conversation, not a backlog. Nothing here is scheduled, and
+none of it is started. It is written down because working it out again
+from scratch would cost more than reading it.
+
+## The framing
+
+The ML pipeline (`~/skul/PaddlePad`) computes **ten numbers per player**.
+Five describe how someone plays — winning shots, mistakes, mistakes at
+the net, how often their third-shot drop lands, and how aggressively they
+play. Five more describe how much each of those **swings from game to
+game**.
+
+The player app shows three things: a score, a tier, and a playstyle word.
+
+So roughly nine-tenths of what the model knows never reaches the person
+it is about. Most of what follows is opening that box rather than
+computing anything new, which is why the list is longer than the work.
+
+## The ideas
+
+**1. What is actually moving your rating.** Take the two features where a
+player sits furthest from the average of others at their level — one
+good, one bad — and say them plainly: *"Your drops land more often than
+most players around you. Your unforced mistakes are the thing holding the
+number down."* A score nobody can act on is a horoscope. This turns it
+into a coaching note. Needs the pipeline to send the per-feature
+comparison alongside the score.
+
+**2. Your ceiling and your floor.** Half the model is about consistency —
+the five "how much do you swing" numbers — and none of it is visible.
+*"On your best day you play like a 74, on your worst like a 41"* is a
+genuinely interesting sentence, and it is the half most rating systems
+cannot say at all because they only ever store one number.
+
+**3. What separates you from the next group up.** The clustering already
+knows where each skill group sits. Compare a player's ten numbers against
+the group above and name the biggest gap: *"It isn't your winners — it's
+that your third-shot drop lands 40% of the time and theirs lands 65%."*
+This is the most useful thing a skill model can tell an amateur, and it
+is mostly arithmetic over numbers that already exist.
+
+**4. Was that an upset?** With scores for all four players, the model can
+say what it expected before the match started, so a finished match can
+carry *"you were expected to lose this one"*. Beating someone stronger
+should feel different from beating someone weaker; today a win is a win.
+
+**5. Drop or drive — which actually works for you.** This app records the
+third shot separately from how the rally ended, which is unusual. So it
+can answer: *"When you drop, you go on to win the rally 58% of the time.
+When you drive, 41%."* No model needed — this one is pure event log.
+
+**6. Playstyle, with its reasons.** The archetype is currently a bare
+label. Two lines of evidence under it — *"you dink more than most, and
+you take fewer risks off the bounce"* — is the difference between a label
+people believe and one they shrug at.
+
+**7. Partner fit, done fairly.** The People screen already counts wins
+with each partner. The model's version weights them by who the pair was
+up against, so a 50% record against strong opponents stops looking worse
+than 70% against weak ones. Note the privacy line the app draws: using
+other players' scores to adjust *your* number is fine, showing them is
+not.
+
+## Where each one lands
+
+**Not a fifth tab.** The app has four (Overview, Matches, People, You), a
+phone's bottom bar frays at five, and a tab is a promise of frequent
+return traffic that a "why is my rating this" page will never earn. The
+ideas split along homes that already exist:
+
+| Idea | Home |
+| --- | --- |
+| 1, 2, 3, 6 — depth on the rating | A new drill-down page, reached by tapping the rating card on Overview |
+| 4 — was that an upset | Match detail; it is a fact about one game, not about a player |
+| 7 — partner fit | People, where the partner records already are |
+| 5 — drop or drive | The orphan. No obvious existing home, and the only one needing no ML |
+
+That shape is one new screen plus three small additions to screens that
+exist — which is also why none of it has to happen at once. The rating
+page can land alone and the rest can follow whenever.
+
+## Three things not to forget
+
+**A small club makes all of this wobbly.** Percentiles and clusters need
+bodies. The five-match gate exists for exactly this reason, and anything
+new here needs its own honest version of it rather than quietly showing a
+number computed from four people.
+
+**These numbers move when other people play.** The skill score is
+relative to the pool, so anything derived from it inherits that, and
+needs the same "as of 24 August, against 46 players" framing the ratings
+already carry. A player who drops four points without touching a paddle
+deserves an explanation that exists.
+
+**Singles and doubles counts are not comparable.** A raw per-player count
+means something different in a format with half the players on court.
+Anything per-format stays per-format, or becomes a ratio.
+
+## If it is ever picked up, start here
+
+Ideas **1** and **3** share a single pipeline change: send the
+per-feature comparison, not just the final score. Together they turn the
+rating from a verdict into advice, which is the whole point of showing a
+player a number in the first place.
