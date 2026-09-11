@@ -123,6 +123,26 @@ section('match of the month')
     score: board.matchOfTheMonth.score,
   }, { teamA: ['Cy'], teamB: ['Dee'], score: { A: 12, B: 10 } },
   '12-10 beats 11-9 on the same margin because it is the longer game; 10-9 was stopped early so is not a finished game; 13-11 has a player who hides their name, and naming the other three would identify them')
+  check('and why it was picked', board.matchOfTheMonth && {
+    outOf: board.matchOfTheMonth.outOf,
+    sameMargin: board.matchOfTheMonth.sameMargin,
+    wentFurthest: board.matchOfTheMonth.wentFurthest,
+  }, { outOf: 2, sameMargin: 2, wentFurthest: true },
+  'chosen from the two games it could be (11-9 and 12-10), both won by two, and it went furthest — the early and hidden-player games were never candidates')
+}
+
+// ============================================================
+section('two games level on margin AND length')
+// ============================================================
+{
+  const board = buildBoard({
+    matches: [match(['Ana'], ['Ben'], 12, 10), match(['Cy'], ['Dee'], 12, 10)],
+    visible: everyone('Ana', 'Ben', 'Cy', 'Dee'),
+    nameOf: names('Ana', 'Ben', 'Cy', 'Dee'),
+  })
+  check('the later one, and not claimed to have gone furthest',
+    [board.matchOfTheMonth.teamA, board.matchOfTheMonth.wentFurthest], [['Cy'], false],
+    'two identical 12-10s: the most recent wins the tie, and "the one that went furthest" would be untrue, so it is not said')
 }
 
 // ============================================================

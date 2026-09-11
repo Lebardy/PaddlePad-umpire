@@ -814,6 +814,100 @@ a.highlight:active { background: var(--surface); }
   margin-bottom: 0.8rem;
 }
 .board-match-key { display: block; margin-top: 0.4rem; }
+
+/* The one sentence that says what happened. It is the reason to open
+   the page, so it is the biggest words on it after the score. */
+.board-match-headline {
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.45;
+  margin: 0 0 0.8rem;
+}
+
+/* ---- The chart, with its key moments pinned to it ---- */
+.mchart { position: relative; height: 150px; margin: 1.4rem 0 1.6rem; }
+.mchart-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.mchart-base { stroke: var(--border); stroke-width: 1; }
+.mchart-area { fill: var(--series-1); opacity: 0.1; }
+.mchart-line {
+  fill: none;
+  stroke: var(--series-1);
+  stroke-width: 2.25;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.mchart-mark {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.mchart-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--series-1);
+}
+.mchart-label {
+  position: absolute;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text);
+}
+.mchart-above .mchart-label { bottom: 100%; margin-bottom: 0.2rem; }
+.mchart-below .mchart-label { top: 100%; margin-top: 0.2rem; }
+/* At the edges the label hangs inwards rather than off the screen. */
+.mchart-end .mchart-label { right: 0; }
+.mchart-start .mchart-label { left: 0; }
+
+/* ---- The game in numbers ---- */
+.board-match-facts {
+  list-style: none;
+  padding: 0;
+  margin: 0.9rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.board-match-facts li {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+}
+
+/* ---- Every point in order ---- */
+.board-match-path {
+  list-style: none;
+  padding: 0;
+  margin: 0.2rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.board-match-path li {
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  padding: 0.2rem 0.4rem;
+  border-radius: 6px;
+  background: var(--surface-sunken);
+  border: 1px solid transparent;
+}
+.board-match-path li.is-level { background: none; border-color: var(--border); }
+.board-match-path li.is-final {
+  background: var(--series-1);
+  border-color: var(--series-1);
+  color: #fff;
+  font-weight: 700;
+}
+
+.board-match-why { font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-top: 0.4rem; }
 .board-match .board-footer { margin-top: 1rem; }
 
 /* A narrow phone gives the label its own line rather than squeezing

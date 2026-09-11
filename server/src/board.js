@@ -151,6 +151,17 @@ export function buildBoard({ matches, visible, nameOf, progress = [] }) {
         // So the board can open it. Only this one match is ever
         // viewable this way -- see getMatchOfTheMonthStory.
         id: best.id,
+        // Why it was picked, in numbers the page can say honestly. Read
+        // across a real month, "the closest of 105" would have been
+        // misleading: sixteen games were won by two, so the true claim is
+        // "one of 16 won by two, and the one that went furthest". All
+        // three are counted from the games it was chosen among, not every
+        // match this month.
+        outOf: candidates.length,
+        sameMargin: candidates.filter((c) => c.margin === best.margin).length,
+        wentFurthest: candidates.every(
+          (c) => c === best || c.margin !== best.margin || c.total < best.total,
+        ),
         teamA: best.teamA.map((id) => nameOf.get(id) ?? 'Unknown'),
         teamB: best.teamB.map((id) => nameOf.get(id) ?? 'Unknown'),
         score: best.score,
@@ -230,7 +241,7 @@ async function gatherMonth(query) {
   const { rows } = await query(
     `SELECT m.id, m.team_a, m.team_b, m.first_server_team, m.first_server_player,
             m.right_start_a, m.right_start_b, m.point_target, m.winner,
-            m.ended_at, m.ended_early
+            m.started_at, m.ended_at, m.ended_early
        FROM matches m
        JOIN sessions s ON s.id = m.session_id
       WHERE m.status = 'completed'
@@ -356,11 +367,23 @@ export async function getMatchOfTheMonthStory(query, matchId) {
   // winners were ahead" -- a neutral page still needs one point of view.
   const winner = row.winner === 'B' ? 'B' : 'A'
 
+  const events = month.eventsByMatch.get(row.id) ?? []
+
+  // Both ends come from a device clock, so a phone set wrong would show
+  // a game lasting minus ten minutes or nine hours. Out-of-range values
+  // are dropped rather than shown -- the same bound the ML export clamps
+  // to, for the same reason.
+  const minutes = Math.round((new Date(row.ended_at) - new Date(row.started_at)) / 60_000)
+
   return {
     ...matchOfTheMonth,
     winner,
     isDoubles: row.team_a.length === 2,
     pointTarget: row.point_target,
-    margins: scoreProgression(row, month.eventsByMatch.get(row.id) ?? [], winner),
+    margins: scoreProgression(row, events, winner),
+    // Every rally, including the ones that only changed the serve.
+    // A count for the whole game, not split by anyone.
+    rallies: events.filter((e) => e.type === 'rally').length,
+    minutes: minutes > 0 && minutes <= 240 ? minutes : null,
   }
 }
