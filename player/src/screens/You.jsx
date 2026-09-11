@@ -19,7 +19,13 @@
 
 import { useState } from 'react'
 import { usePlayerData } from '../lib/PlayerData'
-import { linkGoogle, setCredentials, unlinkGoogle, updateProfile } from '../lib/api'
+import {
+  linkGoogle,
+  setCredentials,
+  setNameVisible,
+  unlinkGoogle,
+  updateProfile,
+} from '../lib/api'
 import GoogleButton from '../components/GoogleButton'
 import { canReturnUnaided } from '../lib/account'
 import { THEMES, getThemeChoice, setThemeChoice } from '../lib/theme'
@@ -491,6 +497,73 @@ function ThemeChoice() {
   )
 }
 
+/**
+ * Whether this player's name may appear on the monthly board.
+ *
+ * Two buttons in the same style as Appearance rather than a switch,
+ * because each says in words what it does -- a toggle's "on" has to be
+ * guessed. No password: this moves no data and locks nobody out, and a
+ * privacy setting that is hard to reach is one people do not use.
+ */
+function BoardVisibility() {
+  const { nameVisible, refresh } = usePlayerData()
+  // Only while a change is on its way. The rest of the time the loaded
+  // value is shown directly -- copying it into state once would freeze
+  // whatever it was on the first render, before the data had arrived.
+  const [pending, setPending] = useState(null)
+  const [error, setError] = useState(null)
+  const shown = pending ?? nameVisible
+
+  async function choose(next) {
+    if (next === shown) return
+    setPending(next)
+    setError(null)
+    try {
+      await setNameVisible(next)
+      await refresh()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setPending(null)
+    }
+  }
+
+  return (
+    <section className="you-section" aria-label="Monthly board">
+      <h2>Monthly board</h2>
+      <p>
+        &ldquo;This month on PaddlePad&rdquo;, at the top of People, names
+        players for things like playing the most or the closest game of the
+        month.
+      </p>
+      <div className="filter-row" role="group" aria-label="Your name on the board">
+        <button
+          type="button"
+          className={`filter ${shown ? 'filter-active' : ''}`}
+          aria-pressed={shown}
+          onClick={() => choose(true)}
+        >
+          Show my name
+        </button>
+        <button
+          type="button"
+          className={`filter ${!shown ? 'filter-active' : ''}`}
+          aria-pressed={!shown}
+          onClick={() => choose(false)}
+        >
+          Hide my name
+        </button>
+      </div>
+      {error && <p className="error">{error}</p>}
+      <p className="detail-note">
+        Hiding only takes your name off the board. Your matches and rating stay
+        exactly as they are, and you still count in numbers about everyone —
+        just never by name.
+      </p>
+    </section>
+  )
+}
+
 function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
   const joined = joinedLabel(player.claimedAt)
 
@@ -506,14 +579,21 @@ function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
 
       <Details player={player} onPlayerChange={onPlayerChange} />
 
+      <BoardVisibility />
+
       <LinkCode onPlayerChange={onPlayerChange} />
 
       <section className="you-section" aria-label="This app">
         <h2>This app</h2>
+        {/* This used to say nothing is ever compared against anyone
+            else. The rating page and the monthly board made that untrue,
+            so it now says where the exceptions are instead. */}
         <p>
-          PaddlePad shows the matches an umpire recorded for you. Every number
-          here is a plain count of what was tapped courtside — nothing is
-          estimated, and nothing is compared against anyone else.
+          PaddlePad shows the matches an umpire recorded for you. Most numbers
+          here are plain counts of what was tapped courtside. Two things look
+          further: your skill rating, which is measured against everyone who
+          has been rated, and the monthly board, which names people for what
+          they did — it never ranks anyone.
         </p>
         {/* Written out rather than a custom install button: the browser
             prompt never fires on iOS and only fires on Android under
