@@ -8,6 +8,7 @@ import {
 } from '../auth.js'
 import {
   countMatchesInProgress,
+  getClubStanding,
   getPlayerMatches,
   getRatingState,
   summarisePlayer,
@@ -71,6 +72,21 @@ router.get('/me', async (req, res) => {
     // reason there isn't one yet. Never a bare null.
     rating,
   })
+})
+
+/**
+ * Where this player sits in the club, and who else is in their group.
+ *
+ * Its own route rather than part of /me, which is this app's hot path:
+ * the overview loads on every launch and should not pay for two extra
+ * aggregate queries that only matter once someone taps through to ask.
+ *
+ * Nothing here identifies anybody. It is counts and a shape -- see
+ * getClubStanding for why a ranked list would be a worse answer than
+ * this one even setting competitiveness aside.
+ */
+router.get('/standing', async (req, res) => {
+  res.json({ standing: await getClubStanding(query, req.player.id) })
 })
 
 /**

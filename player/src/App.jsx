@@ -5,6 +5,7 @@ import Matches from './screens/Matches'
 import MatchDetail from './screens/MatchDetail'
 import People from './screens/People'
 import PersonDetail from './screens/PersonDetail'
+import Rating from './screens/Rating'
 import You from './screens/You'
 import EmptyState from './components/EmptyState'
 import ErrorState from './components/ErrorState'
@@ -94,6 +95,7 @@ function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
   let screen
   if (path === '/')
     screen = <Overview player={player} onPlayerChange={onPlayerChange} />
+  else if (path === '/rating') screen = <Rating />
   else if (path === '/matches') screen = <Matches />
   else if (matchRoute) screen = <MatchDetail id={matchRoute.id} />
   else if (path === '/people') screen = <People />
