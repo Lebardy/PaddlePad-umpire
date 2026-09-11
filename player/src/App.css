@@ -742,6 +742,13 @@ a.highlight:active { background: var(--surface); }
 }
 .rating-more:hover { text-decoration: underline; }
 
+/* A section heading with its icon, on the settings screen. */
+.you-head { display: flex; align-items: center; gap: 0.4rem; }
+.you-head svg { color: var(--text-muted); }
+/* The one line a section is allowed before the rest goes behind a tap. */
+.you-line { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 0.4rem; }
+.you-version { display: block; margin-top: 0.8rem; }
+
 /* ============ Calm motion ============ */
 
 /* Things settle into place once when a screen opens. Nothing loops, and

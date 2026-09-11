@@ -19,6 +19,8 @@
 import Meter from './Meter'
 import { Link } from '../lib/router'
 import RatingHistory from './RatingHistory'
+import Icon from './Icon'
+import { useCountUp } from '../lib/motion'
 
 /**
  * Why five matches, said in the app's own voice.
@@ -60,8 +62,7 @@ function NotEnoughPlayers({ have, need }) {
       <h2>Skill rating</h2>
       <Meter label={`${have} of about ${need} players`} value={have / need} caption="" />
       <p className="muted-inline">
-        You&rsquo;ve played enough — a rating needs a bigger group to
-        compare you against.
+        You&rsquo;ve played enough — a rating needs a bigger group.
       </p>
     </section>
   )
@@ -99,6 +100,7 @@ function Rated({ rating }) {
     day: 'numeric',
     month: 'short',
   })
+  const score = useCountUp(rating.skillScore)
 
   return (
     <section className="rating rating-scored" aria-label="Skill rating">
@@ -107,8 +109,8 @@ function Rated({ rating }) {
         <span className="chip chip-quiet">{when}</span>
       </div>
 
-      <div className="rating-score">
-        <span className="rating-number">{rating.skillScore}</span>
+      <div className="rating-score" aria-label={`${rating.skillScore} out of 100`}>
+        <span className="rating-number">{score}</span>
         <span className="rating-outof">/ 100</span>
       </div>
 
@@ -116,10 +118,18 @@ function Rated({ rating }) {
         <p className="rating-archetype">{rating.playstyleArchetype}</p>
       )}
 
-      <p className="muted-inline">
-        Compared with {rating.poolSize} players, from{' '}
-        {rating.fromMatches} of your matches.
-      </p>
+      {/* The two facts a relative score must never appear without, as
+          chips rather than a sentence. */}
+      <ul className="ichips" aria-label="What this rating rests on">
+        <li className="ichip">
+          <Icon name="people" size={15} />
+          <span>{rating.poolSize} rated</span>
+        </li>
+        <li className="ichip">
+          <Icon name="matches" size={15} />
+          <span>{rating.fromMatches} of your matches</span>
+        </li>
+      </ul>
 
       <RatingHistory history={rating.history} />
 

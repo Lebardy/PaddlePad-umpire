@@ -29,6 +29,8 @@ import {
 import GoogleButton from '../components/GoogleButton'
 import { canReturnUnaided } from '../lib/account'
 import { THEMES, getThemeChoice, setThemeChoice } from '../lib/theme'
+import Icon from '../components/Icon'
+import More from '../components/More'
 import Avatar from '../components/Avatar'
 import DeleteProfile from './DeleteProfile'
 import LinkCode from './LinkCode'
@@ -41,6 +43,16 @@ function joinedLabel(claimedAt) {
     month: 'long',
     year: 'numeric',
   })
+}
+
+/** A section heading with its icon. */
+function Head({ icon, children }) {
+  return (
+    <h2 className="you-head">
+      <Icon name={icon} size={16} />
+      {children}
+    </h2>
+  )
 }
 
 /**
@@ -272,7 +284,7 @@ function Details({ player, onPlayerChange }) {
 
   return (
     <section className="you-details" aria-label="Your details">
-      <h2>Your details</h2>
+      <Head icon="you">Your details</Head>
 
       <DetailRow
         label="Name"
@@ -474,7 +486,7 @@ function ThemeChoice() {
 
   return (
     <section className="you-section" aria-label="Appearance">
-      <h2>Appearance</h2>
+      <Head icon="sparkle">Appearance</Head>
       <div className="filter-row" role="group" aria-label="Theme">
         {THEMES.map((theme) => (
           <button
@@ -530,11 +542,9 @@ function BoardVisibility() {
 
   return (
     <section className="you-section" aria-label="Monthly board">
-      <h2>Monthly board</h2>
-      <p>
-        &ldquo;This month on PaddlePad&rdquo;, at the top of People, names
-        players for things like playing the most or the closest game of the
-        month.
+      <Head icon="trophy">Monthly board</Head>
+      <p className="you-line">
+        Your name can appear on the board at the top of People.
       </p>
       <div className="filter-row" role="group" aria-label="Your name on the board">
         <button
@@ -555,11 +565,13 @@ function BoardVisibility() {
         </button>
       </div>
       {error && <p className="error">{error}</p>}
-      <p className="detail-note">
-        Hiding only takes your name off the board. Your matches and rating stay
-        exactly as they are, and you still count in numbers about everyone —
-        just never by name.
-      </p>
+      <More label="What does hiding do?">
+        <p>
+          It only takes your name off the board. Your matches and rating stay
+          exactly as they are, and you still count in numbers about everyone —
+          just never by name.
+        </p>
+      </More>
     </section>
   )
 }
@@ -584,30 +596,37 @@ function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
       <LinkCode onPlayerChange={onPlayerChange} />
 
       <section className="you-section" aria-label="This app">
-        <h2>This app</h2>
-        {/* This used to say nothing is ever compared against anyone
-            else. The rating page and the monthly board made that untrue,
-            so it now says where the exceptions are instead. */}
-        <p>
-          PaddlePad shows the matches an umpire recorded for you. Most numbers
-          here are plain counts of what was tapped courtside. Two things look
-          further: your skill rating, which is measured against everyone who
-          has been rated, and the monthly board, which names people for what
-          they did — it never ranks anyone.
+        <Head icon="info">This app</Head>
+        <p className="you-line">
+          Your matches, as an umpire recorded them courtside.
         </p>
+        {/* The claim that nothing is compared against anyone else stopped
+            being true when the rating page and the monthly board arrived,
+            so this says where the exceptions are instead -- now behind a
+            tap, because it is an answer to a question, not a greeting. */}
+        <More label="Where do the numbers come from?">
+          <p>
+            Most numbers here are plain counts of what was tapped courtside.
+            Two things look further: your skill rating, which is measured
+            against everyone who has been rated, and the monthly board, which
+            names people for what they did — it never ranks anyone.
+          </p>
+        </More>
         {/* Written out rather than a custom install button: the browser
             prompt never fires on iOS and only fires on Android under
             heuristics nobody controls, so a button that may never appear
             is worse than an instruction that always does. */}
-        <p>
-          Add PaddlePad to your home screen from your browser&rsquo;s share menu
-          and it opens like any other app.
-        </p>
-        <p className="muted-inline">Version {VERSION}</p>
+        <More label="Add it to your home screen">
+          <p>
+            Open your browser&rsquo;s share menu and choose Add to Home Screen.
+            It then opens like any other app.
+          </p>
+        </More>
+        <p className="muted-inline you-version">Version {VERSION}</p>
       </section>
 
       <section className="you-section" aria-label="Account">
-        <h2>Account</h2>
+        <Head icon="info">Account</Head>
         <button type="button" className="sign-out" onClick={onSignOut}>
           Sign out
         </button>

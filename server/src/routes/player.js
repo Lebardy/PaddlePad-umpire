@@ -11,11 +11,13 @@ import {
   getClubStanding,
   getPlayerMatches,
   getRatingState,
+  scoreProgression,
   summarisePlayer,
 } from '../player-stats.js'
 import { normalizeInviteCode } from '../invites.js'
 import { getMatchOfTheMonthStory, getMonthlyBoard } from '../board.js'
-import { normalizePlayerName, playerNameError } from '../validate.js'
+import { isUuid, normalizePlayerName, playerNameError } from '../validate.js'
+import { readGame } from '../drama.js'
 
 const router = Router()
 
@@ -138,6 +140,49 @@ router.put('/me/visibility', async (req, res) => {
   )
   if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
   res.json({ nameVisible: rows[0].name_visible })
+})
+
+/**
+ * How one of this player's own matches went, point by point.
+ *
+ * Its own call rather than part of /player/matches: a reading like this
+ * for every match in a long history would be tens of kilobytes on every
+ * launch, and only the match actually opened needs one.
+ *
+ * Told from THIS player's side -- their points are the ones filled in on
+ * the ribbon -- so "winners" in the reading means their team here,
+ * whether they won or lost. Only matches they played in: the guard is
+ * the same one getPlayerMatches uses, so this can never become a way to
+ * read somebody else's game.
+ */
+router.get('/matches/:id/game', async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such match' })
+
+  const { rows } = await query(
+    `SELECT m.id, m.team_a, m.team_b, m.first_server_team, m.first_server_player,
+            m.right_start_a, m.right_start_b, m.point_target
+       FROM matches m
+       JOIN sessions s ON s.id = m.session_id
+      WHERE m.id = $1
+        AND m.status = 'completed'
+        AND m.ended_at IS NOT NULL
+        AND m.voided_at IS NULL
+        AND s.voided_at IS NULL
+        AND (m.team_a @> ARRAY[$2]::uuid[] OR m.team_b @> ARRAY[$2]::uuid[])`,
+    [req.params.id, req.player.id],
+  )
+  const row = rows[0]
+  if (!row) return res.status(404).json({ error: 'No such match' })
+
+  const { rows: events } = await query(
+    `SELECT type, payload FROM match_events WHERE match_id = $1 ORDER BY seq`,
+    [row.id],
+  )
+  const log = events.map((e) => ({ type: e.type, ...e.payload }))
+  const team = row.team_a.includes(req.player.id) ? 'A' : 'B'
+  const margins = scoreProgression(row, log, team)
+
+  res.json({ margins, game: readGame(margins, row.point_target) })
 })
 
 /**
