@@ -14,7 +14,7 @@ import {
   summarisePlayer,
 } from '../player-stats.js'
 import { normalizeInviteCode } from '../invites.js'
-import { getMonthlyBoard } from '../board.js'
+import { getMatchOfTheMonthStory, getMonthlyBoard } from '../board.js'
 import { normalizePlayerName, playerNameError } from '../validate.js'
 
 const router = Router()
@@ -105,6 +105,19 @@ router.get('/standing', async (req, res) => {
  */
 router.get('/board', async (req, res) => {
   res.json({ board: await getMonthlyBoard(query) })
+})
+
+/**
+ * How this month's match of the month went -- that match and no other.
+ *
+ * A 404 for any other id, including last month's winner once the month
+ * turns: see getMatchOfTheMonthStory for why this must never become a
+ * way to read arbitrary matches.
+ */
+router.get('/board/match/:id', async (req, res) => {
+  const story = await getMatchOfTheMonthStory(query, req.params.id)
+  if (!story) return res.status(404).json({ error: 'That is not this month\'s match of the month' })
+  res.json({ match: story })
 })
 
 /**

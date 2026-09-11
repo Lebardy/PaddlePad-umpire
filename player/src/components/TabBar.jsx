@@ -25,6 +25,9 @@ function isActive(tab, path) {
   // its own, so Overview stays lit while it is open -- the same way a
   // match stays under Matches.
   if (tab.to === '/') return path === '/' || path === '/rating'
+  // The match of the month opens from the board on People, so People
+  // stays lit while it is open.
+  if (tab.to === '/people' && path.startsWith('/board/')) return true
   return path === tab.to || path.startsWith(`${tab.to}/`)
 }
 

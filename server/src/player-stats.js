@@ -150,7 +150,7 @@ export async function getPlayerMatches(query, playerId) {
  * stretch in the middle of a chart says nothing a reader can use --
  * what they want to see is the scoring.
  */
-function scoreProgression(row, events, team) {
+export function scoreProgression(row, events, team) {
   const base = {
     teamA: row.team_a,
     teamB: row.team_b,
