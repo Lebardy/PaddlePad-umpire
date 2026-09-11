@@ -86,7 +86,8 @@ function WhereYouSit({ standing }) {
 
       {!standing.distribution && others > 0 && (
         <p className="muted-inline standing-note">
-          With more players rated, this becomes a picture of the whole club.
+          With more players rated, this becomes a picture of everyone on
+          PaddlePad.
         </p>
       )}
     </section>

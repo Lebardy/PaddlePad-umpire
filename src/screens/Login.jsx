@@ -122,7 +122,7 @@ function Login({ onSignedIn }) {
         <>
           <p className="login-note">
             We don&rsquo;t recognise that Google account yet. Signing in with
-            Google proves who you are, not that you belong to this club.
+            Google proves who you are, not that you may score matches here.
           </p>
 
           {/* Two genuinely different people arrive here. Someone new,
@@ -227,7 +227,7 @@ function Login({ onSignedIn }) {
                 />
               </label>
               <p className="field-hint">
-                From whoever runs this club. Needed either way.
+                From whoever runs PaddlePad. Needed either way.
               </p>
             </div>
           )}

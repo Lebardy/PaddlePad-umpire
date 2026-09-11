@@ -60,7 +60,7 @@ function DeleteProfile({ player, onDeleted }) {
             ? 'Your profile has been deleted.'
             : `Your sign-in has been deleted. The ${result.matches} ` +
               `${result.matches === 1 ? 'match' : 'matches'} you played stay ` +
-              'in the club’s record.'}
+              'on PaddlePad’s record.'}
         </p>
         <button type="button" className="sign-out" onClick={onDeleted}>
           Close
@@ -89,7 +89,7 @@ function DeleteProfile({ player, onDeleted }) {
             <strong>
               You&rsquo;ve played {played} {played === 1 ? 'match' : 'matches'}.
             </strong>{' '}
-            Those stay in the club&rsquo;s record — they&rsquo;re your
+            Those stay on PaddlePad&rsquo;s record — they&rsquo;re your
             partners&rsquo; and opponents&rsquo; history too, not only yours.
           </p>
           <p>
