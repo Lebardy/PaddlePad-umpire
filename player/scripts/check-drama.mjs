@@ -9,7 +9,12 @@
 // answers were worked out from those scores before the code ran.
 // ============================================================
 
-import { headline, readGame } from '../src/lib/matchDrama.js'
+// readGame lives on the server now, because the board ranks games on the
+// same facts the page shows. A test script is never part of the player
+// app's build, so reaching across here is fine -- the app itself only
+// ever receives the result from the API.
+import { readGame } from '../../server/src/drama.js'
+import { headline } from '../src/lib/matchDrama.js'
 
 let pass = 0
 let fail = 0

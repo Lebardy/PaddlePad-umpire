@@ -126,9 +126,9 @@ section('match of the month')
   check('and why it was picked', board.matchOfTheMonth && {
     outOf: board.matchOfTheMonth.outOf,
     sameMargin: board.matchOfTheMonth.sameMargin,
-    wentFurthest: board.matchOfTheMonth.wentFurthest,
-  }, { outOf: 2, sameMargin: 2, wentFurthest: true },
-  'chosen from the two games it could be (11-9 and 12-10), both won by two, and it went furthest — the early and hidden-player games were never candidates')
+    decidedBy: board.matchOfTheMonth.decidedBy,
+  }, { outOf: 2, sameMargin: 2, decidedBy: 'length' },
+  'chosen from the two games it could be (11-9 and 12-10), both won by two; neither carries any drama here, so length decides — the early and hidden-player games were never candidates')
 }
 
 // ============================================================
@@ -140,9 +140,43 @@ section('two games level on margin AND length')
     visible: everyone('Ana', 'Ben', 'Cy', 'Dee'),
     nameOf: names('Ana', 'Ben', 'Cy', 'Dee'),
   })
-  check('the later one, and not claimed to have gone furthest',
-    [board.matchOfTheMonth.teamA, board.matchOfTheMonth.wentFurthest], [['Cy'], false],
-    'two identical 12-10s: the most recent wins the tie, and "the one that went furthest" would be untrue, so it is not said')
+  check('the later one, and says only that',
+    [board.matchOfTheMonth.teamA, board.matchOfTheMonth.decidedBy], [['Cy'], 'recency'],
+    'two identical 12-10s: the most recent wins the tie, and "the one that went furthest" would be untrue, so it is not claimed')
+}
+
+// ============================================================
+section('drama beats length among games equally close')
+// ============================================================
+{
+  // The 12-10 had the losers two game points from winning; the 14-12
+  // swung more but the losers were never that close. Being nearly won
+  // by the other side comes first, so the shorter game is picked.
+  const nearlyLost = { savedByWinners: 2, leadChanges: 5, level: 6, savedByLosers: 0 }
+  const longer = { savedByWinners: 0, leadChanges: 3, level: 7, savedByLosers: 4 }
+  const board = buildBoard({
+    matches: [
+      { ...match(['Ana'], ['Ben'], 14, 12), game: longer },
+      { ...match(['Cy'], ['Dee'], 12, 10), game: nearlyLost },
+    ],
+    visible: everyone('Ana', 'Ben', 'Cy', 'Dee'),
+    nameOf: names('Ana', 'Ben', 'Cy', 'Dee'),
+  })
+  check('the game the losers nearly won',
+    [board.matchOfTheMonth.teamA, board.matchOfTheMonth.decidedBy], [['Cy'], 'losersGamePoints'],
+    '12-10 beats 14-12: its losers had two game points and did not take them, which matters more than two extra points')
+
+  const swung = buildBoard({
+    matches: [
+      { ...match(['Ana'], ['Ben'], 14, 12), game: { ...longer, leadChanges: 2 } },
+      { ...match(['Cy'], ['Dee'], 12, 10), game: { ...nearlyLost, savedByWinners: 0 } },
+    ],
+    visible: everyone('Ana', 'Ben', 'Cy', 'Dee'),
+    nameOf: names('Ana', 'Ben', 'Cy', 'Dee'),
+  })
+  check('with no game points against, the one that swung most',
+    [swung.matchOfTheMonth.teamA, swung.matchOfTheMonth.decidedBy], [['Cy'], 'leadChanges'],
+    'neither losing side had a game point, so five lead changes beats two')
 }
 
 // ============================================================
