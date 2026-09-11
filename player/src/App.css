@@ -789,6 +789,33 @@ a.highlight:active { background: var(--surface); }
   line-height: 1.45;
 }
 
+/* The match row is a way in, so it looks like one -- but it keeps the
+   row's weight rather than turning blue from end to end. */
+.board-link { color: inherit; text-decoration: none; display: block; }
+.board-link .board-note { color: var(--primary); }
+.board-link:hover .board-note { text-decoration: underline; }
+
+/* ---- The match of the month, for someone who was not in it ---- */
+.board-match h1 { font-size: 1.2rem; line-height: 1.3; margin: 0.15rem 0 0.4rem; overflow-wrap: anywhere; }
+.board-match-eyebrow {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.board-match-v { color: var(--text-muted); font-weight: 400; }
+.board-match-score {
+  font-size: 2.2rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 0.8rem;
+}
+.board-match-key { display: block; margin-top: 0.4rem; }
+.board-match .board-footer { margin-top: 1rem; }
+
 /* A narrow phone gives the label its own line rather than squeezing
    both columns into unreadable slivers. */
 @media (max-width: 360px) {

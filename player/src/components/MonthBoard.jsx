@@ -22,6 +22,8 @@
 
 import { useEffect, useState } from 'react'
 import { fetchBoard } from '../lib/api'
+import { usePlayerData } from '../lib/PlayerData'
+import { Link } from '../lib/router'
 
 /** "Ana", "Ana and Ben", "Ana, Ben and Cy", "Ana, Ben, Cy and 3 more". */
 function listNames({ names, more }) {
@@ -57,6 +59,7 @@ function Empty() {
 }
 
 function MonthBoard() {
+  const { matches: mine } = usePlayerData()
   const [board, setBoard] = useState(null)
   const [error, setError] = useState(false)
 
@@ -125,12 +128,22 @@ function MonthBoard() {
 
           <Row label="Match of the month">
             {best ? (
-              <>
+              // Someone who played in it gets their own full match page,
+              // shots and all, as anywhere else in the app. Everyone else
+              // gets the story of the game and nobody's shots.
+              <Link
+                className="board-link"
+                to={
+                  mine.some((m) => m.id === best.id)
+                    ? `/matches/${best.id}`
+                    : `/board/match/${best.id}`
+                }
+              >
                 {best.teamA.join(' & ')} v {best.teamB.join(' & ')}
                 <span className="board-note">
-                  {best.score.A}–{best.score.B}, the closest game this month
+                  {best.score.A}–{best.score.B}, the closest game this month &rarr;
                 </span>
-              </>
+              </Link>
             ) : (
               <Empty />
             )}

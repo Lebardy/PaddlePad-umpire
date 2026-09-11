@@ -28,7 +28,7 @@
 // ============================================================
 
 import { deriveMatchState } from './pickleball.js'
-import { getPlayerMatches } from './player-stats.js'
+import { getPlayerMatches, scoreProgression } from './player-stats.js'
 
 // The month turns over at midnight where the players are, not in UTC,
 // where it would roll over at eight in the morning. One time zone
@@ -148,6 +148,9 @@ export function buildBoard({ matches, visible, nameOf, progress = [] }) {
   const best = candidates[0]
   const matchOfTheMonth = best
     ? {
+        // So the board can open it. Only this one match is ever
+        // viewable this way -- see getMatchOfTheMonthStory.
+        id: best.id,
         teamA: best.teamA.map((id) => nameOf.get(id) ?? 'Unknown'),
         teamB: best.teamB.map((id) => nameOf.get(id) ?? 'Unknown'),
         score: best.score,
@@ -203,12 +206,15 @@ function totalsOf(playerMatches) {
 }
 
 /**
- * The board for the current month, gathered from the database.
+ * Everything about the current month that both the board and its match
+ * page need: the window, the finished matches in it with their scores,
+ * and who may be named.
  *
- * Returns the month it covers and the day it resets, so the app can say
- * both -- a hierarchy that visibly expires is not much of a hierarchy.
+ * Separate from getMonthlyBoard because "biggest step up" reads every
+ * candidate's whole history, which the match page has no use for and
+ * should not pay for.
  */
-export async function getMonthlyBoard(query) {
+async function gatherMonth(query) {
   const { rows: bounds } = await query(
     `SELECT date_trunc('month', now() AT TIME ZONE $1) AT TIME ZONE $1 AS start_at,
             (date_trunc('month', now() AT TIME ZONE $1) + interval '1 month')
@@ -223,7 +229,8 @@ export async function getMonthlyBoard(query) {
 
   const { rows } = await query(
     `SELECT m.id, m.team_a, m.team_b, m.first_server_team, m.first_server_player,
-            m.right_start_a, m.right_start_b, m.point_target, m.ended_at, m.ended_early
+            m.right_start_a, m.right_start_b, m.point_target, m.winner,
+            m.ended_at, m.ended_early
        FROM matches m
        JOIN sessions s ON s.id = m.session_id
       WHERE m.status = 'completed'
@@ -235,10 +242,8 @@ export async function getMonthlyBoard(query) {
     [startAt, endAt],
   )
 
-  const base = { monthStart, resetsOn }
-  if (rows.length === 0) {
-    return { ...base, ...buildBoard({ matches: [], visible: new Set(), nameOf: new Map() }) }
-  }
+  const month = { monthStart, resetsOn, startAt, rows, eventsByMatch: new Map(), matches: [] }
+  if (rows.length === 0) return { ...month, visible: new Set(), nameOf: new Map() }
 
   const { rows: events } = await query(
     `SELECT match_id, type, payload
@@ -247,22 +252,21 @@ export async function getMonthlyBoard(query) {
       ORDER BY match_id, seq`,
     [rows.map((r) => r.id)],
   )
-  const eventsByMatch = new Map()
   for (const e of events) {
-    if (!eventsByMatch.has(e.match_id)) eventsByMatch.set(e.match_id, [])
-    eventsByMatch.get(e.match_id).push({ type: e.type, ...e.payload })
+    if (!month.eventsByMatch.has(e.match_id)) month.eventsByMatch.set(e.match_id, [])
+    month.eventsByMatch.get(e.match_id).push({ type: e.type, ...e.payload })
   }
 
   // The score is not stored on the match row -- it is always derived
   // from the log, so this uses the same engine the server scores with.
-  const matches = rows.map((row) => {
+  month.matches = rows.map((row) => {
     const derived = deriveMatchState({
       teamA: row.team_a,
       teamB: row.team_b,
       firstServer: { team: row.first_server_team, playerId: row.first_server_player },
       rightStart: { A: row.right_start_a, B: row.right_start_b },
       pointTarget: row.point_target,
-      events: eventsByMatch.get(row.id) ?? [],
+      events: month.eventsByMatch.get(row.id) ?? [],
     })
     return {
       id: row.id,
@@ -274,7 +278,7 @@ export async function getMonthlyBoard(query) {
     }
   })
 
-  const everyone = [...new Set(matches.flatMap((m) => [...m.teamA, ...m.teamB]))]
+  const everyone = [...new Set(month.matches.flatMap((m) => [...m.teamA, ...m.teamB]))]
   const { rows: people } = await query(
     `SELECT id, name, name_visible, deactivated_at
        FROM players WHERE id = ANY($1::uuid[])`,
@@ -285,6 +289,19 @@ export async function getMonthlyBoard(query) {
   const visible = new Set(
     people.filter((p) => p.name_visible && !p.deactivated_at).map((p) => p.id),
   )
+
+  return { ...month, visible, nameOf }
+}
+
+/**
+ * The board for the current month, gathered from the database.
+ *
+ * Returns the month it covers and the day it resets, so the app can say
+ * both -- a hierarchy that visibly expires is not much of a hierarchy.
+ */
+export async function getMonthlyBoard(query) {
+  const month = await gatherMonth(query)
+  const { matches, visible, nameOf, monthStart, resetsOn, startAt } = month
 
   // Only players who could qualify are looked up in full. Their whole
   // history is needed for "before", which is why this is not one query
@@ -298,9 +315,9 @@ export async function getMonthlyBoard(query) {
     .map(([id]) => id)
 
   const progress = []
+  const start = new Date(startAt)
   for (const id of candidates) {
     const history = await getPlayerMatches(query, id)
-    const start = new Date(startAt)
     progress.push({
       id,
       thisMonth: totalsOf(history.filter((m) => new Date(m.endedAt) >= start)),
@@ -308,5 +325,42 @@ export async function getMonthlyBoard(query) {
     })
   }
 
-  return { ...base, ...buildBoard({ matches, visible, nameOf, progress }) }
+  return { monthStart, resetsOn, ...buildBoard({ matches, visible, nameOf, progress }) }
+}
+
+/**
+ * The story of this month's match of the month, and of no other match.
+ *
+ * Returns null unless `matchId` IS the current match of the month. That
+ * restriction is the point: an endpoint that told the story of any match
+ * id would let a player read games they were not in and that were never
+ * on the board -- including ones with a player who hides their name,
+ * which the board passes over for exactly that reason.
+ *
+ * What it tells is the GAME, not the people in it: names, the score, and
+ * how the lead moved. No one's winning shots, mistakes or drops. Leaving
+ * a name visible agreed to being named on the board, not to having one's
+ * mistakes shown to everyone.
+ */
+export async function getMatchOfTheMonthStory(query, matchId) {
+  const month = await gatherMonth(query)
+  const { matchOfTheMonth } = buildBoard({
+    matches: month.matches,
+    visible: month.visible,
+    nameOf: month.nameOf,
+  })
+  if (!matchOfTheMonth || matchOfTheMonth.id !== matchId) return null
+
+  const row = month.rows.find((r) => r.id === matchId)
+  // Told from the winning side, so the chart reads "above the line, the
+  // winners were ahead" -- a neutral page still needs one point of view.
+  const winner = row.winner === 'B' ? 'B' : 'A'
+
+  return {
+    ...matchOfTheMonth,
+    winner,
+    isDoubles: row.team_a.length === 2,
+    pointTarget: row.point_target,
+    margins: scoreProgression(row, month.eventsByMatch.get(row.id) ?? [], winner),
+  }
 }

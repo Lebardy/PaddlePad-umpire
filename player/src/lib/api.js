@@ -353,6 +353,14 @@ export function fetchBoard({ signal } = {}) {
 }
 
 /**
+ * How this month's match of the month went. The server answers for that
+ * one match only, and never with anyone's individual shots.
+ */
+export function fetchBoardMatch(id, { signal } = {}) {
+  return apiFetch(`/player/board/match/${encodeURIComponent(id)}`, { signal }).then((d) => d.match)
+}
+
+/**
  * Shows or hides this player's name on the monthly board. A display
  * setting only -- matches, ratings and everything else are untouched.
  */
