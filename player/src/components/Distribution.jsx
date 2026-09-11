@@ -31,8 +31,8 @@ function Distribution({ buckets }) {
           (yours ? `Yours is in the ${yours.from} to ${yours.to} band.` : '')
         }
       >
-        {buckets.map((bucket) => (
-          <span key={bucket.from} className="dist-col">
+        {buckets.map((bucket, i) => (
+          <span key={bucket.from} className="dist-col" style={{ '--i': i }}>
             <span
               className={`dist-bar${bucket.yours ? ' is-you' : ''}`}
               // A floor of 2% so an empty band still reads as "nobody
