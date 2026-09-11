@@ -361,6 +361,15 @@ export function fetchBoardMatch(id, { signal } = {}) {
 }
 
 /**
+ * How one of your own matches went, point by point. Fetched only when a
+ * match is actually opened -- a reading of every match in a history
+ * would be tens of kilobytes on every launch.
+ */
+export function fetchMatchGame(id, { signal } = {}) {
+  return apiFetch(`/player/matches/${encodeURIComponent(id)}/game`, { signal })
+}
+
+/**
  * Shows or hides this player's name on the monthly board. A display
  * setting only -- matches, ratings and everything else are untouched.
  */

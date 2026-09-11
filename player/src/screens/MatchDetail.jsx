@@ -3,15 +3,24 @@
 //
 // Every figure here was already in the payload the list screen used --
 // duration, singles or doubles, stacking and the per-match shot
-// breakdown were all being sent and thrown away. So this screen costs
-// no extra request: it reads out of the history the provider already
-// holds, which is why opening a match is instant.
+// breakdown were all being sent and thrown away. So the screen draws
+// instantly from the history the provider already holds.
+//
+// The one thing it does fetch is the point-by-point reading, and only
+// once the match is opened: a reading of every match in a long history
+// would be tens of kilobytes on every launch for something most visits
+// never look at. It arrives after the page and adds itself to the
+// bottom; nothing above waits for it.
 // ============================================================
 
+import { useEffect, useState } from 'react'
 import { Link, navigate } from '../lib/router'
 import { usePlayerData } from '../lib/PlayerData'
+import { fetchMatchGame } from '../lib/api'
 import { longestRun, matchStory, turningPoint } from '../lib/story'
 import Sparkline from '../components/Sparkline'
+import MomentumRibbon from '../components/MomentumRibbon'
+import Icon from '../components/Icon'
 import StackedBar from '../components/StackedBar'
 import Meter from '../components/Meter'
 
@@ -107,15 +116,30 @@ function MatchDetail({ id }) {
         <h2>How it went</h2>
         <Sparkline margins={match.progression} won={match.won} size="lg" />
         {story && <p className="detail-story">{story}</p>}
-        <ul className="detail-notes">
-          {run >= 3 && <li>Longest run: {run} points in a row</li>}
-          {turn && (
-            <li>
-              Took the lead for good at {turn.yours}&ndash;{turn.theirs}
-            </li>
-          )}
-        </ul>
+        {(run >= 3 || turn) && (
+          <ul className="ichips" aria-label="Moments">
+            {run >= 3 && (
+              <li className="ichip">
+                <Icon name="flame" size={15} />
+                <span>{run} in a row</span>
+              </li>
+            )}
+            {turn && (
+              <li className="ichip">
+                <Icon name="swap" size={15} />
+                <span>
+                  Led for good at {turn.yours}&ndash;{turn.theirs}
+                </span>
+              </li>
+            )}
+          </ul>
+        )}
       </section>
+
+      {/* The same ribbon the match of the month uses, from this player's
+          side: their points filled, their opponents' outlined. Fetched
+          for this match alone -- see fetchMatchGame. */}
+      <PointByPoint id={match.id} match={match} />
 
       <section className="detail-stats" aria-label="Your shots in this match">
         <h2>Your shots</h2>
@@ -190,6 +214,48 @@ function MatchDetail({ id }) {
         )}
       </nav>
     </div>
+  )
+}
+
+/**
+ * Every point of this match, once it has been asked for.
+ *
+ * Renders nothing at all until the reading arrives, and nothing ever if
+ * it fails: the page above it is already complete without this, and an
+ * error box for a nice-to-have would be worse than its absence.
+ */
+function PointByPoint({ id, match }) {
+  // Kept with the id it belongs to, rather than cleared and refetched:
+  // opening the next match from the arrows at the foot of this page
+  // swaps the id, and a stale ribbon must not show under a new match.
+  const [loaded, setLoaded] = useState(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchMatchGame(id, { signal: controller.signal })
+      .then((data) => setLoaded({ id, game: data.game }))
+      .catch(() => {})
+    return () => controller.abort()
+  }, [id])
+
+  const game = loaded?.id === id ? loaded.game : null
+  if (!game || game.moments.length === 0) return null
+
+  const theirs = match.opponents.join(' & ')
+  return (
+    <section className="detail-shape" aria-label="Point by point">
+      <h2>Point by point</h2>
+      <MomentumRibbon
+        moments={game.moments}
+        path={game.path}
+        // The reading is told from this player's side, so "winners"
+        // here means their team whether they won or lost.
+        asShown={({ winners, losers }) => `${winners}–${losers}`}
+        winners={match.partner ? `You & ${match.partner}` : 'You'}
+        losers={theirs}
+        lowIndex={game.lowPoint ? game.lowPoint.index : null}
+      />
+    </section>
   )
 }
 
