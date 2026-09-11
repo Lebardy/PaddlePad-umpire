@@ -50,6 +50,17 @@ console.log('\nthe real match of the month on staging, 14-12')
   check('longest run: six by the winners', game.longestRun, { by: 'winners', points: 6 })
   check('headline', headline(game, 'Ana & Jae', 11),
     'Ana & Jae came back from 1–4 down, then needed five game points to finish it.')
+
+  // The momentum ribbon's per-point moments, as 0-based point numbers.
+  const where = (test) => game.moments.flatMap((m, i) => (test(m) ? [i] : []))
+  check('a moment for every point', game.moments.length, 26)
+  check('lead changed on the points making it 5-4, 7-8 and 9-8', where((m) => m.leadChange), [8, 14, 16])
+  check('game points played from 10-8, 10-9, 11-10, 12-11 and 13-12',
+    where((m) => m.gamePoint === 'winners'), [18, 19, 21, 23, 25])
+  check('level after 1-1, 4-4, 7-7, 8-8, 10-10, 11-11, 12-12', where((m) => m.level), [1, 7, 13, 15, 19, 21, 23])
+  check('fourteen points to the winners, twelve to the losers',
+    [where((m) => m.scorer === 'winners').length, where((m) => m.scorer === 'losers').length], [14, 12])
+  check('the low point is the fifth point, 1-4', game.lowPoint.index, 4)
 }
 
 // ------------------------------------------------------------

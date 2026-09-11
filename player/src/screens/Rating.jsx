@@ -22,13 +22,16 @@
 import { useEffect, useState } from 'react'
 import { fetchStanding } from '../lib/api'
 import { usePlayerData } from '../lib/PlayerData'
+import { useCountUp } from '../lib/motion'
 import { navigate } from '../lib/router'
 import Distribution from '../components/Distribution'
+import Icon from '../components/Icon'
+import More from '../components/More'
 
 function formatDate(value) {
   return new Date(value).toLocaleDateString(undefined, {
     day: 'numeric',
-    month: 'long',
+    month: 'short',
   })
 }
 
@@ -78,16 +81,20 @@ function WhereYouSit({ standing }) {
         <Distribution buckets={standing.distribution} />
       ) : null}
 
-      <p className="standing-sentence">
-        {others === 0
-          ? 'You are the only rated player so far.'
-          : `Your score is higher than ${standing.below} of the ${others} other rated players.`}
-      </p>
+      {/* A figure rather than a sentence: the two numbers are the whole
+          point, and they were buried in eleven words. */}
+      {others === 0 ? (
+        <p className="standing-sentence">You are the only rated player so far.</p>
+      ) : (
+        <p className="standing-figure">
+          Above <strong>{standing.below}</strong> of <strong>{others}</strong>
+          <span>other rated players</span>
+        </p>
+      )}
 
       {!standing.distribution && others > 0 && (
         <p className="muted-inline standing-note">
-          With more players rated, this becomes a picture of everyone on
-          PaddlePad.
+          With more players rated, this becomes a picture of everyone.
         </p>
       )}
     </section>
@@ -105,11 +112,26 @@ function YourGroup({ band }) {
           ? 'Just you, for now.'
           : others === 1
             ? 'You and one other player.'
-            : `You and ${others} other players.`}{' '}
-        The model sorts everyone into a few groups by how they play. Nobody
-        in a group is ranked above anyone else in it.
+            : `You and ${others} other players.`}
       </p>
+      <More label="What is a group?">
+        <p>
+          Everyone is sorted into a few groups by how they play. Nobody in a
+          group is ranked above anyone else in it.
+        </p>
+      </More>
     </section>
+  )
+}
+
+/** The score, counting up once on arrival. */
+function Score({ value }) {
+  const shown = useCountUp(value)
+  return (
+    <div className="rating-score standing-score" aria-label={`${value} out of 100`}>
+      <span className="rating-number">{shown}</span>
+      <span className="rating-outof">/ 100</span>
+    </div>
   )
 }
 
@@ -133,12 +155,7 @@ function Rating() {
       <BackLink />
       <h1>Your rating</h1>
 
-      {rating?.state === 'rated' && (
-        <div className="rating-score standing-score">
-          <span className="rating-number">{rating.skillScore}</span>
-          <span className="rating-outof">/ 100</span>
-        </div>
-      )}
+      {rating?.state === 'rated' && <Score value={rating.skillScore} />}
 
       {error && <p className="error">{error}</p>}
       {!standing && !error && <p className="muted-inline">Loading…</p>}
@@ -158,23 +175,29 @@ function Rating() {
           <WhereYouSit standing={standing} />
           {standing.band && <YourGroup band={standing.band} />}
 
-          <p className="standing-dated muted-inline">
-            As of {formatDate(standing.computedAt)}, among{' '}
-            {standing.poolSize} rated players.
-          </p>
+          <ul className="ichips" aria-label="When this was worked out">
+            <li className="ichip">
+              <Icon name="calendar" size={15} />
+              <span>{formatDate(standing.computedAt)}</span>
+            </li>
+            <li className="ichip">
+              <Icon name="people" size={15} />
+              <span>{standing.poolSize} rated</span>
+            </li>
+          </ul>
 
-          {/* The reason there is no leaderboard, said once, plainly. A
-              player who wonders "why can't I see who's first?" deserves
-              the real answer, not silence. */}
-          <section className="standing-why" aria-label="Why there is no ranking">
-            <h2>Why there&rsquo;s no ranking</h2>
+          {/* The reason there is no leaderboard. Behind a tap rather than
+              on show: a player who wonders "why can't I see who's first?"
+              deserves the real answer, but nobody should have to read it
+              to use the page. */}
+          <More label="Why is there no ranking?">
             <p>
               Your score is measured against whoever has played, so it can move
               when new people join — even if you haven&rsquo;t played at all. A
               place on a list would claim more than the number can. Where you
               sit, and the group you are in, is what it can honestly tell you.
             </p>
-          </section>
+          </More>
         </>
       )}
     </div>

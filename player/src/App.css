@@ -742,6 +742,47 @@ a.highlight:active { background: var(--surface); }
 }
 .rating-more:hover { text-decoration: underline; }
 
+/* ============ Calm motion ============ */
+
+/* Things settle into place once when a screen opens. Nothing loops, and
+   every animation here runs a single time, under 400ms, so a page never
+   keeps moving while it is being read. The reduced-motion block at the
+   end of this section turns all of it off -- see lib/motion.js for the
+   JavaScript half of the same promise. */
+
+/* Fade and lift. `--i` staggers a list: row two starts 40ms after row
+   one. */
+.rise {
+  animation: rise 280ms ease-out both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* A bar growing out of its baseline. */
+@keyframes grow {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+
+/* A marker arriving after the thing it marks. No overshoot: calm, not
+   bouncy. */
+@keyframes pop {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* Revealing a chart left to right. clip-path rather than a curtain in
+   the card's colour, so it cannot go wrong against a different
+   background, and the inset is negative at the end so labels hanging
+   outside the box are not clipped once it settles. */
+@keyframes wipe {
+  from { clip-path: inset(-40px 100% -40px -40px); }
+  to   { clip-path: inset(-40px -40px -40px -40px); }
+}
+
 /* ============ This month on PaddlePad ============ */
 
 /* Same card as the rating and the trend, so the board reads as one
@@ -760,11 +801,13 @@ a.highlight:active { background: var(--surface); }
 .board-rows { list-style: none; margin: 0; padding: 0; }
 .board-row {
   display: grid;
-  grid-template-columns: minmax(0, 8.5rem) minmax(0, 1fr);
-  gap: 0.75rem;
+  grid-template-columns: auto minmax(0, 7.5rem) minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: start;
   padding: 0.6rem 0;
   border-top: 1px solid var(--border);
 }
+.board-icon { color: var(--text-muted); margin-top: 0.05rem; }
 .board-row:first-child { border-top: none; }
 .board-label { font-size: 0.8rem; color: var(--text-muted); padding-top: 0.1rem; }
 .board-value {
@@ -795,9 +838,164 @@ a.highlight:active { background: var(--surface); }
 .board-link .board-note { color: var(--primary); }
 .board-link:hover .board-note { text-decoration: underline; }
 
+/* ---- Icon chips, badges, and an explanation behind a tap ---- */
+
+/* A row of small facts. Replaces sentences like "Level seven times, the
+   lead changed hands three times": the same facts, a fifth of the
+   reading. */
+.ichips {
+  list-style: none;
+  padding: 0;
+  margin: 0.9rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.ichip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.ichip svg { color: var(--text-muted); flex: none; }
+
+/* Why a game was picked: one badge per reason, each only shown when it
+   is true of this game. */
+.badges {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.badges li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-soft);
+}
+.badges svg { flex: none; }
+
+/* The reasoning, one tap away. Native details/summary: no script, and
+   it announces itself as expandable. */
+.more { margin-top: 0.7rem; }
+.more-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  list-style: none;
+  padding: 0.2rem 0;
+}
+.more-summary::-webkit-details-marker { display: none; }
+.more-summary:hover { color: var(--primary); }
+.more[open] .more-summary { color: var(--primary); }
+.more-body { margin-top: 0.4rem; }
+.more-body p {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin: 0 0 0.4rem;
+}
+
+/* ---- Every point, as a ribbon ---- */
+
+.ribbon { margin-top: 0.3rem; }
+.ribbon-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.ribbon-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.ribbon-swatch {
+  width: 10px;
+  height: 14px;
+  border-radius: 2px;
+  display: inline-block;
+}
+/* Filled against outlined, so the ribbon reads without colour too. */
+.ribbon-swatch.is-winners { background: var(--series-1); }
+.ribbon-swatch.is-losers { border: 2px solid var(--series-2); }
+
+.ribbon-readout {
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin: 0.5rem 0 0.4rem;
+  min-height: 1.2em;
+}
+
+.ribbon-blocks,
+.ribbon-marks {
+  display: grid;
+  grid-template-columns: repeat(var(--points), 1fr);
+  gap: 2px;
+}
+.ribbon-block {
+  height: 30px;
+  padding: 0;
+  border-radius: 3px;
+  border: 2px solid var(--series-2);
+  background: none;
+  cursor: pointer;
+  animation: rise 220ms ease-out both;
+  /* Paused until the ribbon is scrolled to, so it does not finish
+     off-screen while the top of the page is being read. */
+  animation-play-state: paused;
+  animation-delay: calc(var(--i) * 22ms);
+}
+.ribbon.is-in .ribbon-block { animation-play-state: running; }
+.ribbon-block.is-winners { background: var(--series-1); border-color: var(--series-1); }
+.ribbon-block.is-selected { outline: 2px solid var(--text); outline-offset: 2px; }
+.ribbon-block:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.ribbon-marks { margin-top: 0.25rem; min-height: 2.4rem; }
+.ribbon-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  opacity: 0;
+}
+.ribbon.is-in .ribbon-mark {
+  animation: fade-in 240ms ease-out both;
+  /* After the blocks have finished arriving. */
+  animation-delay: calc(var(--points) * 22ms + 120ms);
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.ribbon-icon { color: var(--text-muted); }
+.ribbon-icon.is-star { color: var(--series-1); }
+.ribbon-icon.is-flag { color: var(--series-2); }
+.ribbon-score {
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text);
+}
+
 /* ---- The match of the month, for someone who was not in it ---- */
 .board-match h1 { font-size: 1.2rem; line-height: 1.3; margin: 0.15rem 0 0.4rem; overflow-wrap: anywhere; }
 .board-match-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
   margin-top: 0.5rem;
   font-size: 0.75rem;
   font-weight: 600;
@@ -813,7 +1011,42 @@ a.highlight:active { background: var(--surface); }
   font-variant-numeric: tabular-nums;
   margin-bottom: 0.8rem;
 }
-.board-match-key { display: block; margin-top: 0.4rem; }
+.board-match-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+/* The key that replaced "Above the line, X were ahead". */
+.board-match-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.board-match-legend i {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--series-1);
+}
+
+/* Two numbers, not eleven words. */
+.standing-figure {
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 0.2rem;
+}
+.standing-figure strong { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.standing-figure span {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
 
 /* The one sentence that says what happened. It is the reason to open
    the page, so it is the biggest words on it after the score. */
@@ -825,7 +1058,12 @@ a.highlight:active { background: var(--surface); }
 }
 
 /* ---- The chart, with its key moments pinned to it ---- */
-.mchart { position: relative; height: 150px; margin: 1.4rem 0 1.6rem; }
+.mchart {
+  position: relative;
+  height: 150px;
+  margin: 1.4rem 0 1.6rem;
+  animation: wipe 600ms ease-out both;
+}
 .mchart-svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .mchart-base { stroke: var(--border); stroke-width: 1; }
 .mchart-area { fill: var(--series-1); opacity: 0.1; }
@@ -843,6 +1081,9 @@ a.highlight:active { background: var(--surface); }
   align-items: center;
   transform: translate(-50%, -50%);
   pointer-events: none;
+  /* After the line has drawn itself past them. */
+  animation: pop 260ms ease-out both;
+  animation-delay: 620ms;
 }
 .mchart-dot {
   width: 9px;
@@ -865,55 +1106,15 @@ a.highlight:active { background: var(--surface); }
 .mchart-end .mchart-label { right: 0; }
 .mchart-start .mchart-label { left: 0; }
 
-/* ---- The game in numbers ---- */
-.board-match-facts {
-  list-style: none;
-  padding: 0;
-  margin: 0.9rem 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-.board-match-facts li {
-  font-size: 0.8rem;
-  padding: 0.3rem 0.6rem;
-  border-radius: 999px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
-}
-
-/* ---- Every point in order ---- */
-.board-match-path {
-  list-style: none;
-  padding: 0;
-  margin: 0.2rem 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
-.board-match-path li {
-  font-size: 0.78rem;
-  font-variant-numeric: tabular-nums;
-  padding: 0.2rem 0.4rem;
-  border-radius: 6px;
-  background: var(--surface-sunken);
-  border: 1px solid transparent;
-}
-.board-match-path li.is-level { background: none; border-color: var(--border); }
-.board-match-path li.is-final {
-  background: var(--series-1);
-  border-color: var(--series-1);
-  color: #fff;
-  font-weight: 700;
-}
-
 .board-match-why { font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-top: 0.4rem; }
 .board-match .board-footer { margin-top: 1rem; }
 
 /* A narrow phone gives the label its own line rather than squeezing
    both columns into unreadable slivers. */
 @media (max-width: 360px) {
-  .board-row { grid-template-columns: 1fr; gap: 0.15rem; }
+  .board-row { grid-template-columns: auto minmax(0, 1fr); gap: 0.1rem 0.5rem; }
+  .board-label { grid-column: 2; }
+  .board-value { grid-column: 2; }
 }
 
 /* ============ Where you sit ============ */
@@ -956,6 +1157,9 @@ a.highlight:active { background: var(--surface); }
   background: var(--surface-sunken);
   border: 1px solid var(--border);
   border-bottom: none;
+  transform-origin: bottom;
+  animation: grow 320ms ease-out both;
+  animation-delay: calc(var(--i, 0) * 35ms);
 }
 .dist-bar.is-you { background: var(--series-1); border-color: var(--series-1); }
 .dist-axis {
@@ -1377,3 +1581,19 @@ a.highlight:active { background: var(--surface); }
    than the headline, so it loses the full-width prominence it has on
    the way in. */
 .signin-form .google-signin { margin-top: 0.25rem; }
+
+/* Everything above settles once and then stops. For anyone who has asked
+   their device for less motion, it is already settled when they arrive:
+   the same screen, without the arriving. lib/motion.js does the same for
+   the counting numbers and the scroll trigger. */
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .ribbon-block,
+  .ribbon-mark,
+  .mchart,
+  .mchart-mark,
+  .dist-bar {
+    animation: none;
+  }
+  .ribbon-mark { opacity: 1; }
+}

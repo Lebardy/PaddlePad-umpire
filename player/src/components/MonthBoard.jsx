@@ -24,6 +24,8 @@ import { useEffect, useState } from 'react'
 import { fetchBoard } from '../lib/api'
 import { usePlayerData } from '../lib/PlayerData'
 import { Link } from '../lib/router'
+import Icon from './Icon'
+import More from './More'
 
 /** "Ana", "Ana and Ben", "Ana, Ben and Cy", "Ana, Ben, Cy and 3 more". */
 function listNames({ names, more }) {
@@ -45,9 +47,10 @@ function resetLabel(resetsOn) {
   })
 }
 
-function Row({ label, children }) {
+function Row({ icon, label, i, children }) {
   return (
-    <li className="board-row">
+    <li className="board-row rise" style={{ '--i': i }}>
+      <Icon name={icon} size={18} className="board-icon" />
       <span className="board-label">{label}</span>
       <span className="board-value">{children}</span>
     </li>
@@ -98,7 +101,7 @@ function MonthBoard() {
         <p className="muted-inline">No finished matches yet this month.</p>
       ) : (
         <ul className="board-rows">
-          <Row label="Played the most">
+          <Row icon="matches" label="Played most" i={0}>
             {playedMost ? (
               <>
                 {listNames(playedMost)}
@@ -112,7 +115,7 @@ function MonthBoard() {
             )}
           </Row>
 
-          <Row label="Met the most people">
+          <Row icon="people" label="Met most people" i={1}>
             {metMost ? (
               <>
                 {listNames(metMost)}
@@ -126,7 +129,7 @@ function MonthBoard() {
             )}
           </Row>
 
-          <Row label="Match of the month">
+          <Row icon="trophy" label="Match of the month" i={2}>
             {best ? (
               // Someone who played in it gets their own full match page,
               // shots and all, as anywhere else in the app. Everyone else
@@ -140,8 +143,12 @@ function MonthBoard() {
                 }
               >
                 {best.teamA.join(' & ')} v {best.teamB.join(' & ')}
+                {/* Not "the closest game this month" any more: a game
+                    also has to have been played cleaner than its players
+                    usually manage, so the old line had stopped being
+                    true. The page behind this says exactly why it won. */}
                 <span className="board-note">
-                  {best.score.A}–{best.score.B}, the closest game this month &rarr;
+                  {best.score.A}–{best.score.B} · see how it went &rarr;
                 </span>
               </Link>
             ) : (
@@ -149,11 +156,11 @@ function MonthBoard() {
             )}
           </Row>
 
-          <Row label="Biggest step up">
+          <Row icon="trendUp" label="Biggest step up" i={3}>
             {biggestStepUp ? (
               <>
                 {listNames(biggestStepUp)}
-                <span className="board-note">compared with their own earlier games</span>
+                <span className="board-note">vs their own earlier games</span>
               </>
             ) : (
               <Empty />
@@ -162,10 +169,12 @@ function MonthBoard() {
         </ul>
       )}
 
-      <p className="board-footer">
-        Only players who show their name appear here. You can hide yours on the
-        You tab.
-      </p>
+      <More label="Who appears here?">
+        <p>
+          Only players who show their name. You can hide yours on the You tab —
+          it takes your name off this board and changes nothing else.
+        </p>
+      </More>
     </section>
   )
 }

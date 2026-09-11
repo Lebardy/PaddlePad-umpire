@@ -2,26 +2,34 @@
 // This month's match of the month, for someone who was not in it.
 //
 // The story of the GAME and nothing about the people in it beyond their
-// names: the score, a sentence saying what happened, when it was level
-// and when the lead changed, how many chances to win it went begging,
-// every point in order, and why this game was the one picked. Nobody's
-// winning shots, mistakes or drops -- leaving a name visible agreed to
-// being named on the board, not to having one's mistakes shown to
-// everyone on PaddlePad.
+// names. Nobody's winning shots, mistakes or drops -- leaving a name
+// visible agreed to being named on the board, not to having one's
+// mistakes shown to everyone on PaddlePad.
 //
 // A player who WAS in it never lands here: the board sends them to
 // their own full match page instead, shots and all.
 //
-// The first version was a score and a squiggle, and read as boring. What
-// is here now was chosen by reading what every close game of the month
-// would say, not just the one that happened to win -- see matchDrama.js.
+// Laid out to be looked at more than read. It was a score and a
+// squiggle, then a page of sentences; now it is one sentence of story,
+// the numbers as icon chips, the whole game as a ribbon of points, and
+// the reasons it was picked as badges -- with the exact wording a tap
+// away behind "Why this game?". Every claim is still only made when it
+// is true; it has just stopped being recited.
+//
+// The facts are counted on the server (server/src/drama.js), the same
+// reading the board ranked the game on, so a game picked for its lead
+// changes shows the number that got it picked.
 // ============================================================
 
 import { useEffect, useState } from 'react'
 import { fetchBoardMatch } from '../lib/api'
 import { navigate } from '../lib/router'
 import { headline, inWords } from '../lib/matchDrama'
+import { useCountUp } from '../lib/motion'
+import Icon from '../components/Icon'
 import MatchChart from '../components/MatchChart'
+import MomentumRibbon from '../components/MomentumRibbon'
+import More from '../components/More'
 
 function BackLink() {
   return (
@@ -35,47 +43,51 @@ function BackLink() {
   )
 }
 
-function times(n) {
-  return n === 1 ? 'once' : n === 2 ? 'twice' : `${inWords(n)} times`
-}
-
-// What separated it from the next-best game won by the same margin, in
-// the words the page uses. The server says which one actually decided
-// it, so each of these is only ever said when it is true.
-const DECIDED = {
-  losersGamePoints: 'the one the losing side came closest to winning',
-  leadChanges: 'the one where the lead changed hands most',
-  level: 'the one that was level most often',
-  savedGamePoints: 'the one with the most game points saved',
-  length: 'the one that went furthest',
-}
-
 function percent(share) {
   return `${Math.round(share * 100)}%`
 }
 
+// What separated it from the next-best game won by the same margin: a
+// badge, and the full sentence behind "Why this game?". The server says
+// which one actually decided it, so each is only ever shown when true.
+const DECIDED = {
+  losersGamePoints: {
+    icon: 'flag',
+    badge: 'Nearly went the other way',
+    words: 'the one the losing side came closest to winning',
+  },
+  leadChanges: {
+    icon: 'swap',
+    badge: 'Most lead changes',
+    words: 'the one where the lead changed hands most',
+  },
+  level: { icon: 'equals', badge: 'Level most often', words: 'the one that was level most often' },
+  savedGamePoints: {
+    icon: 'flag',
+    badge: 'Most game points saved',
+    words: 'the one with the most game points saved',
+  },
+  length: { icon: 'clock', badge: 'Went furthest', words: 'the one that went furthest' },
+}
+
 /**
- * Why it was eligible at all: it was played cleaner than these players
- * usually play. Only said as "these four usually manage" when every one
- * of them had a history to measure; otherwise the honest claim is
- * weaker, because the month's typical game stood in for someone.
+ * Why it was eligible at all: played cleaner than these players usually
+ * play. Only "these four usually manage" when every one of them had a
+ * history to measure; otherwise the claim is weaker, because the month's
+ * typical game stood in for someone.
  */
-function cleanLine(match) {
+function cleanSentence(match) {
   if (!Number.isFinite(match.clean)) return null
   const who = match.isDoubles ? 'these four' : 'these two'
   const than =
     match.cleanBasis === 'players'
       ? `more than ${who} usually manage`
       : 'more than expected for these players'
-  return `A clean game: ${percent(match.clean)} of rallies ended with a winning shot, ${than}.`
+  return `${percent(match.clean)} of rallies ended with a winning shot, ${than}.`
 }
 
-/**
- * Why this game, in a claim that is actually true of it. Every count here
- * is of the games that could have been picked -- the ones played better
- * than their players usually do -- not every game this month.
- */
-function whyChosen(match) {
+/** Why this game, counted among the games that could have been picked. */
+function chosenSentence(match) {
   const pool = 'played better than their players usually do'
   if (match.outOf === 1) return `The only game this month ${pool}.`
   if (match.sameMargin === 1 || match.decidedBy === 'margin') {
@@ -83,10 +95,168 @@ function whyChosen(match) {
   }
   const margin = Math.abs(match.score.A - match.score.B)
   const base =
-    `Won by ${inWords(margin)} — one of ${match.sameMargin} games this close ` +
+    `Won by ${inWords(margin)}: one of ${match.sameMargin} games this close ` +
     `among the ${match.outOf} ${pool} this month`
   const why = DECIDED[match.decidedBy]
-  return why ? `${base}, and ${why}.` : `${base}.`
+  return why ? `${base}, and ${why.words}.` : `${base}.`
+}
+
+function Chip({ icon, children }) {
+  return (
+    <li className="ichip">
+      <Icon name={icon} size={15} />
+      <span>{children}</span>
+    </li>
+  )
+}
+
+const EMPTY_GAME = {
+  path: [],
+  moments: [],
+  level: 0,
+  leadChanges: 0,
+  lowPoint: null,
+  lastLevel: null,
+  savedByLosers: 0,
+  winnersGamePoints: 0,
+  savedByWinners: 0,
+  longestRun: { by: null, points: 0 },
+}
+
+function Story({ match }) {
+  const winnersA = match.winner === 'A'
+  const winners = (winnersA ? match.teamA : match.teamB).join(' & ')
+  const losers = (winnersA ? match.teamB : match.teamA).join(' & ')
+  const margins = match.margins ?? []
+  const game = { ...EMPTY_GAME, ...match.game }
+  // Scores are shown A–B everywhere on this page, the same way round as
+  // the heading, even though the reading is done from the winners' side.
+  const asShown = ({ winners: w, losers: l }) => (winnersA ? `${w}–${l}` : `${l}–${w}`)
+
+  const scoreA = useCountUp(match.score.A)
+  const scoreB = useCountUp(match.score.B)
+  const clean = useCountUp(Number.isFinite(match.clean) ? Math.round(match.clean * 100) : NaN)
+
+  const markers = []
+  if (game.lowPoint && game.lowPoint.losers - game.lowPoint.winners >= 2) {
+    markers.push({ index: game.lowPoint.index, label: asShown(game.lowPoint), place: 'below' })
+  }
+  if (game.lastLevel) {
+    markers.push({ index: game.lastLevel.index, label: asShown(game.lastLevel), place: 'below' })
+  }
+  if (game.path.length > 0) {
+    markers.push({ index: game.path.length - 1, label: asShown(game.path.at(-1)), place: 'above' })
+  }
+
+  const saved = game.savedByWinners + game.savedByLosers
+  const margin = Math.abs(match.score.A - match.score.B)
+  const decided = DECIDED[match.decidedBy]
+  const when = new Date(match.endedAt).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+  })
+
+  return (
+    <>
+      <p className="board-match-eyebrow">
+        <Icon name="trophy" size={15} /> Match of the month
+      </p>
+      <h1>
+        {match.teamA.join(' & ')} <span className="board-match-v">v</span>{' '}
+        {match.teamB.join(' & ')}
+      </h1>
+
+      <p className="board-match-score" aria-label={`${match.score.A} to ${match.score.B}`}>
+        {scoreA}&ndash;{scoreB}
+      </p>
+
+      {margins.length > 0 && (
+        <p className="board-match-headline rise">{headline(game, winners, match.pointTarget)}</p>
+      )}
+
+      <ul className="ichips rise" style={{ '--i': 1 }} aria-label="Match details">
+        <Chip icon="calendar">{when}</Chip>
+        <Chip icon="people">{match.isDoubles ? 'Doubles' : 'Singles'}</Chip>
+        {match.minutes ? <Chip icon="clock">{match.minutes} min</Chip> : null}
+        {match.rallies ? <Chip icon="matches">{match.rallies} rallies</Chip> : null}
+      </ul>
+
+      {margins.length > 0 && (
+        <section className="detail-shape" aria-label="How the match went">
+          <div className="board-match-head">
+            <h2>How it went</h2>
+            {/* Replaces "Above the line, X were ahead" -- the same fact,
+                as a key rather than a sentence. */}
+            <span className="board-match-legend">
+              <i aria-hidden="true" /> {winners} ahead
+            </span>
+          </div>
+          <MatchChart margins={margins} markers={markers} />
+
+          {/* The game in numbers: each one only when it happened. */}
+          <ul className="ichips" aria-label="The game in numbers">
+            {Number.isFinite(match.clean) && <Chip icon="sparkle">{clean}% clean</Chip>}
+            {game.level > 0 && <Chip icon="equals">Level {game.level}&times;</Chip>}
+            {game.leadChanges > 0 && (
+              <Chip icon="swap">
+                {game.leadChanges} lead {game.leadChanges === 1 ? 'change' : 'changes'}
+              </Chip>
+            )}
+            {saved > 0 && (
+              <Chip icon="flag">
+                {saved} game {saved === 1 ? 'point' : 'points'} saved
+              </Chip>
+            )}
+            {game.longestRun.points >= 3 && (
+              <Chip icon="flame">{game.longestRun.points} in a row</Chip>
+            )}
+          </ul>
+        </section>
+      )}
+
+      {game.moments.length > 0 && (
+        <section className="detail-shape" aria-label="Point by point">
+          <h2>Point by point</h2>
+          <MomentumRibbon
+            moments={game.moments}
+            path={game.path}
+            asShown={asShown}
+            winners={winners}
+            losers={losers}
+            lowIndex={game.lowPoint ? game.lowPoint.index : null}
+          />
+        </section>
+      )}
+
+      <section className="detail-shape" aria-label="Why this game">
+        <h2>Why this game</h2>
+        <ul className="badges">
+          {Number.isFinite(match.clean) && (
+            <li>
+              <Icon name="sparkle" size={15} /> Cleaner than usual
+            </li>
+          )}
+          <li>
+            <Icon name="trophy" size={15} />{' '}
+            {match.sameMargin === 1 || match.decidedBy === 'margin'
+              ? 'Closest game'
+              : `Won by ${margin}`}
+          </li>
+          {decided && match.sameMargin > 1 && (
+            <li>
+              <Icon name={decided.icon} size={15} /> {decided.badge}
+            </li>
+          )}
+        </ul>
+        <More label="Why this game?">
+          {cleanSentence(match) && <p>{cleanSentence(match)}</p>}
+          <p>{chosenSentence(match)}</p>
+        </More>
+      </section>
+
+      <p className="board-footer">The game only — never anyone&rsquo;s shots.</p>
+    </>
+  )
 }
 
 function BoardMatch({ id }) {
@@ -110,148 +280,10 @@ function BoardMatch({ id }) {
     return () => controller.abort()
   }, [id])
 
-  if (error || !match) {
-    return (
-      <div className="board-match">
-        <BackLink />
-        <p className="muted-inline">{error ?? 'Loading…'}</p>
-      </div>
-    )
-  }
-
-  const winnersA = match.winner === 'A'
-  const winners = (winnersA ? match.teamA : match.teamB).join(' & ')
-  const losers = (winnersA ? match.teamB : match.teamA).join(' & ')
-  const plural = match.isDoubles
-
-  const margins = match.margins ?? []
-  // Counted on the server, the same reading the board ranked it on, so a
-  // game picked for its lead changes shows the number that got it picked.
-  const game = match.game ?? {
-    path: [], level: 0, leadChanges: 0, lowPoint: null, lastLevel: null,
-    savedByLosers: 0, winnersGamePoints: 0, savedByWinners: 0,
-    longestRun: { by: null, points: 0 },
-  }
-  // Scores are shown A–B everywhere on this page, the same way round as
-  // the heading, even though the reading is done from the winners' side.
-  const asShown = ({ winners: w, losers: l }) => (winnersA ? `${w}–${l}` : `${l}–${w}`)
-
-  const markers = []
-  if (game.lowPoint && game.lowPoint.losers - game.lowPoint.winners >= 2) {
-    markers.push({ index: game.lowPoint.index, label: asShown(game.lowPoint), place: 'below' })
-  }
-  if (game.lastLevel) {
-    markers.push({ index: game.lastLevel.index, label: asShown(game.lastLevel), place: 'below' })
-  }
-  if (game.path.length > 0) {
-    markers.push({ index: game.path.length - 1, label: asShown(game.path.at(-1)), place: 'above' })
-  }
-
-  // The game in numbers. Each one only when it happened: "level no
-  // times" is not drama.
-  const facts = []
-  if (Number.isFinite(match.clean)) {
-    facts.push(`${percent(match.clean)} of rallies won by a winning shot`)
-  }
-  if (game.level > 0) facts.push(`Level ${times(game.level)}`)
-  if (game.leadChanges > 0) facts.push(`Lead changed hands ${times(game.leadChanges)}`)
-  if (game.savedByWinners > 0) {
-    facts.push(`${winners} saved ${game.savedByWinners} game ${game.savedByWinners === 1 ? 'point' : 'points'}`)
-  }
-  if (game.savedByLosers > 0) {
-    facts.push(`${losers} saved ${game.savedByLosers} game ${game.savedByLosers === 1 ? 'point' : 'points'}`)
-  }
-  if (game.longestRun.points >= 3) {
-    facts.push(
-      `${game.longestRun.points} points in a row by ${game.longestRun.by === 'winners' ? winners : losers}`,
-    )
-  }
-
-  const when = new Date(match.endedAt).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'long',
-  })
-  const size = [
-    match.minutes ? `${match.minutes} minutes` : null,
-    match.rallies ? `${match.rallies} rallies` : null,
-  ].filter(Boolean)
-
   return (
     <div className="board-match">
       <BackLink />
-      <p className="board-match-eyebrow">Match of the month</p>
-      <h1>
-        {match.teamA.join(' & ')} <span className="board-match-v">v</span>{' '}
-        {match.teamB.join(' & ')}
-      </h1>
-
-      <p className="board-match-score">
-        {match.score.A}&ndash;{match.score.B}
-      </p>
-
-      {margins.length > 0 && (
-        <p className="board-match-headline">
-          {headline(game, winners, match.pointTarget)}
-        </p>
-      )}
-
-      <ul className="fact-chips" aria-label="Match details">
-        <li className="chip">{when}</li>
-        <li className="chip">{match.isDoubles ? 'Doubles' : 'Singles'}</li>
-        <li className="chip">Played to {match.pointTarget}</li>
-      </ul>
-
-      {margins.length > 0 && (
-        <section className="detail-shape" aria-label="How the match went">
-          <h2>How it went</h2>
-          <MatchChart margins={margins} markers={markers} />
-          <p className="muted-inline board-match-key">
-            Above the line, {winners} {plural ? 'were' : 'was'} ahead.
-          </p>
-
-          {facts.length > 0 && (
-            <ul className="board-match-facts" aria-label="The game in numbers">
-              {facts.map((fact) => (
-                <li key={fact}>{fact}</li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
-
-      {game.path.length > 0 && (
-        <section className="detail-shape" aria-label="Point by point">
-          <h2>Point by point</h2>
-          <ol className="board-match-path">
-            {game.path.map((point, i) => {
-              const level = point.winners === point.losers
-              const last = i === game.path.length - 1
-              return (
-                <li
-                  key={i}
-                  className={`${level ? 'is-level' : ''}${last ? ' is-final' : ''}`.trim() || undefined}
-                >
-                  {asShown(point)}
-                </li>
-              )
-            })}
-          </ol>
-          <p className="muted-inline board-match-key">
-            {match.teamA.join(' & ')}&rsquo;s score first. Outlined scores were level.
-          </p>
-        </section>
-      )}
-
-      <p className="board-match-why">
-        {size.length > 0 && <span>{size.join(' · ')}. </span>}
-        {cleanLine(match) && <span>{cleanLine(match)} </span>}
-        {whyChosen(match)}
-      </p>
-
-      <p className="board-footer">
-        Only how the game went is shown here — not anyone&rsquo;s individual
-        shots.
-      </p>
+      {match ? <Story match={match} /> : <p className="muted-inline">{error ?? 'Loading…'}</p>}
     </div>
   )
 }
