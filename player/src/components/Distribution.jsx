@@ -27,7 +27,7 @@ function Distribution({ buckets }) {
         className="dist-bars"
         role="img"
         aria-label={
-          `How the club's scores are spread, in ten bands from 0 to 100. ` +
+          `How everyone's scores are spread, in ten bands from 0 to 100. ` +
           (yours ? `Yours is in the ${yours.from} to ${yours.to} band.` : '')
         }
       >

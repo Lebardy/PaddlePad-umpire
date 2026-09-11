@@ -128,7 +128,7 @@ function Rated({ rating }) {
           so the history chart above stays a thing you read, not a
           button you hit by accident. */}
       <Link className="rating-more" to="/rating">
-        Where you sit in the club &rarr;
+        Where you sit among everyone &rarr;
       </Link>
     </section>
   )

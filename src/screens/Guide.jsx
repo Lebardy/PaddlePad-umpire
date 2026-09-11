@@ -37,7 +37,7 @@ const STEPS = [
   },
   {
     title: 'Add the players',
-    body: 'Open the session and add everyone playing. A player added once is on the club roster from then on, so the next night you pick them rather than typing them again.',
+    body: 'Open the session and add everyone playing. A player added once is on everyone’s roster from then on, so the next night you pick them rather than typing them again.',
   },
   {
     title: 'Start a match',
@@ -195,8 +195,8 @@ function Guide({ onBack }) {
       <section className="guide-section" aria-label="Whose sessions">
         <h3>Whose sessions you can see</h3>
         <p>
-          All of them. Every umpire account sees the whole club&rsquo;s
-          records, because courts and phones change hands mid-session and a
+          All of them. Every umpire account sees every record on
+          PaddlePad, because courts and phones change hands mid-session and a
           player has to be the same person whoever scored them. Your own
           sessions are listed first; below them are the ones other umpires
           still have running, with their name against each.

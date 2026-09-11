@@ -104,7 +104,7 @@ function Players({ onBack }) {
       </button>
       <h2>Players</h2>
       <p className="login-note">
-        Search everyone this club has ever recorded. Open one to show the
+        Search everyone PaddlePad has ever recorded. Open one to show the
         code that lets them see their own matches.
       </p>
 
