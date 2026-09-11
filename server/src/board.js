@@ -29,6 +29,7 @@
 
 import { deriveMatchState } from './pickleball.js'
 import { getPlayerMatches, scoreProgression } from './player-stats.js'
+import { DRAMA_ORDER, readGame } from './drama.js'
 
 // The month turns over at midnight where the players are, not in UTC,
 // where it would roll over at eight in the morning. One time zone
@@ -89,6 +90,29 @@ function shotRate({ winners, errors }) {
   return (winners + 1) / (errors + 1)
 }
 
+/** One drama fact for a game, or 0 when the game carries no reading. */
+function dramaOf(match, of) {
+  return match.game ? of(match.game) : 0
+}
+
+/**
+ * What actually separated the chosen game from the next-best one won by
+ * the same margin, so the page can say why it was picked and be right.
+ *
+ * 'margin' when no other game was as close; otherwise the first of
+ * DRAMA_ORDER on which it beat the runner-up, then 'length', then
+ * 'recency' for two games identical on everything that was counted.
+ */
+function decidedBy(best, candidates) {
+  const runnerUp = candidates.find((c) => c !== best && c.margin === best.margin)
+  if (!runnerUp) return 'margin'
+  for (const { key, of } of DRAMA_ORDER) {
+    if (dramaOf(best, of) > dramaOf(runnerUp, of)) return key
+  }
+  if (best.total > runnerUp.total) return 'length'
+  return 'recency'
+}
+
 /**
  * What the board says, from plain data.
  *
@@ -136,11 +160,19 @@ export function buildBoard({ matches, visible, nameOf, progress = [] }) {
       margin: Math.abs(m.score.A - m.score.B),
       total: m.score.A + m.score.B,
     }))
-    // Closest first; then the longer game, since 12-10 is a better game
-    // than 11-9; then the most recent, so a tie has one answer.
+    // Closest first. Among games won by the same margin -- and in a real
+    // month sixteen were won by two -- the most DRAMATIC, in the order
+    // DRAMA_ORDER gives: the game the losers nearly won, then the one
+    // that swung most, and so on. Only then the longer game, and last the
+    // most recent, so a tie always has one answer.
+    //
+    // This used to go straight from margin to length, which picked a
+    // 14-12 over a 12-10 that took 68 rallies, changed hands five times
+    // and saw the losers miss two game points.
     .sort(
       (a, b) =>
         a.margin - b.margin ||
+        DRAMA_ORDER.reduce((found, { of }) => found || dramaOf(b, of) - dramaOf(a, of), 0) ||
         b.total - a.total ||
         new Date(b.endedAt) - new Date(a.endedAt),
     )
@@ -159,9 +191,7 @@ export function buildBoard({ matches, visible, nameOf, progress = [] }) {
         // match this month.
         outOf: candidates.length,
         sameMargin: candidates.filter((c) => c.margin === best.margin).length,
-        wentFurthest: candidates.every(
-          (c) => c === best || c.margin !== best.margin || c.total < best.total,
-        ),
+        decidedBy: decidedBy(best, candidates),
         teamA: best.teamA.map((id) => nameOf.get(id) ?? 'Unknown'),
         teamB: best.teamB.map((id) => nameOf.get(id) ?? 'Unknown'),
         score: best.score,
@@ -279,6 +309,14 @@ async function gatherMonth(query) {
       pointTarget: row.point_target,
       events: month.eventsByMatch.get(row.id) ?? [],
     })
+    // Read from the winners' side, once, here -- the board ranks on it
+    // and the match page shows it, and they must be the same numbers.
+    // A match stopped early may have no winner, and is never a
+    // candidate anyway.
+    const winner = derived.winner ?? row.winner
+    const margins = winner
+      ? scoreProgression(row, month.eventsByMatch.get(row.id) ?? [], winner)
+      : []
     return {
       id: row.id,
       teamA: row.team_a,
@@ -286,6 +324,9 @@ async function gatherMonth(query) {
       score: derived.score,
       endedAt: row.ended_at,
       endedEarly: row.ended_early,
+      winner,
+      margins,
+      game: winner ? readGame(margins, row.point_target) : null,
     }
   })
 
@@ -363,10 +404,7 @@ export async function getMatchOfTheMonthStory(query, matchId) {
   if (!matchOfTheMonth || matchOfTheMonth.id !== matchId) return null
 
   const row = month.rows.find((r) => r.id === matchId)
-  // Told from the winning side, so the chart reads "above the line, the
-  // winners were ahead" -- a neutral page still needs one point of view.
-  const winner = row.winner === 'B' ? 'B' : 'A'
-
+  const chosen = month.matches.find((m) => m.id === matchId)
   const events = month.eventsByMatch.get(row.id) ?? []
 
   // Both ends come from a device clock, so a phone set wrong would show
@@ -377,10 +415,16 @@ export async function getMatchOfTheMonthStory(query, matchId) {
 
   return {
     ...matchOfTheMonth,
-    winner,
+    // Told from the winning side, so the chart reads "above the line,
+    // the winners were ahead" -- a neutral page still needs one point
+    // of view.
+    winner: chosen.winner,
     isDoubles: row.team_a.length === 2,
     pointTarget: row.point_target,
-    margins: scoreProgression(row, events, winner),
+    margins: chosen.margins,
+    // The same reading the board ranked it on, so the page can never
+    // show a different number from the one that got it picked.
+    game: chosen.game,
     // Every rally, including the ones that only changed the serve.
     // A count for the whole game, not split by anyone.
     rallies: events.filter((e) => e.type === 'rally').length,

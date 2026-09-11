@@ -20,7 +20,7 @@
 import { useEffect, useState } from 'react'
 import { fetchBoardMatch } from '../lib/api'
 import { navigate } from '../lib/router'
-import { headline, inWords, readGame } from '../lib/matchDrama'
+import { headline, inWords } from '../lib/matchDrama'
 import MatchChart from '../components/MatchChart'
 
 function BackLink() {
@@ -39,15 +39,27 @@ function times(n) {
   return n === 1 ? 'once' : n === 2 ? 'twice' : `${inWords(n)} times`
 }
 
+// What separated it from the next-best game won by the same margin, in
+// the words the page uses. The server says which one actually decided
+// it, so each of these is only ever said when it is true.
+const DECIDED = {
+  losersGamePoints: 'the one the losing side came closest to winning',
+  leadChanges: 'the one where the lead changed hands most',
+  level: 'the one that was level most often',
+  savedGamePoints: 'the one with the most game points saved',
+  length: 'the one that went furthest',
+}
+
 /** Why this game, in a claim that is actually true of it. */
 function whyChosen(match) {
   const margin = Math.abs(match.score.A - match.score.B)
   if (match.outOf === 1) return 'The only finished game this month.'
-  if (match.sameMargin === 1) {
+  if (match.sameMargin === 1 || match.decidedBy === 'margin') {
     return `The closest of the ${match.outOf} finished games this month.`
   }
   const base = `Won by ${inWords(margin)} — one of ${match.sameMargin} games this close this month`
-  return match.wentFurthest ? `${base}, and the one that went furthest.` : `${base}.`
+  const why = DECIDED[match.decidedBy]
+  return why ? `${base}, and ${why}.` : `${base}.`
 }
 
 function BoardMatch({ id }) {
@@ -86,7 +98,13 @@ function BoardMatch({ id }) {
   const plural = match.isDoubles
 
   const margins = match.margins ?? []
-  const game = readGame(margins, match.pointTarget)
+  // Counted on the server, the same reading the board ranked it on, so a
+  // game picked for its lead changes shows the number that got it picked.
+  const game = match.game ?? {
+    path: [], level: 0, leadChanges: 0, lowPoint: null, lastLevel: null,
+    savedByLosers: 0, winnersGamePoints: 0, savedByWinners: 0,
+    longestRun: { by: null, points: 0 },
+  }
   // Scores are shown A–B everywhere on this page, the same way round as
   // the heading, even though the reading is done from the winners' side.
   const asShown = ({ winners: w, losers: l }) => (winnersA ? `${w}–${l}` : `${l}–${w}`)
