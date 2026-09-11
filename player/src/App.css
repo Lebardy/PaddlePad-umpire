@@ -730,6 +730,86 @@ a.highlight:active { background: var(--surface); }
 }
 .rating-scored .muted-inline { display: block; line-height: 1.45; }
 
+/* The way from the card to the page behind it. Quiet, because the
+   card is the thing; this is a door, not an advert. */
+.rating-more {
+  display: inline-block;
+  margin-top: 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+}
+.rating-more:hover { text-decoration: underline; }
+
+/* ============ Where you sit ============ */
+
+.standing h1 { font-size: 1.35rem; margin: 0.5rem 0 0.4rem; }
+.standing-score { margin-bottom: 1.25rem; }
+
+.standing-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+}
+.standing-section h2 { font-size: 0.95rem; margin-bottom: 0.7rem; }
+.standing-sentence { font-size: 0.95rem; line-height: 1.45; }
+.standing-note { display: block; margin-top: 0.4rem; line-height: 1.45; }
+.standing-group { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.35rem; }
+.standing-section .muted-inline { line-height: 1.5; }
+.standing-dated { display: block; margin: 0.25rem 0 1.25rem; }
+
+.standing-why h2 { font-size: 0.9rem; margin-bottom: 0.4rem; }
+.standing-why p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.55; }
+
+/* The spread. Ten columns, one highlighted; the rest sit back in a
+   neutral so the eye lands on "you" first and the shape second. */
+.dist { margin: 0 0 0.9rem; }
+.dist-bars {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+  align-items: end;
+  height: 88px;
+}
+.dist-col { display: flex; align-items: flex-end; height: 100%; }
+.dist-bar {
+  display: block;
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-bottom: none;
+}
+.dist-bar.is-you { background: var(--series-1); border-color: var(--series-1); }
+.dist-axis {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+  border-top: 1px solid var(--border);
+  padding-top: 0.25rem;
+  min-height: 1.1rem;
+}
+.dist-tick {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--series-1);
+  text-align: center;
+  /* "You" is wider than a tenth of a narrow phone; let it overflow its
+     column rather than wrap into two lines. */
+  white-space: nowrap;
+  overflow: visible;
+}
+.dist-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
 /* ---- Score history ---- */
 
 .rating-history { margin-top: 0.9rem; }

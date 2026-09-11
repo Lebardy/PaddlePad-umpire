@@ -15,7 +15,11 @@
 // ============================================================
 
 import { deriveMatchState } from './pickleball.js'
-import { MIN_MATCHES_PER_PLAYER, RECOMMENDED_PLAYERS } from './rating-gate.js'
+import {
+  MIN_MATCHES_PER_PLAYER,
+  MIN_POOL_FOR_DISTRIBUTION,
+  RECOMMENDED_PLAYERS,
+} from './rating-gate.js'
 
 /**
  * Every completed match this player appeared in, newest first.
@@ -410,5 +414,117 @@ export async function getRatingState(query, playerId, matchCount) {
     state: 'not_enough_players',
     have: qualifying,
     need: RECOMMENDED_PLAYERS,
+  }
+}
+
+// How many columns the club's spread is drawn in. Ten is one per ten
+// points of a 0-100 score, which reads without a legend.
+const BUCKETS = 10
+
+/**
+ * Where this player sits among everyone the pipeline rated, and who
+ * else is in their group.
+ *
+ * Built to answer "am I getting anywhere" without ever producing a
+ * rank. It returns counts and a shape, never another player's score,
+ * name, id or group -- there is no ordering in it for a caller to
+ * reconstruct a leaderboard from.
+ *
+ * That restraint is not only about competitiveness. skill_score is
+ * POOL-RELATIVE (see rating-gate.js): in a small club the best player
+ * scores 100 whatever their actual standard, so a ranked list would
+ * publish a number that means less than it appears to. A position
+ * within a spread, dated and with the pool size attached, is the
+ * strongest honest claim available from this model.
+ */
+export async function getClubStanding(query, playerId) {
+  // The latest completed run this player is actually IN. A later run
+  // they missed would compare their old score against other people's
+  // new ones.
+  const { rows: mine } = await query(
+    `SELECT r.run_id, r.skill_score, r.skill_group, run.computed_at
+       FROM player_ratings r
+       JOIN rating_runs run ON run.id = r.run_id
+      WHERE r.player_id = $1
+        AND run.status = 'completed'
+      ORDER BY run.computed_at DESC
+      LIMIT 1`,
+    [playerId],
+  )
+
+  // No rating yet. The overview's rating card already explains why in
+  // the player's own terms, so this says only that there is nothing to
+  // stand beside rather than repeating the reasoning badly.
+  if (!mine[0]) return { state: 'unrated' }
+
+  const { run_id: runId, skill_score: score, skill_group: group } = mine[0]
+
+  // The player's own column is decided by the SAME expression as
+  // everyone else's, in the same query language. Working it out again in
+  // JavaScript got the edges wrong: width_bucket puts a score of exactly
+  // 40 in the 40-50 column, and Math.ceil(40 / 10) says 30-40, so a
+  // player on a round number saw "You" under the wrong bar.
+  //
+  // least(..., n) folds a score of exactly 100 -- which width_bucket
+  // gives an eleventh column of its own -- back into the tenth, so the
+  // top of the scale does not look like a category.
+  const BUCKET_OF = 'least(width_bucket(skill_score, 0, 100, $2), $2)'
+
+  const { rows: counts } = await query(
+    `SELECT count(*)::int AS rated,
+            count(*) FILTER (WHERE skill_score < $3)::int AS below,
+            count(*) FILTER (WHERE skill_group IS NOT DISTINCT FROM $4)::int AS band,
+            count(DISTINCT skill_group)::int AS groups,
+            max(${BUCKET_OF}) FILTER (WHERE player_id = $5)::int AS yours
+       FROM player_ratings
+      WHERE run_id = $1`,
+    [runId, BUCKETS, score, group, playerId],
+  )
+  const { rated, below, band, groups, yours } = counts[0]
+
+  const { rows: histogram } = await query(
+    `SELECT ${BUCKET_OF}::int AS bucket, count(*)::int AS n
+       FROM player_ratings
+      WHERE run_id = $1
+      GROUP BY 1`,
+    [runId, BUCKETS],
+  )
+
+  const counted = new Map(histogram.map((row) => [row.bucket, row.n]))
+
+  return {
+    state: 'rated',
+    computedAt: mine[0].computed_at,
+    // One number for both the placement sentence and the "as of" line.
+    // rating_runs.player_count records what the pipeline reported; this
+    // counts the rows actually stored, so the sentence can never say
+    // "4 of 46" about a run holding 45 rows.
+    poolSize: rated,
+    // Rounded at the source, as getRatingState does, so two screens
+    // cannot disagree about the same score.
+    yourScore: Math.round(score),
+    below,
+    // The clustering's own level-1 grouping, and how many share it.
+    // Never who they are, and never ordered within the band -- the
+    // group is the point, a position inside it is not.
+    // groupCount is there because the pipeline names groups by how many
+    // it found ("Higher-Performance" of two is not "of three"), and past
+    // three it falls back to "Performance Group N", which means nothing
+    // without knowing N of what.
+    band: group ? { name: group, size: band, groupCount: groups } : null,
+    // Null below the floor: the sentence above is honest at any pool
+    // size, a drawn shape is not.
+    distribution:
+      rated < MIN_POOL_FOR_DISTRIBUTION
+        ? null
+        : Array.from({ length: BUCKETS }, (_, i) => {
+            const bucket = i + 1
+            return {
+              from: i * (100 / BUCKETS),
+              to: bucket * (100 / BUCKETS),
+              count: counted.get(bucket) ?? 0,
+              yours: bucket === yours,
+            }
+          }),
   }
 }

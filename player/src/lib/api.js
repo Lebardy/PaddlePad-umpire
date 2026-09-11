@@ -336,6 +336,17 @@ export function fetchMe({ signal } = {}) {
   return apiFetch('/player/me', { signal })
 }
 
+/**
+ * Where this player sits in the club, and the size of their group.
+ *
+ * Its own call rather than part of fetchMe: the overview pays for that
+ * one on every launch, and this is only wanted once somebody taps
+ * through to ask.
+ */
+export function fetchStanding({ signal } = {}) {
+  return apiFetch('/player/standing', { signal }).then((d) => d.standing)
+}
+
 /** Every match this player has played, newest first. */
 export function fetchMatches({ signal } = {}) {
   return apiFetch('/player/matches', { signal }).then((d) => d.matches)

@@ -21,7 +21,10 @@ const TABS = [
 
 function isActive(tab, path) {
   // '/' would otherwise prefix-match every route.
-  if (tab.to === '/') return path === '/'
+  // The rating page is a drill-down from the overview, not a section of
+  // its own, so Overview stays lit while it is open -- the same way a
+  // match stays under Matches.
+  if (tab.to === '/') return path === '/' || path === '/rating'
   return path === tab.to || path.startsWith(`${tab.to}/`)
 }
 

@@ -17,6 +17,7 @@
 // ============================================================
 
 import Meter from './Meter'
+import { Link } from '../lib/router'
 import RatingHistory from './RatingHistory'
 
 /**
@@ -121,6 +122,14 @@ function Rated({ rating }) {
       </p>
 
       <RatingHistory history={rating.history} />
+
+      {/* The way into "where you sit" and "your group". A link at the
+          foot of the card rather than making the whole card tappable,
+          so the history chart above stays a thing you read, not a
+          button you hit by accident. */}
+      <Link className="rating-more" to="/rating">
+        Where you sit in the club &rarr;
+      </Link>
     </section>
   )
 }
