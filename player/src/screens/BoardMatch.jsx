@@ -50,14 +50,41 @@ const DECIDED = {
   length: 'the one that went furthest',
 }
 
-/** Why this game, in a claim that is actually true of it. */
+function percent(share) {
+  return `${Math.round(share * 100)}%`
+}
+
+/**
+ * Why it was eligible at all: it was played cleaner than these players
+ * usually play. Only said as "these four usually manage" when every one
+ * of them had a history to measure; otherwise the honest claim is
+ * weaker, because the month's typical game stood in for someone.
+ */
+function cleanLine(match) {
+  if (!Number.isFinite(match.clean)) return null
+  const who = match.isDoubles ? 'these four' : 'these two'
+  const than =
+    match.cleanBasis === 'players'
+      ? `more than ${who} usually manage`
+      : 'more than expected for these players'
+  return `A clean game: ${percent(match.clean)} of rallies ended with a winning shot, ${than}.`
+}
+
+/**
+ * Why this game, in a claim that is actually true of it. Every count here
+ * is of the games that could have been picked -- the ones played better
+ * than their players usually do -- not every game this month.
+ */
 function whyChosen(match) {
-  const margin = Math.abs(match.score.A - match.score.B)
-  if (match.outOf === 1) return 'The only finished game this month.'
+  const pool = 'played better than their players usually do'
+  if (match.outOf === 1) return `The only game this month ${pool}.`
   if (match.sameMargin === 1 || match.decidedBy === 'margin') {
-    return `The closest of the ${match.outOf} finished games this month.`
+    return `The closest of the ${match.outOf} games this month ${pool}.`
   }
-  const base = `Won by ${inWords(margin)} — one of ${match.sameMargin} games this close this month`
+  const margin = Math.abs(match.score.A - match.score.B)
+  const base =
+    `Won by ${inWords(margin)} — one of ${match.sameMargin} games this close ` +
+    `among the ${match.outOf} ${pool} this month`
   const why = DECIDED[match.decidedBy]
   return why ? `${base}, and ${why}.` : `${base}.`
 }
@@ -123,6 +150,9 @@ function BoardMatch({ id }) {
   // The game in numbers. Each one only when it happened: "level no
   // times" is not drama.
   const facts = []
+  if (Number.isFinite(match.clean)) {
+    facts.push(`${percent(match.clean)} of rallies won by a winning shot`)
+  }
   if (game.level > 0) facts.push(`Level ${times(game.level)}`)
   if (game.leadChanges > 0) facts.push(`Lead changed hands ${times(game.leadChanges)}`)
   if (game.savedByWinners > 0) {
@@ -214,6 +244,7 @@ function BoardMatch({ id }) {
 
       <p className="board-match-why">
         {size.length > 0 && <span>{size.join(' · ')}. </span>}
+        {cleanLine(match) && <span>{cleanLine(match)} </span>}
         {whyChosen(match)}
       </p>
 
