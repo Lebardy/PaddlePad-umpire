@@ -742,6 +742,59 @@ a.highlight:active { background: var(--surface); }
 }
 .rating-more:hover { text-decoration: underline; }
 
+/* ============ This month on PaddlePad ============ */
+
+/* Same card as the rating and the trend, so the board reads as one
+   more thing the app says rather than a banner competing with the list
+   of people below it. */
+.board {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.5rem;
+}
+.board h2 { font-size: 0.95rem; }
+.board .section-head { margin-bottom: 0.4rem; }
+
+.board-rows { list-style: none; margin: 0; padding: 0; }
+.board-row {
+  display: grid;
+  grid-template-columns: minmax(0, 8.5rem) minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--border);
+}
+.board-row:first-child { border-top: none; }
+.board-label { font-size: 0.8rem; color: var(--text-muted); padding-top: 0.1rem; }
+.board-value {
+  font-size: 0.92rem;
+  font-weight: 600;
+  /* Long names and four-player doubles lines wrap rather than push the
+     row off the side of a phone. */
+  overflow-wrap: anywhere;
+}
+.board-note {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+.board-empty { font-weight: 400; color: var(--text-muted); }
+.board-footer {
+  margin-top: 0.6rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+/* A narrow phone gives the label its own line rather than squeezing
+   both columns into unreadable slivers. */
+@media (max-width: 360px) {
+  .board-row { grid-template-columns: 1fr; gap: 0.15rem; }
+}
+
 /* ============ Where you sit ============ */
 
 .standing h1 { font-size: 1.35rem; margin: 0.5rem 0 0.4rem; }

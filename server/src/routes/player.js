@@ -14,6 +14,7 @@ import {
   summarisePlayer,
 } from '../player-stats.js'
 import { normalizeInviteCode } from '../invites.js'
+import { getMonthlyBoard } from '../board.js'
 import { normalizePlayerName, playerNameError } from '../validate.js'
 
 const router = Router()
@@ -46,7 +47,7 @@ function profileOf(row) {
 
 router.get('/me', async (req, res) => {
   const { rows } = await query(
-    `SELECT id, name, claimed_at, username, google_email
+    `SELECT id, name, claimed_at, username, google_email, name_visible
        FROM players WHERE id = $1`,
     [req.player.id],
   )
@@ -71,6 +72,12 @@ router.get('/me', async (req, res) => {
     // Either a score with the pool it was measured against, or the
     // reason there isn't one yet. Never a bare null.
     rating,
+    // Beside the profile rather than inside it. profileOf feeds half a
+    // dozen responses built from different RETURNING lists, and a field
+    // one of them forgot to select would come back undefined and wipe
+    // the setting on screen -- which is exactly what happened to
+    // googleEmail after a rename. This has one reader and one writer.
+    nameVisible: rows[0].name_visible,
   })
 })
 
@@ -87,6 +94,37 @@ router.get('/me', async (req, res) => {
  */
 router.get('/standing', async (req, res) => {
   res.json({ standing: await getClubStanding(query, req.player.id) })
+})
+
+/**
+ * This month on PaddlePad -- the board at the top of People.
+ *
+ * Every signed-in player sees the same board; nothing on it depends on
+ * who is asking. What it is made of, and the two rows deliberately left
+ * out, are explained at the top of board.js.
+ */
+router.get('/board', async (req, res) => {
+  res.json({ board: await getMonthlyBoard(query) })
+})
+
+/**
+ * Shows or hides this player's name on the monthly board.
+ *
+ * A display setting only: turning it off leaves their matches, their
+ * rating and their share of the ML export exactly as they were. So it
+ * asks for no password -- it cannot lock anyone out or move any data,
+ * and a privacy switch that is hard to reach is one people do not use.
+ */
+router.put('/me/visibility', async (req, res) => {
+  if (typeof req.body?.nameVisible !== 'boolean') {
+    return res.status(400).json({ error: 'nameVisible must be true or false' })
+  }
+  const { rows } = await query(
+    'UPDATE players SET name_visible = $2 WHERE id = $1 RETURNING name_visible',
+    [req.player.id, req.body.nameVisible],
+  )
+  if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
+  res.json({ nameVisible: rows[0].name_visible })
 })
 
 /**

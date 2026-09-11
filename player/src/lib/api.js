@@ -347,6 +347,22 @@ export function fetchStanding({ signal } = {}) {
   return apiFetch('/player/standing', { signal }).then((d) => d.standing)
 }
 
+/** This month on PaddlePad: the board at the top of People. */
+export function fetchBoard({ signal } = {}) {
+  return apiFetch('/player/board', { signal }).then((d) => d.board)
+}
+
+/**
+ * Shows or hides this player's name on the monthly board. A display
+ * setting only -- matches, ratings and everything else are untouched.
+ */
+export function setNameVisible(nameVisible) {
+  return apiFetch('/player/me/visibility', {
+    method: 'PUT',
+    body: { nameVisible },
+  }).then((d) => d.nameVisible)
+}
+
 /** Every match this player has played, newest first. */
 export function fetchMatches({ signal } = {}) {
   return apiFetch('/player/matches', { signal }).then((d) => d.matches)

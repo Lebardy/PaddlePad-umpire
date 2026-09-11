@@ -26,6 +26,7 @@ import { usePlayerData } from '../lib/PlayerData'
 import { peopleSummary, peopleTogether } from '../lib/derive'
 import { lastPlayedLabel } from '../lib/format'
 import Avatar from '../components/Avatar'
+import MonthBoard from '../components/MonthBoard'
 
 // Enough to see a run without a regular partner's row running off the
 // side of a phone.
@@ -101,6 +102,11 @@ function People() {
   return (
     <div className="people-screen">
       <h1>People</h1>
+
+      {/* Everyone on PaddlePad this month, above the people this player
+          has played with. The board is the wider view; the list below is
+          still theirs alone. */}
+      <MonthBoard />
 
       <p className="people-summary">
         {summary.people} {summary.people === 1 ? 'person' : 'people'}

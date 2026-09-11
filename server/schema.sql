@@ -211,6 +211,20 @@ ALTER TABLE players ADD COLUMN IF NOT EXISTS google_email TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS players_google_sub_idx
     ON players (google_sub) WHERE google_sub IS NOT NULL;
 
+-- Whether this player's name may appear on the monthly board.
+--
+-- A DISPLAY choice and nothing more. A player who turns it off keeps
+-- every match, every rating and every row of the ML export exactly as
+-- before -- the board simply leaves them off. They are also still
+-- counted, anonymously, wherever a number is about everyone (how many
+-- rated players there are, how many people someone else met). What they
+-- asked for is not to be named, and that is all this withholds.
+--
+-- Defaults to showing, as the user who designed it chose: people can
+-- keep themselves private if they want to, rather than having to opt in
+-- before the board has anyone on it.
+ALTER TABLE players ADD COLUMN IF NOT EXISTS name_visible BOOLEAN NOT NULL DEFAULT true;
+
 -- A player who deleted their profile.
 --
 -- The row survives, and that is the whole point of this column. A
