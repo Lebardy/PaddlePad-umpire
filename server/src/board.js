@@ -48,6 +48,12 @@ export const STEP_UP_MIN_MATCHES = 3
 // thing is to leave the row empty.
 export const STEP_UP_MIN_GAIN = 0.2
 
+// A player's "usual" game needs this many other finished games behind
+// it to mean anything; below it, this month's typical game stands in.
+// Three, for the same reason as STEP_UP_MIN_MATCHES: one outlier stops
+// deciding it.
+export const USUAL_MIN_GAMES = 3
+
 // A tie is shown as a tie. Past this many names it becomes "and N
 // more", so a quiet month where six people played once each does not
 // turn the row into a list.
@@ -113,6 +119,40 @@ function decidedBy(best, candidates) {
   return 'recency'
 }
 
+/** A share to three places -- a tenth of a percent, which is plenty. */
+function roundShare(x) {
+  return Math.round(x * 1000) / 1000
+}
+
+function mean(values) {
+  return values.reduce((sum, v) => sum + v, 0) / values.length
+}
+
+/**
+ * How clean these players usually play, and whether that is known.
+ *
+ * Their "usual" is the average cleanness of the OTHER finished games
+ * each of them has played -- a history of games, never of anyone's own
+ * shots. Anyone with fewer than USUAL_MIN_GAMES of those is judged
+ * against the month's typical game instead, and `basis` says whether
+ * every player had a history of their own ('players') or some did not
+ * ('mixed'), so the page never claims more than was measured.
+ */
+function usualFor(match, history, typical) {
+  let known = 0
+  const each = [...match.teamA, ...match.teamB].map((id) => {
+    const others = history.filter(
+      (h) => h.id !== match.id && h.players.includes(id) && Number.isFinite(h.clean),
+    )
+    if (others.length >= USUAL_MIN_GAMES) {
+      known += 1
+      return mean(others.map((h) => h.clean))
+    }
+    return typical
+  })
+  return { usual: mean(each), basis: known === each.length ? 'players' : 'mixed' }
+}
+
 /**
  * What the board says, from plain data.
  *
@@ -124,8 +164,11 @@ function decidedBy(best, candidates) {
  * @param {Array<{id, thisMonth: {winners, errors, matches}, before: {winners, errors, matches}}>} input.progress
  *   per-player totals for "biggest step up"; players outside `visible`
  *   are ignored even if present
+ * @param {Array<{id, players: string[], clean: number}>} input.history
+ *   every finished game this month's players have played, all time, with
+ *   its cleanness -- what "cleaner than they usually play" is judged on
  */
-export function buildBoard({ matches, visible, nameOf, progress = [] }) {
+export function buildBoard({ matches, visible, nameOf, progress = [], history = [] }) {
   // ---- Played the most ----
   const played = new Map()
   // ---- Met the most people ----
@@ -152,14 +195,35 @@ export function buildBoard({ matches, visible, nameOf, progress = [] }) {
   // and a match with anyone in it who hides their name is passed over
   // entirely: naming three people and blanking the fourth tells anyone
   // who was there exactly who the fourth was.
-  const candidates = matches
-    .filter((m) => !m.endedEarly)
+  //
+  // And it has to have been played CLEANER than its players usually
+  // play. Picking on drama alone kept rewarding messy games, because
+  // mistakes are exactly what make the lead swing: on staging the three
+  // most back-and-forth games of the month were all messier than
+  // average, one of them with three rallies in four ending in a mistake.
+  // A single bar for everyone would have fixed that and shut beginners
+  // out -- players' usual games ranged from 44% to 78% clean -- so each
+  // game is measured against its own players instead. Everyone has the
+  // same way in: play better than you usually do, in a close game.
+  const finished = matches.filter((m) => !m.endedEarly)
+  const cleans = finished
+    .map((m) => m.clean)
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b)
+  // The month's typical game, for players with no history of their own.
+  const typical = cleans.length > 0 ? cleans[Math.floor(cleans.length / 2)] : null
+
+  const candidates = finished
     .filter((m) => [...m.teamA, ...m.teamB].every((id) => visible.has(id)))
     .map((m) => ({
       ...m,
       margin: Math.abs(m.score.A - m.score.B),
       total: m.score.A + m.score.B,
+      ...(Number.isFinite(m.clean) && typical !== null ? usualFor(m, history, typical) : {}),
     }))
+    // A game with no rallies counted has nothing to judge, and is let
+    // through rather than excluded on no evidence.
+    .filter((m) => !Number.isFinite(m.usual) || m.clean + 1e-9 >= m.usual)
     // Closest first. Among games won by the same margin -- and in a real
     // month sixteen were won by two -- the most DRAMATIC, in the order
     // DRAMA_ORDER gives: the game the losers nearly won, then the one
@@ -192,6 +256,15 @@ export function buildBoard({ matches, visible, nameOf, progress = [] }) {
         outOf: candidates.length,
         sameMargin: candidates.filter((c) => c.margin === best.margin).length,
         decidedBy: decidedBy(best, candidates),
+        // The share of rallies that ended with a winning shot, for the
+        // whole game, and what these players usually manage -- the reason
+        // it was eligible at all. Never broken down by person.
+        // Rounded at the source, as the skill score is, so the page is
+        // never handed 0.4000000000000001 for what it shows as 40%. The
+        // eligibility test above compares the unrounded values.
+        clean: Number.isFinite(best.clean) ? roundShare(best.clean) : null,
+        usualClean: Number.isFinite(best.usual) ? roundShare(best.usual) : null,
+        cleanBasis: best.basis ?? null,
         teamA: best.teamA.map((id) => nameOf.get(id) ?? 'Unknown'),
         teamB: best.teamB.map((id) => nameOf.get(id) ?? 'Unknown'),
         score: best.score,
@@ -284,7 +357,7 @@ async function gatherMonth(query) {
   )
 
   const month = { monthStart, resetsOn, startAt, rows, eventsByMatch: new Map(), matches: [] }
-  if (rows.length === 0) return { ...month, visible: new Set(), nameOf: new Map() }
+  if (rows.length === 0) return { ...month, visible: new Set(), nameOf: new Map(), history: [] }
 
   const { rows: events } = await query(
     `SELECT match_id, type, payload
@@ -317,6 +390,7 @@ async function gatherMonth(query) {
     const margins = winner
       ? scoreProgression(row, month.eventsByMatch.get(row.id) ?? [], winner)
       : []
+    const rallies = (month.eventsByMatch.get(row.id) ?? []).filter((e) => e.type === 'rally')
     return {
       id: row.id,
       teamA: row.team_a,
@@ -327,6 +401,11 @@ async function gatherMonth(query) {
       winner,
       margins,
       game: winner ? readGame(margins, row.point_target) : null,
+      // The share of rallies that ended with a winning shot rather than
+      // a mistake -- for the whole game, never split by person.
+      clean: rallies.length > 0
+        ? rallies.filter((e) => e.outcome === 'winner').length / rallies.length
+        : null,
     }
   })
 
@@ -342,7 +421,34 @@ async function gatherMonth(query) {
     people.filter((p) => p.name_visible && !p.deactivated_at).map((p) => p.id),
   )
 
-  return { ...month, visible, nameOf }
+  // Every finished game these players have ever played, with how clean
+  // it was -- what "cleaner than they usually play" is measured against.
+  // Worked out in the database rather than by loading every event of
+  // everyone's whole history into memory. Stopped-early games are left
+  // out: a game abandoned at 4-2 says nothing about how people play.
+  const { rows: past } = await query(
+    `SELECT m.id, m.team_a, m.team_b,
+            count(*) FILTER (WHERE e.type = 'rally' AND e.payload->>'outcome' = 'winner')::float
+              / NULLIF(count(*) FILTER (WHERE e.type = 'rally'), 0) AS clean
+       FROM matches m
+       JOIN sessions s ON s.id = m.session_id
+       JOIN match_events e ON e.match_id = m.id
+      WHERE m.status = 'completed'
+        AND m.ended_at IS NOT NULL
+        AND m.voided_at IS NULL
+        AND s.voided_at IS NULL
+        AND NOT m.ended_early
+        AND (m.team_a && $1::uuid[] OR m.team_b && $1::uuid[])
+      GROUP BY m.id`,
+    [everyone],
+  )
+  const history = past.map((h) => ({
+    id: h.id,
+    players: [...h.team_a, ...h.team_b],
+    clean: h.clean,
+  }))
+
+  return { ...month, visible, nameOf, history }
 }
 
 /**
@@ -377,7 +483,11 @@ export async function getMonthlyBoard(query) {
     })
   }
 
-  return { monthStart, resetsOn, ...buildBoard({ matches, visible, nameOf, progress }) }
+  return {
+    monthStart,
+    resetsOn,
+    ...buildBoard({ matches, visible, nameOf, progress, history: month.history }),
+  }
 }
 
 /**
@@ -400,6 +510,7 @@ export async function getMatchOfTheMonthStory(query, matchId) {
     matches: month.matches,
     visible: month.visible,
     nameOf: month.nameOf,
+    history: month.history,
   })
   if (!matchOfTheMonth || matchOfTheMonth.id !== matchId) return null
 

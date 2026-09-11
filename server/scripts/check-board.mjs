@@ -180,6 +180,67 @@ section('drama beats length among games equally close')
 }
 
 // ============================================================
+section('cleaner than these players usually play')
+// ============================================================
+{
+  const past = (tag, players, clean) =>
+    [1, 2, 3].map((i) => ({ id: `${tag}${i}`, players, clean }))
+  const nobody = { savedByWinners: 0, leadChanges: 0, level: 0, savedByLosers: 0 }
+  const everyoneHere = everyone('B1', 'B2', 'B3', 'B4', 'S1', 'S2', 'S3', 'S4', 'M1', 'M2', 'M3', 'M4', 'T1', 'T2', 'T3', 'T4')
+  const allNames = names('B1', 'B2', 'B3', 'B4', 'S1', 'S2', 'S3', 'S4', 'M1', 'M2', 'M3', 'M4', 'T1', 'T2', 'T3', 'T4')
+
+  // Beginners who usually play at 40% clean have a 50% game. A stronger
+  // group who usually play at 80% have a 70% game that swung far more.
+  const fair = buildBoard({
+    matches: [
+      { ...match(['B1', 'B2'], ['B3', 'B4'], 12, 10), clean: 0.5, game: { ...nobody, leadChanges: 1 } },
+      { ...match(['S1', 'S2'], ['S3', 'S4'], 12, 10), clean: 0.7, game: { ...nobody, leadChanges: 5 } },
+    ],
+    visible: everyoneHere,
+    nameOf: allNames,
+    history: [...past('hb', ['B1', 'B2', 'B3', 'B4'], 0.4), ...past('hs', ['S1', 'S2', 'S3', 'S4'], 0.8)],
+  })
+  check('the beginners\' game, because it beat their own usual',
+    [fair.matchOfTheMonth.teamA, fair.matchOfTheMonth.usualClean, fair.matchOfTheMonth.cleanBasis],
+    [['B1', 'B2'], 0.4, 'players'],
+    'the stronger game swung more but was below what those four usually play, so it was never eligible — every level gets in the same way, by playing better than they usually do')
+
+  // The dramatic mess: three rallies in four ending in a mistake, below
+  // its players' usual. The tidier game wins though it swung less.
+  const tidy = buildBoard({
+    matches: [
+      { ...match(['M1', 'M2'], ['M3', 'M4'], 12, 10), clean: 0.24,
+        game: { savedByWinners: 2, leadChanges: 5, level: 6, savedByLosers: 0 } },
+      { ...match(['T1', 'T2'], ['T3', 'T4'], 14, 12), clean: 0.83,
+        game: { savedByWinners: 0, leadChanges: 3, level: 7, savedByLosers: 4 } },
+    ],
+    visible: everyoneHere,
+    nameOf: allNames,
+    history: [...past('hm', ['M1', 'M2', 'M3', 'M4'], 0.59), ...past('ht', ['T1', 'T2', 'T3', 'T4'], 0.66)],
+  })
+  check('drama does not rescue a game played below its players\' usual',
+    [tidy.matchOfTheMonth.teamA, tidy.matchOfTheMonth.outOf, tidy.matchOfTheMonth.decidedBy],
+    [['T1', 'T2'], 1, 'margin'],
+    'the 24% game had the losers two game points from winning, but it was far below its players\' usual 59%; the 83% game is the only eligible one')
+
+  // No history at all: everyone is judged against the month's typical
+  // game -- the middle of 30%, 50% and 70%, which is 50%.
+  const fresh = buildBoard({
+    matches: [
+      { ...match(['B1', 'B2'], ['B3', 'B4'], 12, 10), clean: 0.3, game: { ...nobody, leadChanges: 6 } },
+      { ...match(['S1', 'S2'], ['S3', 'S4'], 12, 10), clean: 0.5, game: { ...nobody, leadChanges: 2 } },
+      { ...match(['T1', 'T2'], ['T3', 'T4'], 12, 10), clean: 0.7, game: { ...nobody, leadChanges: 1 } },
+    ],
+    visible: everyoneHere,
+    nameOf: allNames,
+  })
+  check('new players are judged against the month\'s typical game',
+    [fresh.matchOfTheMonth.teamA, fresh.matchOfTheMonth.sameMargin, fresh.matchOfTheMonth.cleanBasis],
+    [['S1', 'S2'], 2, 'mixed'],
+    'the 30% game is below the typical 50% and drops out despite the most lead changes; of the two left, the one that swung more wins, and the page is told this was not measured against their own history')
+}
+
+// ============================================================
 section('biggest step up — against their own earlier matches')
 // ============================================================
 {
