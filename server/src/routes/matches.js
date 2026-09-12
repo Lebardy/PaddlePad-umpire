@@ -291,6 +291,17 @@ router.put('/:id/log', async (req, res) => {
     ) {
       return res.status(400).json({ error: `Event ${index} has unknown type ${event.type}` })
     }
+    // A rally may name the third shot it followed, which is what makes
+    // "did dropping win the point" answerable. Optional on purpose:
+    // logging a third shot is optional for the umpire, and clients from
+    // before this existed send rallies without it.
+    if (
+      event.type === 'rally' &&
+      event.thirdShotId !== undefined &&
+      !isUuid(event.thirdShotId)
+    ) {
+      return res.status(400).json({ error: `Event ${index} has an invalid thirdShotId` })
+    }
     // Both non-rally types name their player the same way, so the check
     // below covers a correction naming someone outside the match too.
     const actor = event.type === 'rally' ? event.actingPlayerId : event.playerId

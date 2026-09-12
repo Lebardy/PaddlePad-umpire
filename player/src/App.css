@@ -1204,6 +1204,15 @@ a.highlight:active { background: var(--surface); }
    so "right is better" holds on every row, including the two where
    fewer is better. That is what lets the four rows be read against each
    other, and what removed the per-row "of 30" nobody could parse. */
+/* The third-shot conversion block on the shot profile. */
+.shot-ask { font-size: 0.88rem; font-weight: 700; margin-top: 1rem; }
+.shot-note {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-top: 0.5rem;
+}
+
 .part-values { font-size: 0.8rem; font-variant-numeric: tabular-nums; flex: none; }
 .part-theirs { color: var(--text-muted); }
 .part-scale {
