@@ -159,18 +159,43 @@ function points(value) {
 }
 
 /**
- * What to call a group: the scores it covers.
+ * What to call a group: where its middle sits.
  *
  * Not "Middle of three" or "Higher scores", both of which were read
- * twice before they made sense -- middle of WHAT, higher THAN what. A
- * group is a band of ratings, so the band is its name and there is
- * nothing left to interpret. The word is "rating" throughout, because
- * that is what the app calls this number everywhere else; "score" here
- * and "rating" in the title was the same thing under two names. The model's own label for it is inside
- * "Why groups?", for anyone who wants it.
+ * twice before they made sense -- middle of WHAT, higher THAN what. And
+ * not the range of ratings it covers either, which was the next attempt
+ * and looked right until two groups were named "Ratings 28-49" and
+ * "Ratings 37-91". Those overlap, so a player rated 45 read their own
+ * number inside the name of the group they were not in.
+ *
+ * The overlap is real, not a bug in the naming: groups are not slices
+ * of the rating scale. The clustering sorts people on ten measurements
+ * and the rating is a sum of four of them, so two players can share a
+ * rating and land either side of the line. A middle cannot overlap, and
+ * "Around 42" needs no word for what 42 is -- the screen has already
+ * said it twice.
+ *
+ * Where two groups round to the SAME middle -- possible in a small
+ * pool, where a group can be split by consistency rather than by
+ * results -- the ladder falls back to ranges for every group. A wordy
+ * name is a smaller problem than the same name on two rungs.
+ *
+ * The model's own label is inside "Why groups?", for anyone who wants it.
  */
-function groupName(group) {
-  return `Ratings ${group.lowest}–${group.highest}`
+function namesFor(groups) {
+  const middles = groups.map((group) => group.middle)
+  const usable =
+    middles.every((middle) => Number.isFinite(middle)) &&
+    new Set(middles).size === middles.length
+
+  return {
+    /** On its own: the step's value, and each rung of the ladder. */
+    label: (group) =>
+      usable ? `Around ${group.middle}` : `Ratings ${group.lowest}–${group.highest}`,
+    /** Inside a sentence, where a capital would read as a slip. */
+    inSentence: (group) =>
+      usable ? `around ${group.middle}` : `Ratings ${group.lowest}–${group.highest}`,
+  }
 }
 
 function Step({ number, title, value, children }) {
@@ -396,12 +421,13 @@ function Group({ standing }) {
   const groups = standing.groups ?? []
   const mine = groups.findIndex((group) => group.name === standing.band?.name)
   const above = mine === -1 ? null : (groups[mine + 1] ?? null)
+  const naming = namesFor(groups)
 
   return (
     <Step
       number={2}
       title="Your group"
-      value={mine === -1 ? 'Not grouped yet' : groupName(groups[mine])}
+      value={mine === -1 ? 'Not grouped yet' : naming.label(groups[mine])}
     >
       {groups.length > 0 && (
         <ol className="ladder" aria-label="The groups, lowest ratings first">
@@ -409,7 +435,7 @@ function Group({ standing }) {
             <li key={group.name} className={i === mine ? 'is-you' : undefined}>
               <span className="ladder-name">
                 {i === mine && <Icon name="chevron" size={13} />}
-                {groupName(group)}
+                {naming.label(group)}
               </span>
               <span className="ladder-size">
                 {group.size} {group.size === 1 ? 'player' : 'players'}
@@ -430,7 +456,7 @@ function Group({ standing }) {
           when there is no group above, which is a fact worth reading
           on its own. */}
       {standing.parts && above && (
-        <NextGroup parts={standing.parts} name={groupName(above)} />
+        <NextGroup parts={standing.parts} name={naming.inSentence(above)} />
       )}
       {standing.parts && mine !== -1 && !above && (
         <p className="step-line">There is no group above yours.</p>
@@ -442,6 +468,16 @@ function Group({ standing }) {
           <em> within</em> a group, so &ldquo;steady&rdquo; means steady for
           players at this level rather than steady compared with everyone. It
           is also why the name below starts with your group&rsquo;s own word.
+        </p>
+        {/* Naming groups by their middle made this visible, and it was
+            always true: a player rated 37 can sit in the group called
+            "Around 59". The old name hid it behind a range wide enough
+            to contain them. Better said than hidden -- it is the most
+            surprising thing on the page, and it has an answer. */}
+        <p>
+          A group is not a slice of the rating scale. The model sorts on ten
+          measurements and your rating is a sum of four of them, so your own
+          number can sit some way from your group&rsquo;s middle.
         </p>
         {standing.band?.name && (
           <p>
