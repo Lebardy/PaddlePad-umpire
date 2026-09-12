@@ -494,14 +494,24 @@ export async function getClubStanding(query, playerId) {
     [runId, BUCKETS],
   )
 
-  // Every group in the run, in score order, with its size and the range
-  // it actually covers. The page shows this as a ladder with the
-  // player's own rung marked, because "your group" means nothing
-  // without the others beside it. Counts and ranges only -- no names,
-  // no ids, the same rule as the rest of this endpoint.
+  // Every group in the run, in score order, with its size, the range it
+  // covers and where its middle sits. The page shows this as a ladder
+  // with the player's own rung marked, because "your group" means
+  // nothing without the others beside it. Counts and ratings only -- no
+  // names, no ids, the same rule as the rest of this endpoint.
+  //
+  // The middle is what the page NAMES a group by. Naming one by its
+  // range put the same ratings in two names -- "28-49" beside "37-91"
+  // -- because groups are not slices of the rating scale: the
+  // clustering sorts people on ten measurements and the rating is a sum
+  // of four of them, so two players can share a rating and land either
+  // side. A median cannot overlap that way, and it is a median rather
+  // than an average so that one outlier cannot drag a group's name away
+  // from where its players actually are.
   const { rows: ladder } = await query(
     `SELECT skill_group AS name, count(*)::int AS size,
-            min(skill_score) AS lowest, max(skill_score) AS highest
+            min(skill_score) AS lowest, max(skill_score) AS highest,
+            percentile_cont(0.5) WITHIN GROUP (ORDER BY skill_score) AS middle
        FROM player_ratings
       WHERE run_id = $1 AND skill_group IS NOT NULL
       GROUP BY skill_group
@@ -580,6 +590,11 @@ export async function getClubStanding(query, playerId) {
       size: g.size,
       lowest: Math.round(g.lowest),
       highest: Math.round(g.highest),
+      // What the page calls the group. The range stays beside it: two
+      // groups in a small pool can round to the same middle, and the
+      // page falls back to ranges for all of them rather than showing
+      // one name twice.
+      middle: Math.round(g.middle),
     })),
     // The four measurements the rating is a weighted sum of -- yours,
     // your group's average, and the group above's. Null for a run from
