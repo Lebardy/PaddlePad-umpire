@@ -86,13 +86,14 @@ function Expectation({ match }) {
         </span>
       )}
       {said && <span>{said}</span>}
-      {/* Not clipped at 100. A rating measures you against everyone
-          else's AVERAGE, so a good game can beat the best average there
-          is -- and being told you played like a 112 is the point, not a
-          glitch. The rating page explains the scale. */}
+      {/* Held inside 0-100. A game is scored against everyone's season
+          AVERAGE, so an exceptional one genuinely beats the top of the
+          scale -- but "you played like a 112" reads as a bug to anyone
+          holding a rating out of 100, and this line has no room to
+          explain itself. The rating page has that room, and does. */}
       {ratedAs !== null && (
         <span className="expectation-rated">
-          You played this one like a {Math.round(ratedAs)}.
+          You played this one like a {Math.round(Math.max(0, Math.min(100, ratedAs)))}.
         </span>
       )}
     </p>

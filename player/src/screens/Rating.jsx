@@ -158,62 +158,58 @@ function points(value) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }
 
-/** 1st, 2nd, 3rd, 4th... 21st. The ordinary English rule, including
- *  the exception that makes 11th, 12th and 13th not follow it. */
-function ordinal(n) {
-  const tens = n % 100
-  if (tens >= 11 && tens <= 13) return `${n}th`
-  return `${n}${['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`
-}
-
 /**
- * What to call a group: where its middle sits among everyone rated.
+ * What to call a group: where it sits relative to the reader.
  *
- * Three namings were tried before this one, and each failed for a
- * reason worth keeping.
+ * FOUR namings were tried before this one, and every one of them was a
+ * number. Keeping why each failed, because between them they rule out
+ * the whole family.
  *
  * "Middle of three" and "Higher scores" were read twice before they
  * made sense -- middle of WHAT, higher THAN what.
  *
  * "Ratings 28-49" beside "Ratings 37-91" overlapped, so a player rated
- * 45 found their own number inside the name of the group they were not
- * in. That overlap is real rather than a slip: groups are not slices of
+ * 45 found their own number inside the name of a group they were not
+ * in. The overlap is real rather than a slip: groups are not slices of
  * the rating scale, because the clustering sorts on ten measurements
  * while the rating is a sum of four of them.
  *
- * "Around 43" cannot overlap, but a rating turns out to be a poor
- * description of position. skill_score is min-max scaled and players
- * are not spread evenly along it -- on the pool this was written
- * against, 26 of 46 sat between 40 and 59. So a rating of 42 is the
- * 17th percentile, not the "just below middle" the number implies, and
- * ten rating points crosses 33 places down there against 7 at the top.
+ * "Around 43" cannot overlap, but a rating describes position poorly.
+ * skill_score is min-max scaled and players are not spread evenly along
+ * it -- on the pool this was written against, 26 of 46 sat between 40
+ * and 59.
  *
- * A percentile says outright what a rating only implies, which is why
- * it survives. It needs one line of explanation the first time, and
- * gets one under the ladder.
+ * "70th percentile" fixed that and broke two other things. It needs a
+ * line of explanation before it means anything, and it sits beside the
+ * rating in step 1 looking like the same unit while being a different
+ * one: nine of those 46 players were 20+ points from their own group's
+ * percentile, one rated 37 while personally at the 7th in a group
+ * called "70th". Worse, a percentile exaggerates where it matters most
+ * -- 27 of 45 neighbouring pairs were under one rating point apart, and
+ * in the crowded middle a single rating point moved a player 6.5
+ * percentile places. It manufactures gaps between players the model
+ * considers tied.
  *
- * Where two groups round to the SAME percentile -- possible in a small
- * pool, where a group can be split by consistency rather than results
- * -- the ladder falls back to ratings for every group. A blunt name is
- * a smaller problem than the same name on two rungs.
+ * So: no number. A rung says where it sits beside YOURS, which is the
+ * only thing a reader needs from it and the only version that needs no
+ * legend. It also survives the clustering changing its mind about how
+ * many groups there are -- 2 at 46 players, 3 at 12, and up to 5 -- at
+ * which point the pipeline's own labels degrade to "Performance Group
+ * 4" and mean nothing to anybody.
  *
- * The model's own label is inside "Why groups?", for anyone who wants it.
+ * The percentile is not lost; it moves into "Why groups?" with the
+ * model's own label, where a reader who wants it will look.
  */
-function namesFor(groups) {
-  const places = groups.map((group) => group.percentile)
-  const usable =
-    places.every((place) => Number.isFinite(place)) &&
-    new Set(places).size === places.length
+const STEPS = ['', 'A step', 'Two steps', 'Three steps', 'Four steps']
 
-  return {
-    usable,
-    /** On its own: the step's value, and each rung of the ladder. */
-    label: (group) =>
-      usable ? `${ordinal(group.percentile)} percentile` : `Around ${group.middle}`,
-    /** Inside a sentence, where a capital would read as a slip. */
-    inSentence: (group) =>
-      usable ? `the ${ordinal(group.percentile)} percentile` : `around ${group.middle}`,
-  }
+function labelFor(index, mine) {
+  // No reference point, so "a step up" has nothing to be a step from.
+  if (mine === -1) return `Group ${index + 1}`
+  if (index === mine) return 'Your group'
+  const distance = Math.abs(index - mine)
+  const direction = index > mine ? 'up' : 'down'
+  const size = STEPS[distance] ?? `${distance} steps`
+  return `${size} ${direction}`
 }
 
 function Step({ number, title, value, children }) {
@@ -355,23 +351,28 @@ function Parts({ parts }) {
  * they are.
  */
 function Games({ games }) {
-  // The strip spans THIS player's own games rather than a fixed 0-100,
-  // and that is not a cosmetic choice.
+  // Held inside 0-100, for the reader's sake rather than the model's.
   //
-  // A single game is scored on a scale whose ceiling is the best
-  // player's SEASON AVERAGE, and a good player's good game beats their
-  // own average routinely -- the strongest player on the pool this was
-  // built against had three games over 100 and a best of 113. Pinning
-  // the axis at 100 would crush their whole middle half against the
-  // right edge and show them a spread they do not have.
+  // A single game is scored against everyone's season AVERAGE, so a
+  // good player's good game genuinely beats the top of the scale --
+  // the strongest player on the pool this was built against had three
+  // games over 100 and a best of 113, and the weakest had one at -6.
+  // Those are real numbers, and "you played like a 112" still reads as
+  // a bug to anyone holding a rating out of 100. So the ends are
+  // clipped and the tap below says what was clipped and why.
   //
-  // This strip answers "how much do you swing", not "where do you sit"
-  // -- the bars higher up the page already answer that -- so an axis
-  // of their own games is the one that tells the truth.
-  const low = Math.min(games.worst, games.rating)
-  const high = Math.max(games.best, games.rating)
+  // The scores themselves are stored uncapped, because the claim this
+  // whole section rests on -- that a rating IS the average of these --
+  // only holds on the real ones. Nothing here recomputes it.
+  const shown = (score) => Math.max(0, Math.min(100, score))
+
+  // The strip still spans this player's own games rather than a fixed
+  // 0-100: it answers "how much do you swing", not "where do you sit",
+  // which the bars higher up the page already answer.
+  const low = Math.min(shown(games.worst), shown(games.rating))
+  const high = Math.max(shown(games.best), shown(games.rating))
   const span = high - low || 1
-  const place = (score) => ((score - low) / span) * 100
+  const place = (score) => ((shown(score) - low) / span) * 100
 
   return (
     <div className="games">
@@ -379,12 +380,12 @@ function Games({ games }) {
       <p className="step-line">
         Your rating is the average of your {games.count} games — not a summary
         of them, the middle. Most land between{' '}
-        <strong>{Math.round(games.lower)}</strong> and{' '}
-        <strong>{Math.round(games.upper)}</strong>.
+        <strong>{Math.round(shown(games.lower))}</strong> and{' '}
+        <strong>{Math.round(shown(games.upper))}</strong>.
       </p>
 
       <div className="games-strip" role="img"
-           aria-label={`${games.count} games, from ${Math.round(games.worst)} to ${Math.round(games.best)}, averaging ${Math.round(games.average)}`}>
+           aria-label={`${games.count} games, from ${Math.round(shown(games.worst))} to ${Math.round(shown(games.best))}, averaging ${Math.round(shown(games.average))}`}>
         {/* The middle half, drawn as the band the dots mostly sit in. */}
         <span
           className="games-band"
@@ -403,16 +404,16 @@ function Games({ games }) {
         <span className="games-mark" style={{ left: `${place(games.rating)}%` }} />
       </div>
       <ul className="games-scale" aria-hidden="true">
-        <li>{Math.round(games.worst)}</li>
-        <li>{Math.round(games.best)}</li>
+        <li>{Math.round(shown(games.worst))}</li>
+        <li>{Math.round(shown(games.best))}</li>
       </ul>
 
       <p className="games-ends">
-        Worst <strong>{Math.round(games.worst)}</strong>
+        Worst <strong>{Math.round(shown(games.worst))}</strong>
         <span className="games-sep">·</span>
-        Rating <strong>{Math.round(games.rating)}</strong>
+        Rating <strong>{Math.round(shown(games.rating))}</strong>
         <span className="games-sep">·</span>
-        Best <strong>{Math.round(games.best)}</strong>
+        Best <strong>{Math.round(shown(games.best))}</strong>
       </p>
 
       <More label="Why is the spread so wide?">
@@ -430,13 +431,12 @@ function Games({ games }) {
         {games.outsideScale > 0 && (
           <p>
             {games.outsideScale === 1
-              ? 'One of these games scored'
-              : `${games.outsideScale} of these games scored`}{' '}
-            outside 0–100, which is not a mistake. The scale is built from
-            everyone&rsquo;s <em>average</em>, and a single game can be better
-            than the best average there is — or worse than the worst. Over 100
-            means you played that one better than anybody plays on an ordinary
-            day; below 0, worse.
+              ? 'One of these games ran past the end of the scale and is shown'
+              : `${games.outsideScale} of these games ran past the ends of the scale and are shown`}{' '}
+            at 0 or 100. The scale is built from everyone&rsquo;s{' '}
+            <em>average</em>, so one exceptional game can be better than the
+            best average there is — there is simply nowhere left on the scale
+            to put it.
           </p>
         )}
       </More>
@@ -452,13 +452,13 @@ function Games({ games }) {
  * is a thing to go and practise. The rest sit behind the tap for
  * anyone who wants to check that the biggest really is the biggest.
  */
-function NextGroup({ parts, name }) {
+function NextGroup({ parts }) {
   const { worst } = gainsAndLosses(parts.parts, 'above')
   if (!worst) return null
 
   return (
     <div className="next-group">
-      <h3 className="next-head">What separates you from {name}</h3>
+      <h3 className="next-head">What separates you from the next group up</h3>
       <p className="step-line">
         The biggest single gap is <strong>{worst.part.label}</strong>: theirs
         averages {partValue(worst.part.above.value, worst.part.unit)}, yours is{' '}
@@ -547,13 +547,16 @@ function Group({ standing }) {
   const groups = standing.groups ?? []
   const mine = groups.findIndex((group) => group.name === standing.band?.name)
   const above = mine === -1 ? null : (groups[mine + 1] ?? null)
-  const naming = namesFor(groups)
 
   return (
     <Step
       number={2}
       title="Your group"
-      value={mine === -1 ? 'Not grouped yet' : naming.label(groups[mine])}
+      value={
+        mine === -1
+          ? 'Not grouped yet'
+          : `${groups[mine].size} ${groups[mine].size === 1 ? 'player' : 'players'} at your level`
+      }
     >
       {groups.length > 0 && (
         <ol className="ladder" aria-label="The groups, lowest ratings first">
@@ -561,7 +564,7 @@ function Group({ standing }) {
             <li key={group.name} className={i === mine ? 'is-you' : undefined}>
               <span className="ladder-name">
                 {i === mine && <Icon name="chevron" size={13} />}
-                {naming.label(group)}
+                {labelFor(i, mine)}
               </span>
               <span className="ladder-size">
                 {group.size} {group.size === 1 ? 'player' : 'players'}
@@ -572,11 +575,9 @@ function Group({ standing }) {
       )}
 
       <p className="step-line">
-        Everyone rated is split into a few groups by results first, and each
-        is named for where its middle sits.{' '}
-        {naming.usable && mine !== -1
-          ? `The ${ordinal(groups[mine].percentile)} percentile means higher than ${groups[mine].percentile}% of everyone rated.`
-          : 'A group needs distinct middles before it can be named that way, so these are ratings instead.'}
+        Everyone rated is split into a few groups first. Which one you land in
+        is worked out from ten measurements, not just your rating — so your own
+        number can sit some way from the rest of your group.
       </p>
 
       {/* The rung above, named from the ladder rather than from
@@ -584,9 +585,7 @@ function Group({ standing }) {
           number of groups the clustering settles on. Nothing at all
           when there is no group above, which is a fact worth reading
           on its own. */}
-      {standing.parts && above && (
-        <NextGroup parts={standing.parts} name={naming.inSentence(above)} />
-      )}
+      {standing.parts && above && <NextGroup parts={standing.parts} />}
       {standing.parts && mine !== -1 && !above && (
         <p className="step-line">There is no group above yours.</p>
       )}
@@ -598,16 +597,19 @@ function Group({ standing }) {
           players at this level rather than steady compared with everyone. It
           is also why the name below starts with your group&rsquo;s own word.
         </p>
-        {/* Naming groups by their middle made this visible, and it was
-            always true: a player rated 37 can sit in the group called
-            "Around 59". The old name hid it behind a range wide enough
-            to contain them. Better said than hidden -- it is the most
-            surprising thing on the page, and it has an answer. */}
-        <p>
-          A group is not a slice of the rating scale. The model sorts on ten
-          measurements and your rating is a sum of four of them, so your own
-          number can sit some way from your group&rsquo;s middle.
-        </p>
+        {/* The numbers the rungs used to be named after. Real, and
+            worth having, but they made a reader decode a label before
+            it meant anything -- so they live down here now, where
+            somebody who wants them will look. */}
+        {mine !== -1 && Number.isFinite(groups[mine].percentile) && (
+          <p>
+            Your group&rsquo;s middle sits higher than{' '}
+            <strong>{groups[mine].percentile}%</strong> of everyone rated, and
+            covers ratings {groups[mine].lowest}–{groups[mine].highest}. Those
+            ranges overlap between groups, which is the same thing said another
+            way: the rating is not what decides the group.
+          </p>
+        )}
         {standing.band?.name && (
           <p>
             The model&rsquo;s own name for your group is{' '}
