@@ -17,6 +17,8 @@
 import { deriveMatchState } from './pickleball.js'
 import { buildPlaystyleProof } from './playstyle.js'
 import { buildRatingParts } from './rating-parts.js'
+import { summariseGames } from './game-scores.js'
+import { expectationFor, sideRating } from './expectation.js'
 import {
   MIN_MATCHES_PER_PLAYER,
   MIN_POOL_FOR_DISTRIBUTION,
@@ -86,6 +88,65 @@ export async function getPlayerMatches(query, playerId) {
   )
   const nameOf = new Map(people.map((p) => [p.id, p.name]))
 
+  // What the model expected of each match BEFORE it was played, and
+  // what this player's own performance in it scored.
+  //
+  // Both come from rating runs, and both are deliberately anchored to
+  // different runs: the expectation to the newest run that finished
+  // before each match (see expectation.js -- a later run has already
+  // seen the result), and the game score to the newest run overall, so
+  // it agrees with the rating and the spread the Rating page shows.
+  const runsNeeded = await query(
+    `SELECT id, computed_at FROM rating_runs
+      WHERE status = 'completed' AND computed_at <= $1
+      ORDER BY computed_at`,
+    [rows[rows.length - 1].ended_at],
+  )
+  const priorRunFor = (endedAt) => {
+    let found = null
+    for (const run of runsNeeded.rows) {
+      if (new Date(run.computed_at) <= new Date(endedAt)) found = run.id
+      else break
+    }
+    return found
+  }
+
+  const wanted = new Set()
+  for (const row of rows) {
+    const runId = priorRunFor(row.ended_at)
+    if (runId) wanted.add(runId)
+  }
+
+  const scoresByRun = new Map()
+  if (wanted.size > 0) {
+    const { rows: scored } = await query(
+      `SELECT run_id, player_id, skill_score
+         FROM player_ratings
+        WHERE run_id = ANY($1::uuid[]) AND player_id = ANY($2::uuid[])`,
+      [[...wanted], [...everyone]],
+    )
+    for (const row of scored) {
+      if (!scoresByRun.has(row.run_id)) scoresByRun.set(row.run_id, new Map())
+      scoresByRun.get(row.run_id).set(row.player_id, Number(row.skill_score))
+    }
+  }
+
+  // This player's own score for each game, from the newest run they are
+  // in. Their own numbers only, so nothing is withheld.
+  const { rows: latest } = await query(
+    `SELECT r.game_scores
+       FROM player_ratings r
+       JOIN rating_runs run ON run.id = r.run_id
+      WHERE r.player_id = $1 AND run.status = 'completed'
+      ORDER BY run.computed_at DESC
+      LIMIT 1`,
+    [playerId],
+  )
+  const scoredGame = new Map(
+    (Array.isArray(latest[0]?.game_scores) ? latest[0].game_scores : [])
+      .map((game) => [game.matchId, Number(game.score)]),
+  )
+
   const result = rows.map((row) => {
     const derived = deriveMatchState({
       teamA: row.team_a,
@@ -138,6 +199,25 @@ export async function getPlayerMatches(query, playerId) {
       usedStacking: team === 'A' ? row.stacking_a : row.stacking_b,
       stats: derived.stats[playerId],
       progression,
+      // A verdict in words and nothing else -- see expectation.js for
+      // why no figure about anybody may appear here. Null when the
+      // match predates every run, or when anyone on court was unrated
+      // at the time.
+      expectation: (() => {
+        const runId = priorRunFor(row.ended_at)
+        const scores = runId ? scoresByRun.get(runId) : null
+        if (!scores) return null
+        const yours = sideRating(ownTeam, scores)
+        const theirs = sideRating(opponents, scores)
+        return expectationFor(
+          yours,
+          theirs,
+          row.winner === null ? null : row.winner === team,
+        )
+      })(),
+      // How this game scored on the rating's own scale. The player's
+      // rating is the average of these across their games.
+      ratedAs: scoredGame.has(row.id) ? Math.round(scoredGame.get(row.id) * 10) / 10 : null,
     }
   })
 
@@ -446,7 +526,7 @@ export async function getClubStanding(query, playerId) {
   const { rows: mine } = await query(
     `SELECT r.run_id, r.skill_score, r.skill_group, r.playstyle_cluster,
             r.playstyle_archetype, r.playstyle_traits, r.evidence,
-            r.score_parts, run.computed_at
+            r.score_parts, r.game_scores, run.computed_at
        FROM player_ratings r
        JOIN rating_runs run ON run.id = r.run_id
       WHERE r.player_id = $1
@@ -500,22 +580,44 @@ export async function getClubStanding(query, playerId) {
   // nothing without the others beside it. Counts and ratings only -- no
   // names, no ids, the same rule as the rest of this endpoint.
   //
-  // The middle is what the page NAMES a group by. Naming one by its
-  // range put the same ratings in two names -- "28-49" beside "37-91"
-  // -- because groups are not slices of the rating scale: the
-  // clustering sorts people on ten measurements and the rating is a sum
-  // of four of them, so two players can share a rating and land either
-  // side. A median cannot overlap that way, and it is a median rather
-  // than an average so that one outlier cannot drag a group's name away
-  // from where its players actually are.
+  // The middle is what the page NAMES a group by, as a PERCENTILE of
+  // that middle rather than as the rating itself.
+  //
+  // Two earlier namings failed. A range -- "Ratings 28-49" beside
+  // "Ratings 37-91" -- put the same numbers in two names, because
+  // groups are not slices of the rating scale: the clustering sorts on
+  // ten measurements and the rating is a sum of four of them, so two
+  // players can share a rating and land either side. A bare middle --
+  // "Around 43" -- cannot overlap, but a rating is a poor description
+  // of position, because skill_score is min-max scaled and the players
+  // are not spread evenly along it. On the pool this was written
+  // against, 26 of 46 players sat between 40 and 59: a rating of 42 is
+  // the 17th percentile, not the "slightly below middle" the number
+  // suggests, and ten rating points crosses 33 places down there
+  // against 7 places up at the top.
+  //
+  // A percentile says the thing a rating only implies. It is taken from
+  // the group's MEDIAN rather than its mean so one outlier cannot drag
+  // a group's name away from where its players actually are, and the
+  // ladder is ordered by that same middle so the rungs can never
+  // contradict their own names.
   const { rows: ladder } = await query(
-    `SELECT skill_group AS name, count(*)::int AS size,
-            min(skill_score) AS lowest, max(skill_score) AS highest,
-            percentile_cont(0.5) WITHIN GROUP (ORDER BY skill_score) AS middle
-       FROM player_ratings
-      WHERE run_id = $1 AND skill_group IS NOT NULL
-      GROUP BY skill_group
-      ORDER BY min(skill_score)`,
+    `WITH rated AS (
+        SELECT skill_score, skill_group
+          FROM player_ratings
+         WHERE run_id = $1 AND skill_group IS NOT NULL
+     ), grouped AS (
+        SELECT skill_group AS name, count(*)::int AS size,
+               min(skill_score) AS lowest, max(skill_score) AS highest,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY skill_score) AS middle
+          FROM rated
+         GROUP BY skill_group
+     )
+     SELECT g.*,
+            (SELECT count(*) FROM rated r WHERE r.skill_score < g.middle)::float
+              / nullif((SELECT count(*) FROM rated), 0) AS share
+       FROM grouped g
+      ORDER BY g.middle`,
     [runId],
   )
 
@@ -569,6 +671,11 @@ export async function getClubStanding(query, playerId) {
     })
   }
 
+  // Every game this player played, on the same scale as their rating.
+  // Their own numbers only -- see game-scores.js, including why the
+  // rating really is the average of these rather than a summary.
+  const games = summariseGames(mine[0].game_scores, score)
+
   const counted = new Map(histogram.map((row) => [row.bucket, row.n]))
 
   return {
@@ -590,16 +697,21 @@ export async function getClubStanding(query, playerId) {
       size: g.size,
       lowest: Math.round(g.lowest),
       highest: Math.round(g.highest),
-      // What the page calls the group. The range stays beside it: two
-      // groups in a small pool can round to the same middle, and the
-      // page falls back to ranges for all of them rather than showing
-      // one name twice.
+      // What the page calls the group: the share of everyone rated who
+      // sits below its middle. The middle and the range stay beside it
+      // because two groups in a small pool can round to the same
+      // percentile, and the page falls back rather than showing one
+      // name on two rungs.
       middle: Math.round(g.middle),
+      percentile: g.share === null ? null : Math.round(g.share * 100),
     })),
     // The four measurements the rating is a weighted sum of -- yours,
     // your group's average, and the group above's. Null for a run from
     // a pipeline that did not send them.
     parts,
+    // The games the rating is the average of. Null for an older run,
+    // or for a player with too few games for a spread to mean much.
+    games,
     // The name the pipeline gave this player's style, and the numbers
     // that earned each word of it.
     playstyleArchetype: mine[0].playstyle_archetype ?? null,

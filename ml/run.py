@@ -108,6 +108,131 @@ SCORE_PART_UNITS = {
 }
 
 
+def _pool_bounds(skill_profiles):
+    """
+    The highest and lowest player AVERAGE for each scoring measurement.
+
+    This is what min_max_normalize sees when it scales the pool, so
+    holding on to it lets a single game be put on the same 0-100 scale
+    as the players it is being compared with.
+    """
+    return {
+        column: (
+            float(skill_profiles[column].min()),
+            float(skill_profiles[column].max()),
+        )
+        for _key, column, _weight_key, _lower in SCORE_PARTS
+    }
+
+
+def _score_from(features, bounds):
+    """
+    The skill score for any frame carrying the four measurements.
+
+    Mirrors min_max_normalize's behaviour on a pool with no spread at
+    all -- everyone sits at 0.5 -- rather than dividing by zero.
+    """
+    total = None
+    for _key, column, weight_key, lower_is_better in SCORE_PARTS:
+        low, high = bounds[column]
+        if high == low:
+            share = pd.Series(0.5, index=features.index)
+        else:
+            share = (features[column] - low) / (high - low)
+        if lower_is_better:
+            share = 1 - share
+        points = share * SKILL_WEIGHTS[weight_key] * 100
+        total = points if total is None else total + points
+    return total
+
+
+def per_match_features(match_df):
+    """
+    The four scoring measurements for ONE match rather than averaged
+    over a player's matches.
+
+    Same formulas as the per-match block at the top of
+    aggregate_player_profiles, and deliberately NOT a second source of
+    truth: build_game_scores asserts that a player's game scores average
+    back to their rating, which stops being true the moment these
+    disagree with the pipeline's own. A copy that cannot drift silently
+    is worth more here than reaching into a vendored function.
+    """
+    duration = match_df["match_duration_mins"].clip(lower=1.0)
+    winners = match_df["clean_winners"] + match_df["dink_winners"]
+    attempts = match_df["drop_attempts"]
+
+    return pd.DataFrame(
+        {
+            # A match with no drop attempted scores 0.0, which is what
+            # aggregate_player_profiles does -- not "no opinion".
+            "drop_efficiency_mean": (
+                match_df["drop_successes"] / attempts.where(attempts > 0, 1.0)
+            ).where(attempts > 0, 0.0),
+            "winner_rate_mean": winners / duration,
+            "general_error_rate_mean": match_df["unforced_errors"] / duration,
+            "dink_error_rate_mean": match_df["dink_errors"] / duration,
+        },
+        index=match_df.index,
+    )
+
+
+def build_game_scores(gated_df, skill_profiles):
+    """
+    Every single game a player played, scored on the pool's own scale.
+
+    This is the consistency half of the model made readable. The five
+    "_std" features the pipeline computes are genuinely about how much
+    someone swings between games, but "your winner rate varies by 1.20"
+    is not a sentence anybody can use. A game that scored 43 beside one
+    that scored 94 is.
+
+    The property that makes it honest: min-max scaling and a weighted
+    sum are both AFFINE, so the average of a player's game scores is
+    exactly their rating -- not approximately, exactly. Their rating is
+    not a summary of these games, it IS their mean. That is asserted
+    below, and it is also what catches per_match_features drifting away
+    from the pipeline's own per-match block.
+
+    Scores are left unclamped here. A single game can be better than
+    any player's AVERAGE, which is what the scale is built from, so
+    about one game in twenty lands outside 0-100. Clipping at this end
+    would quietly break the average-back-to-the-rating property; the
+    app clips only what it draws, and says so.
+
+    Returns {player_id: [{"matchId", "score"}, ...]}.
+    """
+    bounds = _pool_bounds(skill_profiles)
+    scores = _score_from(per_match_features(gated_df), bounds)
+
+    frame = pd.DataFrame(
+        {
+            "player_id": gated_df["player_id"].to_numpy(),
+            "match_id": gated_df["match_id"].to_numpy(),
+            "score": scores.to_numpy(),
+        }
+    )
+
+    averaged = frame.groupby("player_id")["score"].mean()
+    rated = skill_profiles.set_index("player_id")["skill_score"]
+    drift = (averaged - rated).dropna().abs().max()
+    if pd.notna(drift) and drift > 0.05:
+        raise RuntimeError(
+            "A player's game scores do not average back to their rating -- off "
+            f"by {drift:.4f} at worst. per_match_features has drifted from "
+            "aggregate_player_profiles, or the scoring is no longer a weighted "
+            "sum of min-max scaled means."
+        )
+
+    return {
+        player_id: [
+            {"matchId": row.match_id, "score": round(float(row.score), 2)}
+            for row in group.itertuples()
+        ]
+        for player_id, group in frame.groupby("player_id")
+    }
+
+
 def build_score_parts(skill_profiles):
     """
     Each player's score, broken into the four parts it is a sum of.
@@ -398,19 +523,24 @@ def run_pipeline(gated_df):
     # clustering input rather than the score.
     parts = build_score_parts(skill_profiles)
 
+    # Every game each player played, on the same scale as their rating.
+    # Uses the gated match rows rather than anything the clustering
+    # touched, for the same reason as above.
+    games = build_game_scores(gated_df, skill_profiles)
+
     report = {
         "skillGroups": groups,
         "skillK": int(best_skill_k),
         "groupsTooSmallToCluster": unclustered,
     }
-    return final, evidence, parts, report
+    return final, evidence, parts, games, report
 
 
 # ============================================================
 # Publishing
 # ============================================================
 
-def to_payload(final, evidence_df, parts, gate_report, structure_report, match_count):
+def to_payload(final, evidence_df, parts, games, gate_report, structure_report, match_count):
     missing = [c for c in EVIDENCE_COLUMNS if c not in evidence_df.columns]
     if missing:
         # Loud rather than an empty dict. The first version of this
@@ -446,6 +576,9 @@ def to_payload(final, evidence_df, parts, gate_report, structure_report, match_c
             # with what it contributed. Where evidence explains the
             # archetype, this explains the NUMBER -- see SCORE_PARTS.
             "scoreParts": parts.get(row["player_id"]),
+            # Each of this player's games, scored on the pool's scale.
+            # Their rating is the average of these, exactly.
+            "gameScores": games.get(row["player_id"]),
             "matchCount": int(row.get("match_count") or 0),
         })
 
@@ -500,7 +633,7 @@ def run(api_url=None, api_key=None, publish=True):
     gate_report = None
     try:
         gated, gate_report = apply_gate(match_df, gate)
-        final, evidence, parts, structure = run_pipeline(gated)
+        final, evidence, parts, games, structure = run_pipeline(gated)
     except NotEnoughData as reason:
         print(f"Gate held: {reason}")
         if publish:
@@ -508,7 +641,7 @@ def run(api_url=None, api_key=None, publish=True):
         return {"status": "gated", "reason": str(reason), "gate": gate_report}
 
     payload = to_payload(
-        final, evidence, parts, gate_report, structure, int(len(gated))
+        final, evidence, parts, games, gate_report, structure, int(len(gated))
     )
     print(
         f"Rated {payload['playerCount']} players "

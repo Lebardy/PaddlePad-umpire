@@ -19,9 +19,13 @@ import pandas as pd
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
+from pipeline.player_profiles import aggregate_player_profiles
+from pipeline.skill_model import build_skill_model
 from run import (
     EVIDENCE_COLUMNS,
     SCORE_PARTS,
+    build_game_scores,
+    per_match_features,
     NotEnoughData,
     apply_gate,
     run_pipeline,
@@ -116,7 +120,7 @@ check("the point-target mix is recorded", report["pointTargetMix"] == {"11": len
 
 print("\npipeline")
 
-final, evidence, parts, structure = run_pipeline(gated)
+final, evidence, parts, games, structure = run_pipeline(gated)
 check("every player who went in came out",
       set(final["player_id"]) == set(gated["player_id"].unique()),
       f"{len(final)} out of {gated['player_id'].nunique()}")
@@ -148,7 +152,7 @@ else:
     for seed in range(1, 40):
         probe = synthetic_logs(num_players=60, matches_per_player=8, seed=seed)
         probe_gated, _ = apply_gate(probe, GATE)
-        probe_final, _, _, probe_structure = run_pipeline(probe_gated)
+        probe_final, _, _, _, probe_structure = run_pipeline(probe_gated)
         if len(probe_structure["skillGroups"]) >= 3:
             check("a three-group run keeps everyone (the bug the driver fixes)",
                   set(probe_final["player_id"]) == set(probe_gated["player_id"].unique()),
@@ -163,7 +167,7 @@ else:
 
 print("\npayload")
 
-payload = to_payload(final, evidence, parts, report, structure, len(gated))
+payload = to_payload(final, evidence, parts, games, report, structure, len(gated))
 check("one rating per player", len(payload["ratings"]) == final["player_id"].nunique())
 check("scores are plain floats", all(isinstance(r["skillScore"], float)
                                      for r in payload["ratings"]))
@@ -250,6 +254,57 @@ check("parts carry the player's own measurement, not just points",
 check("drops landing is a proportion and the rates are per minute",
       rated[0]["scoreParts"]["dropsLanding"]["unit"] == "proportion"
       and rated[0]["scoreParts"]["winningShots"]["unit"] == "per_minute")
+
+# ---- every game, on the rating's own scale ----------------------
+#
+# The page built on this tells a player their rating IS the average of
+# these games, not a summary of them. That is only true while the
+# scoring stays a weighted sum of min-max scaled means -- both affine,
+# so the average of the scores equals the score of the averages exactly
+# -- and while per_match_features agrees with the pipeline's own
+# per-match block. Either breaking shows up here first.
+check("every player carries a score for every game they played",
+      all(len(r["gameScores"]) == r["matchCount"] for r in rated),
+      str([(len(r["gameScores"]), r["matchCount"]) for r in rated[:3]]))
+check("a player's games average back to their rating, exactly",
+      all(abs(sum(g["score"] for g in r["gameScores"]) / len(r["gameScores"])
+              - r["skillScore"]) < 0.05
+          for r in rated),
+      str([(round(sum(g["score"] for g in r["gameScores"]) / len(r["gameScores"]), 2),
+            r["skillScore"]) for r in rated[:3]]))
+check("each game names the match it was played in",
+      all(isinstance(g["matchId"], str) and g["matchId"] for r in rated
+          for g in r["gameScores"]))
+widest_player = max(
+    max(g["score"] for g in r["gameScores"]) - min(g["score"] for g in r["gameScores"])
+    for r in rated
+)
+whole_pool = max(r["skillScore"] for r in rated) - min(r["skillScore"] for r in rated)
+check("one player's games swing across much of the whole pool's range",
+      widest_player > whole_pool / 2,
+      f"widest player {widest_player:.1f} vs whole pool {whole_pool:.1f} -- one game "
+      "is a small sample, and the page has to say so rather than present a best "
+      "game as a second rating")
+
+# The drift guard is the point of the invariant, so prove it fires
+# rather than trusting that it would.
+# `final` carries scaled columns under the feature names, so the
+# profiles are rebuilt here rather than reused -- the same trap the
+# driver documents at run_pipeline.
+profiles = build_skill_model(aggregate_player_profiles(gated))
+tampered = gated.copy()
+tampered["clean_winners"] = tampered["clean_winners"] + 3
+try:
+    build_game_scores(tampered, profiles)
+    check("per-match arithmetic that drifts from the pipeline is refused",
+          False, "it was accepted")
+except RuntimeError:
+    check("per-match arithmetic that drifts from the pipeline is refused", True)
+
+check("one match in, one row of four measurements out",
+      list(per_match_features(gated.head(1)).columns)
+      == [column for _key, column, _wk, _lower in SCORE_PARTS],
+      str(list(per_match_features(gated.head(1)).columns)))
 
 check("the run records the conditions it ran under",
       payload["notes"]["gate"]["playersQualifying"] == 60,
