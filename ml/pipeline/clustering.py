@@ -1350,6 +1350,29 @@ IDENTITY_DESCRIPTORS = {
 
 DEFAULT_IDENTITY_NOUN = "All-Court Player"
 
+# Which FAMILY each trait belongs to. A name takes at most one
+# adjective per family.
+#
+# Five of the eight traits describe five different spread
+# features -- whether the aggression varies, whether the drops
+# do, whether the scoring does -- and each is a genuinely
+# different measurement. To a reader they are the same word. A
+# cluster above average on two of them used to be named
+# "Advanced Streaky Inconsistent Driver", which nobody can read
+# aloud and which says one thing twice. One word per family
+# keeps the real detail (a temperament word AND a consistency
+# word still both appear) while never repeating itself.
+TRAIT_FAMILIES = {
+    "aggression_mean": "temperament",
+    "drop_efficiency_mean": "precision",
+    "error_to_winner_ratio": "precision",
+    "aggression_std": "consistency",
+    "drop_efficiency_std": "consistency",
+    "winner_rate_std": "consistency",
+    "general_error_rate_std": "consistency",
+    "dink_error_rate_std": "consistency"
+}
+
 # Cohen's d convention treats |z| >= 0.2 as at least a "small"
 # effect size. Below that, a cluster isn't meaningfully
 # different from its skill group's average on that feature, so
@@ -1444,7 +1467,7 @@ def _skill_group_prefix(
     )
 
 
-def _pick_identity_noun(
+def _pick_identity(
     scaled_profile
 ):
     """
@@ -1453,10 +1476,19 @@ def _pick_identity_noun(
     furthest from this skill group's average. Falls back to a
     generic noun if neither identity feature is meaningfully
     different from average.
+
+    Returns (noun, feature, z). The feature and its z come back
+    too so the app can show WHY the noun was chosen -- the
+    player's own number for it, beside their group's average --
+    rather than asserting the name and leaving them to take it
+    on faith. `feature` is None for the generic fallback, which
+    was chosen precisely because nothing stood out.
     """
 
     best_magnitude = 0.0
     best_noun = DEFAULT_IDENTITY_NOUN
+    best_feature = None
+    best_z = 0.0
 
     for feature, (low_label, high_label) in (
         IDENTITY_DESCRIPTORS.items()
@@ -1467,6 +1499,8 @@ def _pick_identity_noun(
         if abs(z) > best_magnitude:
 
             best_magnitude = abs(z)
+            best_feature = feature
+            best_z = z
 
             best_noun = (
                 high_label
@@ -1475,9 +1509,118 @@ def _pick_identity_noun(
             )
 
     if best_magnitude < MEANINGFUL_EFFECT_SIZE:
-        return DEFAULT_IDENTITY_NOUN
+        return (
+            DEFAULT_IDENTITY_NOUN,
+            None,
+            0.0
+        )
 
-    return best_noun
+    return (
+        best_noun,
+        best_feature,
+        best_z
+    )
+
+
+def _pick_identity_noun(
+    scaled_profile
+):
+    """
+    The noun alone. Kept because naming only needs the word.
+    """
+
+    noun, _, _ = _pick_identity(
+        scaled_profile
+    )
+
+    return noun
+
+
+def choose_playstyle_traits(
+    scaled_profile,
+    max_traits=2
+):
+    """
+    The traits a name is built from: the strongest one per
+    family, furthest from this skill group's average first,
+    ignoring anything below MEANINGFUL_EFFECT_SIZE.
+
+    One per family is what stops a name saying the same thing
+    twice -- see TRAIT_FAMILIES. Returns dicts rather than bare
+    words, because these travel out to the app as the evidence
+    for the name: which measurement, which way, and how far.
+    """
+
+    chosen = []
+    families_used = set()
+
+    for magnitude, label, feature in _rank_trait_descriptors(
+        scaled_profile
+    ):
+
+        if magnitude < MEANINGFUL_EFFECT_SIZE:
+            break
+
+        family = TRAIT_FAMILIES[feature]
+
+        if family in families_used:
+            continue
+
+        families_used.add(family)
+
+        chosen.append({
+            "label": label,
+            "feature": feature,
+            "family": family,
+            "direction": (
+                "above"
+                if scaled_profile[feature] >= 0
+                else "below"
+            ),
+            "z": round(
+                float(scaled_profile[feature]),
+                3
+            )
+        })
+
+        if len(chosen) == max_traits:
+            break
+
+    return chosen
+
+
+def describe_playstyle_name(
+    scaled_profile,
+    max_traits=2
+):
+    """
+    Everything behind one archetype name: the adjectives with
+    the measurement each came from, and the noun with the
+    shot-selection feature that anchored it.
+
+    The name itself asserts; this is what lets it be checked.
+    """
+
+    traits = choose_playstyle_traits(
+        scaled_profile,
+        max_traits=max_traits
+    )
+
+    noun, feature, z = _pick_identity(
+        scaled_profile
+    )
+
+    return traits + [{
+        "label": noun,
+        "feature": feature,
+        "family": "identity",
+        "direction": (
+            "above"
+            if z >= 0
+            else "below"
+        ),
+        "z": round(float(z), 3)
+    }]
 
 
 def _rank_trait_descriptors(
@@ -1486,7 +1629,10 @@ def _rank_trait_descriptors(
     """
     Rank every trait feature by how far this cluster sits from
     its skill group's average (in standard deviations),
-    furthest first. Returns (magnitude, label) pairs.
+    furthest first. Returns (magnitude, label, feature) triples
+    -- the feature travels with the label so callers can tell
+    which family a word came from, and so a name can say what it
+    was built from.
     """
 
     scored = []
@@ -1504,7 +1650,7 @@ def _rank_trait_descriptors(
         )
 
         scored.append(
-            (abs(z), label)
+            (abs(z), label, feature)
         )
 
     scored.sort(
@@ -1552,15 +1698,13 @@ def generate_playstyle_archetype_name(
     describes clusters after the fact.
     """
 
-    ranked_traits = _rank_trait_descriptors(
-        scaled_profile
-    )
-
     traits = [
-        label
-        for magnitude, label in ranked_traits
-        if magnitude >= MEANINGFUL_EFFECT_SIZE
-    ][:max_traits]
+        trait["label"]
+        for trait in choose_playstyle_traits(
+            scaled_profile,
+            max_traits=max_traits
+        )
+    ]
 
     noun = _pick_identity_noun(
         scaled_profile
@@ -1577,7 +1721,8 @@ def generate_playstyle_archetype_name(
 
 def _generate_unique_playstyle_names(
     scaled_centroids,
-    skill_group
+    skill_group,
+    traits_out=None
 ):
     """
     Generate archetype names for every cluster in one skill
@@ -1596,11 +1741,39 @@ def _generate_unique_playstyle_names(
         scaled_centroids.index
     )
 
-    trait_counts_to_try = sorted(
-        {2, 3, len(TRAIT_DESCRIPTORS)}
-    )
+    # Two, then three. There is no point trying more: a name
+    # takes at most one adjective per family and there are three
+    # families, so the fourth attempt would produce the same
+    # words. Breaking a tie by stacking two words from the same
+    # family is exactly what TRAIT_FAMILIES removed, and it must
+    # not come back in through this door -- a numbered duplicate
+    # below is honest, "Streaky Inconsistent" is not.
+    trait_counts_to_try = [2, 3]
 
     archetype_map = {}
+
+    def record(max_traits):
+        """
+        The evidence behind the names just generated, for the
+        caller that asked for it. Recorded at the detail level
+        that actually won, so it always matches the words in
+        the name rather than a level that was tried and
+        rejected.
+        """
+
+        if traits_out is None:
+            return
+
+        traits_out.clear()
+
+        for cluster_id in cluster_ids:
+
+            traits_out[
+                int(cluster_id)
+            ] = describe_playstyle_name(
+                scaled_centroids.loc[cluster_id],
+                max_traits=max_traits
+            )
 
     for max_traits in trait_counts_to_try:
 
@@ -1620,6 +1793,7 @@ def _generate_unique_playstyle_names(
         )
 
         if all_unique:
+            record(max_traits)
             return archetype_map
 
     # ----------------------------------------------------
@@ -1628,6 +1802,8 @@ def _generate_unique_playstyle_names(
     # identical clusters). Number the remaining duplicates
     # as a last resort.
     # ----------------------------------------------------
+
+    record(trait_counts_to_try[-1])
 
     used_names = {}
 
@@ -1660,7 +1836,8 @@ def _generate_unique_playstyle_names(
 def interpret_playstyle_clusters(
     group_data,
     clustered_data,
-    raw_playstyle_features
+    raw_playstyle_features,
+    traits_out=None
 ):
     """
     Interpret the playstyle clusters after K-Means.
@@ -1717,7 +1894,8 @@ def interpret_playstyle_clusters(
 
     archetype_map = _generate_unique_playstyle_names(
         scaled_centroids,
-        skill_group
+        skill_group,
+        traits_out=traits_out
     )
 
     return (
@@ -1732,11 +1910,18 @@ def interpret_playstyle_clusters(
 
 def apply_playstyle_archetypes(
     clustered_data,
-    archetype_map
+    archetype_map,
+    traits_map=None
 ):
     """
     Add the automatically generated archetype name to
     every player based on their playstyle cluster.
+
+    With `traits_map`, the evidence behind that name travels
+    with it as `playstyle_traits`: which measurements chose the
+    words, which way each pointed, and how far from the skill
+    group's average it sat. A name a player cannot check is
+    barely better than no name.
     """
 
     result = clustered_data.copy()
@@ -1751,6 +1936,19 @@ def apply_playstyle_archetypes(
             archetype_map
         )
     )
+
+    if traits_map is not None:
+
+        result[
+            "playstyle_traits"
+        ] = (
+            result[
+                "playstyle_cluster"
+            ]
+            .map(
+                traits_map
+            )
+        )
 
     return result
 

@@ -15,6 +15,7 @@
 // ============================================================
 
 import { deriveMatchState } from './pickleball.js'
+import { buildPlaystyleProof } from './playstyle.js'
 import {
   MIN_MATCHES_PER_PLAYER,
   MIN_POOL_FOR_DISTRIBUTION,
@@ -442,7 +443,9 @@ export async function getClubStanding(query, playerId) {
   // they missed would compare their old score against other people's
   // new ones.
   const { rows: mine } = await query(
-    `SELECT r.run_id, r.skill_score, r.skill_group, run.computed_at
+    `SELECT r.run_id, r.skill_score, r.skill_group, r.playstyle_cluster,
+            r.playstyle_archetype, r.playstyle_traits, r.evidence,
+            run.computed_at
        FROM player_ratings r
        JOIN rating_runs run ON run.id = r.run_id
       WHERE r.player_id = $1
@@ -490,6 +493,43 @@ export async function getClubStanding(query, playerId) {
     [runId, BUCKETS],
   )
 
+  // Every group in the run, in score order, with its size and the range
+  // it actually covers. The page shows this as a ladder with the
+  // player's own rung marked, because "your group" means nothing
+  // without the others beside it. Counts and ranges only -- no names,
+  // no ids, the same rule as the rest of this endpoint.
+  const { rows: ladder } = await query(
+    `SELECT skill_group AS name, count(*)::int AS size,
+            min(skill_score) AS lowest, max(skill_score) AS highest
+       FROM player_ratings
+      WHERE run_id = $1 AND skill_group IS NOT NULL
+      GROUP BY skill_group
+      ORDER BY min(skill_score)`,
+    [runId],
+  )
+
+  // Proof for the playstyle name: this player's own numbers, their
+  // group's average, and the average of the other style in their group.
+  // Read from what the run already stored rather than recomputed -- see
+  // playstyle.js, including why a style of one or two is never averaged.
+  let playstyle = null
+  if (group && Array.isArray(mine[0].playstyle_traits)) {
+    const { rows: peers } = await query(
+      `SELECT playstyle_cluster, playstyle_archetype, evidence
+         FROM player_ratings
+        WHERE run_id = $1 AND skill_group = $2`,
+      [runId, group],
+    )
+    playstyle = buildPlaystyleProof({
+      traits: mine[0].playstyle_traits,
+      mine: {
+        playstyle_cluster: mine[0].playstyle_cluster,
+        evidence: mine[0].evidence,
+      },
+      peers,
+    })
+  }
+
   const counted = new Map(histogram.map((row) => [row.bucket, row.n]))
 
   return {
@@ -504,6 +544,18 @@ export async function getClubStanding(query, playerId) {
     // cannot disagree about the same score.
     yourScore: Math.round(score),
     below,
+    // Every group in the run, so the page can show the ladder the
+    // player sits on rather than a label on its own.
+    groups: ladder.map((g) => ({
+      name: g.name,
+      size: g.size,
+      lowest: Math.round(g.lowest),
+      highest: Math.round(g.highest),
+    })),
+    // The name the pipeline gave this player's style, and the numbers
+    // that earned each word of it.
+    playstyleArchetype: mine[0].playstyle_archetype ?? null,
+    playstyle,
     // The clustering's own level-1 grouping, and how many share it.
     // Never who they are, and never ordered within the band -- the
     // group is the point, a position inside it is not.

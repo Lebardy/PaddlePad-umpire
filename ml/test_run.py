@@ -175,6 +175,35 @@ check("nothing is NaN in the payload",
       not any(isinstance(v, float) and np.isnan(v)
               for r in payload["ratings"] for v in r["evidence"].values()
               if v is not None))
+# ---- the evidence behind each name ------------------------------
+#
+# A name a player cannot check is barely better than no name, so every
+# archetype travels with the measurements that chose its words. These
+# assert the two things that could silently go wrong: traits that do not
+# match the name they are supposed to explain, and a name that repeats
+# itself because two words came from the same family.
+named = [r for r in payload["ratings"] if r["playstyleArchetype"]]
+check("every named player carries the traits behind the name",
+      named and all(isinstance(r["playstyleTraits"], list) and r["playstyleTraits"]
+                    for r in named),
+      str([r["playstyleTraits"] for r in named[:1]]))
+check("the traits spell out the name they explain",
+      all(r["playstyleArchetype"].endswith(
+              " ".join(t["label"] for t in r["playstyleTraits"]))
+          for r in named),
+      str([(r["playstyleArchetype"], [t["label"] for t in r["playstyleTraits"]])
+           for r in named[:2]]))
+check("no name says the same thing twice",
+      all(len({t["family"] for t in r["playstyleTraits"]})
+          == len(r["playstyleTraits"])
+          for r in named),
+      str([[t["family"] for t in r["playstyleTraits"]] for r in named[:2]]))
+check("a group too small to cluster has no traits either",
+      all(r["playstyleTraits"] is None
+          for r in payload["ratings"] if not r["playstyleArchetype"]))
+print("       names this run produced: "
+      + "; ".join(sorted({r["playstyleArchetype"] for r in named})))
+
 check("the run records the conditions it ran under",
       payload["notes"]["gate"]["playersQualifying"] == 60,
       str(payload["notes"]["gate"]))
