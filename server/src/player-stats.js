@@ -16,6 +16,7 @@
 
 import { deriveMatchState } from './pickleball.js'
 import { buildPlaystyleProof } from './playstyle.js'
+import { buildRatingParts } from './rating-parts.js'
 import {
   MIN_MATCHES_PER_PLAYER,
   MIN_POOL_FOR_DISTRIBUTION,
@@ -445,7 +446,7 @@ export async function getClubStanding(query, playerId) {
   const { rows: mine } = await query(
     `SELECT r.run_id, r.skill_score, r.skill_group, r.playstyle_cluster,
             r.playstyle_archetype, r.playstyle_traits, r.evidence,
-            run.computed_at
+            r.score_parts, run.computed_at
        FROM player_ratings r
        JOIN rating_runs run ON run.id = r.run_id
       WHERE r.player_id = $1
@@ -530,6 +531,34 @@ export async function getClubStanding(query, playerId) {
     })
   }
 
+  // What the rating is made of: this player's four parts, their group's
+  // average of the same four, and the average of the group one rung up
+  // the ladder. Two questions the score alone cannot answer -- what is
+  // moving my number, and what separates me from the group above --
+  // both answered from the score's own arithmetic. See rating-parts.js,
+  // including why a group of fewer than three is never averaged.
+  //
+  // The group above is found by position on the ladder queried above,
+  // so no group name has to be hardcoded and it keeps working whatever
+  // K the clustering picks. The player in the top group has none, which
+  // the page says rather than hides.
+  let parts = null
+  if (group && mine[0].score_parts) {
+    const rung = ladder.findIndex((g) => g.name === group)
+    const aboveName = rung === -1 ? null : (ladder[rung + 1]?.name ?? null)
+    const { rows: peers } = await query(
+      `SELECT skill_group, score_parts
+         FROM player_ratings
+        WHERE run_id = $1 AND skill_group = ANY($2::text[])`,
+      [runId, aboveName ? [group, aboveName] : [group]],
+    )
+    parts = buildRatingParts({
+      mine: mine[0].score_parts,
+      peers: peers.filter((row) => row.skill_group === group),
+      above: peers.filter((row) => row.skill_group === aboveName),
+    })
+  }
+
   const counted = new Map(histogram.map((row) => [row.bucket, row.n]))
 
   return {
@@ -552,6 +581,10 @@ export async function getClubStanding(query, playerId) {
       lowest: Math.round(g.lowest),
       highest: Math.round(g.highest),
     })),
+    // The four measurements the rating is a weighted sum of -- yours,
+    // your group's average, and the group above's. Null for a run from
+    // a pipeline that did not send them.
+    parts,
     // The name the pipeline gave this player's style, and the numbers
     // that earned each word of it.
     playstyleArchetype: mine[0].playstyle_archetype ?? null,

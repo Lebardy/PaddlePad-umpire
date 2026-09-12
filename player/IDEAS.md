@@ -1,8 +1,10 @@
 # Ideas: more of the ML pipeline, in the player app
 
-Notes from a conversation, not a backlog. Nothing here is scheduled, and
-none of it is started. It is written down because working it out again
-from scratch would cost more than reading it.
+Notes from a conversation, not a backlog. It is written down because
+working it out again from scratch would cost more than reading it.
+
+**Ideas 1 and 3 have since landed**, and idea 6 with them. What that
+took, and the one thing this document had wrong, is at the bottom.
 
 ## The framing
 
@@ -20,12 +22,13 @@ computing anything new, which is why the list is longer than the work.
 
 ## The ideas
 
-**1. What is actually moving your rating.** Take the two features where a
-player sits furthest from the average of others at their level — one
+**1. What is actually moving your rating.** *(landed)* Take the two
+features where a player sits furthest from the average of others at
+their level — one
 good, one bad — and say them plainly: *"Your drops land more often than
-most players around you. Your unforced mistakes are the thing holding the
-number down."* A score nobody can act on is a horoscope. This turns it
-into a coaching note. Needs the pipeline to send the per-feature
+most players around you. Your unforced mistakes are the thing holding
+the number down."* A score nobody can act on is a horoscope. This turns
+it into a coaching note. Needs the pipeline to send the per-feature
 comparison alongside the score.
 
 **2. Your ceiling and your floor.** Half the model is about consistency —
@@ -34,8 +37,9 @@ the five "how much do you swing" numbers — and none of it is visible.
 genuinely interesting sentence, and it is the half most rating systems
 cannot say at all because they only ever store one number.
 
-**3. What separates you from the next group up.** The clustering already
-knows where each skill group sits. Compare a player's ten numbers against
+**3. What separates you from the next group up.** *(landed)* The
+clustering already knows where each skill group sits. Compare a player's
+ten numbers against
 the group above and name the biggest gap: *"It isn't your winners — it's
 that your third-shot drop lands 40% of the time and theirs lands 65%."*
 This is the most useful thing a skill model can tell an amateur, and it
@@ -51,8 +55,9 @@ third shot separately from how the rally ended, which is unusual. So it
 can answer: *"When you drop, you go on to win the rally 58% of the time.
 When you drive, 41%."* No model needed — this one is pure event log.
 
-**6. Playstyle, with its reasons.** The archetype is currently a bare
-label. Two lines of evidence under it — *"you dink more than most, and
+**6. Playstyle, with its reasons.** *(landed)* The archetype is
+currently a bare label. Two lines of evidence under it — *"you dink more
+than most, and
 you take fewer risks off the bounce"* — is the difference between a label
 people believe and one they shrug at.
 
@@ -83,7 +88,7 @@ page can land alone and the rest can follow whenever.
 
 ## Three things not to forget
 
-**A small club makes all of this wobbly.** Percentiles and clusters need
+**A small pool makes all of this wobbly.** Percentiles and clusters need
 bodies. The five-match gate exists for exactly this reason, and anything
 new here needs its own honest version of it rather than quietly showing a
 number computed from four people.
@@ -98,9 +103,48 @@ deserves an explanation that exists.
 means something different in a format with half the players on court.
 Anything per-format stays per-format, or becomes a ratio.
 
-## If it is ever picked up, start here
+## What 1 and 3 turned out to be
 
-Ideas **1** and **3** share a single pipeline change: send the
-per-feature comparison, not just the final score. Together they turn the
-rating from a verdict into advice, which is the whole point of showing a
-player a number in the first place.
+This document said they shared "a single pipeline change: send the
+per-feature comparison, not just the final score", and guessed the work
+was mostly arithmetic over ten numbers that already existed. Both halves
+of that were wrong, and in a useful direction.
+
+**The rating is not made of ten numbers. It is made of four.** The
+skill score is a weighted sum of drop shots landing (25%), winning shots
+(30%), mistakes away from the net (20%) and mistakes at the net (25%),
+and nothing else. The other six features decide which GROUP and which
+PLAYSTYLE a player lands in; they never move the number. So "what is
+moving your rating" is not a correlation or a ranking of z-scores — it
+is the score's own arithmetic, split back into its four terms, and the
+four add up to the rating exactly.
+
+**Three of those four were not being stored.** `evidence` holds the
+playstyle features, which overlap the scoring features in exactly one
+place (drop efficiency). So the pipeline change was real, just a
+different one: publish the four parts with each player's own value and
+the points it contributed, in a `score_parts` column of its own. The
+pipeline now refuses to publish a run whose four parts do not add up to
+the score it is publishing — if the scoring ever gains a fifth term and
+the breakdown does not, the app would otherwise go on confidently
+explaining a number it no longer describes.
+
+Everything else followed from having the four numbers: idea 1 is those
+four against the average of the player's own group, idea 3 is the same
+four against the group one rung up the ladder. Same privacy line as the
+playstyle proof — averages only, and a group of fewer than three is
+never averaged at all.
+
+**The one thing left rough.** Groups are named on the page by the range
+of ratings they cover, and those ranges overlap: staging currently shows
+"Ratings 28–49" and "Ratings 37–91". The clustering groups on ten
+features, not on the score, so a player rated 40 can honestly be in
+either. The ladder's order is still right — it sorts by lowest rating
+and, checked against the group averages, agrees with them — but "what
+separates you from Ratings 37–91" reads oddly to someone rated 45. The
+naming, not the comparison, is what needs rethinking.
+
+## Still not started
+
+Ideas **2** (your ceiling and your floor), **4** (was that an upset),
+**5** (drop or drive) and **7** (partner fit).

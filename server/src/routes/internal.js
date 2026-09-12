@@ -122,7 +122,7 @@ router.post('/ratings', async (req, res) => {
     for (const r of ratings) {
       const base = params.length
       values.push(
-        `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10})`,
+        `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11})`,
       )
       params.push(
         runId,
@@ -138,6 +138,12 @@ router.post('/ratings', async (req, res) => {
         // from. Null where the pipeline sent none -- an older pipeline,
         // or a group too small to have an archetype at all.
         Array.isArray(r.playstyleTraits) ? JSON.stringify(r.playstyleTraits) : null,
+        // The four parts the score is a sum of. Null from an older
+        // pipeline, which the app treats as "not recorded for this run"
+        // rather than as a rating with nothing behind it.
+        r.scoreParts && typeof r.scoreParts === 'object'
+          ? JSON.stringify(r.scoreParts)
+          : null,
       )
     }
 
@@ -145,7 +151,7 @@ router.post('/ratings', async (req, res) => {
       `INSERT INTO player_ratings
          (run_id, player_id, skill_score, skill_tier, skill_group,
           playstyle_cluster, playstyle_archetype, evidence, match_count,
-          playstyle_traits)
+          playstyle_traits, score_parts)
        VALUES ${values.join(', ')}`,
       params,
     )
