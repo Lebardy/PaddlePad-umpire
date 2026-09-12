@@ -1,27 +1,36 @@
 // ============================================================
-// Your rating, and where it puts you in the club.
+// Your rating: the three things the model actually did.
 //
-// This is the page behind the rating card on the overview, and it is
-// the answer to a request for a leaderboard that deliberately is not
-// one. It says where a player sits and which group they are in. It
-// never says who is above them, and it never shows anyone else's score.
+// This page used to show a score, a spread, and a "group" named in
+// words of the app's own invention, with no hint of what the group was
+// for -- while the playstyle, the interesting half, sat on the overview
+// as a bare label. It read as unrelated to the pipeline it came from.
 //
-// That is a design choice about competition, but it is also forced by
-// the model. The skill score is measured against whoever has played:
-// in a club of four, the best of them scores 100 however good they are,
-// and anyone's number can move because somebody else played. A ranked
-// list would publish those numbers as though they meant more than they
-// do. A position in a spread, with a date and the size of the pool
-// attached, is the strongest honest thing this score can say.
+// So it now follows the pipeline, in order:
 //
-// Fetched on arrival rather than with the rest of the player's data:
-// the overview loads on every launch and should not pay for a page most
-// visits never open.
+//   1  a skill score, 0-100, measured against everyone rated
+//   2  a first split into groups, by results
+//   3  a second split inside each group, by how people play
+//
+// Step 2 exists FOR step 3: playstyles are clustered within a group, so
+// a style means "compared with players at a similar level". That is why
+// the archetype name begins with the group's own word. Saying so is the
+// difference between a label and an explanation.
+//
+// Step 3 also has to be checkable, so it shows, for each word in the
+// name, this player's own number, their group's average, and the
+// average of the other style in their group -- the players the
+// clustering separated them from. Nobody's individual numbers but their
+// own; see server/src/playstyle.js.
+//
+// It never shows a ranking and never anyone else's score. Why is one
+// tap away at the bottom.
 // ============================================================
 
 import { useEffect, useState } from 'react'
 import { fetchStanding } from '../lib/api'
 import { usePlayerData } from '../lib/PlayerData'
+import { inWords } from '../lib/matchDrama'
 import { useCountUp } from '../lib/motion'
 import { navigate } from '../lib/router'
 import Distribution from '../components/Distribution'
@@ -36,26 +45,64 @@ function formatDate(value) {
 }
 
 /**
- * The pipeline's group label, in words a player can be told.
+ * Each measurement in everyday words, with how to read its number.
  *
- * The pipeline names its groups by how they compare with each other --
- * "Developing / Lower-Performance", "Higher-Performance" -- and it
- * deliberately does not call them Beginner or Advanced, because a
- * group is only ever relative to this club. These keep that: "the
- * strongest group" is a fact about the club, "Advanced" would be a
- * claim about the player that nothing here can back.
- *
- * Anything unrecognised is shown as sent rather than guessed at.
+ * The feature names belong to the model; a player should never meet
+ * `winner_rate_std`. "Swing" is how the spread features are said here:
+ * they measure how much something moves from game to game.
  */
-function groupLabel(name, groupCount) {
-  if (name.startsWith('Developing')) return 'The developing group'
-  if (name === 'Intermediate-Performance') return 'The middle group'
-  if (name === 'Higher-Performance') {
-    return groupCount === 2 ? 'The stronger group' : 'The strongest group'
+const MEASURES = {
+  aggression_mean: { label: 'going for winners', as: 'percent' },
+  drop_efficiency_mean: { label: 'drop shots landing', as: 'percent' },
+  error_to_winner_ratio: { label: 'mistakes per winning shot', as: 'ratio' },
+  aggression_std: { label: 'aggression swing', as: 'swing' },
+  drop_efficiency_std: { label: 'drop success swing', as: 'swing' },
+  winner_rate_std: { label: 'scoring swing', as: 'swing' },
+  general_error_rate_std: { label: 'mistake swing', as: 'swing' },
+  dink_error_rate_std: { label: 'net mistake swing', as: 'swing' },
+  drop_usage_rate: { label: 'third shots that are drops', as: 'percent' },
+  drop_preference_rate_mean: { label: 'drops rather than drives', as: 'percent' },
+  drop_preference_rate_std: { label: 'drop choice swing', as: 'swing' },
+  net_game_preference_rate_mean: { label: 'points won at the net', as: 'percent' },
+  net_game_preference_rate_std: { label: 'net play swing', as: 'swing' },
+}
+
+function showValue(value, as) {
+  if (value === null || value === undefined) return '—'
+  if (as === 'percent') return `${Math.round(value * 100)}%`
+  if (as === 'ratio') return value.toFixed(2)
+  return `±${value.toFixed(2)}`
+}
+
+/**
+ * What to call each group, from its rung on the ladder.
+ *
+ * Position rather than the pipeline's own label, which is
+ * "Intermediate-Performance" for three groups and "Performance Group 4"
+ * if K ever picks more. The model's word for it is inside "Why
+ * groups?", where a reader who wants it can find it; the ladder itself
+ * has to be readable at a glance.
+ */
+function groupNamer(count) {
+  return (index) => {
+    if (index === 0) return 'Developing'
+    if (index === count - 1) return `Higher of ${inWords(count)}`
+    if (count === 3) return 'Middle of three'
+    return `Group ${index + 1} of ${count}`
   }
-  const numbered = name.match(/^Performance Group (\d+)$/)
-  if (numbered) return `Group ${numbered[1]} of ${groupCount}`
-  return name
+}
+
+function Step({ number, title, value, children }) {
+  return (
+    <section className="step rise" style={{ '--i': number }} aria-label={title}>
+      <div className="step-head">
+        <span className="step-n" aria-hidden="true">{number}</span>
+        <h2>{title}</h2>
+      </div>
+      {value && <p className="step-value">{value}</p>}
+      {children}
+    </section>
+  )
 }
 
 function BackLink() {
@@ -70,68 +117,172 @@ function BackLink() {
   )
 }
 
-function WhereYouSit({ standing }) {
+/** Step 1: the score, and where it sits among everyone rated. */
+function Score({ rating, standing }) {
+  const shown = useCountUp(rating.skillScore)
   const others = standing.poolSize - 1
 
   return (
-    <section className="standing-section" aria-label="Where you sit">
-      <h2>Where you sit</h2>
+    <Step
+      number={1}
+      title="Your score"
+      value={
+        <span aria-label={`${rating.skillScore} out of 100`}>
+          {shown}
+          <span className="step-outof"> / 100</span>
+        </span>
+      }
+    >
+      <ul className="ichips" aria-label="What this rests on">
+        <li className="ichip">
+          <Icon name="people" size={15} />
+          <span>{standing.poolSize} rated</span>
+        </li>
+        <li className="ichip">
+          <Icon name="calendar" size={15} />
+          <span>{formatDate(standing.computedAt)}</span>
+        </li>
+      </ul>
 
-      {standing.distribution ? (
-        <Distribution buckets={standing.distribution} />
-      ) : null}
+      {standing.distribution && <Distribution buckets={standing.distribution} />}
 
-      {/* A figure rather than a sentence: the two numbers are the whole
-          point, and they were buried in eleven words. */}
-      {others === 0 ? (
-        <p className="standing-sentence">You are the only rated player so far.</p>
-      ) : (
-        <p className="standing-figure">
-          Above <strong>{standing.below}</strong> of <strong>{others}</strong>
-          <span>other rated players</span>
-        </p>
-      )}
-
-      {!standing.distribution && others > 0 && (
-        <p className="muted-inline standing-note">
-          With more players rated, this becomes a picture of everyone.
-        </p>
-      )}
-    </section>
+      <p className="step-line">
+        {others === 0
+          ? 'You are the only rated player so far.'
+          : `Your score is higher than ${standing.below} of the ${others} other rated players.`}
+      </p>
+    </Step>
   )
 }
 
-function YourGroup({ band }) {
-  const others = band.size - 1
+/** Step 2: the first split, and what it is for. */
+function Group({ standing }) {
+  const groups = standing.groups ?? []
+  const name = groupNamer(groups.length)
+  const mine = groups.findIndex((group) => group.name === standing.band?.name)
+
   return (
-    <section className="standing-section" aria-label="Your group">
-      <h2>Your group</h2>
-      <p className="standing-group">{groupLabel(band.name, band.groupCount)}</p>
-      <p className="muted-inline">
-        {others === 0
-          ? 'Just you, for now.'
-          : others === 1
-            ? 'You and one other player.'
-            : `You and ${others} other players.`}
+    <Step number={2} title="Your group" value={mine === -1 ? 'Not grouped yet' : name(mine)}>
+      {groups.length > 0 && (
+        <ol className="ladder" aria-label="The groups, lowest scores first">
+          {groups.map((group, i) => (
+            <li key={group.name} className={i === mine ? 'is-you' : undefined}>
+              <span className="ladder-name">
+                {i === mine && <Icon name="chevron" size={13} />}
+                {name(i)}
+              </span>
+              <span className="ladder-size">
+                {group.size} {group.size === 1 ? 'player' : 'players'}
+              </span>
+              <span className="ladder-range">
+                {group.lowest}&ndash;{group.highest}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      <p className="step-line">
+        Everyone rated is split into a few groups by results first.
       </p>
-      <More label="What is a group?">
+
+      <More label="Why groups?">
         <p>
-          Everyone is sorted into a few groups by how they play. Nobody in a
-          group is ranked above anyone else in it.
+          So that a playstyle means something. Styles are worked out
+          <em> within</em> a group, so &ldquo;steady&rdquo; means steady for
+          players at this level rather than steady compared with everyone. It
+          is also why the name below starts with your group&rsquo;s own word.
+        </p>
+        {standing.band?.name && (
+          <p>
+            The model&rsquo;s own name for your group is{' '}
+            <strong>{standing.band.name}</strong>.
+          </p>
+        )}
+      </More>
+    </Step>
+  )
+}
+
+/** Step 3: the second split, with the numbers that chose its words. */
+function Playstyle({ standing }) {
+  const { playstyleArchetype: name, playstyle: proof, band } = standing
+
+  if (!name) {
+    return (
+      <Step number={3} title="Your playstyle" value="Not worked out yet">
+        <p className="step-line">
+          A group needs at least three rated players before the styles inside it
+          are worked out. Yours has {band?.size ?? 1}.
+        </p>
+      </Step>
+    )
+  }
+
+  if (!proof) {
+    return (
+      <Step number={3} title="Your playstyle" value={name}>
+        <p className="step-line">
+          This name comes from where your style sits against your group&rsquo;s
+          average. The measurements behind it weren&rsquo;t recorded for this
+          run, so there is nothing to show beside it yet.
+        </p>
+      </Step>
+    )
+  }
+
+  return (
+    <Step number={3} title="Your playstyle" value={name}>
+      <p className="step-line">
+        One of {proof.styleSize} in this style
+        {band?.size ? `, out of ${band.size} in your group` : ''}.
+      </p>
+
+      <div className="proof-wrap">
+        <table className="proof">
+          <caption>Why this name</caption>
+          <thead>
+            <tr>
+              <th scope="col">measurement</th>
+              <th scope="col">you</th>
+              <th scope="col">your group</th>
+              {proof.other && <th scope="col">the other style</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {proof.rows.map((row) => {
+              const measure = MEASURES[row.feature] ?? { label: row.feature, as: 'swing' }
+              return (
+                <tr key={row.feature}>
+                  <th scope="row">
+                    <span className="proof-word">{row.label}</span>
+                    <span className="proof-measure">{measure.label}</span>
+                  </th>
+                  <td className="is-you">{showValue(row.you, measure.as)}</td>
+                  <td>{showValue(row.group, measure.as)}</td>
+                  {proof.other && <td>{showValue(row.other, measure.as)}</td>}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <More label="How this was worked out">
+        <p>
+          Inside your group, players are grouped again by how they play. The
+          words in your name are the measurements where your style sits
+          furthest from your group&rsquo;s average
+          {proof.other
+            ? ' — and the last column is the other style in your group, the players you were separated from.'
+            : '.'}
+        </p>
+        <p>
+          Averages only, never anyone&rsquo;s own numbers but yours. A style with
+          fewer than three players is never averaged at all.
         </p>
       </More>
-    </section>
-  )
-}
-
-/** The score, counting up once on arrival. */
-function Score({ value }) {
-  const shown = useCountUp(value)
-  return (
-    <div className="rating-score standing-score" aria-label={`${value} out of 100`}>
-      <span className="rating-number">{shown}</span>
-      <span className="rating-outof">/ 100</span>
-    </div>
+    </Step>
   )
 }
 
@@ -150,12 +301,12 @@ function Rating() {
     return () => controller.abort()
   }, [])
 
+  const rated = standing?.state === 'rated' && rating?.state === 'rated'
+
   return (
     <div className="standing">
       <BackLink />
       <h1>Your rating</h1>
-
-      {rating?.state === 'rated' && <Score value={rating.skillScore} />}
 
       {error && <p className="error">{error}</p>}
       {!standing && !error && <p className="muted-inline">Loading…</p>}
@@ -163,33 +314,19 @@ function Rating() {
       {/* The overview's rating card already explains, in the player's
           own terms, why there is no score yet. Saying it again here
           would be worse and would drift. */}
-      {standing?.state === 'unrated' && (
+      {standing && !rated && (
         <p className="muted-inline">
           There is no rating to compare yet — the card on your overview says
           what it is waiting for.
         </p>
       )}
 
-      {standing?.state === 'rated' && (
+      {rated && (
         <>
-          <WhereYouSit standing={standing} />
-          {standing.band && <YourGroup band={standing.band} />}
+          <Score rating={rating} standing={standing} />
+          <Group standing={standing} />
+          <Playstyle standing={standing} />
 
-          <ul className="ichips" aria-label="When this was worked out">
-            <li className="ichip">
-              <Icon name="calendar" size={15} />
-              <span>{formatDate(standing.computedAt)}</span>
-            </li>
-            <li className="ichip">
-              <Icon name="people" size={15} />
-              <span>{standing.poolSize} rated</span>
-            </li>
-          </ul>
-
-          {/* The reason there is no leaderboard. Behind a tap rather than
-              on show: a player who wonders "why can't I see who's first?"
-              deserves the real answer, but nobody should have to read it
-              to use the page. */}
           <More label="Why is there no ranking?">
             <p>
               Your score is measured against whoever has played, so it can move

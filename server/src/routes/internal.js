@@ -122,7 +122,7 @@ router.post('/ratings', async (req, res) => {
     for (const r of ratings) {
       const base = params.length
       values.push(
-        `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9})`,
+        `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10})`,
       )
       params.push(
         runId,
@@ -134,13 +134,18 @@ router.post('/ratings', async (req, res) => {
         r.playstyleArchetype ?? null,
         r.evidence ?? {},
         r.matchCount ?? 0,
+        // The words behind the archetype and the measurement each came
+        // from. Null where the pipeline sent none -- an older pipeline,
+        // or a group too small to have an archetype at all.
+        Array.isArray(r.playstyleTraits) ? JSON.stringify(r.playstyleTraits) : null,
       )
     }
 
     await client.query(
       `INSERT INTO player_ratings
          (run_id, player_id, skill_score, skill_tier, skill_group,
-          playstyle_cluster, playstyle_archetype, evidence, match_count)
+          playstyle_cluster, playstyle_archetype, evidence, match_count,
+          playstyle_traits)
        VALUES ${values.join(', ')}`,
       params,
     )

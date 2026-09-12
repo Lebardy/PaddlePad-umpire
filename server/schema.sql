@@ -516,5 +516,17 @@ CREATE TABLE IF NOT EXISTS player_ratings (
     PRIMARY KEY (run_id, player_id)
 );
 
+-- What the archetype name was built from: each word with the
+-- measurement that chose it, which way it pointed, and how far from the
+-- skill group's average it sat. The pipeline works this out to pick the
+-- words and used to throw it away; stored so the app can show a player
+-- the numbers beside their name instead of asking them to take it on
+-- faith.
+--
+-- NULL for a rating published before this existed, and for a player in
+-- a group too small to cluster -- who has no archetype either. The app
+-- says so rather than inventing a reason.
+ALTER TABLE player_ratings ADD COLUMN IF NOT EXISTS playstyle_traits JSONB;
+
 CREATE INDEX IF NOT EXISTS player_ratings_player_idx
     ON player_ratings (player_id);

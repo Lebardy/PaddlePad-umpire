@@ -240,7 +240,8 @@ def run_pipeline(gated_df):
         if len(members) < 3:
             unclustered.append(group)
             branches.append(members.assign(playstyle_cluster=pd.NA,
-                                           playstyle_archetype=pd.NA))
+                                           playstyle_archetype=pd.NA,
+                                           playstyle_traits=None))
             continue
 
         group_data, best_k, _ = test_playstyle_k_values(
@@ -250,10 +251,18 @@ def run_pipeline(gated_df):
         clustered, _, _ = cluster_playstyles(
             group_data, best_k, random_state=RANDOM_STATE
         )
+        # traits_out collects what each name was actually built from --
+        # which measurement chose each word, which way it pointed, how
+        # far from this group's average. It travels to the app so a
+        # player can check the name against their own numbers instead of
+        # taking it on faith.
+        traits_map = {}
         archetype_map, _, _ = interpret_playstyle_clusters(
-            group_data, clustered, playstyle_features
+            group_data, clustered, playstyle_features, traits_out=traits_map
         )
-        branches.append(apply_playstyle_archetypes(clustered, archetype_map))
+        branches.append(
+            apply_playstyle_archetypes(clustered, archetype_map, traits_map)
+        )
 
     final = pd.concat(branches, ignore_index=True)
 
@@ -324,6 +333,7 @@ def to_payload(final, evidence_df, gate_report, structure_report, match_count):
             for column in EVIDENCE_COLUMNS
         }
         cluster = row.get("playstyle_cluster")
+        traits = row.get("playstyle_traits")
         ratings.append({
             "playerId": row["player_id"],
             "skillScore": float(row["skill_score"]),
@@ -334,6 +344,9 @@ def to_payload(final, evidence_df, gate_report, structure_report, match_count):
                 None if pd.isna(row.get("playstyle_archetype")) else
                 row["playstyle_archetype"]
             ),
+            # What the archetype name was built from. A list, or None for
+            # a group too small to cluster -- which has no name either.
+            "playstyleTraits": traits if isinstance(traits, list) else None,
             "evidence": evidence,
             "matchCount": int(row.get("match_count") or 0),
         })
