@@ -30,7 +30,6 @@
 import { useEffect, useState } from 'react'
 import { fetchStanding } from '../lib/api'
 import { usePlayerData } from '../lib/PlayerData'
-import { inWords } from '../lib/matchDrama'
 import { useCountUp } from '../lib/motion'
 import { navigate } from '../lib/router'
 import Distribution from '../components/Distribution'
@@ -52,19 +51,43 @@ function formatDate(value) {
  * they measure how much something moves from game to game.
  */
 const MEASURES = {
-  aggression_mean: { label: 'going for winners', as: 'percent' },
-  drop_efficiency_mean: { label: 'drop shots landing', as: 'percent' },
-  error_to_winner_ratio: { label: 'mistakes per winning shot', as: 'ratio' },
-  aggression_std: { label: 'aggression swing', as: 'swing' },
-  drop_efficiency_std: { label: 'drop success swing', as: 'swing' },
-  winner_rate_std: { label: 'scoring swing', as: 'swing' },
-  general_error_rate_std: { label: 'mistake swing', as: 'swing' },
-  dink_error_rate_std: { label: 'net mistake swing', as: 'swing' },
-  drop_usage_rate: { label: 'third shots that are drops', as: 'percent' },
-  drop_preference_rate_mean: { label: 'drops rather than drives', as: 'percent' },
-  drop_preference_rate_std: { label: 'drop choice swing', as: 'swing' },
-  net_game_preference_rate_mean: { label: 'points won at the net', as: 'percent' },
-  net_game_preference_rate_std: { label: 'net play swing', as: 'swing' },
+  aggression_mean: { label: 'going for winners', as: 'percent', better: 'neither' },
+  drop_efficiency_mean: { label: 'drop shots landing', as: 'percent', better: 'higher' },
+  error_to_winner_ratio: { label: 'mistakes per winning shot', as: 'ratio', better: 'lower' },
+  aggression_std: { label: 'aggression swing', as: 'swing', better: 'neither' },
+  drop_efficiency_std: { label: 'drop success swing', as: 'swing', better: 'neither' },
+  winner_rate_std: { label: 'scoring swing', as: 'swing', better: 'neither' },
+  general_error_rate_std: { label: 'mistake swing', as: 'swing', better: 'neither' },
+  dink_error_rate_std: { label: 'net mistake swing', as: 'swing', better: 'neither' },
+  drop_usage_rate: { label: 'third shots that are drops', as: 'percent', better: 'neither' },
+  drop_preference_rate_mean: { label: 'drops rather than drives', as: 'percent', better: 'neither' },
+  drop_preference_rate_std: { label: 'drop choice swing', as: 'swing', better: 'neither' },
+  net_game_preference_rate_mean: { label: 'points won at the net', as: 'percent', better: 'neither' },
+  net_game_preference_rate_std: { label: 'net play swing', as: 'swing', better: 'neither' },
+}
+
+// Said on every row, because a number with no direction is a number
+// nobody can act on. Most of these are style rather than quality: the
+// model works playstyles out separately from the score precisely so
+// that "steady" is not a better way to play than "streaky".
+const DIRECTION = {
+  higher: 'higher is better',
+  lower: 'lower is better',
+  neither: 'neither is better — it is a style, not a score',
+}
+
+/**
+ * How this player compares, in words, because the bars alone say "not
+ * the same" without saying how much.
+ */
+function compare(you, them) {
+  if (!Number.isFinite(you) || !Number.isFinite(them) || them === 0) return null
+  const ratio = you / them
+  if (ratio < 0.45) return 'much less than'
+  if (ratio < 0.8) return 'less than'
+  if (ratio > 2.2) return 'much more than'
+  if (ratio > 1.25) return 'more than'
+  return 'about the same as'
 }
 
 function showValue(value, as) {
@@ -75,21 +98,16 @@ function showValue(value, as) {
 }
 
 /**
- * What to call each group, from its rung on the ladder.
+ * What to call a group: the scores it covers.
  *
- * Position rather than the pipeline's own label, which is
- * "Intermediate-Performance" for three groups and "Performance Group 4"
- * if K ever picks more. The model's word for it is inside "Why
- * groups?", where a reader who wants it can find it; the ladder itself
- * has to be readable at a glance.
+ * Not "Middle of three" or "Higher scores", both of which were read
+ * twice before they made sense -- middle of WHAT, higher THAN what. A
+ * group is a band of scores, so the band is its name and there is
+ * nothing left to interpret. The model's own label for it is inside
+ * "Why groups?", for anyone who wants it.
  */
-function groupNamer(count) {
-  return (index) => {
-    if (index === 0) return 'Developing'
-    if (index === count - 1) return `Higher of ${inWords(count)}`
-    if (count === 3) return 'Middle of three'
-    return `Group ${index + 1} of ${count}`
-  }
+function groupName(group) {
+  return `Scores ${group.lowest}–${group.highest}`
 }
 
 function Step({ number, title, value, children }) {
@@ -158,24 +176,24 @@ function Score({ rating, standing }) {
 /** Step 2: the first split, and what it is for. */
 function Group({ standing }) {
   const groups = standing.groups ?? []
-  const name = groupNamer(groups.length)
   const mine = groups.findIndex((group) => group.name === standing.band?.name)
 
   return (
-    <Step number={2} title="Your group" value={mine === -1 ? 'Not grouped yet' : name(mine)}>
+    <Step
+      number={2}
+      title="Your group"
+      value={mine === -1 ? 'Not grouped yet' : groupName(groups[mine])}
+    >
       {groups.length > 0 && (
         <ol className="ladder" aria-label="The groups, lowest scores first">
           {groups.map((group, i) => (
             <li key={group.name} className={i === mine ? 'is-you' : undefined}>
               <span className="ladder-name">
                 {i === mine && <Icon name="chevron" size={13} />}
-                {name(i)}
+                {groupName(group)}
               </span>
               <span className="ladder-size">
                 {group.size} {group.size === 1 ? 'player' : 'players'}
-              </span>
-              <span className="ladder-range">
-                {group.lowest}&ndash;{group.highest}
               </span>
             </li>
           ))}
@@ -183,7 +201,8 @@ function Group({ standing }) {
       )}
 
       <p className="step-line">
-        Everyone rated is split into a few groups by results first.
+        Everyone rated is split into a few groups by results first, and
+        these are the scores each group covers.
       </p>
 
       <More label="Why groups?">
@@ -238,35 +257,61 @@ function Playstyle({ standing }) {
         {band?.size ? `, out of ${band.size} in your group` : ''}.
       </p>
 
-      <div className="proof-wrap">
-        <table className="proof">
-          <caption>Why this name</caption>
-          <thead>
-            <tr>
-              <th scope="col">measurement</th>
-              <th scope="col">you</th>
-              <th scope="col">your group</th>
-              {proof.other && <th scope="col">the other style</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {proof.rows.map((row) => {
-              const measure = MEASURES[row.feature] ?? { label: row.feature, as: 'swing' }
-              return (
-                <tr key={row.feature}>
-                  <th scope="row">
-                    <span className="proof-word">{row.label}</span>
-                    <span className="proof-measure">{measure.label}</span>
-                  </th>
-                  <td className="is-you">{showValue(row.you, measure.as)}</td>
-                  <td>{showValue(row.group, measure.as)}</td>
-                  {proof.other && <td>{showValue(row.other, measure.as)}</td>}
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+      <ul className="proof" aria-label="Why this name">
+        {proof.rows.map((row) => {
+          const measure = MEASURES[row.feature] ?? {
+            label: row.feature, as: 'swing', better: 'neither',
+          }
+          const bars = [
+            { who: 'you', value: row.you, mine: true },
+            { who: 'your group', value: row.group },
+            ...(proof.other ? [{ who: 'the other style', value: row.other }] : []),
+          ]
+          // Bars are drawn against the biggest of the three, so a row is
+          // read by comparing its own bars and nothing else.
+          const widest = Math.max(...bars.map((b) => Math.abs(b.value ?? 0)), 0.0001)
+          const verdict = compare(row.you, row.group)
+          const versus = proof.other ? compare(row.you, row.other) : null
+
+          return (
+            <li key={row.feature} className="proof-row">
+              <div className="proof-head">
+                <span className="proof-word">{row.label}</span>
+                <span className="proof-measure">{measure.label}</span>
+                <span className="proof-better">{DIRECTION[measure.better]}</span>
+              </div>
+
+              <ul className="proof-bars">
+                {bars.map((bar) => (
+                  <li key={bar.who} className={bar.mine ? 'is-you' : undefined}>
+                    <span className="proof-who">{bar.who}</span>
+                    <span className="proof-track">
+                      <span
+                        className="proof-fill"
+                        style={{ width: `${Math.round((Math.abs(bar.value ?? 0) / widest) * 100)}%` }}
+                      />
+                    </span>
+                    {/* A percentage means something on its own, so it is
+                        shown. A spread of a per-minute rate does not, so
+                        the bars carry it and the figures live behind the
+                        tap below. */}
+                    <span className="proof-number">
+                      {measure.as === 'percent' ? showValue(bar.value, 'percent') : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              {verdict && (
+                <p className="proof-verdict">
+                  Yours is {verdict} your group&rsquo;s
+                  {versus ? `, and ${versus} the other style's` : ''}.
+                </p>
+              )}
+            </li>
+          )
+        })}
+      </ul>
 
       <More label="How this was worked out">
         <p>
@@ -281,6 +326,20 @@ function Playstyle({ standing }) {
           Averages only, never anyone&rsquo;s own numbers but yours. A style with
           fewer than three players is never averaged at all.
         </p>
+        <ul className="proof-figures">
+          {proof.rows.map((row) => {
+            const measure = MEASURES[row.feature] ?? { label: row.feature, as: 'swing' }
+            return (
+              <li key={row.feature}>
+                <strong>{measure.label}</strong>
+                {measure.as === 'swing' ? ' (how much it moves between games)' : ''}: you{' '}
+                {showValue(row.you, measure.as)}, your group{' '}
+                {showValue(row.group, measure.as)}
+                {proof.other ? `, the other style ${showValue(row.other, measure.as)}` : ''}.
+              </li>
+            )
+          })}
+        </ul>
       </More>
     </Step>
   )

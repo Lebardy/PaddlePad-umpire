@@ -1176,35 +1176,57 @@ a.highlight:active { background: var(--surface); }
 
 /* ---- Proof for the playstyle name ---- */
 
-/* Scrolls inside itself on a narrow phone rather than pushing the page
-   sideways. */
-.proof-wrap { overflow-x: auto; margin-top: 0.8rem; }
-.proof { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-.proof caption {
-  text-align: left;
-  font-size: 0.78rem;
-  font-weight: 600;
+/* Bars rather than figures. The measurement behind "Steady" is the
+   spread of winning shots per minute between games -- a real quantity,
+   and meaningless to read as "±1.20". The comparison IS the proof, so
+   the bars carry it and the figures sit behind "How this was worked
+   out" for anyone who wants them. Percentages stay as numbers: those
+   mean something on their own. */
+.proof { list-style: none; padding: 0; margin: 0.9rem 0 0; }
+.proof-row + .proof-row { margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
+.proof-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem; }
+.proof-word { font-size: 0.95rem; font-weight: 700; }
+.proof-measure { font-size: 0.8rem; color: var(--text-secondary); }
+/* Never left to be guessed at: some of these are better high, some
+   better low, and most are neither. */
+.proof-better {
+  font-size: 0.7rem;
   color: var(--text-muted);
-  padding-bottom: 0.3rem;
+  background: var(--surface-sunken);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  margin-left: auto;
 }
-.proof th,
-.proof td { padding: 0.4rem 0.5rem; text-align: right; white-space: nowrap; }
-.proof thead th {
-  font-size: 0.72rem;
-  font-weight: 400;
+
+.proof-bars { list-style: none; padding: 0; margin: 0.5rem 0 0; }
+.proof-bars li {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) 2.6rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.12rem 0;
+}
+.proof-who { font-size: 0.75rem; color: var(--text-muted); }
+.proof-bars li.is-you .proof-who { color: var(--text); font-weight: 700; }
+.proof-track {
+  height: 0.65rem;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+.proof-fill { display: block; height: 100%; border-radius: 999px; background: var(--text-muted); }
+.proof-bars li.is-you .proof-fill { background: var(--primary); }
+.proof-number {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
   color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
 }
-.proof thead th:first-child,
-.proof tbody th { text-align: left; }
-.proof tbody th { font-weight: 400; }
-.proof tbody tr + tr th,
-.proof tbody tr + tr td { border-top: 1px solid var(--border); }
-.proof-word { display: block; font-weight: 700; color: var(--text); }
-.proof-measure { display: block; font-size: 0.72rem; color: var(--text-muted); }
-.proof td { font-variant-numeric: tabular-nums; }
-/* Their own column is the one they came to read. */
-.proof td.is-you { font-weight: 700; color: var(--primary); }
+.proof-bars li.is-you .proof-number { color: var(--text); font-weight: 700; }
+.proof-verdict { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; margin-top: 0.45rem; }
+
+.proof-figures { margin: 0.4rem 0 0; padding-left: 1.1rem; }
+.proof-figures li { font-size: 0.8rem; color: var(--text-muted); line-height: 1.55; }
 
 /* The spread. Ten columns, one highlighted; the rest sit back in a
    neutral so the eye lands on "you" first and the shape second. */
