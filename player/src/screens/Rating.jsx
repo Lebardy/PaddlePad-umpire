@@ -153,7 +153,14 @@ function gainsAndLosses(parts, which) {
   return { best, worst }
 }
 
-/** Points read as whole numbers where they are whole. */
+/**
+ * Points read as whole numbers where they are whole.
+ *
+ * Only the next-group section still shows points. There they sit inside
+ * a sentence that says what they are -- "that one part is 9 points of
+ * the difference" -- rather than standing alone as a label, which is
+ * what made "19.9 of 30" unreadable at a glance.
+ */
 function points(value) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }
@@ -253,6 +260,15 @@ function Parts({ parts }) {
   const { best, worst } = gainsAndLosses(parts.parts, 'group')
   const compared = parts.groupAveraged
 
+  // Every bar is drawn against the biggest gap of the four, so the four
+  // rows can be read against each other: the longest arm is the thing
+  // most worth doing something about.
+  const widest = Math.max(
+    ...parts.parts.map((part) =>
+      part.group ? Math.abs(part.you.points - part.group.points) : 0),
+    0.0001,
+  )
+
   return (
     <div className="parts">
       <p className="step-line">
@@ -261,35 +277,46 @@ function Parts({ parts }) {
 
       <ul className="parts-list" aria-label="What the rating is made of">
         {parts.parts.map((part) => {
-          const share = Math.max(0, Math.min(1, part.you.points / part.max))
-          const theirs = part.group
-            ? Math.max(0, Math.min(1, part.group.points / part.max))
-            : null
+          // How far this part sits from the player's level, in POINTS
+          // -- which is the only unit the four can be compared in, and
+          // which already carries the direction: the model subtracts
+          // mistakes rather than adding them, so "ahead" is ahead on
+          // every row, including the ones where fewer is better. The
+          // number itself is never shown; it only sets the bar.
+          const diff = part.group ? part.you.points - part.group.points : null
+          const reach = diff === null ? 0 : Math.min(1, Math.abs(diff) / widest)
+
           return (
             <li key={part.key} className="part">
               <div className="part-head">
                 <span className="part-label">{part.label}</span>
-                <span className="part-points">
-                  {points(part.you.points)}
-                  <span className="part-of"> of {points(part.max)}</span>
+                <span className="part-values">
+                  {partValue(part.you.value, part.unit)}
+                  {part.group && (
+                    <span className="part-theirs">
+                      {' '}· level {partValue(part.group.value, part.unit)}
+                    </span>
+                  )}
                 </span>
               </div>
-              <span
-                className="part-track"
-                role="img"
-                aria-label={`${points(part.you.points)} of ${points(part.max)} points`}
-              >
-                <span className="part-fill" style={{ width: `${share * 100}%` }} />
-                {theirs !== null && (
-                  <span className="part-mark" style={{ left: `${theirs * 100}%` }} />
-                )}
-              </span>
-              <p className="part-note">
-                Yours: {partValue(part.you.value, part.unit)}
-                {part.group
-                  ? `. Your level averages ${partValue(part.group.value, part.unit)}.`
-                  : '.'}
-              </p>
+
+              {diff !== null && (
+                <span
+                  className="part-scale"
+                  role="img"
+                  aria-label={
+                    diff === 0
+                      ? 'level with players at your level'
+                      : `${diff > 0 ? 'ahead of' : 'behind'} players at your level`
+                  }
+                >
+                  <span className="part-axis" />
+                  <span
+                    className={`part-arm ${diff < 0 ? 'is-behind' : 'is-ahead'}`}
+                    style={{ width: `${reach * 50}%` }}
+                  />
+                </span>
+              )}
             </li>
           )
         })}
@@ -298,21 +325,22 @@ function Parts({ parts }) {
       {compared && (
         <p className="step-line">
           {best
-            ? `Where you gain most on players at your level: ${best.part.label}, ${points(best.diff)} points above their average.`
+            ? `You gain most on players at your level in ${best.part.label}.`
             : 'No part of your rating is ahead of the average for your level yet.'}
           {' '}
           {worst
-            ? `Where you lose most: ${worst.part.label}, ${points(Math.abs(worst.diff))} points below.`
+            ? `You lose most in ${worst.part.label}.`
             : 'Every part of it is at or above that average.'}
         </p>
       )}
 
-      <More label="What does 'of 30' mean?">
+      <More label="How much does each one count?">
         <p>
-          Each of the four is worth a fixed share of the 100: winning shots
-          30, drop shots landing 25, mistakes at the net 25, mistakes away
-          from the net 20. That split is the model&rsquo;s, not the
-          app&rsquo;s.
+          Not equally. Out of the 100, winning shots are worth 30, drop shots
+          landing 25, mistakes at the net 25, and mistakes away from the net
+          20. That split is the model&rsquo;s, not the app&rsquo;s — and it is
+          why the bars above are drawn from how much each gap moves your
+          rating rather than from the measurements themselves.
         </p>
         <p>
           Full marks on one of them means <em>best of everyone rated</em>,
