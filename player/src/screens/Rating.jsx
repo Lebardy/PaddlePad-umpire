@@ -68,7 +68,7 @@ const MEASURES = {
 
 // Said only where there IS a direction. Most of these measurements are
 // style rather than quality -- the model works playstyles out
-// separately from the score, so "steady" is not a better way to play
+// separately from the rating, so "steady" is not a better way to play
 // than "streaky" -- and a row that announced "neither is better" said
 // nothing while taking up the space of something that did.
 const DIRECTION = {
@@ -102,12 +102,14 @@ function showValue(value, as) {
  *
  * Not "Middle of three" or "Higher scores", both of which were read
  * twice before they made sense -- middle of WHAT, higher THAN what. A
- * group is a band of scores, so the band is its name and there is
- * nothing left to interpret. The model's own label for it is inside
+ * group is a band of ratings, so the band is its name and there is
+ * nothing left to interpret. The word is "rating" throughout, because
+ * that is what the app calls this number everywhere else; "score" here
+ * and "rating" in the title was the same thing under two names. The model's own label for it is inside
  * "Why groups?", for anyone who wants it.
  */
 function groupName(group) {
-  return `Scores ${group.lowest}–${group.highest}`
+  return `Ratings ${group.lowest}–${group.highest}`
 }
 
 function Step({ number, title, value, children }) {
@@ -143,7 +145,7 @@ function Score({ rating, standing }) {
   return (
     <Step
       number={1}
-      title="Your score"
+      title="Your rating"
       value={
         <span aria-label={`${rating.skillScore} out of 100`}>
           {shown}
@@ -167,7 +169,7 @@ function Score({ rating, standing }) {
       <p className="step-line">
         {others === 0
           ? 'You are the only rated player so far.'
-          : `Your score is higher than ${standing.below} of the ${others} other rated players.`}
+          : `Your rating is higher than ${standing.below} of the ${others} other rated players.`}
       </p>
     </Step>
   )
@@ -185,7 +187,7 @@ function Group({ standing }) {
       value={mine === -1 ? 'Not grouped yet' : groupName(groups[mine])}
     >
       {groups.length > 0 && (
-        <ol className="ladder" aria-label="The groups, lowest scores first">
+        <ol className="ladder" aria-label="The groups, lowest ratings first">
           {groups.map((group, i) => (
             <li key={group.name} className={i === mine ? 'is-you' : undefined}>
               <span className="ladder-name">
@@ -202,7 +204,7 @@ function Group({ standing }) {
 
       <p className="step-line">
         Everyone rated is split into a few groups by results first, and
-        these are the scores each group covers.
+        these are the ratings each group covers.
       </p>
 
       <More label="Why groups?">
@@ -373,7 +375,7 @@ function Rating() {
       {!standing && !error && <p className="muted-inline">Loading…</p>}
 
       {/* The overview's rating card already explains, in the player's
-          own terms, why there is no score yet. Saying it again here
+          own terms, why there is no rating yet. Saying it again here
           would be worse and would drift. */}
       {standing && !rated && (
         <p className="muted-inline">
@@ -390,7 +392,7 @@ function Rating() {
 
           <More label="Why is there no ranking?">
             <p>
-              Your score is measured against whoever has played, so it can move
+              Your rating is measured against whoever has played, so it can move
               when new people join — even if you haven&rsquo;t played at all. A
               place on a list would claim more than the number can. Where you
               sit, and the group you are in, is what it can honestly tell you.
