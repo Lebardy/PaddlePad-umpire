@@ -246,14 +246,54 @@ function finalizeAfterEventChange(match) {
  * (dink/clean winners, dink/unforced errors) gets incremented -- see
  * deriveMatchState in pickleball.js. No-op once the match is completed.
  */
+/**
+ * Which third shot, if any, belongs to the rally being logged now.
+ *
+ * The umpire taps the third shot when it happens and the rally outcome
+ * when the point ends, so any thirdShot events sitting after the last
+ * rally belong to the rally about to be appended. Nothing else in the
+ * log could say so: a thirdShot carries no rally reference, and until
+ * this existed the two were unrelatable -- which is why "does dropping
+ * actually win me points" could not be answered at all.
+ *
+ * The LAST one wins where there are several. Undo removes the previous
+ * event outright (undoLastEvent), so a re-tap without an undo is the
+ * umpire correcting themselves, and the correction is what they meant.
+ * The earlier taps still count as attempts, exactly as before -- only
+ * the link is singular.
+ *
+ * Returns undefined when the umpire logged no third shot, which is
+ * normal: the panel is marked optional and often skipped.
+ */
+function pendingThirdShotId(events) {
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    if (events[i].type === 'rally') return undefined
+    if (events[i].type === 'thirdShot') return events[i].id
+  }
+  return undefined
+}
+
 export function addRallyEvent(matchId, { actingPlayerId, outcome, zone }) {
   const match = getMatch(matchId)
   if (!match || match.status === 'completed') return match
+  // Recorded on the RALLY rather than written back onto the thirdShot,
+  // because the log is append-only -- that is what makes undo trivial
+  // and what lets two devices' events merge without resolution. A new
+  // event may point at an older one; an older one may never change.
+  const thirdShotId = pendingThirdShotId(match.events)
   return finalizeAfterEventChange({
     ...match,
     events: [
       ...match.events,
-      { type: 'rally', id: crypto.randomUUID(), at: Date.now(), actingPlayerId, outcome, zone },
+      {
+        type: 'rally',
+        id: crypto.randomUUID(),
+        at: Date.now(),
+        actingPlayerId,
+        outcome,
+        zone,
+        ...(thirdShotId ? { thirdShotId } : {}),
+      },
     ],
   })
 }

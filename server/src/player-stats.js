@@ -275,6 +275,11 @@ export function scoreProgression(row, events, team) {
  * rating that moves because someone else played would destroy trust in
  * it immediately.
  */
+// Below this, a conversion rate is a coin landing heads twice. Ten of
+// each is still a small sample -- the app says so beside it -- but it
+// is the point where the number stops being meaningless.
+export const MIN_LINKED_THIRD_SHOTS = 10
+
 export function summarisePlayer(matches) {
   const totals = {
     matches: matches.length,
@@ -287,6 +292,15 @@ export function summarisePlayer(matches) {
     dropAttempts: 0,
     dropSuccesses: 0,
     driveAttempts: 0,
+    // Third shots the log ties to the rally they opened, and how many
+    // of those rallies the player's side went on to win. Always <= the
+    // attempts above: a third shot the umpire skipped linking, or one
+    // recorded before rallies carried the link at all, is absent here
+    // rather than counted as a loss.
+    dropRallies: 0,
+    dropRalliesWon: 0,
+    driveRallies: 0,
+    driveRalliesWon: 0,
   }
 
   for (const match of matches) {
@@ -301,6 +315,12 @@ export function summarisePlayer(matches) {
     totals.dropAttempts += s.drop_attempts
     totals.dropSuccesses += s.drop_successes
     totals.driveAttempts += s.drive_attempts
+    // ?? 0 because a match replayed by an older server has no such
+    // counters, and adding undefined would poison every total.
+    totals.dropRallies += s.drop_rallies ?? 0
+    totals.dropRalliesWon += s.drop_rallies_won ?? 0
+    totals.driveRallies += s.drive_rallies ?? 0
+    totals.driveRalliesWon += s.drive_rallies_won ?? 0
   }
 
   const decided = totals.wins + totals.losses
@@ -316,6 +336,20 @@ export function summarisePlayer(matches) {
     dropSuccessRate:
       totals.dropAttempts > 0 ? totals.dropSuccesses / totals.dropAttempts : null,
     dropPreference: thirdShots > 0 ? totals.dropAttempts / thirdShots : null,
+    // Whether the choice actually won the point, which is a different
+    // question from whether the drop landed -- dropSuccessRate above is
+    // the umpire's judgement that the ball arrived soft at the net.
+    //
+    // Null below MIN_LINKED_THIRD_SHOTS. A conversion rate over three
+    // attempts is noise, and this app withholds rather than guesses.
+    dropConversion:
+      totals.dropRallies >= MIN_LINKED_THIRD_SHOTS
+        ? totals.dropRalliesWon / totals.dropRallies
+        : null,
+    driveConversion:
+      totals.driveRallies >= MIN_LINKED_THIRD_SHOTS
+        ? totals.driveRalliesWon / totals.driveRallies
+        : null,
   }
 }
 

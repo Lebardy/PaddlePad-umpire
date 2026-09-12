@@ -46,6 +46,19 @@ export function emptyStats() {
     clean_winners: 0,
     dink_winners: 0,
     unforced_errors: 0,
+    // Whether the third shot actually WON the point, which is a
+    // different question from whether the drop landed.
+    // drop_successes is the umpire's judgement that the ball arrived
+    // soft at the net; these say what happened to the rally afterwards.
+    //
+    // Only rallies carrying a thirdShotId count here, so they are
+    // always <= the attempt counts above: a third shot the umpire
+    // skipped, or one logged by a client from before rallies recorded
+    // the link, is absent rather than assumed lost.
+    drop_rallies: 0,
+    drop_rallies_won: 0,
+    drive_rallies: 0,
+    drive_rallies_won: 0,
   }
 }
 
@@ -250,6 +263,11 @@ export function deriveMatchState(match) {
   }
   ;[...match.teamA, ...match.teamB].forEach(ensure)
 
+  // Third shots seen so far, so a rally can find the one it names.
+  // Built as the log is replayed rather than indexed up front, which
+  // keeps a rally from ever crediting a third shot logged after it.
+  const thirdShots = new Map()
+
   for (const event of match.events) {
     if (scoreState.completed) break
 
@@ -273,6 +291,25 @@ export function deriveMatchState(match) {
           : actingTeam === 'A'
             ? 'B'
             : 'A'
+
+      // Did the third shot that opened this rally go on to win it?
+      //
+      // The rally names the third shot it followed (see addRallyEvent
+      // in the umpire app); before that existed the two were two
+      // unrelated lines in the log and this could not be asked. Credit
+      // goes to the player who PLAYED the third shot, judged by whether
+      // THEIR side won -- not the acting player of this event, who is
+      // whoever ended the rally and is often an opponent.
+      const opener = event.thirdShotId ? thirdShots.get(event.thirdShotId) : null
+      if (opener) {
+        const openerTeam = match.teamA.includes(opener.playerId) ? 'A' : 'B'
+        const bucket = opener.shotType === 'drop' ? 'drop' : 'drive'
+        ensure(opener.playerId)
+        stats[opener.playerId][`${bucket}_rallies`] += 1
+        if (openerTeam === winningTeam) {
+          stats[opener.playerId][`${bucket}_rallies_won`] += 1
+        }
+      }
 
       scoreState = applyRallyResult(scoreState, winningTeam, isDoubles, target)
     } else if (event.type === 'serverCorrection') {
@@ -300,6 +337,9 @@ export function deriveMatchState(match) {
         }
       }
     } else if (event.type === 'thirdShot') {
+      // Kept by id so a later rally can name this one. Recorded for
+      // every third shot, including ones no rally ever points at.
+      thirdShots.set(event.id, event)
       ensure(event.playerId)
       if (event.shotType === 'drop') {
         stats[event.playerId].drop_attempts += 1

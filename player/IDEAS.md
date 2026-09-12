@@ -3,8 +3,8 @@
 Notes from a conversation, not a backlog. It is written down because
 working it out again from scratch would cost more than reading it.
 
-**Ideas 1, 2, 3, 4 and 6 have since landed.** What that took, and the
-things this document had wrong, is at the bottom.
+**Ideas 1, 2, 3, 4 and 6 have landed, and 5's plumbing with them.** What
+that took, and the things this document had wrong, is at the bottom.
 
 ## The framing
 
@@ -50,7 +50,7 @@ say what it expected before the match started, so a finished match can
 carry *"you were expected to lose this one"*. Beating someone stronger
 should feel different from beating someone weaker; today a win is a win.
 
-**5. Drop or drive — which actually works for you.** This app records the
+**5. Drop or drive — which actually works for you.** *(plumbing landed)* This app records the
 third shot separately from how the rally ended, which is unusual. So it
 can answer: *"When you drop, you go on to win the rally 58% of the time.
 When you drive, 41%."* No model needed — this one is pure event log.
@@ -184,8 +184,44 @@ words gives the player the thing worth having and nobody else's number.
 Half the staging matches get no verdict at all, because somebody on
 court was unrated at the time. They show nothing rather than a hedge.
 
+## What idea 5 turned out to need
+
+This document said idea 5 was "pure event log" and needed no model. The
+first half is right and the second half hid a problem: the event log
+could not answer it either.
+
+A third shot is its own event, carrying who played it, whether it was a
+drop or a drive, and whether the drop landed. How a rally ended is a
+separate event. **Nothing connected the two** — no rally id, no point
+number — and the decoupling was deliberate, stated in the umpire's own
+help text: "Separate from how the rally ended." So "when you drop, you
+win the rally 58% of the time" could not be computed at all. Guessing
+from tap order was rejected: it mis-attributes silently whenever the
+umpire taps the rally first, and nothing in the data would ever reveal
+it.
+
+Also worth correcting: `drop_successes` means **the drop landed**, an
+umpire's judgement about the ball arriving soft at the net. It has never
+meant the rally was won. The existing "Drops that landed" meter is
+execution quality, and the new one is a different measurement. The pair
+is the interesting part — a drop can land beautifully and still lose the
+point.
+
+The fix is on the umpire's side and invisible there: when the rally
+outcome is tapped, the rally records which third shot it followed. Same
+buttons, same taps. The log stays append-only, because a new event may
+point at an older one while an older one may never change.
+
+**The consequence to remember: only matches played after this can carry
+the link, and no old match can be repaired.** It was done while
+production held zero completed matches, so nothing was lost — but the
+staging pool's 110 matches will never have it, and the numbers stay
+withheld until ten of each kind have been logged.
+
+Its home was not a problem after all. The Overview screen's shot profile
+already showed "Drops that landed" and "Drop over drive"; the conversion
+sits beside them.
+
 ## Still not started
 
-Ideas **5** (drop or drive) and **7** (partner fit). Idea 5 is the only
-one left that needs no model at all — it reads straight from the event
-log, so it is the one that would work the moment real matches exist.
+Idea **7** (partner fit).
