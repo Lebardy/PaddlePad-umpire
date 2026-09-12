@@ -535,5 +535,13 @@ ALTER TABLE player_ratings ADD COLUMN IF NOT EXISTS playstyle_traits JSONB;
 -- run where they do not. Null for runs published before it sent them.
 ALTER TABLE player_ratings ADD COLUMN IF NOT EXISTS score_parts JSONB;
 
+-- Every game this player played in the run, scored on the pool's own
+-- 0-100 scale: [{"matchId": ..., "score": ...}]. Their rating is the
+-- AVERAGE of these, exactly -- min-max scaling and a weighted sum are
+-- both affine, so the mean of the scores is the score of the means.
+-- The pipeline refuses to publish a run where that stops holding.
+-- Null for runs published before it sent them.
+ALTER TABLE player_ratings ADD COLUMN IF NOT EXISTS game_scores JSONB;
+
 CREATE INDEX IF NOT EXISTS player_ratings_player_idx
     ON player_ratings (player_id);

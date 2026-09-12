@@ -48,6 +48,57 @@ function formatDate(iso) {
   })
 }
 
+/**
+ * What the model expected before this match, and how the game scored.
+ *
+ * The expectation is read from the newest rating run that finished
+ * BEFORE the match -- never the current one, which has already seen the
+ * result -- so it is a prediction rather than a verdict written
+ * afterwards. See server/src/expectation.js.
+ *
+ * It says which side was favoured and never by how much. In doubles a
+ * team average is two people, one of them the reader, so a figure would
+ * hand over their partner's rating by subtraction. A verdict in words
+ * gives the player the thing worth having and nobody else's number.
+ *
+ * Beating a stronger side is the one result worth calling out, so it is
+ * the only thing here that gets any emphasis.
+ */
+function Expectation({ match }) {
+  const { expectation: what, ratedAs } = match
+  if (!what && ratedAs === null) return null
+
+  const said = {
+    even: 'Evenly matched on paper.',
+    win: what?.margin === 'clear'
+      ? 'You were expected to win this one comfortably.'
+      : 'You were slightly favoured.',
+    loss: what?.margin === 'clear'
+      ? 'You were expected to lose this one.'
+      : 'You were slight underdogs.',
+  }[what?.expected]
+
+  return (
+    <p className="expectation">
+      {what?.upset && (
+        <span className="expectation-upset">
+          {what.expected === 'loss' ? 'Upset' : 'Slip'}
+        </span>
+      )}
+      {said && <span>{said}</span>}
+      {/* Not clipped at 100. A rating measures you against everyone
+          else's AVERAGE, so a good game can beat the best average there
+          is -- and being told you played like a 112 is the point, not a
+          glitch. The rating page explains the scale. */}
+      {ratedAs !== null && (
+        <span className="expectation-rated">
+          You played this one like a {Math.round(ratedAs)}.
+        </span>
+      )}
+    </p>
+  )
+}
+
 function MatchDetail({ id }) {
   const { matches, loading } = usePlayerData()
   const index = matches.findIndex((m) => m.id === id)
@@ -95,6 +146,10 @@ function MatchDetail({ id }) {
         <p className="detail-meta">
           {formatDate(match.endedAt)} · {match.sessionName}
         </p>
+        {/* Nothing at all for a match played before any rating existed,
+            or one where somebody on court was unrated at the time. A
+            missing line is better than a hedged one. */}
+        <Expectation match={match} />
       </header>
 
       <ul className="fact-chips" aria-label="Match details">

@@ -158,43 +158,61 @@ function points(value) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }
 
+/** 1st, 2nd, 3rd, 4th... 21st. The ordinary English rule, including
+ *  the exception that makes 11th, 12th and 13th not follow it. */
+function ordinal(n) {
+  const tens = n % 100
+  if (tens >= 11 && tens <= 13) return `${n}th`
+  return `${n}${['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`
+}
+
 /**
- * What to call a group: where its middle sits.
+ * What to call a group: where its middle sits among everyone rated.
  *
- * Not "Middle of three" or "Higher scores", both of which were read
- * twice before they made sense -- middle of WHAT, higher THAN what. And
- * not the range of ratings it covers either, which was the next attempt
- * and looked right until two groups were named "Ratings 28-49" and
- * "Ratings 37-91". Those overlap, so a player rated 45 read their own
- * number inside the name of the group they were not in.
+ * Three namings were tried before this one, and each failed for a
+ * reason worth keeping.
  *
- * The overlap is real, not a bug in the naming: groups are not slices
- * of the rating scale. The clustering sorts people on ten measurements
- * and the rating is a sum of four of them, so two players can share a
- * rating and land either side of the line. A middle cannot overlap, and
- * "Around 42" needs no word for what 42 is -- the screen has already
- * said it twice.
+ * "Middle of three" and "Higher scores" were read twice before they
+ * made sense -- middle of WHAT, higher THAN what.
  *
- * Where two groups round to the SAME middle -- possible in a small
- * pool, where a group can be split by consistency rather than by
- * results -- the ladder falls back to ranges for every group. A wordy
- * name is a smaller problem than the same name on two rungs.
+ * "Ratings 28-49" beside "Ratings 37-91" overlapped, so a player rated
+ * 45 found their own number inside the name of the group they were not
+ * in. That overlap is real rather than a slip: groups are not slices of
+ * the rating scale, because the clustering sorts on ten measurements
+ * while the rating is a sum of four of them.
+ *
+ * "Around 43" cannot overlap, but a rating turns out to be a poor
+ * description of position. skill_score is min-max scaled and players
+ * are not spread evenly along it -- on the pool this was written
+ * against, 26 of 46 sat between 40 and 59. So a rating of 42 is the
+ * 17th percentile, not the "just below middle" the number implies, and
+ * ten rating points crosses 33 places down there against 7 at the top.
+ *
+ * A percentile says outright what a rating only implies, which is why
+ * it survives. It needs one line of explanation the first time, and
+ * gets one under the ladder.
+ *
+ * Where two groups round to the SAME percentile -- possible in a small
+ * pool, where a group can be split by consistency rather than results
+ * -- the ladder falls back to ratings for every group. A blunt name is
+ * a smaller problem than the same name on two rungs.
  *
  * The model's own label is inside "Why groups?", for anyone who wants it.
  */
 function namesFor(groups) {
-  const middles = groups.map((group) => group.middle)
+  const places = groups.map((group) => group.percentile)
   const usable =
-    middles.every((middle) => Number.isFinite(middle)) &&
-    new Set(middles).size === middles.length
+    places.every((place) => Number.isFinite(place)) &&
+    new Set(places).size === places.length
 
   return {
+    usable,
     /** On its own: the step's value, and each rung of the ladder. */
     label: (group) =>
-      usable ? `Around ${group.middle}` : `Ratings ${group.lowest}–${group.highest}`,
+      usable ? `${ordinal(group.percentile)} percentile` : `Around ${group.middle}`,
     /** Inside a sentence, where a capital would read as a slip. */
     inSentence: (group) =>
-      usable ? `around ${group.middle}` : `Ratings ${group.lowest}–${group.highest}`,
+      usable ? `the ${ordinal(group.percentile)} percentile` : `around ${group.middle}`,
   }
 }
 
@@ -323,6 +341,110 @@ function Parts({ parts }) {
 }
 
 /**
+ * The games the rating is the average of.
+ *
+ * Half the model is about how much someone swings between games, and
+ * none of it ever reached the player, because the model says it as
+ * "your winner rate varies by 1.20". Said as scored games it needs no
+ * translating: a 43 beside a 94 is the same fact, legible.
+ *
+ * The headline is the MIDDLE HALF rather than best and worst. On the
+ * pool this was built against the gap between a player's best and
+ * worst game had a median of 40 points -- a best game is one game, and
+ * one game is mostly luck. The extremes are still shown, named as what
+ * they are.
+ */
+function Games({ games }) {
+  // The strip spans THIS player's own games rather than a fixed 0-100,
+  // and that is not a cosmetic choice.
+  //
+  // A single game is scored on a scale whose ceiling is the best
+  // player's SEASON AVERAGE, and a good player's good game beats their
+  // own average routinely -- the strongest player on the pool this was
+  // built against had three games over 100 and a best of 113. Pinning
+  // the axis at 100 would crush their whole middle half against the
+  // right edge and show them a spread they do not have.
+  //
+  // This strip answers "how much do you swing", not "where do you sit"
+  // -- the bars higher up the page already answer that -- so an axis
+  // of their own games is the one that tells the truth.
+  const low = Math.min(games.worst, games.rating)
+  const high = Math.max(games.best, games.rating)
+  const span = high - low || 1
+  const place = (score) => ((score - low) / span) * 100
+
+  return (
+    <div className="games">
+      <h3 className="games-head">The games behind it</h3>
+      <p className="step-line">
+        Your rating is the average of your {games.count} games — not a summary
+        of them, the middle. Most land between{' '}
+        <strong>{Math.round(games.lower)}</strong> and{' '}
+        <strong>{Math.round(games.upper)}</strong>.
+      </p>
+
+      <div className="games-strip" role="img"
+           aria-label={`${games.count} games, from ${Math.round(games.worst)} to ${Math.round(games.best)}, averaging ${Math.round(games.average)}`}>
+        {/* The middle half, drawn as the band the dots mostly sit in. */}
+        <span
+          className="games-band"
+          style={{
+            left: `${place(games.lower)}%`,
+            width: `${place(games.upper) - place(games.lower)}%`,
+          }}
+        />
+        {games.games.map((game) => (
+          <span
+            key={game.matchId}
+            className="games-dot"
+            style={{ left: `${place(game.score)}%` }}
+          />
+        ))}
+        <span className="games-mark" style={{ left: `${place(games.rating)}%` }} />
+      </div>
+      <ul className="games-scale" aria-hidden="true">
+        <li>{Math.round(games.worst)}</li>
+        <li>{Math.round(games.best)}</li>
+      </ul>
+
+      <p className="games-ends">
+        Worst <strong>{Math.round(games.worst)}</strong>
+        <span className="games-sep">·</span>
+        Rating <strong>{Math.round(games.rating)}</strong>
+        <span className="games-sep">·</span>
+        Best <strong>{Math.round(games.best)}</strong>
+      </p>
+
+      <More label="Why is the spread so wide?">
+        <p>
+          Because one game is a small sample. A short game where three shots
+          fall your way scores very differently from a long one where they
+          don&rsquo;t, and neither is a fair picture of how you play. The
+          average of all of them is, which is what your rating is.
+        </p>
+        <p>
+          It is also the half of the model nothing else shows. Five of the ten
+          things it measures are about how much you swing between games rather
+          than how well you play — this is that, in a form you can read.
+        </p>
+        {games.outsideScale > 0 && (
+          <p>
+            {games.outsideScale === 1
+              ? 'One of these games scored'
+              : `${games.outsideScale} of these games scored`}{' '}
+            outside 0–100, which is not a mistake. The scale is built from
+            everyone&rsquo;s <em>average</em>, and a single game can be better
+            than the best average there is — or worse than the worst. Over 100
+            means you played that one better than anybody plays on an ordinary
+            day; below 0, worse.
+          </p>
+        )}
+      </More>
+    </div>
+  )
+}
+
+/**
  * What separates this player from the rung above -- idea 3, and the
  * most useful thing a skill model can tell an amateur.
  *
@@ -412,6 +534,10 @@ function Score({ rating, standing }) {
           true, and an apology for a missing panel is worse than the
           panel simply not being there. */}
       {standing.parts && <Parts parts={standing.parts} />}
+
+      {/* Null for an older run, or for a player with too few games for
+          a spread to describe a habit rather than a fortnight. */}
+      {standing.games && <Games games={standing.games} />}
     </Step>
   )
 }
@@ -446,8 +572,11 @@ function Group({ standing }) {
       )}
 
       <p className="step-line">
-        Everyone rated is split into a few groups by results first, and
-        these are the ratings each group covers.
+        Everyone rated is split into a few groups by results first, and each
+        is named for where its middle sits.{' '}
+        {naming.usable && mine !== -1
+          ? `The ${ordinal(groups[mine].percentile)} percentile means higher than ${groups[mine].percentile}% of everyone rated.`
+          : 'A group needs distinct middles before it can be named that way, so these are ratings instead.'}
       </p>
 
       {/* The rung above, named from the ladder rather than from

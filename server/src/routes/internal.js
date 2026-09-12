@@ -122,7 +122,7 @@ router.post('/ratings', async (req, res) => {
     for (const r of ratings) {
       const base = params.length
       values.push(
-        `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11})`,
+        `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}, $${base + 12})`,
       )
       params.push(
         runId,
@@ -144,6 +144,10 @@ router.post('/ratings', async (req, res) => {
         r.scoreParts && typeof r.scoreParts === 'object'
           ? JSON.stringify(r.scoreParts)
           : null,
+        // One score per game played. Null from an older pipeline.
+        Array.isArray(r.gameScores) && r.gameScores.length > 0
+          ? JSON.stringify(r.gameScores)
+          : null,
       )
     }
 
@@ -151,7 +155,7 @@ router.post('/ratings', async (req, res) => {
       `INSERT INTO player_ratings
          (run_id, player_id, skill_score, skill_tier, skill_group,
           playstyle_cluster, playstyle_archetype, evidence, match_count,
-          playstyle_traits, score_parts)
+          playstyle_traits, score_parts, game_scores)
        VALUES ${values.join(', ')}`,
       params,
     )

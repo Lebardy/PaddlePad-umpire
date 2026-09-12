@@ -3,8 +3,8 @@
 Notes from a conversation, not a backlog. It is written down because
 working it out again from scratch would cost more than reading it.
 
-**Ideas 1 and 3 have since landed**, and idea 6 with them. What that
-took, and the one thing this document had wrong, is at the bottom.
+**Ideas 1, 2, 3, 4 and 6 have since landed.** What that took, and the
+things this document had wrong, is at the bottom.
 
 ## The framing
 
@@ -31,7 +31,7 @@ the number down."* A score nobody can act on is a horoscope. This turns
 it into a coaching note. Needs the pipeline to send the per-feature
 comparison alongside the score.
 
-**2. Your ceiling and your floor.** Half the model is about consistency —
+**2. Your ceiling and your floor.** *(landed)* Half the model is about consistency —
 the five "how much do you swing" numbers — and none of it is visible.
 *"On your best day you play like a 74, on your worst like a 41"* is a
 genuinely interesting sentence, and it is the half most rating systems
@@ -45,7 +45,7 @@ that your third-shot drop lands 40% of the time and theirs lands 65%."*
 This is the most useful thing a skill model can tell an amateur, and it
 is mostly arithmetic over numbers that already exist.
 
-**4. Was that an upset?** With scores for all four players, the model can
+**4. Was that an upset?** *(landed)* With scores for all four players, the model can
 say what it expected before the match started, so a finished match can
 carry *"you were expected to lose this one"*. Beating someone stronger
 should feel different from beating someone weaker; today a win is a win.
@@ -144,7 +144,48 @@ and, checked against the group averages, agrees with them — but "what
 separates you from Ratings 37–91" reads oddly to someone rated 45. The
 naming, not the comparison, is what needs rethinking.
 
+## What 2 and 4 turned out to be
+
+**Idea 2 is better than the document imagined, and the reason is a
+coincidence of arithmetic.** Min-max scaling and a weighted sum are both
+affine, which means the average of a player's per-game scores is exactly
+their rating — not close to it, equal to it. So the page does not say
+"on your best day you play like a 74". It says: your rating IS the
+average of these nine games, here they are. The pipeline refuses to
+publish a run where that stops being true, which also catches the
+per-match arithmetic drifting away from the pipeline's own.
+
+Best-and-worst turned out to be the wrong headline. The median gap
+between a player's best and worst game on the staging pool is **40
+points** — a best game is one game, and one game is mostly luck. The
+middle half is the honest answer to "how well do I play", with the
+extremes shown beside it, named as extremes.
+
+Two surprises worth keeping. Single games regularly score **outside
+0–100**: the scale's ceiling is the best player's season average, so a
+strong player's good game beats it — the top player had three games over
+100 and a best of 113, and the weakest had one at −6. The strip is drawn
+over each player's own range rather than a fixed 0–100 for exactly that
+reason, and the page explains the overflow rather than hiding it.
+
+**Idea 4 needed checking before it was worth building, and it survived
+the check.** Over every completed match with a rating run before it —
+60 of them — the higher-rated side won 68%, and it graded properly:
+near-level matches were a coin flip, gaps over 10 points won 8 or 9
+times in 10. So the claim has something behind it.
+
+Two rules shape it. The expectation is read from the newest run that
+finished BEFORE the match, never the current one, which has already seen
+the result. And no figure about anybody leaves the server: in doubles a
+team average is two people, one of them the reader, so publishing a gap
+would hand over their partner's rating by subtraction. A verdict in
+words gives the player the thing worth having and nobody else's number.
+
+Half the staging matches get no verdict at all, because somebody on
+court was unrated at the time. They show nothing rather than a hedge.
+
 ## Still not started
 
-Ideas **2** (your ceiling and your floor), **4** (was that an upset),
-**5** (drop or drive) and **7** (partner fit).
+Ideas **5** (drop or drive) and **7** (partner fit). Idea 5 is the only
+one left that needs no model at all — it reads straight from the event
+log, so it is the one that would work the moment real matches exist.
