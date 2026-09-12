@@ -1198,6 +1198,53 @@ a.highlight:active { background: var(--surface); }
   flex: none;
 }
 .part-of { font-weight: 400; color: var(--text-muted); }
+/* Your measurement against your level, as a bar either side of centre.
+   The length comes from the gap in POINTS, which already carries the
+   direction -- the model subtracts mistakes rather than adding them --
+   so "right is better" holds on every row, including the two where
+   fewer is better. That is what lets the four rows be read against each
+   other, and what removed the per-row "of 30" nobody could parse. */
+.part-values { font-size: 0.8rem; font-variant-numeric: tabular-nums; flex: none; }
+.part-theirs { color: var(--text-muted); }
+.part-scale {
+  position: relative;
+  display: block;
+  height: 0.6rem;
+  margin-top: 0.35rem;
+}
+.part-axis {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 1px;
+  background: var(--surface-sunken);
+}
+/* The centre: where players at this level sit. */
+.part-scale::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--text-muted);
+  opacity: 0.5;
+}
+.part-arm {
+  position: absolute;
+  top: 50%;
+  height: 0.4rem;
+  margin-top: -0.2rem;
+  border-radius: 999px;
+}
+.part-arm.is-ahead { left: 50%; background: var(--primary); }
+.part-arm.is-behind { right: 50%; background: var(--text-muted); }
+
 .part-track {
   position: relative;
   display: block;
