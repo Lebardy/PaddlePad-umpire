@@ -89,7 +89,7 @@ function RatingHistory({ history }) {
         preserveAspectRatio="none"
         role="img"
         aria-label={
-          `Your skill score since ${since}, from ${first.skillScore} to ` +
+          `Your skill rating since ${since}, from ${first.skillScore} to ` +
           `${last.skillScore} out of 100 — ${describe(first, last)}.`
         }
       >
@@ -116,10 +116,10 @@ function RatingHistory({ history }) {
         {poolGrew ? (
           <>
             The pool grew from {first.poolSize} to {last.poolSize} — your
-            score can move when others play.
+            rating can move when others play.
           </>
         ) : (
-          <>Your score can move when others play, not only when you do.</>
+          <>Your rating can move when others play, not only when you do.</>
         )}
       </p>
     </div>
