@@ -66,14 +66,14 @@ const MEASURES = {
   net_game_preference_rate_std: { label: 'net play swing', as: 'swing', better: 'neither' },
 }
 
-// Said on every row, because a number with no direction is a number
-// nobody can act on. Most of these are style rather than quality: the
-// model works playstyles out separately from the score precisely so
-// that "steady" is not a better way to play than "streaky".
+// Said only where there IS a direction. Most of these measurements are
+// style rather than quality -- the model works playstyles out
+// separately from the score, so "steady" is not a better way to play
+// than "streaky" -- and a row that announced "neither is better" said
+// nothing while taking up the space of something that did.
 const DIRECTION = {
   higher: 'higher is better',
   lower: 'lower is better',
-  neither: 'neither is better — it is a style, not a score',
 }
 
 /**
@@ -278,7 +278,9 @@ function Playstyle({ standing }) {
               <div className="proof-head">
                 <span className="proof-word">{row.label}</span>
                 <span className="proof-measure">{measure.label}</span>
-                <span className="proof-better">{DIRECTION[measure.better]}</span>
+                {DIRECTION[measure.better] && (
+                  <span className="proof-better">{DIRECTION[measure.better]}</span>
+                )}
               </div>
 
               <ul className="proof-bars">
