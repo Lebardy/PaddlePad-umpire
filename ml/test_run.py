@@ -19,7 +19,14 @@ import pandas as pd
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from run import EVIDENCE_COLUMNS, NotEnoughData, apply_gate, run_pipeline, to_payload
+from run import (
+    EVIDENCE_COLUMNS,
+    SCORE_PARTS,
+    NotEnoughData,
+    apply_gate,
+    run_pipeline,
+    to_payload,
+)
 
 GATE = {"minMatchesPerPlayer": 5, "minPlayers": 3, "recommendedPlayers": 40}
 
@@ -109,7 +116,7 @@ check("the point-target mix is recorded", report["pointTargetMix"] == {"11": len
 
 print("\npipeline")
 
-final, evidence, structure = run_pipeline(gated)
+final, evidence, parts, structure = run_pipeline(gated)
 check("every player who went in came out",
       set(final["player_id"]) == set(gated["player_id"].unique()),
       f"{len(final)} out of {gated['player_id'].nunique()}")
@@ -141,7 +148,7 @@ else:
     for seed in range(1, 40):
         probe = synthetic_logs(num_players=60, matches_per_player=8, seed=seed)
         probe_gated, _ = apply_gate(probe, GATE)
-        probe_final, _, probe_structure = run_pipeline(probe_gated)
+        probe_final, _, _, probe_structure = run_pipeline(probe_gated)
         if len(probe_structure["skillGroups"]) >= 3:
             check("a three-group run keeps everyone (the bug the driver fixes)",
                   set(probe_final["player_id"]) == set(probe_gated["player_id"].unique()),
@@ -156,7 +163,7 @@ else:
 
 print("\npayload")
 
-payload = to_payload(final, evidence, report, structure, len(gated))
+payload = to_payload(final, evidence, parts, report, structure, len(gated))
 check("one rating per player", len(payload["ratings"]) == final["player_id"].nunique())
 check("scores are plain floats", all(isinstance(r["skillScore"], float)
                                      for r in payload["ratings"]))
@@ -203,6 +210,46 @@ check("a group too small to cluster has no traits either",
           for r in payload["ratings"] if not r["playstyleArchetype"]))
 print("       names this run produced: "
       + "; ".join(sorted({r["playstyleArchetype"] for r in named})))
+
+# ---- what the score is made of ----------------------------------
+#
+# The page built on this tells a player which of four things is lifting
+# their rating and which is holding it down. That claim is only true if
+# the four parts ARE the score rather than four numbers shown near it,
+# so the arithmetic is asserted here and the run refuses to publish when
+# it stops holding (see run.build_score_parts).
+rated = payload["ratings"]
+check("every player carries all four parts of their score",
+      all(set(r["scoreParts"]) == {key for key, *_ in SCORE_PARTS} for r in rated),
+      str(sorted(rated[0]["scoreParts"])))
+check("the four parts add up to the score itself",
+      all(abs(sum(part["points"] for part in r["scoreParts"].values())
+              - r["skillScore"]) < 0.05
+          for r in rated),
+      str([(round(sum(p["points"] for p in r["scoreParts"].values()), 2), r["skillScore"])
+           for r in rated[:3]]))
+check("no part can be worth more than its share of 100",
+      all(0 <= part["points"] <= part["max"] + 0.01
+          for r in rated for part in r["scoreParts"].values()),
+      str([(k, p["points"], p["max"]) for k, p in rated[0]["scoreParts"].items()]))
+check("the shares themselves add to 100",
+      abs(sum(part["max"] for part in rated[0]["scoreParts"].values()) - 100) < 0.01,
+      str({k: p["max"] for k, p in rated[0]["scoreParts"].items()}))
+# Someone has to be at each end: min-max normalization gives the pool's
+# best on a measurement full marks for it and the pool's worst none. The
+# app says so rather than letting a player read 25/25 as perfection.
+check("the pool's best and worst on a part really do sit at the ends",
+      any(part["points"] >= part["max"] - 0.01
+          for r in rated for part in r["scoreParts"].values())
+      and any(part["points"] <= 0.01
+              for r in rated for part in r["scoreParts"].values()))
+check("parts carry the player's own measurement, not just points",
+      all(isinstance(part["value"], float) for r in rated
+          for part in r["scoreParts"].values()),
+      str(rated[0]["scoreParts"]))
+check("drops landing is a proportion and the rates are per minute",
+      rated[0]["scoreParts"]["dropsLanding"]["unit"] == "proportion"
+      and rated[0]["scoreParts"]["winningShots"]["unit"] == "per_minute")
 
 check("the run records the conditions it ran under",
       payload["notes"]["gate"]["playersQualifying"] == 60,

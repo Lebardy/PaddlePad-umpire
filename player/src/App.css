@@ -1174,6 +1174,71 @@ a.highlight:active { background: var(--surface); }
 .ladder-name svg { color: var(--primary); flex: none; }
 .ladder-range { font-variant-numeric: tabular-nums; }
 
+/* ---- What the rating is made of ---- */
+
+/* One track per part, filled to the points earned out of the points
+   available, with a tick where players at this level average. The bar
+   answers "how much is left on the table" and the tick answers
+   "is that unusual" -- which is the difference between a number and
+   something to go and practise. */
+.parts { margin-top: 0.9rem; }
+.parts-list { list-style: none; padding: 0; margin: 0.6rem 0 0; }
+.part + .part { margin-top: 0.75rem; }
+.part-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.part-label { font-size: 0.85rem; font-weight: 600; }
+.part-points {
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+.part-of { font-weight: 400; color: var(--text-muted); }
+.part-track {
+  position: relative;
+  display: block;
+  height: 0.5rem;
+  margin-top: 0.3rem;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+}
+.part-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+}
+/* The group's average. A tick rather than a second bar: four parts
+   would otherwise be eight bars, and the comparison is a position,
+   not a quantity of its own. */
+.part-mark {
+  position: absolute;
+  top: -0.15rem;
+  width: 2px;
+  height: 0.8rem;
+  border-radius: 1px;
+  background: var(--text);
+  opacity: 0.55;
+}
+.part-note {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-top: 0.25rem;
+}
+
+.next-group {
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+.next-head { font-size: 0.88rem; font-weight: 700; }
+.next-group .step-line { margin-top: 0.35rem; }
+
 /* ---- Proof for the playstyle name ---- */
 
 /* Bars rather than figures. The measurement behind "Steady" is the

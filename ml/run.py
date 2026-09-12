@@ -29,7 +29,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from pipeline.player_profiles import aggregate_player_profiles
-from pipeline.skill_model import build_skill_model
+from pipeline.skill_model import SKILL_WEIGHTS, build_skill_model, min_max_normalize
 from pipeline.feature_engineering import (
     create_ml_features,
     prepare_for_ml,
@@ -71,6 +71,93 @@ EVIDENCE_COLUMNS = [
     "net_game_preference_rate_mean",
     "net_game_preference_rate_std",
 ]
+
+
+# ============================================================
+# What the score is made of
+# ============================================================
+#
+# The skill score is a weighted sum of exactly FOUR measurements and
+# nothing else (see skill_model.calculate_skill_score). The other six in
+# EVIDENCE_COLUMNS shape the CLUSTERING -- which group and which
+# playstyle -- and never touch the number itself.
+#
+# Which means a breakdown of the score is not an estimate of what moved
+# it, nor a correlation found after the fact. It is the score's own
+# arithmetic written out, and the four parts add up to the number
+# exactly. That is asserted below rather than assumed.
+#
+# Each entry: the app's key, the profile column, the weight's key, and
+# whether a LOWER value is the better one -- the two error rates are
+# subtracted from the score rather than added to it.
+SCORE_PARTS = [
+    ("dropsLanding", "drop_efficiency_mean", "drop_efficiency", False),
+    ("winningShots", "winner_rate_mean", "winner_rate", False),
+    ("mistakes", "general_error_rate_mean", "general_error", True),
+    ("netMistakes", "dink_error_rate_mean", "dink_error", True),
+]
+
+# Two of the four are per-minute rates and two are proportions, and a
+# player should never have to work out which. Sent with the numbers so
+# the app is not the only place that knows.
+SCORE_PART_UNITS = {
+    "dropsLanding": "proportion",
+    "winningShots": "per_minute",
+    "mistakes": "per_minute",
+    "netMistakes": "per_minute",
+}
+
+
+def build_score_parts(skill_profiles):
+    """
+    Each player's score, broken into the four parts it is a sum of.
+
+    Returns {player_id: {part: {"value", "points", "max", "unit"}}},
+    where `value` is the player's own measurement in its natural units
+    and `points` is what that measurement contributed to their 0-100
+    score.
+
+    The normalization is min-max across the pool, exactly as the scoring
+    does it, which is why this reuses those functions instead of
+    restating the arithmetic: the best drop rate in the pool earns the
+    full 25 points by definition, not by being perfect. The app has to
+    say so, and does.
+    """
+    totals = pd.Series(0.0, index=skill_profiles.index)
+    computed = {}
+
+    for key, column, weight_key, lower_is_better in SCORE_PARTS:
+        share = min_max_normalize(skill_profiles[column])
+        if lower_is_better:
+            share = 1 - share
+        points = share * SKILL_WEIGHTS[weight_key] * 100
+        computed[key] = (skill_profiles[column], points, SKILL_WEIGHTS[weight_key] * 100)
+        totals = totals + points
+
+    # The breakdown has to BE the score, not a story told beside it.
+    # If the scoring ever gains a fifth term and this does not, the app
+    # would go on confidently explaining a number it no longer
+    # describes -- so the run stops here rather than publishing that.
+    drift = (totals - skill_profiles["skill_score"]).abs().max()
+    if drift > 0.05:
+        raise RuntimeError(
+            "The score parts do not add up to the skill score -- off by "
+            f"{drift:.4f} at worst. skill_model.calculate_skill_score has "
+            "changed and run.SCORE_PARTS has not."
+        )
+
+    return {
+        player_id: {
+            key: {
+                "value": None if pd.isna(values.loc[i]) else float(values.loc[i]),
+                "points": round(float(points.loc[i]), 2),
+                "max": float(cap),
+                "unit": SCORE_PART_UNITS[key],
+            }
+            for key, (values, points, cap) in computed.items()
+        }
+        for i, player_id in skill_profiles["player_id"].items()
+    }
 
 
 class NotEnoughData(Exception):
@@ -304,19 +391,26 @@ def run_pipeline(gated_df):
     # compare to the pool after skill was projected out.
     evidence = playstyle_features.set_index("player_id")[EVIDENCE_COLUMNS]
 
+    # The score's own arithmetic, written out per player. Computed from
+    # skill_profiles rather than from `final` for the same reason the
+    # evidence is: `final` carries scaled and residualized columns under
+    # these names, and a breakdown built from those would describe the
+    # clustering input rather than the score.
+    parts = build_score_parts(skill_profiles)
+
     report = {
         "skillGroups": groups,
         "skillK": int(best_skill_k),
         "groupsTooSmallToCluster": unclustered,
     }
-    return final, evidence, report
+    return final, evidence, parts, report
 
 
 # ============================================================
 # Publishing
 # ============================================================
 
-def to_payload(final, evidence_df, gate_report, structure_report, match_count):
+def to_payload(final, evidence_df, parts, gate_report, structure_report, match_count):
     missing = [c for c in EVIDENCE_COLUMNS if c not in evidence_df.columns]
     if missing:
         # Loud rather than an empty dict. The first version of this
@@ -348,6 +442,10 @@ def to_payload(final, evidence_df, gate_report, structure_report, match_count):
             # a group too small to cluster -- which has no name either.
             "playstyleTraits": traits if isinstance(traits, list) else None,
             "evidence": evidence,
+            # The four measurements the score is a weighted sum of, each
+            # with what it contributed. Where evidence explains the
+            # archetype, this explains the NUMBER -- see SCORE_PARTS.
+            "scoreParts": parts.get(row["player_id"]),
             "matchCount": int(row.get("match_count") or 0),
         })
 
@@ -402,14 +500,16 @@ def run(api_url=None, api_key=None, publish=True):
     gate_report = None
     try:
         gated, gate_report = apply_gate(match_df, gate)
-        final, evidence, structure = run_pipeline(gated)
+        final, evidence, parts, structure = run_pipeline(gated)
     except NotEnoughData as reason:
         print(f"Gate held: {reason}")
         if publish:
             post_failure(api_url, api_key, str(reason), gate_report)
         return {"status": "gated", "reason": str(reason), "gate": gate_report}
 
-    payload = to_payload(final, evidence, gate_report, structure, int(len(gated)))
+    payload = to_payload(
+        final, evidence, parts, gate_report, structure, int(len(gated))
+    )
     print(
         f"Rated {payload['playerCount']} players "
         f"in {(datetime.now(timezone.utc) - started).total_seconds():.1f}s."

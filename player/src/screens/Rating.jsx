@@ -23,6 +23,18 @@
 // clustering separated them from. Nobody's individual numbers but their
 // own; see server/src/playstyle.js.
 //
+// Steps 1 and 2 each answer one more question, from the same arithmetic:
+//
+//   under the score   what is moving MY number -- the four measurements
+//                     it is a weighted sum of, against the average of
+//                     players at my level
+//   under the ladder  what separates me from the group above -- the
+//                     same four, against the rung up
+//
+// Neither is a guess about what correlates with a rating. The score IS
+// those four parts added up, and the pipeline refuses to publish a run
+// where they do not add up to it. See server/src/rating-parts.js.
+//
 // It never shows a ranking and never anyone else's score. Why is one
 // tap away at the bottom.
 // ============================================================
@@ -98,6 +110,55 @@ function showValue(value, as) {
 }
 
 /**
+ * One of the four measurements behind the rating, in its own units.
+ *
+ * Two of them are per-MINUTE rates, which are real and unreadable at
+ * that scale: "0.28 winning shots a minute" is not a number anyone
+ * holds in their head. Ten minutes is roughly a game, which is a length
+ * people already think in, so that is what they are shown in.
+ */
+function partValue(value, unit) {
+  if (value === null || value === undefined) return '—'
+  if (unit === 'proportion') return `${Math.round(value * 100)}%`
+  if (unit === 'per_minute') return `${(value * 10).toFixed(1)} per 10 min`
+  return value.toFixed(2)
+}
+
+/**
+ * Which part gains the most on a comparison group, and which loses the
+ * most to it.
+ *
+ * Measured in POINTS rather than in the measurements themselves, which
+ * is what makes the two comparable at all: a drop rate and a mistake
+ * rate are different quantities pointing in opposite directions, but
+ * the points each contributed to the score are the same currency, and
+ * already carry the direction (the model subtracts mistakes rather than
+ * adding them). So "6 points more" and "5 points less" can be read
+ * beside each other without anybody being misled.
+ *
+ * Either can be null: a player above their group on all four parts has
+ * nothing dragging the number down, and saying otherwise would be
+ * false. Those cases are said differently rather than forced.
+ */
+function gainsAndLosses(parts, which) {
+  let best = null
+  let worst = null
+  for (const part of parts) {
+    const them = part[which]
+    if (!them || !Number.isFinite(them.points)) continue
+    const diff = part.you.points - them.points
+    if (diff > 0 && (!best || diff > best.diff)) best = { part, diff }
+    if (diff < 0 && (!worst || diff < worst.diff)) worst = { part, diff }
+  }
+  return { best, worst }
+}
+
+/** Points read as whole numbers where they are whole. */
+function points(value) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
+
+/**
  * What to call a group: the scores it covers.
  *
  * Not "Middle of three" or "Higher scores", both of which were read
@@ -137,6 +198,155 @@ function BackLink() {
   )
 }
 
+/**
+ * What the number is made of, under the number.
+ *
+ * A rating nobody can act on is a horoscope. These four are the whole
+ * of it -- the score is their sum, not a model of them -- so naming the
+ * one earning the most and the one costing the most turns a verdict
+ * into something to work on.
+ *
+ * The bar is the share of that part's own points earned, and the tick
+ * is the average for players at this level. Both matter: the bar says
+ * how much is left on the table, the tick says whether that is unusual.
+ */
+function Parts({ parts }) {
+  const { best, worst } = gainsAndLosses(parts.parts, 'group')
+  const compared = parts.groupAveraged
+
+  return (
+    <div className="parts">
+      <p className="step-line">
+        Four things are added up to make it, and nothing else is.
+      </p>
+
+      <ul className="parts-list" aria-label="What the rating is made of">
+        {parts.parts.map((part) => {
+          const share = Math.max(0, Math.min(1, part.you.points / part.max))
+          const theirs = part.group
+            ? Math.max(0, Math.min(1, part.group.points / part.max))
+            : null
+          return (
+            <li key={part.key} className="part">
+              <div className="part-head">
+                <span className="part-label">{part.label}</span>
+                <span className="part-points">
+                  {points(part.you.points)}
+                  <span className="part-of"> of {points(part.max)}</span>
+                </span>
+              </div>
+              <span
+                className="part-track"
+                role="img"
+                aria-label={`${points(part.you.points)} of ${points(part.max)} points`}
+              >
+                <span className="part-fill" style={{ width: `${share * 100}%` }} />
+                {theirs !== null && (
+                  <span className="part-mark" style={{ left: `${theirs * 100}%` }} />
+                )}
+              </span>
+              <p className="part-note">
+                Yours: {partValue(part.you.value, part.unit)}
+                {part.group
+                  ? `. Your level averages ${partValue(part.group.value, part.unit)}.`
+                  : '.'}
+              </p>
+            </li>
+          )
+        })}
+      </ul>
+
+      {compared && (
+        <p className="step-line">
+          {best
+            ? `Where you gain most on players at your level: ${best.part.label}, ${points(best.diff)} points above their average.`
+            : 'No part of your rating is ahead of the average for your level yet.'}
+          {' '}
+          {worst
+            ? `Where you lose most: ${worst.part.label}, ${points(Math.abs(worst.diff))} points below.`
+            : 'Every part of it is at or above that average.'}
+        </p>
+      )}
+
+      <More label="What does 'of 30' mean?">
+        <p>
+          Each of the four is worth a fixed share of the 100: winning shots
+          30, drop shots landing 25, mistakes at the net 25, mistakes away
+          from the net 20. That split is the model&rsquo;s, not the
+          app&rsquo;s.
+        </p>
+        <p>
+          Full marks on one of them means <em>best of everyone rated</em>,
+          not perfect — each part is measured from the highest and lowest in
+          the pool. So these move when other people play, the same way the
+          rating does.
+        </p>
+        {!compared && (
+          <p>
+            Your group is too small to average without describing one
+            person, so there is nothing to compare yours against yet. It
+            needs three rated players.
+          </p>
+        )}
+        <p>
+          A mistake at the net and a mistake anywhere else are counted
+          separately, and never both.
+        </p>
+      </More>
+    </div>
+  )
+}
+
+/**
+ * What separates this player from the rung above -- idea 3, and the
+ * most useful thing a skill model can tell an amateur.
+ *
+ * The biggest gap by itself, because four gaps is a table and one gap
+ * is a thing to go and practise. The rest sit behind the tap for
+ * anyone who wants to check that the biggest really is the biggest.
+ */
+function NextGroup({ parts, name }) {
+  const { worst } = gainsAndLosses(parts.parts, 'above')
+  if (!worst) return null
+
+  return (
+    <div className="next-group">
+      <h3 className="next-head">What separates you from {name}</h3>
+      <p className="step-line">
+        The biggest single gap is <strong>{worst.part.label}</strong>: theirs
+        averages {partValue(worst.part.above.value, worst.part.unit)}, yours is{' '}
+        {partValue(worst.part.you.value, worst.part.unit)}. That one part is{' '}
+        {points(Math.abs(worst.diff))} points of the difference.
+      </p>
+
+      <More label="The other three">
+        <ul className="proof-figures">
+          {parts.parts
+            .filter((part) => part.key !== worst.part.key && part.above)
+            .map((part) => {
+              const diff = part.you.points - part.above.points
+              return (
+                <li key={part.key}>
+                  <strong>{part.label}</strong>: theirs{' '}
+                  {partValue(part.above.value, part.unit)}, yours{' '}
+                  {partValue(part.you.value, part.unit)} —{' '}
+                  {diff >= 0
+                    ? `${points(diff)} points ahead of them`
+                    : `${points(Math.abs(diff))} points behind`}
+                  .
+                </li>
+              )
+            })}
+        </ul>
+        <p>
+          Averages of that group, never anyone&rsquo;s own numbers. A group
+          of fewer than three is never averaged at all.
+        </p>
+      </More>
+    </div>
+  )
+}
+
 /** Step 1: the score, and where it sits among everyone rated. */
 function Score({ rating, standing }) {
   const shown = useCountUp(rating.skillScore)
@@ -171,6 +381,12 @@ function Score({ rating, standing }) {
           ? 'You are the only rated player so far.'
           : `Your rating is higher than ${standing.below} of the ${others} other rated players.`}
       </p>
+
+      {/* Null for a run published before the pipeline sent the
+          breakdown. Nothing is said about it: the score above is still
+          true, and an apology for a missing panel is worse than the
+          panel simply not being there. */}
+      {standing.parts && <Parts parts={standing.parts} />}
     </Step>
   )
 }
@@ -179,6 +395,7 @@ function Score({ rating, standing }) {
 function Group({ standing }) {
   const groups = standing.groups ?? []
   const mine = groups.findIndex((group) => group.name === standing.band?.name)
+  const above = mine === -1 ? null : (groups[mine + 1] ?? null)
 
   return (
     <Step
@@ -206,6 +423,18 @@ function Group({ standing }) {
         Everyone rated is split into a few groups by results first, and
         these are the ratings each group covers.
       </p>
+
+      {/* The rung above, named from the ladder rather than from
+          anything the server sends -- so it keeps working whatever
+          number of groups the clustering settles on. Nothing at all
+          when there is no group above, which is a fact worth reading
+          on its own. */}
+      {standing.parts && above && (
+        <NextGroup parts={standing.parts} name={groupName(above)} />
+      )}
+      {standing.parts && mine !== -1 && !above && (
+        <p className="step-line">There is no group above yours.</p>
+      )}
 
       <More label="Why groups?">
         <p>

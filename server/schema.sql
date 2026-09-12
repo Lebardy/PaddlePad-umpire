@@ -528,5 +528,12 @@ CREATE TABLE IF NOT EXISTS player_ratings (
 -- says so rather than inventing a reason.
 ALTER TABLE player_ratings ADD COLUMN IF NOT EXISTS playstyle_traits JSONB;
 
+-- The four measurements the skill score is a weighted sum of, each with
+-- the player's own value and the points it contributed. Where
+-- `evidence` explains the ARCHETYPE, this explains the NUMBER: the four
+-- add up to skill_score exactly, and the pipeline refuses to publish a
+-- run where they do not. Null for runs published before it sent them.
+ALTER TABLE player_ratings ADD COLUMN IF NOT EXISTS score_parts JSONB;
+
 CREATE INDEX IF NOT EXISTS player_ratings_player_idx
     ON player_ratings (player_id);
