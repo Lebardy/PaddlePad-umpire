@@ -18,6 +18,8 @@
 //   6. a game to 15 is not declared won at 11            (point_target)
 // ============================================================
 
+import { RALLY_ENDINGS, rallyEndingColumn } from '../src/rally-endings.js'
+
 const API = (process.argv[2] ?? process.env.API_URL ?? 'http://localhost:3000').replace(/\/$/, '')
 
 let pass = 0
@@ -595,6 +597,9 @@ async function main() {
     'match_duration_mins', 'uses_stacking',
     'team', 'won', 'partner_id', 'opponent_1_id', 'opponent_2_id',
     'ended_at', 'point_target',
+    // How each rally ended, one count per ending, after everything the
+    // pipeline already reads (see rally-endings.js).
+    ...RALLY_ENDINGS.map((ending) => rallyEndingColumn(ending.key)),
   ].join(',')
   check('csv header is exactly the expected columns, in order',
     lines[0] === expectedHeader, lines[0])

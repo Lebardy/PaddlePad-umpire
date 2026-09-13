@@ -1469,6 +1469,115 @@ section {
 .guide-terms dt { font-weight: 700; font-size: 0.98rem; }
 .guide-terms dd { margin: 0.15rem 0 0; font-size: 0.92rem; line-height: 1.55; color: var(--text-muted); }
 
+/* ============ The scoring block ============ */
+
+/* Everything tapped during a rally. On a phone it simply stacks and
+   scrolls; on a tablet it is arranged to fit one screen with nothing
+   below the fold that a rally needs -- in either orientation, because
+   a tablet courtside gets turned whichever way the stand allows. */
+.scoring {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.scoring-status {
+  display: grid;
+  gap: 0.6rem;
+  align-content: start;
+  min-width: 0;
+}
+.scoring .scoreboard,
+.scoring .serve-note,
+.scoring .last-logged,
+.scoring .match-complete,
+.scoring .rally-log,
+.scoring .who-picker,
+.scoring .scoring-third { margin: 0; }
+.scoring-rally,
+.scoring-third { min-width: 0; }
+.scoring-third h3 { margin-bottom: 0.45rem; }
+.third-shot-hint {
+  margin-left: 0.35rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  opacity: 0.85;
+}
+
+/* Tablet, portrait: one column, but tight. The two teams sit side by
+   side, the serve line shares a row with undo, and the ending buttons
+   run four across. */
+@media (min-width: 700px) and (orientation: portrait) {
+  .app-main--full { padding-top: 0.5rem; }
+  .live-match > .back-link { padding: 0.2rem 0; }
+
+  .scoring-status {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+  }
+  .scoring-status .scoreboard,
+  .scoring-status .match-complete { grid-column: 1 / -1; }
+  .scoring .scoreboard { grid-template-columns: 1fr 1fr; }
+
+  .ending-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.45rem; }
+  .ending-group + .ending-group { margin-top: 0.6rem; }
+  .ending-btn { min-height: 4.1rem; font-size: 1.05rem; }
+  .ending-group-title { margin-bottom: 0.4rem; }
+
+  .third-shot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+  .player-panel { padding: 0.55rem; }
+  .player-panel-name { margin-bottom: 0.35rem; }
+  .player-panel-outcomes .outcome-btn { min-height: 3rem; }
+}
+
+/* Tablet, landscape: two columns. Score, undo and the third shot down
+   the left, where a glance lands first; every ending (or the "who"
+   step, in the same place) across the wider right. */
+@media (min-width: 900px) and (orientation: landscape) and (min-height: 521px) {
+  .app-main--full { padding-top: 0.5rem; }
+  .live-match > .back-link { padding: 0.2rem 0; }
+
+  .scoring.is-live {
+    grid-template-columns: minmax(19rem, 0.85fr) minmax(0, 1.6fr);
+    grid-template-areas:
+      'status rally'
+      'third  rally';
+    grid-template-rows: auto 1fr;
+    align-items: start;
+    column-gap: 1rem;
+  }
+  .scoring-status { grid-area: status; }
+  .scoring-rally { grid-area: rally; }
+  .scoring-third { grid-area: third; }
+
+  .scoring .score-side { padding: 0.55rem 1rem; }
+  .scoring .score-value { font-size: 3.6rem; }
+
+  .ending-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem; }
+  .ending-group + .ending-group { margin-top: 0.75rem; }
+  .ending-btn { min-height: 4.5rem; font-size: 1.08rem; }
+  .ending-group-title { margin-bottom: 0.4rem; }
+
+  .third-shot-grid { grid-template-columns: 1fr; gap: 0.45rem; }
+  .player-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 5.5rem) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.5rem;
+  }
+  .player-panel-name { margin: 0; font-size: 0.95rem; }
+  .player-panel-outcomes { gap: 0.35rem; }
+  .player-panel-outcomes .outcome-btn {
+    min-height: 2.9rem;
+    padding-inline: 0.25rem;
+    font-size: 0.95rem;
+    white-space: nowrap;
+  }
+
+  .who-btn { min-height: 5rem; font-size: 1.2rem; }
+}
+
 /* ============ Narrow phones ============ */
 
 /* Paired action buttons stack rather than squeeze. A truncated "No,
