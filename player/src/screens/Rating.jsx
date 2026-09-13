@@ -459,7 +459,7 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
       {/* Nothing recorded is said, not drawn as an empty bar that would
           read as zero: no third shots logged is not "never drops". */}
       {row.you === null ? (
-        <p className="proof-verdict">Nothing recorded for you yet.</p>
+        <p className="proof-verdict">Nothing recorded for this yet.</p>
       ) : (
         <ul className="proof-bars">
           {bars.map((bar) => (
