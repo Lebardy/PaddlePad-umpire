@@ -14,9 +14,13 @@ import {
   ACTOR_SHARE,
   DEFAULT_K,
   ENDING_WEIGHTS,
+  MIN_MATCHES,
+  MOVED_MOST_MIN_RALLIES,
   START_POINTS,
   endingWeight,
   expectedWin,
+  movedMost,
+  rallyRatingFor,
   rateHistory,
 } from '../src/rally-rating.js'
 import { RALLY_ENDINGS, rallyEnding } from '../src/rally-endings.js'
@@ -173,6 +177,49 @@ section('Order, history and the summary fields')
   check('recentChange is points now minus the start when there are fewer than 5 matches',
     forward.get(A1).recentChange, Math.round(forward.get(A1).rawPoints - START_POINTS),
     'With only two matches, the change is since their first.')
+}
+
+section('What a player is sent')
+{
+  const four = Array.from({ length: 4 }, () => match([rally(A1, 'putaway')]))
+  const unrated = rallyRatingFor(rateHistory(four), A1)
+  check('under 5 matches a player is not rated yet',
+    unrated, { state: 'not_enough_matches', have: 4, need: MIN_MATCHES },
+    'The same floor the pipeline uses; the app shows progress towards it.')
+
+  const five = [...four, match([rally(A1, 'net')])]
+  const rated = rallyRatingFor(rateHistory(five), A1)
+  check('at 5 matches the player is rated',
+    rated.state, 'rated', 'Five counted matches is enough.')
+  check('the response carries exactly the agreed fields',
+    Object.keys(rated).sort(),
+    ['matches', 'points', 'rallies', 'recentChange', 'state', 'trend', 'winChanceVsStart'],
+    'Nothing about anyone else, and no movedMost unless asked for.')
+  check('winChanceVsStart is a whole percentage against a 1500 player',
+    rated.winChanceVsStart, Math.round(expectedWin(rateHistory(five).get(A1).rawPoints, START_POINTS) * 100),
+    'This is the "54 of every 100 rallies" sentence.')
+  check('a player nobody has seen is not rated',
+    rallyRatingFor(rateHistory(five), randomUUID()), { state: 'not_enough_matches', have: 0, need: MIN_MATCHES },
+    'A brand new player has no matches yet.')
+
+  check('movedMost is withheld under 20 rallies with an ending',
+    movedMost(rateHistory(five).get(A1)), null,
+    'Naming a habit from five rallies would be guessing.')
+
+  const many = Array.from({ length: 6 }, () =>
+    match([rally(A1, 'putaway'), rally(A1, 'putaway'), rally(A1, 'lob'), rally(A1, 'net'), rally(A1, 'kitchen')]),
+  )
+  const rich = rateHistory(many).get(A1)
+  const moved = movedMost(rich)
+  check('with enough rallies it names the top gains and costs',
+    [moved.gained.map((g) => g.ending), moved.cost.map((c) => c.ending)],
+    [['putaway', 'lob'], ['kitchen', 'net']],
+    'Put-aways earned the most; the heavier kitchen fault cost more than hitting into the net.')
+  check('points in movedMost are whole numbers',
+    moved.gained.every((g) => Number.isInteger(g.points)), true, 'Players never see decimals.')
+  check('the standing response includes movedMost when asked',
+    'movedMost' in rallyRatingFor(rateHistory(many), A1, { withMovedMost: true }), true,
+    'Only the rating screen needs it.')
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
