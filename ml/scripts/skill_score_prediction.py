@@ -46,7 +46,6 @@ if "player_id" not in scored.columns:
 skill = dict(zip(scored["player_id"], scored["skill_score"]))
 
 right = total = 0
-brier = 0.0
 for match_id in split["test"]:
     group = rows[rows["match_id"] == match_id]
     if group.empty:
@@ -67,17 +66,21 @@ for match_id in split["test"]:
     a_won = int(float(won)) == 1
     total += 1
     right += int((mean_a > mean_b) == a_won)
-    # The score is 0-100, not a probability; a logistic on the gap gives
-    # Brier something comparable to the rally rating's chance.
-    chance_a = 1 / (1 + math.exp(-(mean_a - mean_b) / 10))
-    brier += (chance_a - (1 if a_won else 0)) ** 2
 
-accuracy = right / total if total else float("nan")
+if total == 0:
+    print("no later match had both sides' skill scores; cannot report an accuracy", file=sys.stderr)
+    sys.exit(1)
+
+accuracy = right / total
 z = 1.96
 centre = (accuracy + z * z / (2 * total)) / (1 + z * z / total)
 half = z * math.sqrt(accuracy * (1 - accuracy) / total + z * z / (4 * total * total)) / (1 + z * z / total)
 print(f"old skill score on later matches: {accuracy:.1%} of {total} "
-      f"(95% range {centre - half:.0%}-{centre + half:.0%}), Brier {brier / total:.3f}")
+      f"(95% range {centre - half:.0%}-{centre + half:.0%})")
+# The skill score is 0-100, not a probability, and there is no agreed way
+# to turn its gap into one, so only accuracy (which side it points to) is
+# compared -- no Brier score.
+print("(accuracy only -- the skill score is not a match-win probability, so no Brier score is reported)")
 
 truth_path = Path(sys.argv[2]).with_name(".sim-pool-truth.json")
 if truth_path.exists():
