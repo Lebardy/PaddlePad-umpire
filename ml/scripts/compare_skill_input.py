@@ -7,7 +7,8 @@ Would using the rally rating inside the pipeline change its results?
 Read-only, and changes nothing in the pipeline. Runs run.run_pipeline
 twice on the same staging match logs:
 
-  A. exactly as the nightly job does, with the old skill score;
+  A. with the old skill score doing both jobs, as the nightly job did
+     before rally points named its groups;
   B. with each player's rally points standing in for skill_score.
 
 K-Means itself never reads the score and uses a fixed random_state, so
@@ -42,7 +43,7 @@ rows["ended_at"] = rows["ended_at"].astype(str)
 counts = rows.groupby("player_id")["match_id"].nunique()
 gated = rows[rows["player_id"].isin(counts[counts >= MIN_MATCHES].index)].copy()
 
-# ---- A: the pipeline as it is ----
+# ---- A: the old score for everything (no rally points passed) ----
 final_a, *_ = run.run_pipeline(gated)
 
 # ---- B: rally points in place of the old score ----

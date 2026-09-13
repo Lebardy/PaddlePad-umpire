@@ -195,8 +195,9 @@ function points(value) {
  * which point the pipeline's own labels degrade to "Performance Group
  * 4" and mean nothing to anybody.
  *
- * The percentile is not lost; it moves into "Why groups?" with the
- * model's own label, where a reader who wants it will look.
+ * The percentile went too, once the old score stopped being shown at
+ * all: groups are put in order by rally points, and a percentile of the
+ * old score could say a group was lower than the rung beneath it.
  */
 const STEPS = ['', 'A step', 'Two steps', 'Three steps', 'Four steps']
 
@@ -393,19 +394,11 @@ function Group({ standing }) {
           players at this level rather than steady compared with everyone. It
           is also why the name below starts with your group&rsquo;s own word.
         </p>
-        {/* The numbers the rungs used to be named after. Real, and
-            worth having, but they made a reader decode a label before
-            it meant anything -- so they live down here now, where
-            somebody who wants them will look. */}
-        {mine !== -1 && Number.isFinite(groups[mine].percentile) && (
-          <p>
-            Your group&rsquo;s middle sits higher than{' '}
-            <strong>{groups[mine].percentile}%</strong> of everyone rated, and
-            covers ratings {groups[mine].lowest}–{groups[mine].highest}. Those
-            ranges overlap between groups, which is the same thing said another
-            way: the rating is not what decides the group.
-          </p>
-        )}
+        <p>
+          Which group sits higher is decided by the average rally points of the
+          players in it. The points only put the groups in order — they never
+          decide who is in which group.
+        </p>
         {standing.band?.name && (
           <p>
             The model&rsquo;s own name for your group is{' '}
