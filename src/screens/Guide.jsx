@@ -8,8 +8,8 @@
 // and first server as bare labels.
 //
 // This is the long version. The short one now sits on the scoring
-// screen itself: the same 2x2 of won/lost against dink/not, built from
-// the same list in lib/outcomes.js, so an umpire who is unsure
+// screen itself: every way a rally can end, built from the same list in
+// lib/outcomes.js, so an umpire who is unsure
 // mid-rally does not have to leave the match to find out. What is here
 // and not there is everything that is not urgent -- how a night runs,
 // fixing mistakes, signal, codes.
@@ -27,8 +27,7 @@
 // MatchSetup change, this has to change with them.
 // ============================================================
 
-import { Fragment } from 'react'
-import { OUTCOMES, RALLY_RULE, outcomeFor } from '../lib/outcomes'
+import { FAULT_ENDINGS, RALLY_RULE, WINNING_ENDINGS } from '../lib/outcomes'
 
 const STEPS = [
   {
@@ -44,15 +43,15 @@ const STEPS = [
     body: 'Choose singles or doubles, pick the teams, and say who serves first. That is the whole setup.',
   },
   {
-    title: 'Tap once per rally',
-    body: 'When a rally ends, tap the button under whoever hit the last shot. The score, the serve and every statistic come from those taps.',
+    title: 'Two taps per rally',
+    body: 'When a rally ends, tap what ended it, then tap the player. The score, the serve and every statistic come from those taps.',
   },
 ]
 
 const TERMS = [
   {
-    term: 'Dink or clean',
-    body: 'A dink is a soft shot at the net. Clean means every other shot. It is about where the shot was played, not how good it was.',
+    term: 'Dink',
+    body: 'A soft shot at the net. Dink winner and Missed dink are the two endings about them; every other ending is a shot played anywhere else.',
   },
   {
     term: 'Third shot',
@@ -108,40 +107,35 @@ function Guide({ onBack }) {
         </ol>
       </section>
 
-      <section className="guide-section" aria-label="The four buttons">
-        <h3>The four buttons</h3>
+      <section className="guide-section" aria-label="Scoring a rally">
+        <h3>Scoring a rally</h3>
         <p>{RALLY_RULE}</p>
-        <div className="rally-legend-grid guide-legend-grid">
-          <span />
-          <span className="rally-legend-head">Won the rally</span>
-          <span className="rally-legend-head">Lost the rally</span>
-          {[true, false].map((dink) => (
-            <Fragment key={String(dink)}>
-              <span className="rally-legend-row">
-                {dink ? 'Soft shot at the net' : 'Any other shot'}
-              </span>
-              {[true, false].map((won) => (
-                <span
-                  key={String(won)}
-                  className={`rally-legend-cell ${won ? 'winner' : 'error'}`}
-                >
-                  {outcomeFor(won, dink).label}
-                </span>
+        {[
+          ['Won with a shot', WINNING_ENDINGS],
+          ['Lost by a fault', FAULT_ENDINGS],
+        ].map(([title, endings]) => (
+          <div key={title}>
+            <h4 className="guide-subhead">{title}</h4>
+            <dl className="guide-terms">
+              {endings.map((ending) => (
+                <div key={ending.key}>
+                  <dt>{ending.label}</dt>
+                  <dd>{ending.help}</dd>
+                </div>
               ))}
-            </Fragment>
-          ))}
-        </div>
-        <dl className="guide-terms">
-          {OUTCOMES.map((o) => (
-            <div key={o.label}>
-              <dt>{o.label}</dt>
-              <dd>{o.help}</dd>
-            </div>
-          ))}
-        </dl>
+            </dl>
+          </div>
+        ))}
+        <p>
+          In doubles, the player step is a picture of the court: each pair on
+          its side of the net, each player on the side they are standing on
+          right now, worked out from the score the same way the serve is. If
+          the picture is upside down from where you stand, tap{' '}
+          <strong>Swap ends</strong> once and it stays that way for the match.
+        </p>
         <p className="guide-note">
-          Winners go to the player who hit them. Errors go to the player who
-          made them — not to whoever won the point.
+          Winning shots go to the player who hit them. Faults go to the player
+          who made them — not to whoever won the point.
         </p>
       </section>
 
@@ -160,9 +154,11 @@ function Guide({ onBack }) {
       <section className="guide-section" aria-label="Fixing mistakes">
         <h3>When you get it wrong</h3>
         <p>
-          <strong>Undo last</strong> sits up with the score rather than at the
-          bottom, because correcting a mis-tap has to be as quick as the tap
-          was. It removes the last thing logged, as many times as you need.
+          <strong>Undo</strong> sits right under the score, beside the last
+          thing logged, because correcting a mis-tap has to be as quick as the
+          tap was. It removes the last thing logged, as many times as you need.
+          Tapped the wrong ending? <strong>Back</strong>, in the same place,
+          before you pick a player.
         </p>
         <p>
           <strong>End match early</strong> is for a game stopped rather than

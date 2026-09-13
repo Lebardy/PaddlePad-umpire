@@ -273,7 +273,12 @@ function pendingThirdShotId(events) {
   return undefined
 }
 
-export function addRallyEvent(matchId, { actingPlayerId, outcome, zone }) {
+/**
+ * Logs how a rally ended. `detail` is the key of the ending from
+ * lib/outcomes.js ("out", "kitchen"); outcome and zone are still sent
+ * beside it, because they are what every stat bucket is built from.
+ */
+export function addRallyEvent(matchId, { actingPlayerId, outcome, zone, detail }) {
   const match = getMatch(matchId)
   if (!match || match.status === 'completed') return match
   // Recorded on the RALLY rather than written back onto the thirdShot,
@@ -292,6 +297,7 @@ export function addRallyEvent(matchId, { actingPlayerId, outcome, zone }) {
         actingPlayerId,
         outcome,
         zone,
+        ...(detail ? { detail } : {}),
         ...(thirdShotId ? { thirdShotId } : {}),
       },
     ],

@@ -32,7 +32,7 @@ export const THEMES = [
 
 // Kept in step with --primary and --bg in index.css, which is what the
 // browser chrome is meant to match.
-const CHROME = { light: '#7c3aed', dark: '#15111f' }
+const CHROME = { light: '#1b6e4c', dark: '#0c1311' }
 
 const DARK_QUERY = '(prefers-color-scheme: dark)'
 

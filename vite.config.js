@@ -24,8 +24,8 @@ export default defineConfig({
         name: 'PaddlePad Umpire',
         short_name: 'PP Umpire',
         description: 'Courtside pickleball match tracking for umpires',
-        theme_color: '#7c3aed',
-        background_color: '#f5f3fb',
+        theme_color: '#1b6e4c',
+        background_color: '#f2f4f1',
         display: 'standalone',
         start_url: '/',
         icons: [
