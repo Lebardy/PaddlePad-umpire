@@ -426,11 +426,20 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
   const measure = MEASURES[row.feature] ?? {
     label: row.feature, as: 'swing', better: 'neither',
   }
-  const bars = [
-    { who: 'you', value: row.you, mine: true },
-    { who: 'your group', value: row.group },
-    ...(proof.other ? [{ who: 'the other style', value: row.other }] : []),
-  ]
+  // An all-court row compares the player's STYLE with their group,
+  // because that is what the name was chosen from; the player's own
+  // number stays first so they can see where they sit inside it.
+  const bars = row.neutral
+    ? [
+        { who: 'you', value: row.you, mine: true },
+        ...(row.style !== null && row.style !== undefined ? [{ who: 'your style', value: row.style }] : []),
+        { who: 'your group', value: row.group },
+      ]
+    : [
+        { who: 'you', value: row.you, mine: true },
+        { who: 'your group', value: row.group },
+        ...(proof.other ? [{ who: 'the other style', value: row.other }] : []),
+      ]
   // Bars are drawn against the biggest of the three, so a row is read by
   // comparing its own bars and nothing else.
   const widest = Math.max(...bars.map((b) => Math.abs(b.value ?? 0)), 0.0001)
@@ -532,9 +541,10 @@ function Playstyle({ standing }) {
                 <ProofMeasure key={row.feature} row={row} proof={proof} />
               ))}
               <p className="proof-verdict">
-                Neither habit stands out from your group — you don&rsquo;t lean
-                towards dropping or driving, or towards the net or power — so
-                you&rsquo;re called an all-court player.
+                Your style sits close to your group on both — it doesn&rsquo;t
+                lean towards dropping or driving, or towards the net or power —
+                so it&rsquo;s called all-court. Your own numbers can lean one way;
+                the name describes everyone in your style.
               </p>
             </li>
           ) : (

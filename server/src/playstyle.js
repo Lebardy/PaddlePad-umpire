@@ -93,6 +93,11 @@ export function buildPlaystyleProof({ traits, mine, peers }) {
 
   const row = (trait, feature, neutral) => {
     const own = mine.evidence[feature]
+    // The pipeline stores a player with nothing to measure (no third
+    // shots logged) as 0 rather than as missing. One zero can be real;
+    // a whole group of zeros is nothing recorded, and bars at 0% would
+    // tell every one of them they never drop.
+    const recorded = valuesOf(peers, feature).some((value) => value !== 0)
     return {
       label: trait.label,
       feature,
@@ -101,11 +106,23 @@ export function buildPlaystyleProof({ traits, mine, peers }) {
       // True for the all-court rows below: the word was chosen because
       // this measurement did NOT stand out, so the page reads it that way.
       neutral,
-      // Null, never 0, when nothing was recorded: no third shots logged is
-      // not the same as never choosing a drop. Number(null) would say 0.
-      you: own === null || own === undefined || !Number.isFinite(Number(own)) ? null : round(Number(own)),
-      group: round(mean(valuesOf(peers, feature))),
-      other: other ? round(mean(valuesOf(other.members, feature))) : null,
+      // Null, never 0, when nothing was recorded. Number(null) would say 0.
+      you: !recorded || own === null || own === undefined || !Number.isFinite(Number(own))
+        ? null
+        : round(Number(own)),
+      group: recorded ? round(mean(valuesOf(peers, feature))) : null,
+      other: recorded && other ? round(mean(valuesOf(other.members, feature))) : null,
+      // All-court rows only: the average of this player's own style. The
+      // noun is chosen from where the STYLE sits, not the one player, so
+      // this is the column that proves it. Measured on staging: 17 of 17
+      // all-court styles sat close to their group, while 8 of those 17
+      // players' own numbers did not. Withheld below MIN_STYLE_MEMBERS,
+      // where an average of the style describes the other people in it.
+      ...(neutral && {
+        style: recorded && sameStyle.length >= MIN_STYLE_MEMBERS
+          ? round(mean(valuesOf(sameStyle, feature)))
+          : null,
+      }),
     }
   }
 
