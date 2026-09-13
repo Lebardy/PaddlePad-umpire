@@ -19,9 +19,11 @@
 // nightly run has rated them. Steps 2 and 3 still need that run.
 //
 // Step 2 exists FOR step 3: playstyles are clustered within a group, so
-// a style means "compared with players at a similar level". That is why
-// the archetype name begins with the group's own word. Saying so is the
-// difference between a label and an explanation.
+// a style means "compared with players at a similar level". The
+// pipeline starts each style name with its label for the group ("Group
+// 3"); that label is dropped here, because the ladder in step 2 already
+// shows where the group sits and a bare number explains nothing. See
+// lib/styleName.js.
 //
 // Step 3 also has to be checkable, so it shows, for each word in the
 // name, this player's own number, their group's average, and the
@@ -42,6 +44,7 @@ import { fetchStanding } from '../lib/api'
 import { usePlayerData } from '../lib/PlayerData'
 import { navigate } from '../lib/router'
 import { endingPhrase } from '../lib/endingWords'
+import { styleName } from '../lib/styleName'
 import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
 import Icon from '../components/Icon'
 import More from '../components/More'
@@ -391,20 +394,13 @@ function Group({ standing }) {
         <p>
           So that a playstyle means something. Styles are worked out
           <em> within</em> a group, so &ldquo;steady&rdquo; means steady for
-          players at this level rather than steady compared with everyone. It
-          is also why the name below starts with your group&rsquo;s own word.
+          players at this level rather than steady compared with everyone.
         </p>
         <p>
           Which group sits higher is decided by the average rally points of the
           players in it. The points only put the groups in order — they never
           decide who is in which group.
         </p>
-        {standing.band?.name && (
-          <p>
-            The model&rsquo;s own name for your group is{' '}
-            <strong>{standing.band.name}</strong>.
-          </p>
-        )}
       </More>
     </Step>
   )
@@ -412,7 +408,8 @@ function Group({ standing }) {
 
 /** Step 3: the second split, with the numbers that chose its words. */
 function Playstyle({ standing }) {
-  const { playstyleArchetype: name, playstyle: proof, band } = standing
+  const { playstyle: proof, band } = standing
+  const name = styleName(standing.playstyleArchetype, band?.name)
 
   if (!name) {
     return (
