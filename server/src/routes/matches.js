@@ -8,6 +8,7 @@ import {
   eventToRow,
 } from '../pickleball.js'
 import { isUuid, stackingFromColumns, stackingToColumns } from '../validate.js'
+import { rallyEndingProblem } from '../rally-endings.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -306,6 +307,16 @@ router.put('/:id/log', async (req, res) => {
       !isUuid(event.thirdShotId)
     ) {
       return res.status(400).json({ error: `Event ${index} has an invalid thirdShotId` })
+    }
+    // What ended the rally, when the app says. Optional, because copies
+    // of the app from before this existed are still installed on
+    // phones; but when present it must be a known ending that agrees
+    // with the outcome and zone filed beside it.
+    if (event.type === 'rally') {
+      const problem = rallyEndingProblem(event)
+      if (problem) {
+        return res.status(400).json({ error: `Event ${index} has a ${problem}` })
+      }
     }
     // Both non-rally types name their player the same way, so the check
     // below covers a correction naming someone outside the match too.

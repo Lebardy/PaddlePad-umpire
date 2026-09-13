@@ -1,25 +1,39 @@
 :root {
-  --bg: #f5f3fb;
+  /* --- Courtside, calm ---
+     The umpire's eyes belong on the court, so this app is quiet: a
+     pale green-grey page, white sheets, and court green marking only
+     what can be tapped. Brick red means a fault or something that
+     throws work away; slate blue is the one neutral voice (a drive, a
+     share code). The player app's black scoreboard is deliberately not
+     here -- the two apps must never be mistaken for each other. */
+  --bg: #f2f4f1;
   --bg-elevated: #ffffff;
-  --text: #2b1f3d;
-  --text-muted: #736a85;
-  --border: #e3ddef;
-  --primary: #7c3aed;
-  --primary-hover: #6d28d9;
+  --bg-sunken: #e8ece8;
+  --text: #14201b;
+  --text-muted: #56645d;
+  --border: #d9e0db;
+  --primary: #1b6e4c;
+  --primary-hover: #155a3d;
   --primary-contrast: #ffffff;
-  --primary-soft: #ede6ff;
-  --accent: #0ea5e9;
-  --accent-soft: rgba(14, 165, 233, 0.12);
-  --danger: #e33d6f;
-  --danger-soft: rgba(227, 61, 111, 0.1);
-  --shadow-sm: 0 1px 2px rgba(43, 20, 77, 0.06);
-  --shadow-md: 0 6px 20px -4px rgba(69, 20, 130, 0.18);
+  --primary-soft: #e1f0e8;
+  --accent: #2f5d8a;
+  --accent-soft: rgba(47, 93, 138, 0.1);
+  --danger: #b3261e;
+  --danger-soft: rgba(179, 38, 30, 0.08);
+  --shadow-sm: 0 1px 2px rgba(20, 32, 27, 0.06);
+  --shadow-md: 0 8px 24px -8px rgba(20, 32, 27, 0.18);
   --radius-sm: 8px;
-  --radius-md: 14px;
-  --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --radius-md: 12px;
+
+  /* The player app's families, used with restraint: Big Shoulders only
+     for the score and screen titles, Barlow Condensed for small labels,
+     Barlow for everything read. */
+  --display: 'Big Shoulders Display', 'Barlow Condensed', Impact, sans-serif;
+  --label: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --sans: 'Barlow', system-ui, 'Segoe UI', Roboto, sans-serif;
 
   color-scheme: light dark;
-  font: 16px/1.5 var(--sans);
+  font: 17px/1.5 var(--sans);
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
@@ -32,24 +46,25 @@
    query, because lib/theme.js always writes a resolved light/dark to
    data-theme -- never "system". The OS preference is still honoured;
    it is resolved in JS, and by the inline script in index.html before
-   the first paint. Fifteen colour values kept in two places are fifteen
-   values that will drift. */
+   the first paint. Colour values kept in two places are values that
+   will drift. */
 :root[data-theme='dark'] {
-  --bg: #15111f;
-  --bg-elevated: #201a30;
-  --text: #f1edfa;
-  --text-muted: #a89bc0;
-  --border: #342a49;
-  --primary: #9d5cff;
-  --primary-hover: #b17dff;
-  --primary-contrast: #ffffff;
-  --primary-soft: rgba(157, 92, 255, 0.16);
-  --accent: #47bfff;
-  --accent-soft: rgba(71, 191, 255, 0.16);
-  --danger: #ff6b93;
-  --danger-soft: rgba(255, 107, 147, 0.14);
+  --bg: #0c1311;
+  --bg-elevated: #141d1a;
+  --bg-sunken: #101815;
+  --text: #eef3ef;
+  --text-muted: #9aa8a1;
+  --border: #26332e;
+  --primary: #4cc38a;
+  --primary-hover: #66d19c;
+  --primary-contrast: #05140d;
+  --primary-soft: rgba(76, 195, 138, 0.15);
+  --accent: #7fb0e6;
+  --accent-soft: rgba(127, 176, 230, 0.13);
+  --danger: #ff7a6b;
+  --danger-soft: rgba(255, 122, 107, 0.13);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 8px 24px -6px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 10px 28px -8px rgba(0, 0, 0, 0.55);
 }
 
 * {
@@ -58,6 +73,26 @@
 
 body {
   margin: 0;
+  background: var(--bg);
+}
+
+::selection {
+  background: var(--primary-soft);
+  color: var(--text);
+}
+
+input,
+textarea {
+  caret-color: var(--primary);
+}
+
+:root {
+  accent-color: var(--primary);
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 #root {
@@ -68,7 +103,8 @@ body {
 
 h1,
 h2,
-h3 {
+h3,
+h4 {
   font-family: var(--sans);
   font-weight: 600;
   color: var(--text);
@@ -81,13 +117,22 @@ p {
 
 button {
   font-family: var(--sans);
-  transition: transform 0.08s ease, filter 0.08s ease, box-shadow 0.08s ease;
+  transition: transform 0.08s ease, filter 0.08s ease, box-shadow 0.08s ease,
+    background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 
 /* Global tactile press feedback: buttons visibly compress and darken
    the instant they're tapped, rather than only changing on release.
    Courtside taps need to feel immediate and confirmed. */
 button:active:not(:disabled) {
-  transform: scale(0.95);
-  filter: brightness(0.92);
+  transform: scale(0.96);
+  filter: brightness(0.93);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button,
+  button:active:not(:disabled) {
+    transition: none;
+    transform: none;
+  }
 }

@@ -134,28 +134,21 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
         <PlayerCodeCard player={sharing} onClose={() => setSharing(null)} />
       )}
 
-      <section className="roster">
-        <h3>Roster</h3>
-        {roster.length === 0 && <p className="empty">No players yet.</p>}
-        <ul>
-          {roster.map((p) => (
-            <li key={p.id}>
-              {p.name}
-              <span className="roster-actions">
-                <button className="share-code" onClick={() => setSharing(p)}>
-                  Code
-                </button>
-                <button className="remove" onClick={() => handleRemove(p.id)}>
-                  Remove
-                </button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
       <section className="matches">
         <h3>Matches</h3>
+        {/* First on the screen: starting the next game is what an
+            umpire opens a session to do, far more often than editing
+            its roster. */}
+        <button
+          className="new-match-btn"
+          disabled={roster.length < 2}
+          onClick={() => onNewMatch(sessionId)}
+        >
+          New Match
+        </button>
+        {roster.length < 2 && (
+          <p className="setup-note">Add at least two players to start a match.</p>
+        )}
         {matches.length === 0 && <p className="empty">No matches yet.</p>}
         <ul className="match-list">
           {matches.map((m) => (
@@ -179,15 +172,32 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
             </li>
           ))}
         </ul>
-        <button
-          className="new-match-btn"
-          disabled={roster.length < 2}
-          onClick={() => onNewMatch(sessionId)}
-        >
-          New Match
-        </button>
       </section>
 
+      <section className="roster">
+        <h3>Roster</h3>
+        {roster.length === 0 && <p className="empty">No players yet.</p>}
+        <ul>
+          {roster.map((p) => (
+            <li key={p.id}>
+              {p.name}
+              <span className="roster-actions">
+                <button className="share-code" onClick={() => setSharing(p)}>
+                  Code
+                </button>
+                <button className="remove" onClick={() => handleRemove(p.id)}>
+                  Remove
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="add-player">
+        <h3>Add a player</h3>
+        <PlayerPicker excludeIds={session.playerIds} onPick={handlePick} />
+      </section>
       <section className="danger-zone">
         {session.voidedAt ? (
           <>
@@ -222,10 +232,6 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
         )}
       </section>
 
-      <section className="add-player">
-        <h3>Add a player</h3>
-        <PlayerPicker excludeIds={session.playerIds} onPick={handlePick} />
-      </section>
     </div>
   )
 }

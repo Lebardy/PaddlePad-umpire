@@ -252,6 +252,9 @@ function rightStartIndices(match, firstServerTeam, firstServerIndex) {
  *                 four stat buckets (dink/clean winners, dink/unforced
  *                 errors) the acting player is credited with, and
  *                 whose team wins the rally for scoring purposes.
+ *                 A rally may also carry `detail`, a key from
+ *                 rally-endings.js saying what ended it; it is counted
+ *                 per player in the returned `endings`.
  *   'thirdShot' - a serving-team drop or drive attempt, tracked
  *                 independently of how that rally ended.
  *
@@ -286,6 +289,16 @@ export function deriveMatchState(match) {
   }
   ;[...match.teamA, ...match.teamB].forEach(ensure)
 
+  // What ended each rally, counted per player: { [playerId]: { out: 2 } }.
+  // Kept apart from `stats` on purpose. stats is the fixed column set
+  // the ML pipeline and the player app read, and a map of free keys
+  // inside it would change the shape of every one of those rows.
+  // Only rallies carrying a `detail` count; older ones have none.
+  const endings = {}
+  ;[...match.teamA, ...match.teamB].forEach((id) => {
+    endings[id] = {}
+  })
+
   // Third shots seen so far, so a rally can find the one it names.
   // Built as the log is replayed rather than indexed up front, which
   // keeps a rally from ever crediting a third shot logged after it.
@@ -307,6 +320,10 @@ export function deriveMatchState(match) {
 
       ensure(event.actingPlayerId)
       stats[event.actingPlayerId][bucket] += 1
+      if (event.detail) {
+        const mine = (endings[event.actingPlayerId] ??= {})
+        mine[event.detail] = (mine[event.detail] ?? 0) + 1
+      }
 
       const winningTeam =
         event.outcome === 'winner'
@@ -373,7 +390,31 @@ export function deriveMatchState(match) {
     }
   }
 
-  return { ...scoreState, isDoubles, pointTarget: target, stats }
+  return { ...scoreState, isDoubles, pointTarget: target, stats, endings }
+}
+
+/**
+ * Where each doubles player is standing right now, as they face the net:
+ * `{ A: { left, right }, B: { left, right } }`, or null for singles.
+ *
+ * The same rule that picks the incoming server: a pair swaps only when
+ * their own team scores, so whoever began on the right is still there
+ * on an even score and their partner is on an odd one. A serve
+ * correction has already flipped `rightStart` in the derived state.
+ *
+ * For a match recorded before setup asked who started on the right,
+ * the receiving pair's starting side is the engine's guess, and so is
+ * this.
+ */
+export function courtSides(derived, match) {
+  if (!derived.isDoubles) return null
+  const sidesOf = (key) => {
+    const team = key === 'A' ? match.teamA : match.teamB
+    const right =
+      derived.score[key] % 2 === 0 ? derived.rightStart[key] : 1 - derived.rightStart[key]
+    return { left: team[1 - right], right: team[right] }
+  }
+  return { A: sidesOf('A'), B: sidesOf('B') }
 }
 
 /** The player id currently serving, given a match and its derived state. */
