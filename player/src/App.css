@@ -2011,3 +2011,29 @@ a.highlight:active,
     transition: none;
   }
 }
+
+/* ============ What to work on ============ */
+
+.tips { list-style: none; padding: 0; margin: 0.9rem 0 0; display: grid; gap: 1rem; }
+.tip { display: grid; grid-template-columns: 2.1rem minmax(0, 1fr); gap: 0.75rem; align-items: start; }
+.tip + .tip { padding-top: 1rem; border-top: 1px solid var(--border); }
+.tip-rank {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  font-family: var(--display);
+  font-size: 1.25rem;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--text);
+  background: var(--surface-sunken);
+  border-radius: 2px;
+}
+.tip:first-child .tip-rank { background: var(--status-critical); color: #fff; }
+.tip-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.25rem 0.75rem; }
+.tip-name { font-weight: 700; font-size: 1rem; }
+.tip-cost { font-size: 0.9rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tip-cost strong { color: var(--status-critical); }
+.tip-times { color: var(--text-muted); }
+.tip-text { margin-top: 0.3rem; font-size: 0.95rem; line-height: 1.5; color: var(--text-secondary); }

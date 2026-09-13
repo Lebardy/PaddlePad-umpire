@@ -10,18 +10,20 @@
 //
 //   1  the player's rally points, and every kind of rally moving them --
 //      worked out rally by rally in the API, never compared with anyone
-//   2  how they play: a playstyle found among the players closest to
+//   2  what to work on: their costliest faults, each with one tip
+//   3  how they play: a playstyle found among the players closest to
 //      their level, each word proven with numbers
 //
 // Step 1 used to be the pipeline's 0-100 score, placed among everyone
 // rated. That score moved when other people played; points do not. It
 // shows whenever the player has five matches, whether or not the
-// nightly run has rated them. Step 2 still needs that run.
+// nightly run has rated them, and so does step 2. Step 3 still needs
+// that run.
 //
 // A separate step about the player's skill group (a ladder, and what
 // separated them from the group above) sat between the two. It supported
 // the old score and confused more than it explained, so the group is now
-// one line inside step 2 -- the only place it matters to a player. The
+// one line inside the playstyle step -- the only place it matters. The
 // pipeline's label for the group ("Group 3") is dropped from style names
 // for the same reason; see lib/styleName.js.
 //
@@ -40,6 +42,7 @@ import { usePlayerData } from '../lib/PlayerData'
 import { navigate } from '../lib/router'
 import { endingPhrase } from '../lib/endingWords'
 import { styleName } from '../lib/styleName'
+import { faultsToWorkOn } from '../lib/faultTips'
 import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
 import More from '../components/More'
 import Collapsible from '../components/Collapsible'
@@ -290,6 +293,61 @@ function Score({ rallyRating }) {
 }
 
 /**
+ * Step 2: what to work on -- the faults that cost the most points, each
+ * with one tip.
+ *
+ * Straight after step 1 because it is that card's "so what": the same
+ * rows, the player's own costliest faults, turned into something to
+ * practise. It needs no nightly run, so it shows for any rated player.
+ *
+ * Waits for the same 20 rallies with an ending that "What's moving it"
+ * waits for before naming a habit (movedMost is null until then): a tip
+ * aimed at two unlucky rallies would be advice about nothing.
+ */
+function WorkOn({ rallyRating }) {
+  const enough = Boolean(rallyRating.movedMost)
+  const faults = enough ? faultsToWorkOn(rallyRating.breakdown) : []
+
+  return (
+    <Step number={2} title="What to work on">
+      {!enough ? (
+        <p className="step-line">
+          Tips appear once 20 of your rallies have been scored with how they
+          ended — a few rallies can&rsquo;t show a habit.
+        </p>
+      ) : faults.length === 0 ? (
+        <p className="step-line">None of your mistakes cost you points yet.</p>
+      ) : (
+        <>
+          <p className="step-line">
+            The mistakes that cost you the most points, costliest first.
+          </p>
+          <ol className="tips" aria-label="Mistakes to work on">
+            {faults.map((fault, i) => (
+              <li key={fault.ending} className="tip rise" style={{ '--i': i }}>
+                <span className="tip-rank" aria-hidden="true">{i + 1}</span>
+                <div className="tip-body">
+                  <div className="tip-head">
+                    <span className="tip-name">{endingPhrase(fault.ending)}</span>
+                    <span className="tip-cost">
+                      <span className="tip-times">
+                        {fault.rallies} {fault.rallies === 1 ? 'time' : 'times'} ·{' '}
+                      </span>
+                      <strong>{signed(fault.points)}</strong>
+                    </span>
+                  </div>
+                  <p className="tip-text">{fault.tip}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </Step>
+  )
+}
+
+/**
  * The proof rows gathered by word. Every adjective has one measurement;
  * the all-court noun arrives as two rows marked neutral (see
  * server/src/playstyle.js) and is shown as one word with both under it.
@@ -384,7 +442,7 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
 }
 
 /**
- * Step 2: how the player plays, with the numbers that chose its words.
+ * Step 3: how the player plays, with the numbers that chose its words.
  *
  * This used to be step 3, after a step of its own about the player's
  * skill group -- a ladder of groups and what separated them from the one
@@ -418,13 +476,13 @@ function ComparedWith({ band, styleSize }) {
   )
 }
 
-function Playstyle({ standing }) {
+function Playstyle({ standing, number }) {
   const { playstyle: proof, band } = standing
   const name = styleName(standing.playstyleArchetype, band?.name)
 
   if (!name) {
     return (
-      <Step number={2} title="Your playstyle" value="Not worked out yet">
+      <Step number={number} title="Your playstyle" value="Not worked out yet">
         <p className="step-line">
           Styles are worked out among the players closest to your level, and
           that needs at least three of them. There {band?.size === 1 || !band?.size ? 'is 1' : `are ${band.size}`} so far.
@@ -435,7 +493,7 @@ function Playstyle({ standing }) {
 
   if (!proof) {
     return (
-      <Step number={2} title="Your playstyle" value={name}>
+      <Step number={number} title="Your playstyle" value={name}>
         <p className="step-line">
           This name comes from how players with your style compare with the
           players closest to your level. The measurements behind it weren&rsquo;t recorded for this
@@ -446,7 +504,7 @@ function Playstyle({ standing }) {
   }
 
   return (
-    <Step number={2} title="Your playstyle" value={name}>
+    <Step number={number} title="Your playstyle" value={name}>
       <ComparedWith band={band} styleSize={proof.styleSize} />
 
       <ul className="proof" aria-label="Why this name">
@@ -528,13 +586,16 @@ function Rating() {
         </Step>
       )}
 
-      {standing && rally?.state === 'rated' && <Score rallyRating={rally} />}
-
-      {mlRated && (
+      {standing && rally?.state === 'rated' && (
         <>
-          <Playstyle standing={standing} />
+          <Score rallyRating={rally} />
+          <WorkOn rallyRating={rally} />
         </>
       )}
+
+      {/* Third after the two rally cards; second when the player is not
+          rated on points yet but the nightly run has a style for them. */}
+      {mlRated && <Playstyle standing={standing} number={rally?.state === 'rated' ? 3 : 2} />}
     </div>
   )
 }
