@@ -308,7 +308,9 @@ def fetch_match_logs(api_url, api_key, timeout=120):
     )
     response.raise_for_status()
     body = response.json()
-    return pd.DataFrame(body["rows"]), body["gate"]
+    # Every player's rally points, which name the skill groups. None from
+    # an API older than that, in which case the old score names them.
+    return pd.DataFrame(body["rows"]), body["gate"], body.get("rallyPoints")
 
 
 # ============================================================
@@ -375,10 +377,63 @@ def apply_gate(match_df, gate):
 # The pipeline
 # ============================================================
 
-def run_pipeline(gated_df):
+def name_skill_groups(skill_clustered, rally_points):
+    """
+    Names the skill clusters, and says in which order they run.
+
+    K-Means decides who is grouped with whom and never sees a score. A
+    score only decides which group is called higher: the vendored
+    interpret_skill_clusters ranks clusters by their average skill_score.
+
+    That ranking now comes from the players' rally points. On staging's
+    synthetic pool, whose players have a hidden ability, group numbers
+    ranked by rally points followed that ability (Spearman 0.81 over ten
+    random starts) where ranking by the old score barely did (0.17), and
+    nobody changed group either way -- see
+    scripts/playstyle_truth_check.py.
+
+    Only the naming changes. skill_score stays the old score everywhere
+    else, including the residualising of the playstyle features, so
+    playstyles are clustered exactly as before.
+
+    Returns the labelled frame, the group names from lowest to highest,
+    and which number named them.
+    """
+    if rally_points is None:
+        ranked_by = skill_clustered
+        source = "skill_score"
+    else:
+        points = skill_clustered["player_id"].map(rally_points)
+        if points.isna().any():
+            missing = skill_clustered.loc[points.isna(), "player_id"].tolist()
+            # Refused rather than filled in. A player with no points means
+            # the API and the export disagree about which matches count,
+            # and naming groups from part of a group would hide that.
+            raise RuntimeError(
+                f"{len(missing)} rated player(s) have no rally points. "
+                f"Refusing to publish. Missing: {sorted(missing)[:5]}"
+            )
+        ranked_by = skill_clustered.assign(skill_score=points.astype(float))
+        source = "rally_points"
+
+    labels = interpret_skill_clusters(ranked_by)
+    order = (
+        ranked_by.groupby("skill_cluster")["skill_score"].mean().sort_values().index
+    )
+    return (
+        apply_skill_cluster_labels(skill_clustered, labels),
+        [labels[cluster] for cluster in order],
+        source,
+    )
+
+
+def run_pipeline(gated_df, rally_points=None):
     """
     Runs the vendored pipeline end to end and returns one row per
     player, plus a report of what happened structurally.
+
+    `rally_points` maps player id to rally points and names the skill
+    groups; without it the old score names them. See name_skill_groups.
 
     Every player who goes in comes out. That is asserted, not assumed --
     see the integrity check at the bottom.
@@ -399,8 +454,8 @@ def run_pipeline(gated_df):
     skill_clustered, _ = cluster_skill_groups(
         clustering_data, best_skill_k, random_state=RANDOM_STATE
     )
-    skill_clustered = apply_skill_cluster_labels(
-        skill_clustered, interpret_skill_clusters(skill_clustered)
+    skill_clustered, group_order, group_names_from = name_skill_groups(
+        skill_clustered, rally_points
     )
 
     # ---- Level 2: playstyles within each group ---------------------
@@ -530,6 +585,10 @@ def run_pipeline(gated_df):
 
     report = {
         "skillGroups": groups,
+        # Lowest to highest. The app orders its ladder by this, so the
+        # rungs always agree with the names the groups were given.
+        "groupOrder": group_order,
+        "groupNamesFrom": group_names_from,
         "skillK": int(best_skill_k),
         "groupsTooSmallToCluster": unclustered,
     }
@@ -627,13 +686,13 @@ def run(api_url=None, api_key=None, publish=True):
     api_key = api_key or os.environ["INTERNAL_API_KEY"]
 
     started = datetime.now(timezone.utc)
-    match_df, gate = fetch_match_logs(api_url, api_key)
+    match_df, gate, rally_points = fetch_match_logs(api_url, api_key)
     print(f"Fetched {len(match_df)} match rows.")
 
     gate_report = None
     try:
         gated, gate_report = apply_gate(match_df, gate)
-        final, evidence, parts, games, structure = run_pipeline(gated)
+        final, evidence, parts, games, structure = run_pipeline(gated, rally_points)
     except NotEnoughData as reason:
         print(f"Gate held: {reason}")
         if publish:

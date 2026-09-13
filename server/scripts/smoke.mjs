@@ -654,6 +654,13 @@ async function main() {
     check('internal carries the rating gate thresholds',
       typeof logs.body.gate?.minMatchesPerPlayer === 'number' &&
       typeof logs.body.gate?.minPlayers === 'number', JSON.stringify(logs.body.gate))
+    // Rally points name the pipeline's skill groups, so every player in
+    // the rows must have some.
+    const rowPlayers = new Set((logs.body.rows ?? []).map((row) => row.player_id))
+    const pointed = logs.body.rallyPoints ?? {}
+    check('internal carries rally points for every player in the rows',
+      [...rowPlayers].every((id) => typeof pointed[id] === 'number'),
+      `${[...rowPlayers].filter((id) => typeof pointed[id] !== 'number').length} of ${rowPlayers.size} missing`)
 
     // A failed run is recorded rather than dropped: "the gate held" and
     // "the service never woke up" must not look identical afterwards.
