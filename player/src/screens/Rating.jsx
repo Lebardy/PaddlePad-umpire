@@ -370,9 +370,10 @@ function Group({ standing }) {
       )}
 
       <p className="step-line">
-        Everyone rated is split into a few groups first. Which one you land in
-        is worked out from ten measurements, not just your rating — so your own
-        number can sit some way from the rest of your group.
+        Everyone rated is split into a few groups first, from ten measurements
+        of how your matches have gone. Your points above aren&rsquo;t one of
+        them, so a group isn&rsquo;t a range of points — players in it can have
+        quite different points.
       </p>
 
       {/* The rung above, named from the ladder rather than from
