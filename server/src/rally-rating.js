@@ -22,8 +22,8 @@ import { deriveMatchState } from './pickleball.js'
 import { RALLY_ENDINGS } from './rally-endings.js'
 
 export const START_POINTS = 1500
-export const DEFAULT_K = 8
-export const DEFAULT_SCALE = 400
+export const DEFAULT_K = 4
+export const DEFAULT_SCALE = 100
 export const ACTOR_SHARE = 0.75
 export const MIN_MATCHES = 5
 export const TREND_MATCHES = 10
