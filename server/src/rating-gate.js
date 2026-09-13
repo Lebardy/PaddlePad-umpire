@@ -42,14 +42,6 @@ export const MIN_PLAYERS = 3
 // the interesting half of the result, stops being produced.
 export const RECOMMENDED_PLAYERS = 40
 
-// Below this a histogram is not a shape -- it is a handful of lonely
-// bars, and drawing one invites a player to read meaning into which
-// bucket happens to hold two people instead of one. The placement
-// sentence ("higher than 4 of the 7 rated players") stays honest at any
-// size, so only the drawing waits. A judgement call, like the five
-// above, not something derived.
-export const MIN_POOL_FOR_DISTRIBUTION = 12
-
 export const RATING_GATE = {
   minMatchesPerPlayer: MIN_MATCHES_PER_PLAYER,
   minPlayers: MIN_PLAYERS,
