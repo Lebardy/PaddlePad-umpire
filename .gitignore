@@ -53,8 +53,17 @@ paddlepad-backup.json
 
 # Agent skills and design context installed on this machine only: the
 # find-skills and task-observer skills (and the lock file recording where
-# they came from), and Impeccable's PRODUCT.md product brief.
+# they came from), and Impeccable's PRODUCT.md product brief, DESIGN.md style guide and
+# .impeccable/ working files.
 .agents/
 .claude/skills/
 skills-lock.json
 PRODUCT.md
+DESIGN.md
+.impeccable/
+
+# Written by the rating scripts in server/scripts: which matches were used
+# to build and to test, and the synthetic pool's hidden abilities.
+server/scripts/.rating-split.json
+server/scripts/.sim-pool-truth.json
+server/scripts/.rally-points.json

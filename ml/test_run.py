@@ -165,6 +165,48 @@ else:
               "the loop is still what makes it safe")
 
 
+print("\ngroup names")
+
+check("without rally points the old score names the groups",
+      structure["groupNamesFrom"] == "skill_score", structure["groupNamesFrom"])
+check("the group order lists every group once",
+      sorted(structure["groupOrder"]) == sorted(structure["skillGroups"]),
+      str(structure["groupOrder"]))
+
+# Points that run exactly against the old score, so any naming taken
+# from them must come out reversed.
+score_by_player = final.set_index("player_id")["skill_score"]
+reversed_points = {pid: 3000.0 - float(score) for pid, score in score_by_player.items()}
+by_points, _, _, _, points_structure = run_pipeline(gated, reversed_points)
+both = final.merge(by_points, on="player_id", suffixes=("_score", "_points"))
+
+check("rally points name the groups when given",
+      points_structure["groupNamesFrom"] == "rally_points", points_structure["groupNamesFrom"])
+check("the same people are grouped together either way",
+      both.groupby("skill_group_score")["skill_group_points"].nunique().max() == 1
+      and both.groupby("skill_group_points")["skill_group_score"].nunique().max() == 1)
+means = both.groupby("skill_group_points")["skill_score_points"].mean()
+point_means = [float((3000.0 - means[name])) for name in points_structure["groupOrder"]]
+check("the group order runs from fewest to most rally points",
+      point_means == sorted(point_means), str(point_means))
+if len(structure["groupOrder"]) > 1:
+    check("points running against the score reverse the order",
+          [both.loc[both["skill_group_points"] == name, "skill_group_score"].iloc[0]
+           for name in points_structure["groupOrder"]] == list(reversed(structure["groupOrder"])),
+          f"{structure['groupOrder']} vs {points_structure['groupOrder']}")
+check("the skill score itself is untouched",
+      (both["skill_score_score"] == both["skill_score_points"]).all())
+check("playstyles are clustered exactly as before",
+      (both["playstyle_cluster_score"].fillna(-1) == both["playstyle_cluster_points"].fillna(-1)).all())
+
+missing_one = dict(list(reversed_points.items())[1:])
+try:
+    run_pipeline(gated, missing_one)
+    check("a rated player with no rally points is refused", False, "it published")
+except RuntimeError as error:
+    check("a rated player with no rally points is refused", "no rally points" in str(error), str(error))
+
+
 print("\npayload")
 
 payload = to_payload(final, evidence, parts, games, report, structure, len(gated))

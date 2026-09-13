@@ -562,30 +562,60 @@ def print_skill_cluster_profiles(
 # ============================================================
 
 def interpret_skill_clusters(
-    skill_clustered
+    skill_clustered,
+    rank_by="skill_score"
 ):
     """
     Assign human-readable names to the discovered
     first-level skill clusters.
 
-    The cluster with the highest average skill score
-    is interpreted as the higher-performance group.
+    The cluster with the highest average of the
+    `rank_by` column is interpreted as the
+    higher-performance group.
 
-    The cluster with the lowest average skill score
-    is interpreted as the lower-performance group.
+    The cluster with the lowest average of the
+    `rank_by` column is interpreted as the
+    lower-performance group.
 
     IMPORTANT:
-    This uses only the calculated statistical skill score
-    for interpretation. The skill score was NOT provided
-    to K-Means.
+    The ranking column is used for interpretation
+    only. It was NOT provided to K-Means, so changing
+    it changes which group is called higher, never
+    who is in which group.
+
+    PaddlePad passes rank_by="rally_points": each
+    player's rally rating, calculated rally by rally in
+    the app from how every rally ended and who ended
+    it. On a synthetic pool whose players had a hidden
+    true ability, group numbers ranked by rally points
+    followed that ability far more closely than group
+    numbers ranked by skill_score (Spearman 0.81
+    against 0.17, over ten K-Means random starts).
+
+    skill_score stays the default so these files still
+    run on their own, and it is still what
+    residualize_playstyle_features removes from the
+    playstyle features.
     """
+
+    if rank_by not in skill_clustered.columns:
+        raise ValueError(
+            f"skill_clustered must contain '{rank_by}' "
+            f"to rank the skill clusters by."
+        )
+
+    if skill_clustered[rank_by].isna().any():
+        raise ValueError(
+            f"Every player needs a '{rank_by}' value "
+            f"to rank the skill clusters by."
+        )
 
     cluster_scores = (
         skill_clustered
         .groupby(
             "skill_cluster"
         )[
-            "skill_score"
+            rank_by
         ]
         .mean()
         .sort_values()

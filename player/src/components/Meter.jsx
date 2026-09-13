@@ -15,18 +15,21 @@
 // attempted one.
 // ============================================================
 
-function Meter({ label, value, caption }) {
+// `valueText` replaces the percentage where a count says it better --
+// "3 of 5" beside a progress bar, rather than "60%" repeating it.
+function Meter({ label, value, caption, valueText }) {
   const filled = value === null ? 0 : Math.round(value * 100)
+  const shown = valueText ?? (value === null ? '—' : `${filled}%`)
   return (
     <div className="meter-block">
       <div className="meter-head">
         <span className="meter-label">{label}</span>
-        <span className="meter-value">{value === null ? '—' : `${filled}%`}</span>
+        <span className="meter-value">{shown}</span>
       </div>
       <div
         className="meter-track"
         role="img"
-        aria-label={`${label}: ${value === null ? 'no data' : `${filled} percent`}`}
+        aria-label={`${label}: ${valueText ?? (value === null ? 'no data' : `${filled} percent`)}`}
       >
         <span className="meter-fill" style={{ width: `${filled}%` }} />
       </div>

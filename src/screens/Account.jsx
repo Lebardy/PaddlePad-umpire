@@ -193,7 +193,7 @@ function GoogleRow({ umpire, onUmpireChange, isOpen, onToggle, saved, onSaved })
   )
 }
 
-function Account({ umpire, onUmpireChange, onBack }) {
+function Account({ umpire, onUmpireChange, onBack, onSignOut }) {
   const [open, setOpen] = useState(null)
   const [saved, setSaved] = useState(null)
 
@@ -382,6 +382,12 @@ function Account({ umpire, onUmpireChange, onBack }) {
           ))}
         </div>
       </div>
+
+      {onSignOut && (
+        <button type="button" className="sign-out" onClick={onSignOut}>
+          Sign out
+        </button>
+      )}
 
       <p className="account-footer">
         {umpire.is_admin ? 'Admin — you can issue invite codes. ' : ''}

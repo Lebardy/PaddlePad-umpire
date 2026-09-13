@@ -1,89 +1,174 @@
+/* ============================================================
+   PaddlePad Umpire, courtside and calm.
+
+   Built from two things:
+
+   1. SHEETS. White panels on a pale page, holding grouped lists whose
+      rows are divided by hairlines -- sessions, matches, the roster,
+      tools, account settings. A list reads as one object, not a pile
+      of floating cards.
+   2. BIG, TINTED BUTTONS for anything tapped during play. Green is
+      "won with a shot", brick red is "lost by a fault", slate blue is
+      neither. Everything else on screen stays quiet so these are the
+      only loud thing an umpire has to find mid-rally.
+
+   Type is the player app's families at low volume: Big Shoulders only
+   for the score and screen titles, Barlow Condensed capitals for small
+   section labels, Barlow for reading.
+   ============================================================ */
+
+/* ============ Shell and header ============ */
+
 .app-shell {
   min-height: 100svh;
   display: flex;
   flex-direction: column;
   align-items: center;
+  /* Nothing should ever cause a horizontal page scroll -- on a touch
+     device that reads as the layout being broken. */
+  overflow-x: hidden;
 }
 
 .app-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.9rem clamp(0.75rem, 3vw, 1.25rem);
+  padding: 0.6rem clamp(0.75rem, 3vw, 1.25rem);
   /* Respect notches and rounded corners in landscape. */
   padding-left: max(clamp(0.75rem, 3vw, 1.25rem), env(safe-area-inset-left));
   padding-right: max(clamp(0.75rem, 3vw, 1.25rem), env(safe-area-inset-right));
-  padding-top: max(0.9rem, env(safe-area-inset-top));
+  padding-top: max(0.6rem, env(safe-area-inset-top));
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
 }
 
 .app-brand {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.55rem;
   min-width: 0; /* lets the title shrink instead of shoving the controls */
 }
 
 .app-header img {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
 }
 
 .app-header h1 {
-  font-size: clamp(1rem, 3.5vw, 1.3rem);
-  letter-spacing: -0.01em;
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-family: var(--display);
+  font-size: 1.45rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.app-brand-sub {
+  font-family: var(--label);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--primary);
+}
+
 .header-right {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.45rem;
   flex-shrink: 0;
 }
 
-/* Your own name, and the way in to the account screen. */
+/* Your own initials, and the way in to the account screen. The name
+   beside them only shows where there is room for it. */
 .account-btn {
   display: flex;
   align-items: center;
+  gap: 0.45rem;
   background: none;
   border: none;
-  padding: 0.4rem 0;
+  padding: 0.2rem;
   cursor: pointer;
   line-height: 1.2;
+  color: var(--text);
 }
 
-.account-btn:hover .umpire-name { color: var(--primary); }
+.account-initials {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-contrast);
+  font-family: var(--label);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
 
 .umpire-name {
   font-weight: 600;
-  color: var(--text);
+  font-size: 0.9rem;
   max-width: 9rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+@media (max-width: 560px) {
+  .umpire-name { display: none; }
+}
+
+.account-btn:hover .umpire-name { color: var(--primary); }
+
+/* A permanent way in to the guide. */
+.help-btn {
+  width: 2.1rem;
+  height: 2.1rem;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.help-btn:hover { color: var(--text); border-color: var(--primary); }
+
 .sync-pill {
-  font-size: 0.72rem;
+  font-family: var(--label);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--text-muted);
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 0.2rem 0.55rem;
+  padding: 0.15rem 0.6rem;
   white-space: nowrap;
 }
 
-/* Pending-but-online is a dot, not a count: at one tap per rally a
-   number would flicker constantly and earn nothing. */
+/* Pending-but-online is a dot, not a count: at one rally every few
+   seconds a number would flicker constantly and earn nothing. */
 .sync-pill--quiet {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   padding: 0;
   border-radius: 50%;
   background: var(--accent);
@@ -97,74 +182,131 @@
   cursor: pointer;
 }
 
-.sign-out {
+.update-pill {
+  font-family: var(--label);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary);
+  border-radius: 999px;
+  padding: 0.15rem 0.65rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Reading width scales with the screen. */
+.app-main {
+  width: 100%;
+  max-width: 520px;
+  flex: 1;
+  padding: 1.25rem clamp(0.85rem, 4vw, 1.5rem) 3rem;
+  padding-bottom: max(3rem, env(safe-area-inset-bottom));
+}
+
+@media (min-width: 700px) {
+  .app-main { max-width: 640px; }
+}
+
+@media (min-width: 1100px) {
+  .app-main { max-width: 720px; }
+}
+
+/* The live scoring screen wants every pixel of width it can get for
+   big, courtside-tappable buttons. */
+.app-main--full {
+  max-width: 1100px;
+  padding: 0.75rem clamp(0.6rem, 2.5vw, 1.25rem) 2.5rem;
+  padding-bottom: max(2.5rem, env(safe-area-inset-bottom));
+}
+
+/* ============ Shared type ============ */
+
+/* Section labels: small condensed capitals, quiet. */
+h2,
+section h3 {
+  font-family: var(--label);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-muted);
+  margin: 0 0 0.6rem;
+}
+
+.home h2 { margin-top: 1.75rem; }
+
+section {
+  margin-bottom: 1.75rem;
+}
+
+/* Screen titles: the one place Big Shoulders speaks up off the score. */
+.session-detail > h2,
+.match-setup > h2,
+.account > h2,
+.guide > h2,
+.players-screen > h2,
+.invites > h2,
+.login h2,
+.not-found h2 {
+  font-family: var(--display);
+  font-size: clamp(2rem, 8vw, 2.5rem);
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: 0.005em;
+  line-height: 1;
+  color: var(--text);
+  margin: 0.2rem 0 0.9rem;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.back-link {
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 0.8rem;
-  cursor: pointer;
-  padding: 0.4rem;
-}
-
-.sign-out:hover {
-  color: var(--primary);
-}
-
-/* Login */
-
-.login {
-  max-width: 22rem;
-  margin: 1rem auto 0;
-}
-
-.login h2 {
-  font-size: 1.3rem;
-  margin-bottom: 0.4rem;
-}
-
-.login-note {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  margin-bottom: 1.5rem;
-  line-height: 1.4;
-}
-
-.login label {
-  display: block;
-  font-size: 0.8rem;
+  font-size: 0.95rem;
   font-weight: 600;
-  color: var(--text-muted);
-  margin-bottom: 0.9rem;
+  padding: 0.45rem 0;
+  margin-bottom: 0.15rem;
+  cursor: pointer;
 }
+.back-link:hover { color: var(--primary); }
 
-.login input {
+.link-btn,
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--primary);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.link-btn:hover,
+.link-button:hover { text-decoration: underline; }
+
+.link-button {
   display: block;
   width: 100%;
-  margin-top: 0.35rem;
-  padding: 0.7rem 0.85rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text);
-  font-size: 0.95rem;
-  font-weight: 400;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.login input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-soft);
-}
-
-.field-hint {
-  font-size: 0.78rem;
+  margin-top: 1rem;
+  padding: 0.6rem;
   color: var(--text-muted);
-  margin: -0.5rem 0 0.9rem;
+}
+.link-button:hover { color: var(--primary); }
+
+.empty {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  padding: 1.1rem;
+  text-align: center;
+  background: var(--bg-sunken);
+  border-radius: var(--radius-md);
+  margin-bottom: 0.75rem;
 }
 
 .form-error {
-  font-size: 0.85rem;
+  font-size: 0.92rem;
   color: var(--danger);
   background: var(--danger-soft);
   border: 1px solid var(--danger);
@@ -173,645 +315,455 @@
   margin-bottom: 0.9rem;
 }
 
-.link-button {
-  display: block;
-  width: 100%;
-  margin-top: 1rem;
-  padding: 0.6rem;
-  background: none;
-  border: none;
+.field-hint,
+.setup-note,
+.placeholder-note {
+  font-size: 0.88rem;
   color: var(--text-muted);
-  font-size: 0.85rem;
-  cursor: pointer;
+  line-height: 1.45;
 }
+.field-hint { margin: -0.5rem 0 0.9rem; }
+.setup-note { margin: 0 0 0.6rem; }
+.placeholder-note { margin: 0 0 0.75rem; }
 
-.link-button:hover {
-  color: var(--primary);
-}
+/* ============ Fields and the primary button ============ */
 
-/* ============ The account screen ============ */
-
-.account { max-width: 26rem; margin: 0 auto; }
-.account h2 { font-size: 1.3rem; margin-bottom: 0.4rem; }
-
-/* One row per thing, so the page reads as a list rather than a stack
-   of unrelated cards. Only one is ever open at a time. */
-.detail-row {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-elevated);
-  padding: 0.75rem 0.9rem;
-  margin-bottom: 0.6rem;
-}
-
-.detail-row.is-open { border-color: var(--primary); }
-
-.detail-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.detail-text { min-width: 0; }
-
-.detail-label {
-  display: block;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-}
-
-.detail-value {
-  display: block;
-  font-size: 0.95rem;
-  font-weight: 600;
-  /* A long address must wrap rather than push the button off. */
-  overflow-wrap: anywhere;
-}
-
-.detail-saved {
-  margin: 0.4rem 0 0;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.account-form { margin-top: 0.85rem; }
-
-.account-form label {
-  display: block;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  margin-bottom: 0.9rem;
-}
-
-.account-form input {
-  display: block;
-  width: 100%;
-  margin-top: 0.35rem;
-  padding: 0.7rem 0.85rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  font-size: 0.95rem;
-  font-weight: 400;
-}
-
-.account-form input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-soft);
-}
-
-.account-form button[type='submit'] {
-  width: 100%;
-  padding: 0.75rem;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: var(--primary);
-  color: var(--primary-contrast);
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.account-form button[type='submit']:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.account-form button.danger-btn {
-  background: var(--danger);
-  color: #fff;
-}
-
-/* Three states, one visibly on. Not a toggle: "System" is a real
-   choice and not the absence of one. */
-.theme-choices {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.4rem;
-  margin-top: 0.75rem;
-}
-
-.theme-choice {
-  padding: 0.55rem 0.3rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.theme-choice.is-on {
-  border-color: var(--primary);
-  background: var(--primary-soft);
-  color: var(--primary);
-}
-
-.account-footer {
-  margin-top: 1.5rem;
-  font-size: 0.78rem;
-  color: var(--text-muted);
-}
-
-/* Invites */
-
-.invite-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-
-.invite-item {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 0.8rem 0.9rem;
-}
-
-.invite-item.used,
-.invite-item.expired {
-  opacity: 0.55;
-}
-
-.invite-main {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.invite-code {
-  font-family: var(--mono, ui-monospace, monospace);
-  font-size: 1.05rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--text);
-}
-
-.invite-status {
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.2rem 0.5rem;
-  border-radius: 999px;
-  background: var(--primary-soft);
-  color: var(--primary);
-}
-
-.invite-status.used,
-.invite-status.expired {
-  background: var(--border);
-  color: var(--text-muted);
-}
-
-.invite-note {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  margin-top: 0.35rem;
-}
-
-.invite-actions {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.6rem;
-}
-
-.invite-actions button {
-  flex: 1;
-  padding: 0.45rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.invite-actions button:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
-.invite-actions .remove {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-.invite-actions .remove:hover {
-  background: var(--danger-soft);
-}
-
-/* Reading width scales with the screen instead of being pinned at
-   480px, which left a narrow strip on a tablet or laptop and, on a
-   small phone, spent too much of the width on padding. */
-.app-main {
-  width: 100%;
-  max-width: 480px;
-  flex: 1;
-  padding: 1.25rem clamp(0.85rem, 4vw, 1.5rem) 3rem;
-  padding-bottom: max(3rem, env(safe-area-inset-bottom));
-  box-sizing: border-box;
-}
-
-@media (min-width: 700px) {
-  .app-main {
-    max-width: 620px;
-  }
-}
-
-@media (min-width: 1100px) {
-  .app-main {
-    max-width: 720px;
-  }
-}
-
-/* The live scoring screen wants every pixel of width it can get for
-   big, courtside-tappable buttons. */
-.app-main--full {
-  max-width: none;
-  padding: 0.75rem clamp(0.5rem, 2vw, 1rem) 2rem;
-  padding-bottom: max(2rem, env(safe-area-inset-bottom));
-}
-
-@media (min-width: 1200px) {
-  .app-main--full {
-    max-width: 1200px;
-  }
-}
-
-.empty {
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  padding: 1.25rem;
-  text-align: center;
-  background: var(--bg-elevated);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-md);
-}
-
-/* Inputs & buttons, shared by Home + SessionDetail */
-
-.new-session-form,
-.add-player form {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-}
-
+.login input,
+.account-form input,
 .new-session-form input,
 .add-player form input,
+.player-picker input,
 .player-search {
-  flex: 1;
+  display: block;
+  width: 100%;
   min-width: 0;
-  padding: 0.7rem 0.85rem;
+  padding: 0.8rem 0.9rem;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   background: var(--bg-elevated);
   color: var(--text);
-  font-size: 0.95rem;
+  font: inherit;
+  font-size: 1rem;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.login input::placeholder,
 .new-session-form input::placeholder,
 .add-player form input::placeholder,
+.player-picker input::placeholder,
 .player-search::placeholder {
   color: var(--text-muted);
 }
 
+.login input:focus,
+.account-form input:focus,
 .new-session-form input:focus,
 .add-player form input:focus,
+.player-picker input:focus,
 .player-search:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
+.login label,
+.account-form label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.9rem;
+}
+.login label input,
+.account-form label input { margin-top: 0.35rem; font-weight: 400; }
+
+/* The one filled button style: start, save, create. */
+.start-match,
+.new-match-btn,
+.account-form button[type='submit'],
 .new-session-form button,
-.add-player form button {
-  padding: 0.7rem 1.1rem;
+.add-player form button,
+.guide-nudge-open,
+.dupe-yes {
+  padding: 0.85rem 1.1rem;
   border-radius: var(--radius-sm);
   border: none;
   background: var(--primary);
   color: var(--primary-contrast);
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.05s ease;
   white-space: nowrap;
 }
 
+.start-match:hover:not(:disabled),
+.new-match-btn:hover:not(:disabled),
 .new-session-form button:hover,
-.add-player form button:hover {
-  background: var(--primary-hover);
+.add-player form button:hover { background: var(--primary-hover); }
+
+.start-match,
+.new-match-btn,
+.account-form button[type='submit'] { width: 100%; }
+
+.start-match { margin-top: 1rem; font-size: 1.1rem; padding: 1rem; }
+
+.start-match:disabled,
+.new-match-btn:disabled,
+.account-form button[type='submit']:disabled {
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+  cursor: not-allowed;
 }
 
-.new-session-form button:active,
-.add-player form button:active {
-  transform: scale(0.97);
+.account-form button.danger-btn {
+  background: var(--danger);
+  color: var(--bg-elevated);
 }
 
-h2 {
-  font-size: 1.05rem;
-  margin-bottom: 0.75rem;
-}
+/* ============ Sheets: grouped lists ============ */
 
-/* Session list */
-
-.session-list {
+.session-list,
+.match-list,
+.roster ul,
+.tool-list,
+.invite-list,
+.history-list,
+.picker-results {
   list-style: none;
   padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-
-.session-item {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.75rem;
+  margin: 0 0 0.75rem;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 0.9rem 1rem;
-  cursor: pointer;
-  text-align: left;
-  box-shadow: var(--shadow-sm);
-  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  overflow: hidden;
 }
 
-.session-item:hover {
-  border-color: var(--primary);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+.session-list > li + li,
+.match-list > li + li,
+.roster li + li,
+.tool-list > li + li,
+.invite-list > li + li,
+.history-list > li + li,
+.picker-results > li + li {
+  border-top: 1px solid var(--border);
 }
 
-.session-name {
-  font-weight: 600;
+/* A tappable row: the whole row is the target, and it says so with a
+   chevron and a tint on press. */
+.session-item,
+.match-item,
+.export-btn,
+.picker-results button {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.75rem;
+  min-height: 3.5rem;
+  padding: 0.8rem 2.4rem 0.8rem 1rem;
+  background: none;
+  border: none;
+  border-radius: 0;
   color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.session-item::after,
+.match-item::after,
+.export-btn::after,
+.picker-results button::after {
+  content: '\203A';
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-52%);
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+.session-item:hover,
+.match-item:hover,
+.export-btn:hover:not(:disabled),
+.picker-results button:hover { background: var(--bg-sunken); }
+
+/* A row tap shouldn't shrink the whole row; the tint is the feedback. */
+.session-item:active:not(:disabled),
+.match-item:active:not(:disabled),
+.export-btn:active:not(:disabled),
+.picker-results button:active:not(:disabled) {
+  transform: none;
+  filter: none;
+  background: var(--primary-soft);
+}
+
+.session-name,
+.match-item > span:first-child {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .session-meta {
-  flex-shrink: 0;
-  color: var(--primary);
-  background: var(--primary-soft);
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0.25rem 0.55rem;
-  border-radius: 999px;
+  font-size: 0.88rem;
+  color: var(--text-muted);
 }
 
-/* Session detail */
+.players-screen .session-meta { white-space: normal; text-align: right; }
 
-.back-link {
+.voided-tag,
+.ended-tag,
+.session-ended-tag,
+.match-status,
+.invite-status {
+  display: inline-block;
+  margin-left: 0.45rem;
+  font-family: var(--label);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+  vertical-align: 0.1em;
+}
+.voided-tag { color: var(--danger); background: var(--danger-soft); }
+.ended-tag,
+.session-ended-tag { color: var(--text-muted); background: var(--bg-sunken); }
+
+.match-status { margin-left: 0; color: var(--primary); background: var(--primary-soft); }
+.match-status.completed { color: var(--text-muted); background: var(--bg-sunken); }
+
+/* Tools: a title and one line on what it is for. */
+.export-btn { flex-direction: column; align-items: flex-start; gap: 0.1rem; font-weight: 600; }
+.export-btn:disabled { color: var(--text-muted); cursor: progress; }
+.tool-note { font-size: 0.88rem; font-weight: 400; color: var(--text-muted); }
+
+/* ============ Home ============ */
+
+/* Starting tonight's session is what the screen is for, so it leads. */
+.new-session-form {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+.new-session-form label {
+  display: block;
+  font-family: var(--display);
+  font-size: 1.7rem;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 0.7rem;
+}
+.new-session-row,
+.add-player form { display: flex; gap: 0.5rem; }
+.new-session-row input,
+.add-player form input { flex: 1; }
+.new-session-form button,
+.add-player form button { flex-shrink: 0; }
+
+@media (max-width: 420px) {
+  .new-session-row { flex-direction: column; }
+}
+
+/* Shown until waved away; the ? in the header opens the same guide. */
+.guide-nudge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--primary-soft);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 0.9rem 0.85rem 1rem;
+  margin-bottom: 1rem;
+}
+.guide-nudge p { margin: 0.15rem 0 0; font-size: 0.9rem; color: var(--text-muted); }
+.guide-nudge-actions { display: flex; align-items: center; gap: 0.25rem; flex: none; }
+.guide-nudge-open { padding: 0.55rem 0.8rem; font-size: 0.9rem; }
+.guide-nudge-close {
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 0.9rem;
-  font-weight: 500;
-  padding: 0.5rem 0;
-  margin-bottom: 0.25rem;
-  cursor: pointer;
-  transition: color 0.12s ease;
-}
-
-.back-link:hover {
-  color: var(--primary);
-}
-
-.session-detail h2 {
   font-size: 1.4rem;
-  margin-bottom: 1.5rem;
+  line-height: 1;
+  padding: 0.3rem 0.45rem;
+  cursor: pointer;
 }
 
-section {
-  margin-bottom: 1.75rem;
-}
+/* ============ Session detail ============ */
 
-section h3 {
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  margin-bottom: 0.75rem;
-}
-
-.roster ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.session-state {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.6rem;
+  margin: -0.3rem 0 1.4rem;
 }
+.session-ended-tag { margin-left: 0; }
+
+.matches .new-match-btn { margin-bottom: 0.75rem; font-size: 1.1rem; padding: 1rem; }
 
 .roster li {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  padding: 0.7rem 0.9rem;
-  border-radius: var(--radius-sm);
-  font-weight: 500;
-}
-
-.roster .remove {
-  background: none;
-  border: 1px solid var(--danger);
-  color: var(--danger);
-  border-radius: 999px;
-  padding: 0.25rem 0.7rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.12s ease;
-}
-
-.roster .remove:hover {
-  background: var(--danger-soft);
-}
-
-.placeholder-note {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  margin-top: -0.35rem;
-  margin-bottom: 0.9rem;
-  line-height: 1.4;
-}
-
-.known-players {
-  margin-top: 1rem;
-}
-
-.known-players p {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  margin-bottom: 0.6rem;
-}
-
-.known-players ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.5rem 0.6rem;
+  padding: 0.65rem 0.75rem 0.65rem 1rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
-.known-players button {
-  padding: 0.4rem 0.8rem;
+.roster-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+
+.share-code,
+.roster .remove,
+.team-slots .remove {
+  min-height: 2.25rem;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text);
-  font-size: 0.85rem;
+  padding: 0.25rem 0.85rem;
+  background: none;
+  font-size: 0.88rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.12s ease, color 0.12s ease;
+}
+.share-code { border: 1.5px solid var(--accent); color: var(--accent); }
+.share-code:hover { background: var(--accent-soft); }
+.roster .remove,
+.team-slots .remove { border: 1.5px solid var(--border); color: var(--text-muted); }
+.roster .remove:hover,
+.team-slots .remove:hover { border-color: var(--danger); color: var(--danger); }
+
+.add-player form { margin-bottom: 0; }
+
+.danger-zone {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
 }
 
-.known-players button:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
-.export-btn {
+.cancel-session,
+.void-controls button,
+.match-controls button,
+.sign-out,
+.takeover-btn,
+.dupe-no,
+.invite-actions button {
   width: 100%;
-  margin-top: 1.5rem;
-  padding: 0.7rem 1rem;
+  min-height: 2.9rem;
+  padding: 0.65rem;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   background: var(--bg-elevated);
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.12s ease, color 0.12s ease;
+}
+.cancel-session:hover,
+.void-controls .void-btn,
+.match-controls .cancel-match,
+.sign-out,
+.takeover-btn {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.cancel-session:hover,
+.sign-out:hover,
+.match-controls .cancel-match:hover { background: var(--danger-soft); }
+
+.voided-note {
+  font-size: 0.92rem;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.8rem;
+  margin-bottom: 0.6rem;
+  line-height: 1.45;
 }
 
-.export-btn:hover {
-  border-color: var(--primary);
-  color: var(--primary);
+/* ============ Sharing a player's code ============ */
+
+.code-card {
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  box-shadow: var(--shadow-md);
 }
-
-/* Matches list (in SessionDetail) */
-
-.match-list {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.match-item {
-  width: 100%;
+.code-card-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 0.75rem;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
+  margin-bottom: 0.5rem;
+}
+.code-card-head h4 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+.code-card .link-button { width: auto; margin: 0; padding: 0.2rem 0.4rem; }
+.code-help { font-size: 0.9rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 0.75rem; }
+
+/* White ground so the QR stays scannable on a dark theme. */
+.qr-wrap {
+  display: inline-block;
+  background: #fff;
+  padding: 0.6rem;
   border-radius: var(--radius-sm);
-  padding: 0.7rem 0.9rem;
-  cursor: pointer;
-  text-align: left;
-  font-size: 0.9rem;
-  transition: border-color 0.12s ease;
+  line-height: 0;
+}
+.qr { display: block; max-width: 100%; height: auto; }
+.code-large {
+  display: block;
+  margin: 0.75rem 0;
+  font-family: var(--display);
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--accent);
 }
 
-.match-item:hover {
-  border-color: var(--primary);
-}
+/* ============ Match setup ============ */
 
-.match-status {
-  flex-shrink: 0;
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.2rem 0.5rem;
-  border-radius: 999px;
-  background: var(--primary-soft);
-  color: var(--primary);
-}
-
-.match-status.completed {
-  background: var(--border);
-  color: var(--text-muted);
-}
-
-.new-match-btn {
-  width: 100%;
-  padding: 0.7rem 1rem;
-  border-radius: var(--radius-sm);
-  border: none;
-  background: var(--primary);
-  color: var(--primary-contrast);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.new-match-btn:hover {
-  background: var(--primary-hover);
-}
-
-.new-match-btn:disabled {
-  background: var(--border);
-  color: var(--text-muted);
-  cursor: not-allowed;
-}
-
-/* Match setup */
-
-.format-toggle {
+/* Choices are a segmented row: one visibly on. */
+.format-toggle,
+.server-choice,
+.theme-choices {
   display: flex;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.3rem;
+  background: var(--bg-sunken);
+  border-radius: var(--radius-md);
   margin-bottom: 0.5rem;
 }
 
 .format-toggle button,
-.server-choice button {
+.server-choice button,
+.theme-choice {
   flex: 1;
-  padding: 0.6rem;
+  min-width: 6rem;
+  min-height: 2.9rem;
+  padding: 0.55rem 0.6rem;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text);
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 0.98rem;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .format-toggle button.active,
-.server-choice button.active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--primary-contrast);
-}
-
-.server-choice {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-/* Quiet caption under a setup control, for rules that are easy to
-   assume wrong (win-by-two) or that stop being changeable later. */
-.setup-note {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--text-muted);
+.server-choice button.active,
+.theme-choice.is-on {
+  background: var(--bg-elevated);
+  color: var(--primary);
+  box-shadow: var(--shadow-sm), inset 0 0 0 1.5px var(--primary);
 }
 
 .team-slots {
@@ -822,320 +774,365 @@ section h3 {
   flex-direction: column;
   gap: 0.4rem;
 }
-
 .team-slots li {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   background: var(--primary-soft);
-  padding: 0.6rem 0.8rem;
+  padding: 0.55rem 0.6rem 0.55rem 0.9rem;
   border-radius: var(--radius-sm);
-  font-weight: 500;
+  font-weight: 600;
 }
+
+.known-players { margin-top: 0.6rem; }
+.known-players p { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.6rem; }
+.known-players ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.known-players button {
+  min-height: 2.6rem;
+  padding: 0.4rem 0.95rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.known-players button:hover { border-color: var(--primary); color: var(--primary); }
 
 .stacking-toggle {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.85rem;
+  gap: 0.45rem;
+  font-size: 0.92rem;
   color: var(--text-muted);
-  margin-top: 0.4rem;
+  margin-top: 0.5rem;
 }
+.stacking-toggle input { width: 1.1rem; height: 1.1rem; }
 
-.start-match {
-  width: 100%;
-  padding: 0.85rem;
-  border-radius: var(--radius-sm);
-  border: none;
-  background: var(--primary);
-  color: var(--primary-contrast);
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
-  margin-top: 1rem;
-}
+/* ============ Live match ============ */
 
-.start-match:disabled {
-  background: var(--border);
-  color: var(--text-muted);
-  cursor: not-allowed;
-}
-
-/* Live match / scoreboard */
-
+/* The score: the two sides of the net as two rows, score on the right
+   where the eye lands, the serving side lifted. */
 .scoreboard {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 1.25rem 1rem;
-  margin-bottom: 0.75rem;
-}
-
-.score-side {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.5rem;
-  border-radius: var(--radius-sm);
-}
-
-.score-side.serving {
-  background: var(--primary-soft);
-}
-
-.score-value {
-  font-size: 2.5rem;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.score-names {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  text-align: center;
-}
-
-.score-sep {
-  font-size: 1.5rem;
-  color: var(--text-muted);
-}
-
-.serve-note,
-.match-complete {
-  text-align: center;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  margin-bottom: 1.25rem;
-}
-
-/* Quiet on purpose. It is the answer to a question an umpire asks once
-   or twice a night, sitting where the question is asked -- not a
-   control competing with the rally buttons. */
-.swap-server {
-  margin-left: 0.4rem;
-  padding: 0.1rem 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: none;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-
-.swap-server:hover {
-  color: var(--primary);
-  border-color: var(--primary);
-}
-
-.match-complete {
-  font-weight: 600;
-  color: var(--primary);
-}
-
-.match-summary {
-  overflow-x: auto;
-}
-
-.match-summary table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-}
-
-.match-summary td,
-.match-summary th {
-  padding: 0.35rem 0.4rem;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-
-.match-summary th {
-  color: var(--text-muted);
-  font-weight: 600;
-  text-align: left;
-}
-
-/* Quick controls -- pinned right under the scoreboard so correcting a
-   mis-tap is always as fast as making the original tap. */
-
-.quick-controls {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.quick-controls button {
-  flex: 1;
-  padding: 0.6rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text);
-  cursor: pointer;
-}
-
-.quick-controls button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.quick-controls .end-early {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-/* Rally / 3rd-shot logging -- one panel per player, always fully on
-   screen so every outcome is a single tap. The full-width layout
-   (.app-main--full) is what makes room for these at a usable size. */
-
-.rally-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 0.85rem;
-}
-
-.player-panel {
-  background: var(--bg-elevated);
+  gap: 1px;
+  background: var(--border);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 0.75rem;
-}
-
-.player-panel-name {
-  text-align: center;
-  font-weight: 700;
-  font-size: 1.05rem;
+  overflow: hidden;
   margin-bottom: 0.6rem;
 }
 
-.player-panel-outcomes {
+.score-side {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'names score'
+    'tag   score';
+  align-items: center;
+  column-gap: 1rem;
+  min-width: 0;
+  padding: 0.7rem 1.1rem;
+  background: var(--bg-elevated);
+}
+.score-side.serving { background: var(--primary-soft); }
+
+.score-names {
+  grid-area: names;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.7rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+/* The server's name marked with the ball, so it reads at a glance. */
+.score-names .is-server::before {
+  content: '';
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-right: 0.35rem;
+  border-radius: 50%;
+  background: var(--primary);
+  vertical-align: 0.1em;
 }
 
-.player-panel-outcomes.third-shot-outcomes {
-  grid-template-columns: repeat(3, 1fr);
+.score-value {
+  grid-area: score;
+  font-family: var(--display);
+  font-size: clamp(3.2rem, 15vw, 4.5rem);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 0.9;
 }
 
-.outcome-btn {
-  min-height: 3.75rem;
-  padding: 0.5rem;
-  border-radius: var(--radius-sm);
-  border: 2px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
+.serving-tag {
+  grid-area: tag;
+  justify-self: start;
+  font-family: var(--label);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--primary);
+}
+
+.serve-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
   font-size: 0.95rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+.serve-note strong { color: var(--text); }
+
+/* Quiet on purpose: asked once or twice a night, not a rally control. */
+.swap-server {
+  padding: 0.3rem 0.75rem;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.swap-server:hover { color: var(--primary); border-color: var(--primary); }
+
+.match-complete {
+  font-family: var(--display);
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: var(--primary);
+  margin: 0.4rem 0 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+/* The check after every tap: what was just logged, and its undo. */
+.last-logged {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0.4rem 0.4rem 1rem;
+  margin-bottom: 1rem;
+  background: var(--bg-sunken);
+  border-radius: var(--radius-md);
+}
+.last-logged-text {
+  min-width: 0;
+  font-size: 0.98rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.undo {
+  flex: none;
+  min-width: 5.5rem;
+  min-height: 2.9rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--text);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
 }
+.undo:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* Step one: what ended the rally. */
+.rally-log { margin-bottom: 1rem; }
+.ending-group + .ending-group { margin-top: 1rem; }
+.ending-group-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.ending-group-title::before {
+  content: '';
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+.ending-group.winner .ending-group-title { color: var(--primary); }
+.ending-group.error .ending-group-title { color: var(--danger); }
+
+.ending-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+@media (min-width: 620px) {
+  .ending-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 960px) {
+  .ending-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.ending-btn,
+.outcome-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  min-height: 3.9rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: var(--radius-md);
+  border: 1.5px solid transparent;
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+
+.ending-btn.winner,
 .outcome-btn.winner {
-  border-color: var(--primary);
   color: var(--primary);
   background: var(--primary-soft);
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
 }
-
+.ending-btn.error,
 .outcome-btn.error {
-  border-color: var(--danger);
   color: var(--danger);
   background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
 }
-
-/* Drive isn't good or bad -- it's just the other 3rd-shot choice --
-   so it gets the brand's cyan rather than the win/loss purple/pink,
-   but the same tinted weight so it doesn't read as disabled. */
+/* A drive isn't good or bad -- it's just the other 3rd-shot choice. */
 .outcome-btn.neutral {
-  border-color: var(--accent);
   color: var(--accent);
   background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
-/* The courtside legend. The guide is two taps and a screen away, so
-   the one thing an umpire actually asks mid-rally -- which of these
-   four -- is answered above the buttons themselves. Same panel
-   treatment as .player-panel so it reads as part of the scoring area
-   rather than a banner pasted over it. */
-
-.rally-legend-wrap { margin-bottom: 0.5rem; }
-
-.rally-legend {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 0.75rem;
-  margin-bottom: 0.85rem;
-}
-
-.rally-legend-rule {
-  margin: 0 0 0.7rem;
-  font-size: 0.82rem;
-  line-height: 1.5;
-  color: var(--text-muted);
-}
-
-/* Row label plus the two outcome columns. The cells carry button
-   names only -- never sentences -- so this survives a 390px phone
-   without wrapping into a wall. */
-.rally-legend-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr);
-  gap: 0.35rem;
-  align-items: stretch;
-}
-
-.rally-legend-head,
-.rally-legend-row {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  align-self: center;
-}
-
-.rally-legend-head { text-align: center; }
-
-.rally-legend-cell {
-  border-radius: var(--radius-sm);
-  padding: 0.4rem 0.3rem;
-  text-align: center;
+/* Endings only the server can cause skip the "who" step; the tag says
+   so before the tap rather than surprising after it. */
+.ending-auto {
+  font-family: var(--label);
   font-size: 0.75rem;
   font-weight: 700;
-  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.8;
 }
 
-/* Deliberately the same tints as .outcome-btn.winner / .error below,
-   so a cell and the button it names are the same colour. */
-.rally-legend-cell.winner {
+/* Step two: who. The two teams side by side, like the net between. */
+.who-picker {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--primary);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-md);
+}
+.who-picker.error { border-color: var(--danger); }
+
+.who-question {
+  font-family: var(--display);
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 0.8rem;
+}
+
+.who-teams {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.who-team { display: flex; flex-direction: column; gap: 0.5rem; }
+.who-team + .who-team {
+  padding-left: 0.75rem;
+  border-left: 2px dashed var(--border);
+}
+
+.who-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  min-height: 4.75rem;
+  padding: 0.5rem;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 1.12rem;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.who-picker.winner .who-btn:hover { border-color: var(--primary); }
+.who-picker.error .who-btn:hover { border-color: var(--danger); }
+.who-serving {
+  font-family: var(--label);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: var(--primary);
+}
+
+/* Doubles: the court from above. Each half is a pair; the net runs
+   between them. */
+.who-court { display: grid; gap: 0.5rem; }
+.who-half {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
   background: var(--primary-soft);
-  border: 1px solid var(--primary);
 }
-
-.rally-legend-cell.error {
-  color: var(--danger);
-  background: var(--danger-soft);
-  border: 1px solid var(--danger);
-}
-
-/* Same grid in the guide, which has no surrounding panel of its own. */
-.guide-legend-grid { margin: 0 0 0.9rem; }
-
-.third-shot-rule {
-  margin: 0 0 0.2rem;
+.who-net {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--text-muted);
+  font-family: var(--label);
   font-size: 0.8rem;
-  line-height: 1.5;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+.who-net::before,
+.who-net::after { content: ''; flex: 1; border-top: 2px dashed var(--border); }
+.who-side {
+  font-family: var(--label);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: var(--text-muted);
 }
+.who-court .who-btn { background: var(--bg-elevated); }
+.who-swap {
+  justify-self: center;
+  margin-top: 0.15rem;
+  padding: 0.35rem 0.9rem;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  background: none;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.who-swap:hover { color: var(--primary); border-color: var(--primary); }
 
-/* Collapsible sections (3rd shot, history) -- kept out of the way by
-   default so they never compete for space with the rally panels. */
-
+/* The courtside explanation of every ending. */
+.rally-legend-wrap { margin-bottom: 1rem; }
 .collapsible-toggle {
   width: 100%;
   text-align: left;
@@ -1143,820 +1140,251 @@ section h3 {
   border: none;
   background: none;
   color: var(--text-muted);
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.third-shot-log .rally-grid {
-  margin-top: 0.5rem;
-}
-
-.history-list {
-  list-style: none;
-  margin: 0.5rem 0 0;
-  padding: 0;
-  max-height: 14rem;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.history-list li {
-  padding: 0.55rem 0.75rem;
-  border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  font-size: 0.85rem;
-}
-
-/* Player picker */
-
-.player-picker input {
-  width: 100%;
-  padding: 0.7rem 0.85rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text);
   font-size: 0.95rem;
-  margin-bottom: 0.6rem;
-}
-
-.player-picker input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-soft);
-}
-
-.picker-results {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 0.6rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  max-height: 16rem;
-  overflow-y: auto;
-}
-
-.picker-results button {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 0.75rem;
-  padding: 0.65rem 0.8rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text);
-  text-align: left;
+  font-weight: 600;
   cursor: pointer;
 }
+.collapsible-toggle:active:not(:disabled) { transform: none; }
 
-.picker-results button:hover {
-  border-color: var(--primary);
+.rally-legend {
+  display: grid;
+  gap: 1rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
 }
-
-.picker-name {
-  font-weight: 600;
+@media (min-width: 720px) {
+  .rally-legend { grid-template-columns: 1fr 1fr; }
+  .rally-legend-rule { grid-column: 1 / -1; }
 }
+.rally-legend-rule { font-size: 0.92rem; line-height: 1.5; color: var(--text-muted); }
+.rally-legend-list { margin: 0; }
+.rally-legend-head {
+  font-family: var(--label);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.4rem;
+}
+.rally-legend-list.winner .rally-legend-head { color: var(--primary); }
+.rally-legend-list.error .rally-legend-head { color: var(--danger); }
+.rally-legend-list > div { padding: 0.4rem 0; border-top: 1px solid var(--border); }
+.rally-legend-list dt { font-weight: 700; font-size: 0.95rem; }
+.rally-legend-list dd { margin: 0.05rem 0 0; font-size: 0.88rem; line-height: 1.45; color: var(--text-muted); }
 
-/* The evidence that makes "same person?" answerable. */
-.picker-meta {
-  font-size: 0.75rem;
-  color: var(--text-muted);
+/* Third shot: one small panel per serving player. */
+.third-shot-log { margin-bottom: 1.5rem; }
+.third-shot-rule { margin: 0 0 0.6rem; font-size: 0.88rem; line-height: 1.5; color: var(--text-muted); }
+.third-shot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.6rem;
+}
+.player-panel {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.7rem;
+}
+.player-panel-name { font-weight: 700; font-size: 1rem; margin-bottom: 0.5rem; overflow-wrap: anywhere; }
+.player-panel-outcomes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.45rem; }
+.player-panel-outcomes .outcome-btn { min-height: 3.3rem; font-size: 0.98rem; }
+
+/* Far below the rally buttons, where no scoring tap can land on them. */
+.match-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+.match-controls button { flex: 1; }
+
+.void-controls { margin-bottom: 1.25rem; }
+
+/* Final stats: seven columns scroll in their own box on a phone. */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 1.25rem; }
+.match-summary table {
+  width: 100%;
+  min-width: 30rem;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.match-summary td,
+.match-summary th {
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid var(--border);
   white-space: nowrap;
+  text-align: left;
+}
+.match-summary tr:last-child td { border-bottom: none; }
+.match-summary th {
+  font-family: var(--label);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
 }
 
+.endings-summary { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+.endings-player { display: block; font-weight: 700; margin-bottom: 0.3rem; }
+.endings-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.endings-chip {
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+}
+.endings-chip.winner { background: var(--primary-soft); color: var(--primary); }
+.endings-chip.error { background: var(--danger-soft); color: var(--danger); }
+
+.history-list { max-height: 16rem; overflow-y: auto; margin-top: 0.4rem; }
+.history-list li { padding: 0.6rem 1rem; font-size: 0.95rem; }
+
+/* Scoring-lease takeover */
+.takeover {
+  border: 1.5px solid var(--danger);
+  background: var(--danger-soft);
+  border-radius: var(--radius-md);
+  padding: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+.takeover--ok { border-color: var(--primary); background: var(--primary-soft); }
+.takeover-text { font-size: 0.95rem; line-height: 1.45; margin-bottom: 0.7rem; }
+
+/* ============ Player picker ============ */
+
+.player-picker input { margin-bottom: 0.6rem; }
+.picker-results { max-height: 18rem; overflow-y: auto; }
+.picker-results button { align-items: baseline; }
+.picker-name { font-weight: 600; }
+/* The evidence that makes "same person?" answerable. */
+.picker-meta { font-size: 0.85rem; color: var(--text-muted); }
 .picker-create {
   width: 100%;
+  min-height: 3rem;
   padding: 0.65rem;
   border-radius: var(--radius-sm);
-  border: 1px dashed var(--border);
+  border: 1.5px dashed var(--border);
   background: none;
   color: var(--text-muted);
-  font-size: 0.88rem;
+  font-size: 0.95rem;
+  font-weight: 600;
   cursor: pointer;
 }
+.picker-create:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.picker-offline { font-size: 0.9rem; color: var(--text-muted); line-height: 1.45; padding: 0.6rem 0; }
 
-.picker-create:hover:not(:disabled) {
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
-.picker-offline {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  line-height: 1.4;
-  padding: 0.6rem 0;
+@media (max-width: 480px) {
+  .picker-results button { flex-direction: column; align-items: flex-start; gap: 0.1rem; }
 }
 
 /* Duplicate-name confirmation */
-
 .dupe-check {
-  border: 1px solid var(--primary);
-  background: var(--primary-soft);
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--primary);
   border-radius: var(--radius-md);
   padding: 1rem;
 }
-
-.dupe-check h4 {
-  margin: 0 0 0.5rem;
-  font-size: 0.95rem;
-}
-
-.dupe-name {
-  font-size: 1.15rem;
-  font-weight: 700;
-}
-
-.dupe-meta {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  margin-bottom: 0.6rem;
-}
-
-.dupe-note {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  line-height: 1.45;
-  margin-bottom: 0.9rem;
-}
-
-.dupe-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.dupe-actions button {
-  flex: 1;
-  padding: 0.6rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.88rem;
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid var(--border);
-}
-
-.dupe-yes {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--primary-contrast);
-}
-
-.dupe-no {
-  background: var(--bg-elevated);
-  color: var(--text);
-}
-
-/* Scoring-lease takeover */
-
-.takeover {
-  border: 1px solid var(--danger);
-  background: var(--danger-soft);
-  border-radius: var(--radius-md);
-  padding: 0.85rem;
-  margin-bottom: 0.75rem;
-}
-
-.takeover-text {
-  font-size: 0.85rem;
-  line-height: 1.45;
-  margin-bottom: 0.7rem;
-}
-
-.takeover-btn {
-  width: 100%;
-  padding: 0.6rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--danger);
-  background: var(--bg-elevated);
-  color: var(--danger);
-  font-size: 0.88rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-/* Waiting service-worker update */
-
-.update-pill {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--primary);
-  background: var(--primary-soft);
-  border: 1px solid var(--primary);
-  border-radius: 999px;
-  padding: 0.25rem 0.6rem;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.takeover--ok {
-  border-color: var(--primary);
-  background: var(--primary-soft);
-}
-
-/* Cancelling and voiding */
-
-.quick-controls .cancel-match {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-.void-controls {
-  margin-bottom: 1.25rem;
-}
-
-.void-controls button {
-  width: 100%;
-  padding: 0.6rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.void-controls .void-btn {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-.voided-note {
-  font-size: 0.85rem;
-  color: var(--danger);
-  background: var(--danger-soft);
-  border: 1px solid var(--danger);
-  border-radius: var(--radius-sm);
-  padding: 0.6rem 0.75rem;
-  margin-bottom: 0.6rem;
-  line-height: 1.4;
-}
-
-.danger-zone {
-  margin-top: 2rem;
-}
-
-.cancel-session {
-  width: 100%;
-  padding: 0.6rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: none;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.cancel-session:hover {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-.voided-tag {
-  margin-left: 0.5rem;
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--danger);
-  background: var(--danger-soft);
-  border: 1px solid var(--danger);
-  border-radius: 999px;
-  padding: 0.1rem 0.4rem;
-  vertical-align: middle;
-}
-
-/* ============================================================
-   Responsive scoring screen
-   ============================================================
-   The tap buttons are the only thing on this screen that really
-   matters, so every rule here is about keeping them big and reachable
-   rather than fitting more in.
-   ============================================================ */
-
-/* Very small phones (~320px). Reclaim the padding that was eating the
-   button width, and let long labels like "Unforced Error" wrap onto two
-   lines instead of shrinking to unreadable. */
-@media (max-width: 380px) {
-  .rally-grid {
-    grid-template-columns: 1fr;
-    gap: 0.6rem;
-  }
-
-  .player-panel {
-    padding: 0.6rem 0.5rem;
-  }
-
-  .player-panel-outcomes {
-    gap: 0.4rem;
-  }
-
-  .outcome-btn {
-    font-size: 0.82rem;
-    padding: 0.4rem 0.2rem;
-    min-height: 3.4rem;
-    line-height: 1.15;
-  }
-
-  .score-value {
-    font-size: 2.1rem;
-  }
-
-  .scoreboard {
-    padding: 0.9rem 0.6rem;
-    gap: 0.5rem;
-  }
-}
-
-/* Landscape on a phone: plenty of width, very little height. Umpires
-   hold the phone sideways at the net more often than not, and the
-   default portrait layout pushes the tap buttons below the fold there.
-   Shrink the scoreboard hard and spread the panels across the width so
-   everything stays on one screen. */
-@media (max-height: 520px) and (orientation: landscape) {
-  .app-header {
-    padding-top: 0.4rem;
-    padding-bottom: 0.4rem;
-  }
-
-  .app-header h1 {
-    font-size: 0.95rem;
-  }
-
-  .app-main--full {
-    padding-top: 0.5rem;
-  }
-
-  .scoreboard {
-    padding: 0.5rem 0.75rem;
-    margin-bottom: 0.4rem;
-  }
-
-  .score-value {
-    font-size: 1.75rem;
-  }
-
-  .score-names {
-    font-size: 0.7rem;
-  }
-
-  .serve-note,
-  .match-complete {
-    margin-bottom: 0.5rem;
-    font-size: 0.8rem;
-  }
-
-  .quick-controls {
-    margin-bottom: 0.5rem;
-  }
-
-  /* Two panels across, not four. Four fits without scrolling but
-     leaves each button under 90px wide, and "Unforced Error" at that
-     size is a mis-tap waiting to happen. Two columns keeps the buttons
-     near 190px and costs a small scroll, which is the better trade
-     when every tap is a scored point. */
-  .rally-grid {
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 0.5rem;
-  }
-
-  .player-panel {
-    padding: 0.5rem;
-  }
-
-  .player-panel-name {
-    font-size: 0.9rem;
-    margin-bottom: 0.35rem;
-  }
-
-  .outcome-btn {
-    min-height: 2.9rem;
-    font-size: 0.85rem;
-  }
-
-  .history-list {
-    max-height: 8rem;
-  }
-
-  section {
-    margin-bottom: 0.85rem;
-  }
-}
-
-/* Tablet portrait: two roomy panels rather than three cramped ones.
-   auto-fit would land on three at this width, which both shrinks the
-   buttons and leaves a doubles match as an awkward three-plus-one. */
-@media (min-width: 620px) and (max-width: 899px) {
-  .rally-grid {
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  }
-}
-
-/* Tablets and up: four panels across rather than a stretched two, so a
-   doubles match shows every player without scrolling. */
-@media (min-width: 900px) {
-  .rally-grid {
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  }
-
-  .outcome-btn {
-    min-height: 4.25rem;
-    font-size: 1rem;
-  }
-
-  .score-value {
-    font-size: 3rem;
-  }
-}
-
-/* ============================================================
-   Wide-content guards
-   ============================================================ */
-
-/* Long player names shouldn't push the scoreboard off-centre or force
-   the page to scroll sideways. */
-.score-side {
-  min-width: 0;
-}
-
-.score-names {
-  overflow-wrap: anywhere;
-}
-
-.player-panel-name {
-  overflow-wrap: anywhere;
-}
-
-/* The final-stats table has seven columns; on a phone it scrolls in its
-   own box rather than making the whole page scroll sideways. */
-.match-summary {
-  -webkit-overflow-scrolling: touch;
-}
-
-.match-summary table {
-  min-width: 30rem;
-}
-
-/* Nothing should ever cause a horizontal page scroll -- on a touch
-   device that reads as the layout being broken. */
-.app-shell {
-  overflow-x: hidden;
-}
-
-/* Session and match rows wrap instead of squeezing their badge. */
-.session-item,
-.match-item {
-  flex-wrap: wrap;
-}
-
-.session-name,
-.match-item > span:first-child {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-/* Paired action buttons stack rather than squeeze on narrow phones.
-   Two buttons sharing ~300px leaves each too narrow for its label, and
-   a truncated "No, someone else" on a confirmation is exactly where a
-   misread costs data. */
-@media (max-width: 420px) {
-  .dupe-actions,
-  .quick-controls,
-  .invite-actions,
-  .match-controls {
-    flex-direction: column;
-  }
-
-  .dupe-actions button,
-  .quick-controls button,
-  .invite-actions button,
-  .match-controls button {
-    width: 100%;
-  }
-
-  /* Drop/Drive is three across; at this width give the labels room by
-     putting the two drop outcomes on top and Drive underneath. */
-  .player-panel-outcomes.third-shot-outcomes {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .player-panel-outcomes.third-shot-outcomes > :last-child {
-    grid-column: 1 / -1;
-  }
-
-  .format-toggle,
-  .server-choice {
-    flex-wrap: wrap;
-  }
-
-  .format-toggle button,
-  .server-choice button {
-    min-width: 8rem;
-  }
-}
-
-/* The invite code and its status badge wrap instead of the code being
-   clipped -- it has to be readable to be typed. */
+.dupe-check h4 { margin: 0 0 0.5rem; font-size: 1rem; }
+.dupe-name { font-size: 1.25rem; font-weight: 700; }
+.dupe-meta { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.6rem; }
+.dupe-note { font-size: 0.88rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 0.9rem; }
+.dupe-actions { display: flex; gap: 0.5rem; }
+.dupe-actions button { flex: 1; }
+.dupe-no { color: var(--text); }
+
+/* ============ Players & codes ============ */
+
+.player-search { margin-bottom: 1.25rem; }
+.players-screen .code-card { margin-bottom: 1.25rem; }
+
+/* ============ Invites ============ */
+
+.invite-item { padding: 0.85rem 1rem; }
+.invite-item.used,
+.invite-item.expired { opacity: 0.6; }
+.invite-main { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 .invite-code {
+  font-family: var(--display);
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--text);
   overflow-wrap: anywhere;
 }
+.invite-status { margin-left: 0; color: var(--primary); background: var(--primary-soft); }
+.invite-status.used,
+.invite-status.expired { color: var(--text-muted); background: var(--bg-sunken); }
+.invite-note { font-size: 0.9rem; color: var(--text-muted); margin-top: 0.3rem; }
+.invite-actions { display: flex; gap: 0.5rem; margin-top: 0.7rem; }
+.invite-actions button { flex: 1; min-height: 2.6rem; color: var(--text); }
+.invite-actions button:hover { border-color: var(--primary); color: var(--primary); }
+.invite-actions .remove { border-color: var(--danger); color: var(--danger); }
+.invite-actions .remove:hover { background: var(--danger-soft); }
 
-/* Forms: the input should shrink, the button should not. */
-.new-session-form input,
-.add-player form input {
-  min-width: 0;
-}
+/* ============ Account ============ */
 
-.new-session-form button,
-.add-player form button {
-  flex-shrink: 0;
-}
+.account { max-width: 30rem; margin: 0 auto; }
 
-/* Roster rows: long names wrap rather than shoving Remove off the row. */
-.roster li,
-.team-slots li {
-  gap: 0.6rem;
-  flex-wrap: wrap;
-}
-
-.roster li {
-  overflow-wrap: anywhere;
-}
-
-/* Picker results: name and "14 matches · last played Aug 12" stack when
-   there isn't room for both on one line. */
-@media (max-width: 480px) {
-  .picker-results button {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.15rem;
-  }
-
-  .picker-meta {
-    white-space: normal;
-  }
-}
-
-/* Comfortable reading measure for the login and invite screens on a
-   large display, rather than a full-width sprawl. */
-@media (min-width: 700px) {
-  .login {
-    max-width: 26rem;
-  }
-}
-
-/* Sharing a player's claim code */
-
-.roster-actions {
-  display: flex;
-  gap: 0.4rem;
-  flex-shrink: 0;
-}
-
-.share-code {
-  border: 1px solid var(--accent);
-  color: var(--accent);
-  background: none;
-  border-radius: 999px;
-  padding: 0.25rem 0.7rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.share-code:hover {
-  background: var(--accent-soft);
-}
-
-.code-card {
+/* One row per setting inside one sheet. Only one open at a time. */
+.detail-row {
   background: var(--bg-elevated);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-md);
-  padding: 1rem;
-  margin-bottom: 1.5rem;
-  text-align: center;
-}
-
-.code-card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-
-.code-card-head h4 {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.code-card .link-button {
-  width: auto;
-  margin: 0;
-  padding: 0.2rem 0.4rem;
-}
-
-.code-help {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  line-height: 1.45;
-  margin-bottom: 0.75rem;
-}
-
-/* White ground and a little padding so the QR stays scannable against a
-   dark background -- a transparent code on dark is unreadable to a
-   camera. */
-.qr-wrap {
-  display: inline-block;
-  background: #fff;
-  padding: 0.6rem;
-  border-radius: 8px;
-  line-height: 0;
-}
-
-.qr {
-  display: block;
-  max-width: 100%;
-  height: auto;
-}
-
-.code-large {
-  display: block;
-  margin: 0.75rem 0;
-  font-size: 1.2rem;
-}
-
-/* ============ The guide ============ */
-
-/* A permanent way in, sitting with the other header controls rather
-   than being a one-time tour that vanishes once dismissed. */
-.help-btn {
-  width: 2rem;
-  height: 2rem;
-  flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text-muted);
-  font-size: 0.95rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-.help-btn:hover { color: var(--text); border-color: var(--primary); }
-
-/* Shown until waved away. Dismissing costs nothing, because the ? in
-   the header opens the same screen whenever they want it. */
-.guide-nudge {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-  background: var(--primary-soft);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 0.85rem 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.6rem;
 }
-.guide-nudge p { margin: 0.2rem 0 0; font-size: 0.85rem; color: var(--text-muted); }
-.guide-nudge-actions { display: flex; align-items: center; gap: 0.35rem; flex: none; }
-.guide-nudge-open {
-  background: var(--primary);
-  color: var(--primary-contrast);
-  border: none;
-  border-radius: var(--radius-sm);
-  padding: 0.5rem 0.7rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.guide-nudge-close {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 1.2rem;
-  line-height: 1;
-  padding: 0.25rem 0.35rem;
-  cursor: pointer;
-}
-
-.guide { max-width: 40rem; }
-.guide h2 { margin: 0.25rem 0 0.35rem; }
-.guide-lede { color: var(--text-muted); margin: 0 0 1.5rem; }
-.guide-section { margin-bottom: 1.75rem; }
-.guide-section h3 { font-size: 0.95rem; margin: 0 0 0.6rem; }
-.guide-section p { font-size: 0.9rem; line-height: 1.6; margin: 0 0 0.7rem; }
-.guide-note {
-  font-size: 0.85rem !important;
-  color: var(--text-muted);
-  border-left: 2px solid var(--border);
-  padding-left: 0.7rem;
-}
-
-.guide-steps { list-style: none; margin: 0; padding: 0; }
-.guide-steps li { display: flex; gap: 0.7rem; margin-bottom: 0.9rem; }
-.guide-steps p { margin: 0.15rem 0 0; color: var(--text-muted); }
-.guide-step-n {
-  flex: none;
-  width: 1.6rem;
-  height: 1.6rem;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--primary);
-  color: var(--primary-contrast);
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.guide-terms { margin: 0; }
-.guide-terms > div {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 0.7rem 0.85rem;
-  margin-bottom: 0.5rem;
-}
-.guide-terms dt { font-weight: 600; font-size: 0.9rem; }
-.guide-terms dd {
-  margin: 0.2rem 0 0;
+.detail-row.is-open { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.detail-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.detail-text { min-width: 0; }
+.detail-label {
+  display: block;
+  font-family: var(--label);
   font-size: 0.85rem;
-  line-height: 1.55;
-  color: var(--text-muted);
-}
-
-/* ============ Session state ============ */
-
-/* "Ended" is not a warning. It reads in the muted colour, unlike
-   .voided-tag which uses --danger, because a finished night is the
-   normal end of a session and a voided one is a mistake being undone. */
-.ended-tag {
-  margin-left: 0.5rem;
-  font-size: 0.65rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.07em;
   color: var(--text-muted);
 }
+.detail-value { display: block; font-size: 1.02rem; font-weight: 600; overflow-wrap: anywhere; }
+.detail-saved { margin: 0.4rem 0 0; font-size: 0.9rem; font-weight: 600; color: var(--primary); }
+.account-form { margin-top: 0.85rem; }
+.theme-choices { margin-top: 0.75rem; margin-bottom: 0; }
+.account .sign-out { margin-top: 1.5rem; }
+.account-footer { margin-top: 1.25rem; font-size: 0.85rem; color: var(--text-muted); text-align: center; }
 
-.session-state {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin: -0.35rem 0 1rem;
-}
-.session-ended-tag {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0.15rem 0.5rem;
-}
-.link-btn {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--primary);
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-.link-btn:hover { text-decoration: underline; }
+/* ============ Sign in ============ */
 
-/* ============ Google sign-in ============ */
+.login { max-width: 24rem; margin: 1.5rem auto 0; }
+@media (min-width: 700px) { .login { max-width: 26rem; } }
+.login-note { font-size: 0.95rem; color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.45; }
 
-/* Full width, so Google's button lines up with the inputs under it.
-   The button itself is sized in JS from this element's measured width --
-   Google draws it in an iframe and will not take a percentage. */
 .google-signin { display: block; margin-bottom: 0.25rem; }
-
-/* Our button, not Google's -- so it can simply match .start-match above
-   and below it instead of being a fixed 40px on 4px corners in a
-   typeface we do not choose. Neutral rather than --primary, because
-   this and "Create account" are alternatives and two filled purple
-   buttons would compete for the same tap. */
+/* Neutral rather than green, because Google and "Create account" are
+   alternatives and two filled buttons would compete for the same tap. */
 .google-btn {
   width: 100%;
+  min-height: 3.1rem;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  padding: 0.85rem;
+  padding: 0.8rem;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   background: var(--bg-elevated);
   color: var(--text);
-  font-family: inherit;
+  font: inherit;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
@@ -1965,6 +1393,7 @@ section h3 {
 .google-btn:disabled { opacity: 0.6; cursor: default; }
 .google-mark { width: 1.15rem; height: 1.15rem; flex: none; }
 .google-unavailable { text-align: center; margin: 0 0 1rem; }
+.google-caption { font-size: 0.85rem; color: var(--text-muted); text-align: center; margin: 0.45rem 0 0; }
 
 .or-divider {
   display: flex;
@@ -1972,70 +1401,226 @@ section h3 {
   gap: 0.75rem;
   margin: 1.25rem 0;
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-family: var(--label);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 .or-divider::before,
-.or-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border);
-}
+.or-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
-.google-invite .link-btn { align-self: center; margin-top: 0.4rem; }
-
-/* The two ways past an unrecognised Google account: an invite for
-   someone new, or an existing account to attach it to. Boxed so they
-   read as a choice between two, not one long form. */
-.google-choice {
+.google-choice,
+.invite-block {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 0.9rem 1rem;
 }
-.google-choice h3 { font-size: 0.9rem; margin: 0 0 0.6rem; }
+.invite-block { padding-bottom: 0.6rem; margin-bottom: 1.1rem; }
+.invite-block .field-hint { margin: 0.45rem 0 0; }
+.google-choice h3 { margin: 0 0 0.6rem; }
 .google-choice .field-hint { margin: -0.3rem 0 0.7rem; }
 .google-invite { display: flex; flex-direction: column; }
 .google-invite .start-match { margin-top: 0.9rem; }
+.google-invite .link-btn { align-self: center; margin-top: 0.4rem; }
 
-/* The invite code, above both ways of creating an account because it
-   feeds both. Boxed so it reads as belonging to the pair below it
-   rather than as a stray field. */
-.invite-block {
+/* ============ The guide ============ */
+
+.guide { max-width: 42rem; }
+.guide-lede { color: var(--text-muted); margin: 0 0 1.5rem; font-size: 1.02rem; }
+.guide-section { margin-bottom: 2rem; }
+.guide-section p { font-size: 0.98rem; line-height: 1.6; margin: 0 0 0.7rem; max-width: 65ch; }
+.guide-subhead { font-size: 1rem; font-weight: 700; margin: 1rem 0 0.5rem; }
+.guide-note {
+  font-size: 0.92rem !important;
+  color: var(--text-muted);
+  background: var(--bg-sunken);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.8rem;
+}
+
+.guide-steps { list-style: none; margin: 0; padding: 0; }
+.guide-steps li { display: flex; gap: 0.75rem; margin-bottom: 0.9rem; }
+.guide-steps p { margin: 0.15rem 0 0; color: var(--text-muted); }
+.guide-step-n {
+  flex: none;
+  width: 1.8rem;
+  height: 1.8rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-contrast);
+  font-family: var(--label);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.guide-terms {
+  margin: 0;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 0.85rem 1rem 0.6rem;
-  margin-bottom: 1.1rem;
+  overflow: hidden;
 }
-.invite-block .field-hint { margin: 0.45rem 0 0; }
-.google-caption {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  text-align: center;
-  margin: 0.45rem 0 0;
+.guide-terms > div { padding: 0.7rem 1rem; }
+.guide-terms > div + div { border-top: 1px solid var(--border); }
+.guide-terms dt { font-weight: 700; font-size: 0.98rem; }
+.guide-terms dd { margin: 0.15rem 0 0; font-size: 0.92rem; line-height: 1.55; color: var(--text-muted); }
+
+/* ============ The scoring block ============ */
+
+/* Everything tapped during a rally. On a phone it simply stacks and
+   scrolls; on a tablet it is arranged to fit one screen with nothing
+   below the fold that a rally needs -- in either orientation, because
+   a tablet courtside gets turned whichever way the stand allows. */
+.scoring {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.scoring-status {
+  display: grid;
+  gap: 0.6rem;
+  align-content: start;
+  min-width: 0;
+}
+.scoring .scoreboard,
+.scoring .serve-note,
+.scoring .last-logged,
+.scoring .match-complete,
+.scoring .rally-log,
+.scoring .who-picker,
+.scoring .scoring-third { margin: 0; }
+.scoring-rally,
+.scoring-third { min-width: 0; }
+.scoring-third h3 { margin-bottom: 0.45rem; }
+.third-shot-hint {
+  margin-left: 0.35rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  opacity: 0.85;
 }
 
-/* ============ Players & codes ============ */
+/* Tablet, portrait: one column, but tight. The two teams sit side by
+   side, the serve line shares a row with undo, and the ending buttons
+   run four across. */
+@media (min-width: 700px) and (orientation: portrait) {
+  .app-main--full { padding-top: 0.5rem; }
+  .live-match > .back-link { padding: 0.2rem 0; }
 
-/* The search field is not inside a form, unlike the two rules it shares
-   its look with, so it has to be told to fill the width itself -- flex:1
-   does nothing to a block-level element with no flex parent. */
-.player-search {
-  display: block;
-  width: 100%;
-  margin-bottom: 1.25rem;
+  .scoring-status {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+  }
+  .scoring-status .scoreboard,
+  .scoring-status .match-complete { grid-column: 1 / -1; }
+  .scoring .scoreboard { grid-template-columns: 1fr 1fr; }
+
+  .ending-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.45rem; }
+  .ending-group + .ending-group { margin-top: 0.6rem; }
+  .ending-btn { min-height: 4.1rem; font-size: 1.05rem; }
+  .ending-group-title { margin-bottom: 0.4rem; }
+
+  .third-shot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+  .player-panel { padding: 0.55rem; }
+  .player-panel-name { margin-bottom: 0.35rem; }
+  .player-panel-outcomes .outcome-btn { min-height: 3rem; }
 }
 
-/* A player row carries a longer subtitle than a session's "6 players",
-   so the pill wraps rather than squeezing the name to nothing. */
-.players-screen .session-meta {
-  white-space: normal;
-  text-align: right;
+/* Tablet, landscape: two columns. Score, undo and the third shot down
+   the left, where a glance lands first; every ending (or the "who"
+   step, in the same place) across the wider right. */
+@media (min-width: 900px) and (orientation: landscape) and (min-height: 521px) {
+  .app-main--full { padding-top: 0.5rem; }
+  .live-match > .back-link { padding: 0.2rem 0; }
+
+  .scoring.is-live {
+    grid-template-columns: minmax(19rem, 0.85fr) minmax(0, 1.6fr);
+    grid-template-areas:
+      'status rally'
+      'third  rally';
+    grid-template-rows: auto 1fr;
+    align-items: start;
+    column-gap: 1rem;
+  }
+  .scoring-status { grid-area: status; }
+  .scoring-rally { grid-area: rally; }
+  .scoring-third { grid-area: third; }
+
+  .scoring .score-side { padding: 0.55rem 1rem; }
+  .scoring .score-value { font-size: 3.6rem; }
+
+  .ending-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem; }
+  .ending-group + .ending-group { margin-top: 0.75rem; }
+  .ending-btn { min-height: 4.5rem; font-size: 1.08rem; }
+  .ending-group-title { margin-bottom: 0.4rem; }
+
+  .third-shot-grid { grid-template-columns: 1fr; gap: 0.45rem; }
+  .player-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 5.5rem) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.5rem;
+  }
+  .player-panel-name { margin: 0; font-size: 0.95rem; }
+  .player-panel-outcomes { gap: 0.35rem; }
+  .player-panel-outcomes .outcome-btn {
+    min-height: 2.9rem;
+    padding-inline: 0.25rem;
+    font-size: 0.95rem;
+    white-space: nowrap;
+  }
+
+  .who-btn { min-height: 5rem; font-size: 1.2rem; }
 }
 
-/* The code card opens above the list. Given room of its own so it does
-   not read as belonging to whichever row happens to sit under it. */
-.players-screen .code-card {
-  margin-bottom: 1.25rem;
+/* ============ Narrow phones ============ */
+
+/* Paired action buttons stack rather than squeeze. A truncated "No,
+   someone else" on a confirmation is exactly where a misread costs
+   data. */
+@media (max-width: 420px) {
+  .dupe-actions,
+  .invite-actions,
+  .match-controls {
+    flex-direction: column;
+  }
+
+  .ending-btn { font-size: 0.98rem; min-height: 3.7rem; }
+
+  /* Drop/Drive: the two drop outcomes on top, Drive underneath. */
+  .player-panel-outcomes { grid-template-columns: 1fr 1fr; }
+  .player-panel-outcomes > :last-child { grid-column: 1 / -1; }
+}
+
+/* ============ Landscape phone ============ */
+
+/* Umpires often hold the phone sideways at the net: plenty of width,
+   very little height. The score shrinks hard and the teams sit side by
+   side so the rally buttons stay on screen. */
+@media (max-height: 520px) and (orientation: landscape) {
+  .app-header { padding-top: 0.35rem; padding-bottom: 0.35rem; }
+  .app-header img { width: 24px; height: 24px; }
+  .app-header h1 { font-size: 1.15rem; }
+  .app-main--full { padding-top: 0.5rem; }
+
+  .scoreboard { grid-template-columns: 1fr 1fr; margin-bottom: 0.4rem; }
+  .score-side { padding: 0.35rem 0.8rem; }
+  .score-value { font-size: 2.4rem; }
+  .score-names { font-size: 0.92rem; }
+
+  .serve-note,
+  .last-logged { margin-bottom: 0.5rem; }
+  .match-complete { font-size: 1.4rem; margin-bottom: 0.5rem; }
+
+  .ending-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.4rem; }
+  .ending-btn { min-height: 3rem; font-size: 0.95rem; }
+  .who-btn { min-height: 3.5rem; }
+  .history-list { max-height: 8rem; }
+
+  section { margin-bottom: 0.85rem; }
 }

@@ -25,7 +25,8 @@ function SessionList({ sessions, onOpenSession, showOwner = false }) {
               )}
             </span>
             <span className="session-meta">
-              {s.playerIds.length} players
+              {/* The server's count where this device has no roster yet. */}
+              {s.playerCount ?? s.playerIds.length} players
               {showOwner && s.createdByName ? ` \u00b7 by ${s.createdByName}` : ''}
             </span>
           </button>
@@ -142,13 +143,17 @@ function Home({ onOpenSession, onOpenInvites, onOpenGuide, onOpenPlayers, umpire
       )}
 
       <form className="new-session-form" onSubmit={handleCreate}>
-        <input
-          type="text"
-          placeholder="e.g. Saturday League — Court 3"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <button type="submit">New Session</button>
+        <label htmlFor="new-session-name">Start a session</label>
+        <div className="new-session-row">
+          <input
+            id="new-session-name"
+            type="text"
+            placeholder="e.g. Saturday League — Court 3"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <button type="submit">New Session</button>
+        </div>
       </form>
 
       <h2>Your sessions</h2>
@@ -174,21 +179,32 @@ function Home({ onOpenSession, onOpenInvites, onOpenGuide, onOpenPlayers, umpire
           invite is admin-only; a player asking for their code is a
           Tuesday. It should not require building a session around them
           first, which is what it used to. */}
-      {onOpenPlayers && (
-        <button className="export-btn" onClick={onOpenPlayers}>
-          Players &amp; codes
-        </button>
-      )}
-
+      <h2>Tools</h2>
       {exportError && <p className="form-error">{exportError}</p>}
-      <button className="export-btn" onClick={handleExport} disabled={exporting}>
-        {exporting ? 'Preparing…' : 'Export match data (CSV)'}
-      </button>
-      {onOpenInvites && (
-        <button className="export-btn" onClick={onOpenInvites}>
-          Invite an umpire
-        </button>
-      )}
+      <ul className="tool-list">
+        {onOpenPlayers && (
+          <li>
+            <button className="export-btn" onClick={onOpenPlayers}>
+              <span>Players &amp; codes</span>
+              <span className="tool-note">Show a player their sign-in code</span>
+            </button>
+          </li>
+        )}
+        <li>
+          <button className="export-btn" onClick={handleExport} disabled={exporting}>
+            <span>{exporting ? 'Preparing…' : 'Export match data (CSV)'}</span>
+            <span className="tool-note">Every umpire&rsquo;s matches, for the rating pipeline</span>
+          </button>
+        </li>
+        {onOpenInvites && (
+          <li>
+            <button className="export-btn" onClick={onOpenInvites}>
+              <span>Invite an umpire</span>
+              <span className="tool-note">Make a one-time code for a new account</span>
+            </button>
+          </li>
+        )}
+      </ul>
     </div>
   )
 }

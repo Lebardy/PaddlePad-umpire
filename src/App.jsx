@@ -16,6 +16,17 @@ import { clearLocalData, migrateLegacyData } from './lib/storage'
 import { pendingCount } from './lib/outbox'
 import './App.css'
 
+/** "Jan Librando" -> "JL", for the account button. */
+function initialsOf(name) {
+  // Letters only, so "Third-shot check (staging)" is "TS", not "T(".
+  const parts = String(name ?? '')
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
 // Central view-router. There is no URL routing in this app (it's a
 // single-page courtside tool) -- `view` is the entire navigation
 // state, and each screen only gets the id it needs plus callbacks to
@@ -117,7 +128,9 @@ function App() {
             pill and umpire name simply overlapped the title. */}
         <div className="app-brand">
           <img src="/favicon.svg" alt="" />
-          <h1>PaddlePad Umpire</h1>
+          <h1>
+            PaddlePad <span className="app-brand-sub">Umpire</span>
+          </h1>
         </div>
         {signedIn && (
           <div className="header-right">
@@ -140,15 +153,21 @@ function App() {
                 session. It opens the account screen now; signing out
                 keeps its own button, and its own confirm when there is
                 unsynced play. */}
+            {/* Signing out lives on the account screen now, with its own
+                confirm when there is unsynced play. In the header it sat
+                one thumb-width from the sync pill, the control an umpire
+                glances at most -- the worst neighbour for the one tap
+                that can throw work away. */}
             <button
               className="account-btn"
               onClick={() => setView({ name: 'account' })}
               title="Your account"
+              aria-label={`Your account, ${umpire.name}`}
             >
+              <span className="account-initials" aria-hidden="true">
+                {initialsOf(umpire.name)}
+              </span>
               <span className="umpire-name">{umpire.name}</span>
-            </button>
-            <button className="sign-out" onClick={handleSignOut}>
-              Sign out
             </button>
           </div>
         )}
@@ -187,6 +206,7 @@ function App() {
                 umpire={umpire}
                 onUmpireChange={setUmpire}
                 onBack={goHome}
+                onSignOut={handleSignOut}
               />
             )}
             {view.name === 'invites' && umpire.is_admin && (

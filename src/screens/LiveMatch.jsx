@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   addRallyEvent,
   addServerCorrection,
@@ -14,18 +14,37 @@ import NotFound from './NotFound'
 import TakeoverNotice from '../components/TakeoverNotice'
 import * as sync from '../lib/sync'
 import { getDeviceId } from '../lib/outbox'
-import { deriveMatchState, currentServerPlayerId } from '../lib/pickleball'
-import { OUTCOMES, RALLY_RULE, THIRD_SHOT_RULE, outcomeFor } from '../lib/outcomes'
+import { deriveMatchState, currentServerPlayerId, courtSides } from '../lib/pickleball'
+import {
+  FAULT_ENDINGS,
+  RALLY_RULE,
+  THIRD_SHOT_RULE,
+  WINNING_ENDINGS,
+  legacyRallyLabel,
+  rallyEnding,
+} from '../lib/outcomes'
 
 // How often a device that is only WATCHING a match re-reads it. Slow
 // enough to be negligible, fast enough that a watcher isn't looking at
 // a score several rallies out of date.
 const WATCH_POLL_MS = 8_000
 
-// Remembered so the legend is open for someone's first night and out
-// of the way by their tenth -- the same bargain as the guide nudge on
-// the home screen.
+// Remembered so the explanation is open for someone's first night and
+// out of the way by their tenth -- the same bargain as the guide nudge
+// on the home screen.
 const LEGEND_KEY = 'paddlepad.umpire.legendCollapsed'
+
+// Which team the court picture puts nearest the bottom of the screen,
+// per match: the umpire's own end, so the picture matches the view.
+const courtEndKey = (matchId) => `paddlepad.umpire.nearEnd.${matchId}`
+
+function readNearEnd(matchId) {
+  try {
+    return localStorage.getItem(courtEndKey(matchId)) === 'B' ? 'B' : 'A'
+  } catch {
+    return 'A'
+  }
+}
 
 function readLegendCollapsed() {
   try {
@@ -35,9 +54,7 @@ function readLegendCollapsed() {
   }
 }
 
-// The four buttons as the 2x2 they actually are: won or lost the
-// rally, crossed with dink or not. Built from the shared list so it
-// cannot describe buttons the screen no longer has.
+// Every ending with what it means, in the two groups the buttons use.
 function RallyLegend() {
   const [collapsed, setCollapsed] = useState(readLegendCollapsed)
 
@@ -48,42 +65,90 @@ function RallyLegend() {
       localStorage.setItem(LEGEND_KEY, next ? '1' : '0')
     } catch {
       // A phone with storage blocked still scores matches; it just
-      // gets the legend open again next time.
+      // gets the explanation open again next time.
     }
   }
 
   return (
     <section className="rally-legend-wrap">
-      <button className="collapsible-toggle" onClick={toggle}>
-        {collapsed ? '\u25b8' : '\u25be'} What do these mean?
+      <button className="collapsible-toggle" onClick={toggle} aria-expanded={!collapsed}>
+        {collapsed ? '▸' : '▾'} What do these mean?
       </button>
       {!collapsed && (
         <div className="rally-legend">
           <p className="rally-legend-rule">{RALLY_RULE}</p>
-          <div className="rally-legend-grid">
-            <span />
-            <span className="rally-legend-head">Won the rally</span>
-            <span className="rally-legend-head">Lost the rally</span>
-            {[true, false].map((dink) => (
-              <Fragment key={String(dink)}>
-                <span className="rally-legend-row">
-                  {dink ? 'Soft shot at the net' : 'Any other shot'}
-                </span>
-                {[true, false].map((won) => (
-                  <span
-                    key={String(won)}
-                    className={`rally-legend-cell ${won ? 'winner' : 'error'}`}
-                  >
-                    {outcomeFor(won, dink).label}
-                  </span>
-                ))}
-              </Fragment>
-            ))}
-          </div>
+          <p className="rally-legend-rule">
+            <strong>3rd shot:</strong> {THIRD_SHOT_RULE}
+          </p>
+          {[
+            ['Won with a shot', WINNING_ENDINGS, 'winner'],
+            ['Lost by a fault', FAULT_ENDINGS, 'error'],
+          ].map(([title, endings, tone]) => (
+            <dl key={title} className={`rally-legend-list ${tone}`}>
+              <p className="rally-legend-head">{title}</p>
+              {endings.map((ending) => (
+                <div key={ending.key}>
+                  <dt>{ending.label}</dt>
+                  <dd>{ending.help}</dd>
+                </div>
+              ))}
+            </dl>
+          ))}
         </div>
       )}
     </section>
   )
+}
+
+/**
+ * The "who" step for doubles, drawn as the court seen from above: each
+ * pair on its own side of the net, each player on the side they are
+ * standing on right now (see courtSides).
+ *
+ * Both pairs face the net, so they mirror each other. The near pair's
+ * right is on the right of the screen; the far pair, facing the other
+ * way, has its right on the LEFT of the screen -- which is what puts
+ * two players on the same sideline diagonally across from each other,
+ * exactly where they are on court.
+ */
+function CourtPicker({ sides, nearEnd, serverId, name, onPick, onSwapEnds }) {
+  const farEnd = nearEnd === 'A' ? 'B' : 'A'
+
+  function spot(id, side) {
+    return (
+      <button key={id} className="who-btn" onClick={() => onPick(id)}>
+        {name(id)}
+        <span className="who-side">
+          {side}
+          {id === serverId ? ' · serving' : ''}
+        </span>
+      </button>
+    )
+  }
+
+  return (
+    <div className="who-court">
+      <div className="who-half far">
+        {spot(sides[farEnd].right, 'right')}
+        {spot(sides[farEnd].left, 'left')}
+      </div>
+      <div className="who-net">
+        <span>Net</span>
+      </div>
+      <div className="who-half near">
+        {spot(sides[nearEnd].left, 'left')}
+        {spot(sides[nearEnd].right, 'right')}
+      </div>
+      <button className="who-swap" onClick={onSwapEnds}>
+        Swap ends
+      </button>
+    </div>
+  )
+}
+
+/** The words for how a rally ended, including rallies from before details. */
+function rallyLabel(event) {
+  return rallyEnding(event.detail)?.label ?? legacyRallyLabel(event.outcome, event.zone)
 }
 
 // Turns one logged event into the plain-English line shown in the
@@ -91,14 +156,14 @@ function RallyLegend() {
 // actually recorded without needing to remember button labels.
 function describeEvent(event, name) {
   if (event.type === 'rally') {
-    const outcome = OUTCOMES.find(
-      (o) => o.outcome === event.outcome && o.zone === event.zone,
-    )
-    return `${name(event.actingPlayerId)} — ${outcome?.label ?? event.outcome}`
+    return `${rallyLabel(event)} — ${name(event.actingPlayerId)}`
+  }
+  if (event.type === 'serverCorrection') {
+    return `Serve corrected — ${name(event.playerId)}`
   }
   const shotLabel =
     event.shotType === 'drop' ? (event.success ? 'Drop ✓' : 'Drop ✗') : 'Drive'
-  return `${name(event.playerId)} — ${shotLabel} (3rd shot)`
+  return `3rd shot ${shotLabel} — ${name(event.playerId)}`
 }
 
 // The live courtside scoring screen for one match. Score, server
@@ -107,17 +172,20 @@ function describeEvent(event, name) {
 // re-derives everything fresh with deriveMatchState, so this component
 // can't drift out of sync with what's actually stored.
 //
-// Every player's 4 outcome buttons are always on screen at once (one
-// tap logs a rally, not two) -- the full-width layout gives enough
-// room for that without the buttons getting tiny. Undo sits right
-// under the scoreboard rather than at the bottom, since correcting a
-// mis-tap needs to be just as fast as making the original tap.
-// Rally and 3rd-shot logging are both always on screen since both are
-// tapped during play; only the history log is collapsed by default, as
-// it's for reviewing after the fact rather than logging mid-rally.
+// A rally is logged in two taps: WHAT ended it, then WHO. That is the
+// order it is seen from the side of the court -- the ball goes out, and
+// only then does the eye go to whose shot it was. The one exception is
+// an ending only the server can cause (an ace, a service or foot
+// fault), which is credited to the server at once. Undo and the last
+// thing logged sit right under the score, because correcting a mis-tap
+// has to be as quick as making it.
 function LiveMatch({ matchId, onBack }) {
   const match = useMatch(matchId)
   const [showHistory, setShowHistory] = useState(false)
+  // The ending picked by the first tap, waiting for the player.
+  const [pending, setPending] = useState(null)
+  // The team drawn at the near (bottom) end of the court picture.
+  const [nearEnd, setNearEnd] = useState(() => readNearEnd(matchId))
   const knownPlayers = usePlayers()
 
   // Fetch this match's event log, which the session list deliberately
@@ -161,12 +229,34 @@ function LiveMatch({ matchId, onBack }) {
     }
   }, [matchId, isScorer])
 
+  // A half-finished pick must not survive into a different match, or
+  // outlive the match finishing underneath it (another device, say).
+  useEffect(() => {
+    setPending(null)
+  }, [matchId, match?.status])
+
   function name(id) {
     return knownPlayers.find((p) => p.id === id)?.name ?? '?'
   }
 
-  function logRally(actingPlayerId, outcome, zone) {
-    addRallyEvent(matchId, { actingPlayerId, outcome, zone })
+  function logRally(actingPlayerId, ending) {
+    addRallyEvent(matchId, {
+      actingPlayerId,
+      outcome: ending.outcome,
+      zone: ending.zone,
+      detail: ending.key,
+    })
+    setPending(null)
+  }
+
+  function swapEnds() {
+    const next = nearEnd === 'A' ? 'B' : 'A'
+    setNearEnd(next)
+    try {
+      localStorage.setItem(courtEndKey(matchId), next)
+    } catch {
+      // Still swapped for as long as the screen is open.
+    }
   }
 
   function logThirdShot(playerId, shotType, success) {
@@ -185,6 +275,12 @@ function LiveMatch({ matchId, onBack }) {
   }
 
   function handleUndo() {
+    // Undo while a player is being picked means "not that one" -- the
+    // pick is the last thing the umpire did, not the last rally.
+    if (pending) {
+      setPending(null)
+      return
+    }
     undoLastEvent(matchId)
   }
 
@@ -227,6 +323,19 @@ function LiveMatch({ matchId, onBack }) {
     match.status === 'in_progress' ? currentServerPlayerId(derived, match) : null
   const servingTeamPlayers = derived.servingTeam === 'A' ? match.teamA : match.teamB
   const history = [...match.events].reverse()
+  const lastRally = history.find((event) => event.type === 'rally')
+  const pendingEnding = pending ? rallyEnding(pending) : null
+  const sides = match.status === 'in_progress' ? courtSides(derived, match) : null
+
+  function pick(ending) {
+    if (ending.by === 'server' && serverId) logRally(serverId, ending)
+    else setPending(ending.key)
+  }
+
+  const teams = [
+    { key: 'A', ids: match.teamA },
+    { key: 'B', ids: match.teamB },
+  ]
 
   return (
     <div className="live-match">
@@ -236,112 +345,202 @@ function LiveMatch({ matchId, onBack }) {
 
       <TakeoverNotice matchId={matchId} />
 
-      <div className="scoreboard">
-        <div className={`score-side ${derived.servingTeam === 'A' ? 'serving' : ''}`}>
-          <span className="score-names">{match.teamA.map(name).join(' / ')}</span>
-          <span className="score-value">{derived.score.A}</span>
+      {/* Everything tapped during a rally, in one block that fits a
+          tablet screen in either orientation without scrolling: the
+          score and undo, the ending buttons (or the "who" step in the
+          same place), and the third shot. Explanations and the match
+          controls sit below it. See App.css for the arrangements. */}
+      <div className={`scoring${match.status === 'in_progress' ? ' is-live' : ''}`}>
+        <div className="scoring-status">
+          <div className="scoreboard" aria-label="Score">
+            {teams.map(({ key, ids }) => {
+              const serving = match.status === 'in_progress' && derived.servingTeam === key
+              return (
+                <div key={key} className={`score-side ${serving ? 'serving' : ''}`}>
+                  <span className="score-names">
+                    {ids.map((id) => (
+                      <span key={id} className={id === serverId ? 'is-server' : undefined}>
+                        {name(id)}
+                      </span>
+                    ))}
+                  </span>
+                  <span className="score-value">{derived.score[key]}</span>
+                  {serving && <span className="serving-tag">Serving</span>}
+                </div>
+              )
+            })}
+          </div>
+
+          {match.status === 'in_progress' && (
+            <p className="serve-note">
+              <span>
+                <strong>{name(serverId)}</strong> serves
+                {derived.isDoubles ? ` · server ${derived.serverNumber}` : ''}
+                {' · '}first to {derived.pointTarget}
+              </span>
+              {derived.isDoubles && (
+                <button className="swap-server" onClick={() => swapServer(serverId)}>
+                  Not them?
+                </button>
+              )}
+            </p>
+          )}
+
+          {match.status === 'completed' && (
+            <p className="match-complete">
+              {match.winner
+                ? `${match.winner === 'A' ? match.teamA.map(name).join(' / ') : match.teamB.map(name).join(' / ')} won`
+                : 'Match ended'}
+            </p>
+          )}
+
+          {match.status === 'in_progress' && (
+            <>
+                  {/* The last thing logged, with its undo beside it: the check
+                      an umpire makes after every tap, in one glance. */}
+                  <div className="last-logged" aria-live="polite">
+                    <span className="last-logged-text">
+                      {pendingEnding
+                        ? `${pendingEnding.label} — who?`
+                        : lastRally
+                          ? `Last: ${rallyLabel(lastRally)} — ${name(lastRally.actingPlayerId)}`
+                          : 'No rallies yet'}
+                    </span>
+                    <button
+                      className="undo"
+                      onClick={handleUndo}
+                      disabled={!pending && match.events.length === 0}
+                    >
+                      {pending ? 'Back' : 'Undo'}
+                    </button>
+                  </div>
+            </>
+          )}
         </div>
-        <div className="score-sep">&ndash;</div>
-        <div className={`score-side ${derived.servingTeam === 'B' ? 'serving' : ''}`}>
-          <span className="score-value">{derived.score.B}</span>
-          <span className="score-names">{match.teamB.map(name).join(' / ')}</span>
-        </div>
+
+        {match.status === 'in_progress' && (
+          <>
+            <div className="scoring-rally">
+              {pendingEnding ? (
+                <section
+                  className={`who-picker ${pendingEnding.outcome}`}
+                  aria-label={`Who — ${pendingEnding.label}`}
+                >
+                  <p className="who-question">
+                    {pendingEnding.outcome === 'winner'
+                      ? 'Who hit it?'
+                      : 'Who made the fault?'}
+                  </p>
+                  {sides ? (
+                    <CourtPicker
+                      sides={sides}
+                      nearEnd={nearEnd}
+                      serverId={serverId}
+                      name={name}
+                      onPick={(id) => logRally(id, pendingEnding)}
+                      onSwapEnds={swapEnds}
+                    />
+                  ) : (
+                    // Singles: one player a side, nobody to tell apart.
+                    <div className="who-teams">
+                      {teams.map(({ key, ids }) => (
+                        <div key={key} className="who-team">
+                          {ids.map((id) => (
+                            <button
+                              key={id}
+                              className="who-btn"
+                              onClick={() => logRally(id, pendingEnding)}
+                            >
+                              {name(id)}
+                              {id === serverId && <span className="who-serving">serving</span>}
+                            </button>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              ) : (
+                <section className="rally-log" aria-label="How the rally ended">
+                  {[
+                    ['Won with a shot', WINNING_ENDINGS, 'winner'],
+                    ['Lost by a fault', FAULT_ENDINGS, 'error'],
+                  ].map(([title, endings, tone]) => (
+                    <div key={tone} className={`ending-group ${tone}`}>
+                      <h3 className="ending-group-title">{title}</h3>
+                      <div className="ending-grid">
+                        {endings.map((ending) => (
+                          <button
+                            key={ending.key}
+                            className={`ending-btn ${tone}`}
+                            onClick={() => pick(ending)}
+                          >
+                            {ending.label}
+                            {ending.by === 'server' && (
+                              <span className="ending-auto">server</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              )}
+            </div>
+
+            {/* Only the serving team ever hits the 3rd shot of a rally. */}
+            <section className="third-shot-log scoring-third">
+                {/* The full rule is in "What do these mean?" below; on court
+                    the title is enough, and a paragraph here would push
+                    the buttons off a tablet screen. */}
+                <h3>
+                  3rd shot <span className="third-shot-hint">serving side · optional</span>
+                </h3>
+                <div className="third-shot-grid">
+                  {servingTeamPlayers.map((id) => (
+                    <div className="player-panel" key={id}>
+                      <div className="player-panel-name">{name(id)}</div>
+                      <div className="player-panel-outcomes">
+                        <button
+                          className="outcome-btn winner"
+                          onClick={() => logThirdShot(id, 'drop', true)}
+                        >
+                          Drop &#10003;
+                        </button>
+                        <button
+                          className="outcome-btn error"
+                          onClick={() => logThirdShot(id, 'drop', false)}
+                        >
+                          Drop &#10007;
+                        </button>
+                        <button
+                          className="outcome-btn neutral"
+                          onClick={() => logThirdShot(id, 'drive', null)}
+                        >
+                          Drive
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+          </>
+        )}
       </div>
 
       {match.status === 'in_progress' && (
-        <p className="serve-note">
-          Serving: {name(serverId)}
-          {derived.isDoubles ? ` (server ${derived.serverNumber})` : ''}
-          {derived.isDoubles && (
-            <button className="swap-server" onClick={() => swapServer(serverId)}>
-              Not them?
-            </button>
-          )}
-          {' \u00b7 '}
-          first to {derived.pointTarget}
-        </p>
-      )}
-
-      {match.status === 'completed' && (
-        <p className="match-complete">
-          {match.winner
-            ? `${match.winner === 'A' ? match.teamA.map(name).join(' / ') : match.teamB.map(name).join(' / ')} won`
-            : 'Match ended'}
-        </p>
-      )}
-
-      {match.status === 'in_progress' && (
         <>
-          <div className="quick-controls">
-            <button className="cancel-match" onClick={handleCancel}>
-              Cancel match
-            </button>
-            <button
-              className="undo"
-              onClick={handleUndo}
-              disabled={match.events.length === 0}
-            >
-              Undo last
-            </button>
+          <RallyLegend />
+
+          {/* Kept well below the scoring buttons, where no rally tap can
+              land on them by accident. */}
+          <section className="match-controls" aria-label="Match">
             <button className="end-early" onClick={handleEndEarly}>
               End match early
             </button>
-          </div>
-
-          <RallyLegend />
-
-          <section className="rally-log">
-            <div className="rally-grid">
-              {players.map((id) => (
-                <div className="player-panel" key={id}>
-                  <div className="player-panel-name">{name(id)}</div>
-                  <div className="player-panel-outcomes">
-                    {OUTCOMES.map(({ outcome, zone, label }) => (
-                      <button
-                        key={label}
-                        className={`outcome-btn ${outcome}`}
-                        onClick={() => logRally(id, outcome, zone)}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Only the serving team ever hits the 3rd shot of a rally. */}
-          <section className="third-shot-log">
-            <h3>3rd shot (optional)</h3>
-            <p className="third-shot-rule">{THIRD_SHOT_RULE}</p>
-            <div className="rally-grid">
-              {servingTeamPlayers.map((id) => (
-                <div className="player-panel" key={id}>
-                  <div className="player-panel-name">{name(id)}</div>
-                  <div className="player-panel-outcomes third-shot-outcomes">
-                    <button
-                      className="outcome-btn winner"
-                      onClick={() => logThirdShot(id, 'drop', true)}
-                    >
-                      Drop &#10003;
-                    </button>
-                    <button
-                      className="outcome-btn error"
-                      onClick={() => logThirdShot(id, 'drop', false)}
-                    >
-                      Drop &#10007;
-                    </button>
-                    <button
-                      className="outcome-btn neutral"
-                      onClick={() => logThirdShot(id, 'drive', null)}
-                    >
-                      Drive
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <button className="cancel-match" onClick={handleCancel}>
+              Cancel match
+            </button>
           </section>
         </>
       )}
@@ -367,42 +566,78 @@ function LiveMatch({ matchId, onBack }) {
       {match.status === 'completed' && (
         <section className="match-summary">
           <h3>Final stats</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Player</th>
-                <th>Winners</th>
-                <th>Dink W</th>
-                <th>Errors</th>
-                <th>Dink E</th>
-                <th>Drops</th>
-                <th>Drives</th>
-              </tr>
-            </thead>
-            <tbody>
-              {players.map((id) => {
-                const s = derived.stats[id]
-                return (
-                  <tr key={id}>
-                    <td>{name(id)}</td>
-                    <td>{s.clean_winners}</td>
-                    <td>{s.dink_winners}</td>
-                    <td>{s.unforced_errors}</td>
-                    <td>{s.dink_errors}</td>
-                    <td>
-                      {s.drop_successes}/{s.drop_attempts}
-                    </td>
-                    <td>{s.drive_attempts}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Player</th>
+                  <th>Winners</th>
+                  <th>Dink W</th>
+                  <th>Errors</th>
+                  <th>Dink E</th>
+                  <th>Drops</th>
+                  <th>Drives</th>
+                </tr>
+              </thead>
+              <tbody>
+                {players.map((id) => {
+                  const s = derived.stats[id]
+                  return (
+                    <tr key={id}>
+                      <td>{name(id)}</td>
+                      <td>{s.clean_winners}</td>
+                      <td>{s.dink_winners}</td>
+                      <td>{s.unforced_errors}</td>
+                      <td>{s.dink_errors}</td>
+                      <td>
+                        {s.drop_successes}/{s.drop_attempts}
+                      </td>
+                      <td>{s.drive_attempts}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* The finer split the two-tap scoring records. Only for
+              players with at least one, since older matches have none. */}
+          {players.some((id) => Object.keys(derived.endings[id] ?? {}).length > 0) && (
+            <>
+              <h3>How their rallies ended</h3>
+              <ul className="endings-summary">
+                {players.map((id) => {
+                  const counts = derived.endings[id] ?? {}
+                  const keys = Object.keys(counts)
+                  if (keys.length === 0) return null
+                  return (
+                    <li key={id}>
+                      <span className="endings-player">{name(id)}</span>
+                      <span className="endings-chips">
+                        {keys.map((key) => (
+                          <span
+                            key={key}
+                            className={`endings-chip ${rallyEnding(key)?.outcome ?? ''}`}
+                          >
+                            {rallyEnding(key)?.label ?? key} &times;{counts[key]}
+                          </span>
+                        ))}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
+          )}
         </section>
       )}
 
       <section className="history">
-        <button className="collapsible-toggle" onClick={() => setShowHistory((v) => !v)}>
+        <button
+          className="collapsible-toggle"
+          onClick={() => setShowHistory((v) => !v)}
+          aria-expanded={showHistory}
+        >
           {showHistory ? '▾' : '▸'} History ({history.length})
         </button>
         {showHistory && (

@@ -25,9 +25,9 @@ export const THEMES = [
   { key: 'dark', label: 'Dark' },
 ]
 
-// Kept in step with --primary and --bg in index.css, which is what the
+// Kept in step with --board and the dark --bg in index.css, which is what the
 // browser chrome is meant to match.
-const CHROME = { light: '#2a78d6', dark: '#131019' }
+const CHROME = { light: '#12161c', dark: '#0a0c0f' }
 
 const DARK_QUERY = '(prefers-color-scheme: dark)'
 
