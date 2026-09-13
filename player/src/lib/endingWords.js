@@ -11,7 +11,7 @@ const PHRASES = {
   out: 'Hitting out',
   net: 'Hitting into the net',
   dink_error: 'Missed soft shots at the net',
-  kitchen: 'Stepping into the no-volley zone',
+  kitchen: 'Stepping into the kitchen',
   service: 'Missed serves',
   foot_fault: 'Stepping over the line on serve',
   two_bounce: 'Hitting before the bounce',
