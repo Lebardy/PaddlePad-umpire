@@ -262,6 +262,9 @@ function rightStartIndices(match, firstServerTeam, firstServerIndex) {
  * after that point (there shouldn't be any -- storage.js blocks
  * writes once a match is completed) are ignored rather than corrupting
  * a finished match's score.
+ *
+ * `foldedEvents` is how many events were folded before the game was won,
+ * so a caller can apply its own rules to exactly the rallies that counted.
  */
 export function deriveMatchState(match) {
   const isDoubles = match.teamA.length === 2
@@ -304,8 +307,10 @@ export function deriveMatchState(match) {
   // keeps a rally from ever crediting a third shot logged after it.
   const thirdShots = new Map()
 
+  let foldedEvents = 0
   for (const event of match.events) {
     if (scoreState.completed) break
+    foldedEvents += 1
 
     if (event.type === 'rally') {
       const actingTeam = match.teamA.includes(event.actingPlayerId) ? 'A' : 'B'
@@ -390,7 +395,7 @@ export function deriveMatchState(match) {
     }
   }
 
-  return { ...scoreState, isDoubles, pointTarget: target, stats, endings }
+  return { ...scoreState, isDoubles, pointTarget: target, stats, endings, foldedEvents }
 }
 
 /**
