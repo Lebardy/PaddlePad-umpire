@@ -8,32 +8,27 @@
 //
 // So it now runs in order:
 //
-//   1  the player's rally points, and the endings moving them -- worked
-//      out rally by rally in the API, and never compared with anyone
-//   2  a first split into groups, by results
-//   3  a second split inside each group, by how people play
+//   1  the player's rally points, and every kind of rally moving them --
+//      worked out rally by rally in the API, never compared with anyone
+//   2  how they play: a playstyle found among the players closest to
+//      their level, each word proven with numbers
 //
 // Step 1 used to be the pipeline's 0-100 score, placed among everyone
 // rated. That score moved when other people played; points do not. It
 // shows whenever the player has five matches, whether or not the
-// nightly run has rated them. Steps 2 and 3 still need that run.
+// nightly run has rated them. Step 2 still needs that run.
 //
-// Step 2 exists FOR step 3: playstyles are clustered within a group, so
-// a style means "compared with players at a similar level". The
-// pipeline starts each style name with its label for the group ("Group
-// 3"); that label is dropped here, because the ladder in step 2 already
-// shows where the group sits and a bare number explains nothing. See
-// lib/styleName.js.
+// A separate step about the player's skill group (a ladder, and what
+// separated them from the group above) sat between the two. It supported
+// the old score and confused more than it explained, so the group is now
+// one line inside step 2 -- the only place it matters to a player. The
+// pipeline's label for the group ("Group 3") is dropped from style names
+// for the same reason; see lib/styleName.js.
 //
-// Step 3 also has to be checkable, so it shows, for each word in the
-// name, this player's own number, the average of players with their
-// style, and their group's average, with one plain sentence saying
-// which way the style leans. Nobody's individual numbers but their own;
-// see server/src/playstyle.js.
-//
-// Under the ladder, step 2 answers one more question: what separates me
-// from the group above -- the four measurements the pipeline's score is
-// a weighted sum of, against the rung up. See server/src/rating-parts.js.
+// Each word in the style name shows this player's own number, the
+// average of players with their style and their group's average, with
+// one plain sentence saying which way the style leans. Nobody's
+// individual numbers but their own; see server/src/playstyle.js.
 //
 // It never shows a ranking and never anyone else's score. Why is one
 // tap away at the bottom.
@@ -46,7 +41,6 @@ import { navigate } from '../lib/router'
 import { endingPhrase } from '../lib/endingWords'
 import { styleName } from '../lib/styleName'
 import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
-import Icon from '../components/Icon'
 import More from '../components/More'
 import Collapsible from '../components/Collapsible'
 
@@ -142,117 +136,6 @@ function showValue(value, as) {
   return `±${value.toFixed(2)}`
 }
 
-/**
- * One of the four measurements behind the rating, in its own units.
- *
- * Two of them are per-MINUTE rates, which are real and unreadable at
- * that scale: "0.28 winning shots a minute" is not a number anyone
- * holds in their head. Ten minutes is roughly a game, which is a length
- * people already think in, so that is what they are shown in.
- */
-function partValue(value, unit) {
-  if (value === null || value === undefined) return '—'
-  if (unit === 'proportion') return `${Math.round(value * 100)}%`
-  if (unit === 'per_minute') return `${(value * 10).toFixed(1)} per 10 min`
-  return value.toFixed(2)
-}
-
-/**
- * Which part gains the most on a comparison group, and which loses the
- * most to it.
- *
- * Measured in POINTS rather than in the measurements themselves, which
- * is what makes the two comparable at all: a drop rate and a mistake
- * rate are different quantities pointing in opposite directions, but
- * the points each contributed to the score are the same currency, and
- * already carry the direction (the model subtracts mistakes rather than
- * adding them). So "6 points more" and "5 points less" can be read
- * beside each other without anybody being misled.
- *
- * Either can be null: a player above their group on all four parts has
- * nothing dragging the number down, and saying otherwise would be
- * false. Those cases are said differently rather than forced.
- */
-function gainsAndLosses(parts, which) {
-  let best = null
-  let worst = null
-  for (const part of parts) {
-    const them = part[which]
-    if (!them || !Number.isFinite(them.points)) continue
-    const diff = part.you.points - them.points
-    if (diff > 0 && (!best || diff > best.diff)) best = { part, diff }
-    if (diff < 0 && (!worst || diff < worst.diff)) worst = { part, diff }
-  }
-  return { best, worst }
-}
-
-/**
- * Points read as whole numbers where they are whole.
- *
- * Only the next-group section still shows points. There they sit inside
- * a sentence that says what they are -- "that one part is 9 points of
- * the difference" -- rather than standing alone as a label, which is
- * what made "19.9 of 30" unreadable at a glance.
- */
-function points(value) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1)
-}
-
-/**
- * What to call a group: where it sits relative to the reader.
- *
- * FOUR namings were tried before this one, and every one of them was a
- * number. Keeping why each failed, because between them they rule out
- * the whole family.
- *
- * "Middle of three" and "Higher scores" were read twice before they
- * made sense -- middle of WHAT, higher THAN what.
- *
- * "Ratings 28-49" beside "Ratings 37-91" overlapped, so a player rated
- * 45 found their own number inside the name of a group they were not
- * in. The overlap is real rather than a slip: groups are not slices of
- * the rating scale, because the clustering sorts on ten measurements
- * while the rating is a sum of four of them.
- *
- * "Around 43" cannot overlap, but a rating describes position poorly.
- * skill_score is min-max scaled and players are not spread evenly along
- * it -- on the pool this was written against, 26 of 46 sat between 40
- * and 59.
- *
- * "70th percentile" fixed that and broke two other things. It needs a
- * line of explanation before it means anything, and it sits beside the
- * rating in step 1 looking like the same unit while being a different
- * one: nine of those 46 players were 20+ points from their own group's
- * percentile, one rated 37 while personally at the 7th in a group
- * called "70th". Worse, a percentile exaggerates where it matters most
- * -- 27 of 45 neighbouring pairs were under one rating point apart, and
- * in the crowded middle a single rating point moved a player 6.5
- * percentile places. It manufactures gaps between players the model
- * considers tied.
- *
- * So: no number. A rung says where it sits beside YOURS, which is the
- * only thing a reader needs from it and the only version that needs no
- * legend. It also survives the clustering changing its mind about how
- * many groups there are -- 2 at 46 players, 3 at 12, and up to 5 -- at
- * which point the pipeline's own labels degrade to "Performance Group
- * 4" and mean nothing to anybody.
- *
- * The percentile went too, once the old score stopped being shown at
- * all: groups are put in order by rally points, and a percentile of the
- * old score could say a group was lower than the rung beneath it.
- */
-const STEPS = ['', 'A step', 'Two steps', 'Three steps', 'Four steps']
-
-function labelFor(index, mine) {
-  // No reference point, so "a step up" has nothing to be a step from.
-  if (mine === -1) return `Group ${index + 1}`
-  if (index === mine) return 'Your group'
-  const distance = Math.abs(index - mine)
-  const direction = index > mine ? 'up' : 'down'
-  const size = STEPS[distance] ?? `${distance} steps`
-  return `${size} ${direction}`
-}
-
 function Step({ number, title, value, children }) {
   return (
     <section className="step rise" style={{ '--i': number }} aria-label={title}>
@@ -275,56 +158,6 @@ function BackLink() {
     >
       &larr; Back
     </button>
-  )
-}
-
-/**
- * What separates this player from the rung above -- idea 3, and the
- * most useful thing a skill model can tell an amateur.
- *
- * The biggest gap by itself, because four gaps is a table and one gap
- * is a thing to go and practise. The rest sit behind the tap for
- * anyone who wants to check that the biggest really is the biggest.
- */
-function NextGroup({ parts }) {
-  const { worst } = gainsAndLosses(parts.parts, 'above')
-  if (!worst) return null
-
-  return (
-    <div className="next-group">
-      <h3 className="next-head">What separates you from the next group up</h3>
-      <p className="step-line">
-        The biggest single gap is <strong>{worst.part.label}</strong>: theirs
-        averages {partValue(worst.part.above.value, worst.part.unit)}, yours is{' '}
-        {partValue(worst.part.you.value, worst.part.unit)}. That one part is{' '}
-        {points(Math.abs(worst.diff))} points of the difference.
-      </p>
-
-      <More label="The other three">
-        <ul className="proof-figures">
-          {parts.parts
-            .filter((part) => part.key !== worst.part.key && part.above)
-            .map((part) => {
-              const diff = part.you.points - part.above.points
-              return (
-                <li key={part.key}>
-                  <strong>{part.label}</strong>: theirs{' '}
-                  {partValue(part.above.value, part.unit)}, yours{' '}
-                  {partValue(part.you.value, part.unit)} —{' '}
-                  {diff >= 0
-                    ? `${points(diff)} points ahead of them`
-                    : `${points(Math.abs(diff))} points behind`}
-                  .
-                </li>
-              )
-            })}
-        </ul>
-        <p>
-          Averages of that group, never anyone&rsquo;s own numbers. A group
-          of fewer than three is never averaged at all.
-        </p>
-      </More>
-    </div>
   )
 }
 
@@ -456,71 +289,6 @@ function Score({ rallyRating }) {
   )
 }
 
-/** Step 2: the first split, and what it is for. */
-function Group({ standing }) {
-  const groups = standing.groups ?? []
-  const mine = groups.findIndex((group) => group.name === standing.band?.name)
-  const above = mine === -1 ? null : (groups[mine + 1] ?? null)
-
-  return (
-    <Step
-      number={2}
-      title="Your group"
-      value={
-        mine === -1
-          ? 'Not grouped yet'
-          : `${groups[mine].size} ${groups[mine].size === 1 ? 'player' : 'players'} at your level`
-      }
-    >
-      {groups.length > 0 && (
-        <ol className="ladder" aria-label="The groups, lowest ratings first">
-          {groups.map((group, i) => (
-            <li key={group.name} className={i === mine ? 'is-you' : undefined}>
-              <span className="ladder-name">
-                {i === mine && <Icon name="chevron" size={13} />}
-                {labelFor(i, mine)}
-              </span>
-              <span className="ladder-size">
-                {group.size} {group.size === 1 ? 'player' : 'players'}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
-
-      <p className="step-line">
-        Everyone rated is split into a few groups first, from ten measurements
-        of how your matches have gone. Your points above aren&rsquo;t one of
-        them, so a group isn&rsquo;t a range of points — players in it can have
-        quite different points.
-      </p>
-
-      {/* The rung above, named from the ladder rather than from
-          anything the server sends -- so it keeps working whatever
-          number of groups the clustering settles on. Nothing at all
-          when there is no group above, which is a fact worth reading
-          on its own. */}
-      {standing.parts && above && <NextGroup parts={standing.parts} />}
-      {standing.parts && mine !== -1 && !above && (
-        <p className="step-line">There is no group above yours.</p>
-      )}
-
-      <More label="Why groups?">
-        <p>
-          So that a playstyle means something. Styles are worked out
-          <em> within</em> a group, so &ldquo;steady&rdquo; means steady for
-          players at this level rather than steady compared with everyone.
-        </p>
-        <p>
-          Which group sits higher is decided by the average rally points of the
-          players in it. The points only put the groups in order — they never
-          decide who is in which group.
-        </p>
-      </More>
-    </Step>
-  )
-}
-
 /**
  * The proof rows gathered by word. Every adjective has one measurement;
  * the all-court noun arrives as two rows marked neutral (see
@@ -615,17 +383,51 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
   )
 }
 
-/** Step 3: the second split, with the numbers that chose its words. */
+/**
+ * Step 2: how the player plays, with the numbers that chose its words.
+ *
+ * This used to be step 3, after a step of its own about the player's
+ * skill group -- a ladder of groups and what separated them from the one
+ * above, built to support the old 0-100 score. With that score gone the
+ * group's only job for a player is to say who their style is compared
+ * with, so it is said here, in one line, where it is used.
+ */
+/** Who the style is compared with, and what that group is, on a tap. */
+function ComparedWith({ band, styleSize }) {
+  if (!band?.size) return null
+  return (
+    <>
+      <p className="step-line">
+        Compared with the <strong>{band.size} players</strong> closest to your
+        level{styleSize ? <> — {styleSize} of them, you included, share your style</> : ''}.
+      </p>
+      <More label="Who are they?">
+        <p>
+          Everyone rated is first split into a few groups of players whose
+          matches go in similar ways — how often they win points, make
+          mistakes, land drops and so on. Yours has {band.size} players.
+        </p>
+        <p>
+          Styles are then worked out inside each group, so a word like
+          &ldquo;Patient&rdquo; means patient for players at your level, not
+          compared with everyone. Your rally points don&rsquo;t decide which
+          group you&rsquo;re in.
+        </p>
+      </More>
+    </>
+  )
+}
+
 function Playstyle({ standing }) {
   const { playstyle: proof, band } = standing
   const name = styleName(standing.playstyleArchetype, band?.name)
 
   if (!name) {
     return (
-      <Step number={3} title="Your playstyle" value="Not worked out yet">
+      <Step number={2} title="Your playstyle" value="Not worked out yet">
         <p className="step-line">
-          A group needs at least three rated players before the styles inside it
-          are worked out. Yours has {band?.size ?? 1}.
+          Styles are worked out among the players closest to your level, and
+          that needs at least three of them. There {band?.size === 1 || !band?.size ? 'is 1' : `are ${band.size}`} so far.
         </p>
       </Step>
     )
@@ -633,10 +435,10 @@ function Playstyle({ standing }) {
 
   if (!proof) {
     return (
-      <Step number={3} title="Your playstyle" value={name}>
+      <Step number={2} title="Your playstyle" value={name}>
         <p className="step-line">
-          This name comes from where your style sits against your group&rsquo;s
-          average. The measurements behind it weren&rsquo;t recorded for this
+          This name comes from how players with your style compare with the
+          players closest to your level. The measurements behind it weren&rsquo;t recorded for this
           run, so there is nothing to show beside it yet.
         </p>
       </Step>
@@ -644,11 +446,8 @@ function Playstyle({ standing }) {
   }
 
   return (
-    <Step number={3} title="Your playstyle" value={name}>
-      <p className="step-line">
-        One of {proof.styleSize} in this style
-        {band?.size ? `, out of ${band.size} in your group` : ''}.
-      </p>
+    <Step number={2} title="Your playstyle" value={name}>
+      <ComparedWith band={band} styleSize={proof.styleSize} />
 
       <ul className="proof" aria-label="Why this name">
         {proofItems(proof.rows).map((item) =>
@@ -733,7 +532,6 @@ function Rating() {
 
       {mlRated && (
         <>
-          <Group standing={standing} />
           <Playstyle standing={standing} />
         </>
       )}
