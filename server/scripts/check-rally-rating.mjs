@@ -156,6 +156,19 @@ section('What does not count')
     'Every match scored before endings existed still says who won each rally.')
 }
 
+section('The onRally callback')
+{
+  const calls = []
+  const third = { type: 'thirdShot', id: randomUUID(), playerId: A1, shotType: 'drop', success: true }
+  rateHistory([match([third, rally(A1, 'putaway')])], { onRally: (info) => calls.push(info) })
+  check('onRally fires once per counted rally, not for third shots',
+    calls.length, 1, 'A third shot describes how a rally started, not a contest of its own.')
+  check('expected is 0.5 on the first rally between fresh players',
+    calls[0].expected, 0.5, 'With no history yet, either side is an even chance to win the rally.')
+  check('weight matches the ending that closed the rally',
+    calls[0].weight, endingWeight('putaway'), 'The callback carries the same weight the points update used.')
+}
+
 section('Order, history and the summary fields')
 {
   const m1 = match([rally(A1, 'putaway'), rally(A1, 'net')])

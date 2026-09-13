@@ -81,6 +81,12 @@ function byWhenEnded(a, b) {
  * Every player's rating after replaying `matches` in the order they ended.
  *
  * `matches` must already be the ones that count: completed and not voided.
+ *
+ * `options.onRally`, if given, is called once per counted rally with
+ * `{ expected, weight }` -- the pre-rally chance the side that actually
+ * won the rally was expected to (the same value the points update uses)
+ * and that rally's ending weight. Lets callers (tuning scripts) score
+ * per-rally predictions without duplicating the model.
  */
 export function rateHistory(matches, options = {}) {
   const k = options.k ?? DEFAULT_K
@@ -118,8 +124,11 @@ export function rateHistory(matches, options = {}) {
       const winners = actorSideWon ? actorSide : otherSide
       const losers = actorSideWon ? otherSide : actorSide
 
-      const stake =
-        k * endingWeight(event.detail) * (1 - expectedWin(average(winners), average(losers), scale))
+      const weight = endingWeight(event.detail)
+      const expected = expectedWin(average(winners), average(losers), scale)
+      options.onRally?.({ expected, weight })
+
+      const stake = k * weight * (1 - expected)
       const actorSideChange = actorSideWon ? stake : -stake
 
       // Worked out in full before anything is applied, so every share is
