@@ -99,7 +99,7 @@ export function upsertKnownPlayer(name) {
 export function addPlayerToSession(sessionId, playerId) {
   const updated = getSessions().map((s) =>
     s.id === sessionId && !s.playerIds.includes(playerId)
-      ? { ...s, playerIds: [...s.playerIds, playerId] }
+      ? { ...s, playerIds: [...s.playerIds, playerId], playerCount: s.playerIds.length + 1 }
       : s,
   )
   writeJSON(SESSIONS_KEY, updated)
@@ -115,7 +115,10 @@ export function addPlayerToSession(sessionId, playerId) {
 export function removePlayerFromSession(sessionId, playerId) {
   const updated = getSessions().map((s) =>
     s.id === sessionId
-      ? { ...s, playerIds: s.playerIds.filter((id) => id !== playerId) }
+      ? (() => {
+          const playerIds = s.playerIds.filter((id) => id !== playerId)
+          return { ...s, playerIds, playerCount: playerIds.length }
+        })()
       : s,
   )
   writeJSON(SESSIONS_KEY, updated)
@@ -414,10 +417,14 @@ export function replaceServerState({
   force = false,
 }) {
   if (players) {
-    writeJSON(
-      PLAYERS_KEY,
-      players.map((p) => ({ id: p.id, name: p.name })),
-    )
+    // Merged, not replaced. The list endpoint is capped (the players with
+    // the most matches come first), so replacing wiped out everyone
+    // below the cap -- including players this device had just learned
+    // from a session it opened. Their sessions then showed "No players
+    // yet" and their matches "? vs ?". Names the server sends still win.
+    const fresh = new Map(players.map((p) => [p.id, { id: p.id, name: p.name }]))
+    const kept = getKnownPlayers().filter((p) => !fresh.has(p.id))
+    writeJSON(PLAYERS_KEY, [...fresh.values(), ...kept])
   }
 
   if (sessions) {
@@ -444,6 +451,10 @@ export function replaceServerState({
         createdBy: s.created_by ?? null,
         createdByName: s.created_by_name ?? null,
         playerIds: mine?.playerIds ?? [],
+        // The server's own count, so the home screen is right on a device
+        // that has never opened this session (and so has no roster for
+        // it). Kept in step with local roster edits below.
+        playerCount: s.player_count ?? mine?.playerIds?.length ?? 0,
       }
     })
     // Sessions created here and not yet accepted must survive the pull;
@@ -458,11 +469,20 @@ export function replaceServerState({
   }
 
   if (sessionDetail?.session) {
+    // The session names its own players. They may be missing from the
+    // capped list pulled above, and a roster id with no known player is
+    // simply not drawn.
+    for (const player of sessionDetail.players ?? []) rememberPlayer(player)
+
     const dirty = new Set(pendingEntities('roster'))
     if (!dirty.has(sessionDetail.session.id)) {
       const updated = getSessions().map((s) =>
         s.id === sessionDetail.session.id
-          ? { ...s, playerIds: sessionDetail.session.playerIds }
+          ? {
+              ...s,
+              playerIds: sessionDetail.session.playerIds,
+              playerCount: sessionDetail.session.playerIds.length,
+            }
           : s,
       )
       writeJSON(SESSIONS_KEY, updated)
