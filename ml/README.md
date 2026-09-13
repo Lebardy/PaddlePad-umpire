@@ -110,15 +110,21 @@ was built; check what the URL actually serves.
 
 ### The nightly run
 
-It runs in a **thread inside this service** (`scheduler.py`), waking at
-19:00 UTC — 3am Manila. That is not the arrangement to want. Railway
-cron services are expected to start, run and **exit**, and this one is a
-gunicorn process that never does, so a `cronSchedule` set on it would
-look configured and quietly never fire. A second service is the right
-answer and is not currently available: the free plan caps the project at
-five services, and `api`, `web`, `play`, `ml` and Postgres use all five.
+It runs at 19:00 UTC — 3am Manila — and where it runs differs by
+environment:
 
-Two consequences worth knowing:
+| | production | staging |
+|---|---|---|
+| Nightly run | `ml-cron` service (Railway cron) | thread inside `ml` |
+| `PADDLEPAD_SCHEDULE` on `ml` | `off` | unset (on) |
+
+Railway cron services are expected to start, run and **exit**, and `ml`
+is a gunicorn process that never does, so a `cronSchedule` set on it
+would look configured and quietly never fire. That is why the cron is a
+second service. Staging still uses the thread because it was built while
+the free plan capped the project at five services.
+
+Two consequences of the thread, for staging, worth knowing:
 
 - **It only fires while the container is up.** `sleepApplication` must
   stay **off** for this service. Turning it on would stop the nightly
@@ -127,9 +133,9 @@ Two consequences worth knowing:
   second process with its own thread, and both would wake at 3am and
   publish near-identical snapshots.
 
-### When the plan is upgraded: moving to a real cron service
+### Moving an environment to a real cron service
 
-Two steps, in this order:
+Done for production on the Hobby plan. Two steps, in this order:
 
 1. Set `PADDLEPAD_SCHEDULE=off` on the `ml` service. The thread then
    never starts, and `POST /run` keeps working. Do this **first**, so
@@ -149,6 +155,26 @@ Two steps, in this order:
    setting it in the dashboard did not save when it was tried here.
    Leave `healthcheckPath` unset; a process that exits has nothing to
    health-check.
+
+   Setting the root directory in the dashboard failed to save again for
+   production's `ml-cron`, and its first deploy built the umpire app.
+   What worked, and can be read back to check:
+
+   ```bash
+   railway api 'mutation($s:String!,$e:String){serviceInstanceUpdate(serviceId:$s,environmentId:$e,input:{rootDirectory:"ml"})}' \
+     --var s=<service id> --var e=<environment id>
+   railway api 'query($s:String!,$e:String!){serviceInstance(serviceId:$s,environmentId:$e){rootDirectory startCommand cronSchedule nextCronRunAt}}' \
+     --var s=<service id> --var e=<environment id>
+   ```
+
+   The variables can be references rather than copies, so no key is
+   typed: `INTERNAL_API_KEY=${{ml.INTERNAL_API_KEY}}` and
+   `PADDLEPAD_API_URL=${{ml.PADDLEPAD_API_URL}}`.
+
+**Adding a service to production with the dashboard's Sync copies
+staging's variables along with it.** Production's `ml` arrived pointing
+at the staging API with the staging key. Check both before the first
+deploy.
 
 **Never pass `--variables` to `railway add`.** That command echoes each
 prompt back *including the value*. It is how the staging

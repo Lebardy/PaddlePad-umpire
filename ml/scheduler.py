@@ -4,10 +4,12 @@ The nightly run, scheduled from inside the web process.
 The tidier arrangement is a second Railway service with a cron schedule
 that starts, runs and exits -- Railway cron services are expected to
 exit, and this one never does, so a cronSchedule set on it would look
-configured and quietly do nothing. That second service is not available:
-the free plan caps the project at five services and all five are in use.
+configured and quietly do nothing. Production now has that service,
+`ml-cron`, and runs this web service with PADDLEPAD_SCHEDULE=off. The
+thread is what staging still uses, and was the only option while the
+free plan capped the project at five services.
 
-So the schedule lives in a thread here instead. Two things make that
+Where the schedule does live in a thread here: Two things make that
 safe enough to rely on:
 
   - It computes the NEXT occurrence of the target time and sleeps until

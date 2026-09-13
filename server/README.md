@@ -156,10 +156,20 @@ uses; `staging` is an identical copy to deploy to first.
 
 | | production | staging |
 |---|---|---|
-| api | `paddlepad-api.up.railway.app` | `api-staging-8ac6.up.railway.app` |
-| web (umpire) | `paddlepad-umpire.up.railway.app` | `web-staging-e8e9.up.railway.app` |
-| play (player) | `paddlepad.up.railway.app` | `play-staging-7f59.up.railway.app` |
-| ml (pipeline) | not deployed yet | `ml-staging-12f5.up.railway.app` |
+| api | `api.paddlepad.app` | `api-staging-8ac6.up.railway.app` |
+| web (umpire) | `umpire.paddlepad.app` | `web-staging-e8e9.up.railway.app` |
+| play (player) | `paddlepad.app` | `play-staging-7f59.up.railway.app` |
+| ml (pipeline) | no public address | `ml-staging-12f5.up.railway.app` |
+| ml-cron (nightly run) | no public address | none; staging's runs inside `ml` |
+
+Production's three `paddlepad.app` addresses are custom domains at
+name.com. Its older `railway.app` addresses (`paddlepad-api`,
+`paddlepad-umpire`, `paddlepad`) still work, and stay in the api's
+`CORS_ORIGIN` so an installed app that has not updated keeps working.
+A new app address needs adding in three places: the api's
+`CORS_ORIGIN`, the apps' `VITE_API_URL` / `VITE_PLAYER_APP_URL`
+(read at build time, so redeploy after), and the Google OAuth client's
+Authorized JavaScript origins.
 
 ```bash
 railway up --service api  --environment staging
