@@ -41,3 +41,12 @@ __pycache__/
 # once already; never again.
 paddlepad-backup.json
 *-backup.json
+
+# Claude Code's local state. The permission allowlist says what may run
+# without asking on THIS machine, which is a decision for whoever is
+# sitting at it -- committing one would hand everybody who clones the
+# repo an allowlist they never agreed to. RESUME.md is a session
+# checkpoint and is stale the moment it is written.
+.claude/settings.json
+.claude/settings.local.json
+.claude/RESUME.md
