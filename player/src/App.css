@@ -1855,3 +1855,50 @@ a.highlight:active,
   }
   .ribbon-mark { opacity: 1; }
 }
+
+/* ============ Rally rating ============ */
+
+.points-figure {
+  font-family: var(--display);
+  font-size: clamp(3.4rem, 16vw, 4.4rem);
+  font-weight: 900;
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+}
+.points-unit {
+  font-family: var(--label);
+  font-size: 1.2rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.points-change {
+  font-family: var(--label);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-top: 0.3rem;
+}
+.points-change.is-up { color: var(--status-good); }
+.points-change.is-down { color: var(--status-critical); }
+.points-anchor {
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin-top: 0.8rem;
+  max-width: 34ch;
+}
+.points-anchor strong { color: var(--text); }
+.points-trend { display: block; width: 100%; height: 56px; margin-top: 0.9rem; overflow: visible; }
+.points-trend-line {
+  fill: none;
+  stroke: var(--series-1);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.points-basis { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem; }
