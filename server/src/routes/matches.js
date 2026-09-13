@@ -1,7 +1,12 @@
 import { Router } from 'express'
 import { query, withTransaction } from '../db.js'
 import { requireAuth } from '../auth.js'
-import { DEFAULT_POINT_TARGET, POINT_TARGETS, deriveMatchState } from '../pickleball.js'
+import {
+  DEFAULT_POINT_TARGET,
+  POINT_TARGETS,
+  deriveMatchState,
+  eventToRow,
+} from '../pickleball.js'
 import { isUuid, stackingFromColumns, stackingToColumns } from '../validate.js'
 
 const router = Router()
@@ -334,7 +339,7 @@ router.put('/:id/log', async (req, res) => {
     await client.query('DELETE FROM match_events WHERE match_id = $1', [req.params.id])
 
     for (const event of events) {
-      const { id, seq, type, at, ...payload } = event
+      const { id, seq, type, at, payload } = eventToRow(event)
       await client.query(
         `INSERT INTO match_events (id, match_id, seq, type, payload, at)
          VALUES ($1, $2, $3, $4, $5::jsonb, COALESCE($6::timestamptz, now()))`,

@@ -14,7 +14,7 @@
 // them nothing.
 // ============================================================
 
-import { deriveMatchState } from './pickleball.js'
+import { deriveMatchState, eventFromRow } from './pickleball.js'
 import { buildPlaystyleProof } from './playstyle.js'
 import { buildRatingParts } from './rating-parts.js'
 import { summariseGames } from './game-scores.js'
@@ -63,7 +63,7 @@ export async function getPlayerMatches(query, playerId) {
   const matchIds = rows.map((r) => r.id)
 
   const { rows: events } = await query(
-    `SELECT match_id, type, payload
+    `SELECT match_id, id, type, payload
        FROM match_events
       WHERE match_id = ANY($1::uuid[])
       ORDER BY match_id, seq`,
@@ -73,7 +73,7 @@ export async function getPlayerMatches(query, playerId) {
   const eventsByMatch = new Map()
   for (const event of events) {
     if (!eventsByMatch.has(event.match_id)) eventsByMatch.set(event.match_id, [])
-    eventsByMatch.get(event.match_id).push({ type: event.type, ...event.payload })
+    eventsByMatch.get(event.match_id).push(eventFromRow(event))
   }
 
   // Resolve every id on court to a name in one query -- a player reading

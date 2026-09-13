@@ -27,7 +27,7 @@
 // test every rule here without staging, credentials or a network.
 // ============================================================
 
-import { deriveMatchState } from './pickleball.js'
+import { deriveMatchState, eventFromRow } from './pickleball.js'
 import { getPlayerMatches, scoreProgression } from './player-stats.js'
 import { DRAMA_ORDER, readGame } from './drama.js'
 
@@ -360,7 +360,7 @@ async function gatherMonth(query) {
   if (rows.length === 0) return { ...month, visible: new Set(), nameOf: new Map(), history: [] }
 
   const { rows: events } = await query(
-    `SELECT match_id, type, payload
+    `SELECT match_id, id, type, payload
        FROM match_events
       WHERE match_id = ANY($1::uuid[])
       ORDER BY match_id, seq`,
@@ -368,7 +368,7 @@ async function gatherMonth(query) {
   )
   for (const e of events) {
     if (!month.eventsByMatch.has(e.match_id)) month.eventsByMatch.set(e.match_id, [])
-    month.eventsByMatch.get(e.match_id).push({ type: e.type, ...e.payload })
+    month.eventsByMatch.get(e.match_id).push(eventFromRow(e))
   }
 
   // The score is not stored on the match row -- it is always derived

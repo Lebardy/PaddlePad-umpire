@@ -12,7 +12,7 @@
 // the club's full data no matter how many matches get logged.
 // ============================================================
 
-import { deriveMatchState } from './pickleball.js'
+import { deriveMatchState, eventFromRow } from './pickleball.js'
 
 // The 12 columns the ML pipeline actually reads today. Kept first and
 // in this exact order so the CSV stays a drop-in superset of what the
@@ -99,7 +99,7 @@ export async function buildMatchLogRows(query) {
   if (matches.length === 0) return []
 
   const { rows: events } = await query(
-    `SELECT e.match_id, e.seq, e.type, e.payload
+    `SELECT e.match_id, e.id, e.seq, e.type, e.payload
        FROM match_events e
        JOIN matches m ON m.id = e.match_id
        JOIN sessions s ON s.id = m.session_id
@@ -112,7 +112,7 @@ export async function buildMatchLogRows(query) {
   const eventsByMatch = new Map()
   for (const event of events) {
     if (!eventsByMatch.has(event.match_id)) eventsByMatch.set(event.match_id, [])
-    eventsByMatch.get(event.match_id).push({ type: event.type, ...event.payload })
+    eventsByMatch.get(event.match_id).push(eventFromRow(event))
   }
 
   const rows = []
