@@ -26,10 +26,10 @@
 // lib/styleName.js.
 //
 // Step 3 also has to be checkable, so it shows, for each word in the
-// name, this player's own number, their group's average, and the
-// average of the other style in their group -- the players the
-// clustering separated them from. Nobody's individual numbers but their
-// own; see server/src/playstyle.js.
+// name, this player's own number, the average of players with their
+// style, and their group's average, with one plain sentence saying
+// which way the style leans. Nobody's individual numbers but their own;
+// see server/src/playstyle.js.
 //
 // Under the ladder, step 2 answers one more question: what separates me
 // from the group above -- the four measurements the pipeline's score is
@@ -54,23 +54,73 @@ import Collapsible from '../components/Collapsible'
  * Each measurement in everyday words, with how to read its number.
  *
  * The feature names belong to the model; a player should never meet
- * `winner_rate_std`. "Swing" is how the spread features are said here:
- * they measure how much something moves from game to game.
+ * `winner_rate_std`. The spread features are said as how much something
+ * changes from match to match.
  */
+// `as` says how its number reads:
+//   percent        a share, shown as 19%
+//   ratio          shown as 0.85
+//   swing-percent  how much a share changes from match to match (the
+//                  spread of a proportion), shown as ±12%
+//   swing-per10    how much a per-minute count changes from match to
+//                  match, shown per 10 minutes as ±0.9 -- ten minutes is
+//                  roughly a game, a length people already think in
+//
+// `says(way)` finishes "Compared with your group, players with your
+// style …" for a style that sits higher or lower than its group.
 const MEASURES = {
-  aggression_mean: { label: 'going for winners', as: 'percent', better: 'neither' },
-  drop_efficiency_mean: { label: 'drop shots landing', as: 'percent', better: 'higher' },
-  error_to_winner_ratio: { label: 'mistakes per winning shot', as: 'ratio', better: 'lower' },
-  aggression_std: { label: 'aggression swing', as: 'swing', better: 'neither' },
-  drop_efficiency_std: { label: 'drop success swing', as: 'swing', better: 'neither' },
-  winner_rate_std: { label: 'scoring swing', as: 'swing', better: 'neither' },
-  general_error_rate_std: { label: 'mistake swing', as: 'swing', better: 'neither' },
-  dink_error_rate_std: { label: 'net mistake swing', as: 'swing', better: 'neither' },
-  drop_usage_rate: { label: 'third shots that are drops', as: 'percent', better: 'neither' },
-  drop_preference_rate_mean: { label: 'drops rather than drives', as: 'percent', better: 'neither' },
-  drop_preference_rate_std: { label: 'drop choice swing', as: 'swing', better: 'neither' },
-  net_game_preference_rate_mean: { label: 'points won at the net', as: 'percent', better: 'neither' },
-  net_game_preference_rate_std: { label: 'net play swing', as: 'swing', better: 'neither' },
+  aggression_mean: {
+    label: 'going for winners', as: 'percent', better: 'neither',
+    says: (way) => `go for winners ${way === 'higher' ? 'more' : 'less'} often`,
+  },
+  drop_efficiency_mean: {
+    label: 'drop shots landing', as: 'percent', better: 'higher',
+    says: (way) => `land their drop shots ${way === 'higher' ? 'more' : 'less'} often`,
+  },
+  error_to_winner_ratio: {
+    label: 'mistakes per winning shot', as: 'ratio', better: 'lower',
+    says: (way) => `make ${way === 'higher' ? 'more' : 'fewer'} mistakes for every winning shot`,
+  },
+  aggression_std: {
+    label: 'change in going for winners, match to match', as: 'swing-percent', better: 'neither',
+    says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how often they go for winners`,
+  },
+  drop_efficiency_std: {
+    label: 'change in drops landing, match to match', as: 'swing-percent', better: 'neither',
+    says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how well their drops land`,
+  },
+  winner_rate_std: {
+    label: 'change in winning shots per 10 min, match to match', as: 'swing-per10', better: 'neither',
+    says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how many winning shots they hit`,
+  },
+  general_error_rate_std: {
+    label: 'change in mistakes per 10 min, match to match', as: 'swing-per10', better: 'neither',
+    says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how many mistakes they make`,
+  },
+  dink_error_rate_std: {
+    label: 'change in net mistakes per 10 min, match to match', as: 'swing-per10', better: 'neither',
+    says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how many mistakes they make at the net`,
+  },
+  drop_usage_rate: {
+    label: 'third shots that are drops', as: 'percent', better: 'neither',
+    says: (way) => `use drops for ${way === 'higher' ? 'more' : 'fewer'} of their third shots`,
+  },
+  drop_preference_rate_mean: {
+    label: 'drops rather than drives', as: 'percent', better: 'neither',
+    says: (way) => `choose drops over drives ${way === 'higher' ? 'more' : 'less'} often`,
+  },
+  drop_preference_rate_std: {
+    label: 'change in choosing drops, match to match', as: 'swing-percent', better: 'neither',
+    says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in choosing drops over drives`,
+  },
+  net_game_preference_rate_mean: {
+    label: 'points won at the net', as: 'percent', better: 'neither',
+    says: (way) => `win ${way === 'higher' ? 'more' : 'fewer'} of their points at the net`,
+  },
+  net_game_preference_rate_std: {
+    label: 'change in points won at the net, match to match', as: 'swing-percent', better: 'neither',
+    says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how many points they win at the net`,
+  },
 }
 
 // Said only where there IS a direction. Most of these measurements are
@@ -83,24 +133,12 @@ const DIRECTION = {
   lower: 'lower is better',
 }
 
-/**
- * How this player compares, in words, because the bars alone say "not
- * the same" without saying how much.
- */
-function compare(you, them) {
-  if (!Number.isFinite(you) || !Number.isFinite(them) || them === 0) return null
-  const ratio = you / them
-  if (ratio < 0.45) return 'much less than'
-  if (ratio < 0.8) return 'less than'
-  if (ratio > 2.2) return 'much more than'
-  if (ratio > 1.25) return 'more than'
-  return 'about the same as'
-}
-
 function showValue(value, as) {
   if (value === null || value === undefined) return '—'
   if (as === 'percent') return `${Math.round(value * 100)}%`
   if (as === 'ratio') return value.toFixed(2)
+  if (as === 'swing-percent') return `±${Math.round(value * 100)}%`
+  if (as === 'swing-per10') return `±${(value * 10).toFixed(1)}`
   return `±${value.toFixed(2)}`
 }
 
@@ -516,30 +554,25 @@ function allCourtSentence(rows) {
 /** One measurement: you, your style, your group and the other style, as bars. */
 function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
   const measure = MEASURES[row.feature] ?? {
-    label: row.feature, as: 'swing', better: 'neither',
+    label: row.feature, as: 'ratio', better: 'neither',
   }
   // Every word is chosen from where the player's STYLE sits against their
-  // group, so "your style" is the bar that proves it; the player's own
-  // number stays first so they can see where they sit inside it. The
-  // other style is left off the all-court rows, which already carry two
-  // measurements under one word.
+  // group, so the style's bar is the one that proves it; the player's own
+  // number stays first so they can see where they sit inside it.
   const hasStyle = row.style !== null && row.style !== undefined
   const bars = [
     { who: 'you', value: row.you, mine: true },
-    ...(hasStyle ? [{ who: 'your style', value: row.style }] : []),
+    ...(hasStyle ? [{ who: 'players with your style', value: row.style }] : []),
     { who: 'your group', value: row.group },
-    ...(!row.neutral && proof.other ? [{ who: 'the other style', value: row.other }] : []),
   ]
   // Bars are drawn against the biggest of them, so a row is read by
   // comparing its own bars and nothing else.
   const widest = Math.max(...bars.map((b) => Math.abs(b.value ?? 0)), 0.0001)
 
-  // Said as a direction, not a size. On staging the style's number
-  // pointed the word's way for all 124 words, but for most it was within
-  // a quarter of the group's -- which "about the same as" would have
-  // called a contradiction of the word right above it.
+  // Said as a direction, never a size. On staging the style's number
+  // pointed the word's way for all 124 words, but most gaps were small,
+  // and "about the same as" beside the word read as a contradiction.
   const styleWay = hasStyle && row.style !== row.group ? (row.style > row.group ? 'higher' : 'lower') : null
-  const yours = compare(row.you, row.group)
 
   return (
     <>
@@ -566,22 +599,16 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
                   style={{ width: `${Math.round((Math.abs(bar.value ?? 0) / widest) * 100)}%` }}
                 />
               </span>
-              {/* A percentage means something on its own, so it is shown.
-                  A spread of a per-minute rate does not, so the bars carry
-                  it and the figures live behind the tap below. */}
-              <span className="proof-number">
-                {measure.as === 'percent' ? showValue(bar.value, 'percent') : ''}
-              </span>
+              <span className="proof-number">{showValue(bar.value, measure.as)}</span>
             </li>
           ))}
         </ul>
       )}
 
-      {withVerdict && row.you !== null && (styleWay || yours) && (
+      {withVerdict && word && row.you !== null && styleWay && measure.says && (
         <p className="proof-verdict">
-          {styleWay
-            ? <>Your style&rsquo;s is {styleWay} than your group&rsquo;s, which is where the word comes from{yours ? `; yours is ${yours} your group's` : ''}.</>
-            : <>Yours is {yours} your group&rsquo;s.</>}
+          Compared with your group, players with your style {measure.says(styleWay)} —
+          that&rsquo;s why it&rsquo;s called {word}.
         </p>
       )}
     </>
@@ -652,31 +679,16 @@ function Playstyle({ standing }) {
 
       <More label="How this was worked out">
         <p>
-          Inside your group, players are grouped again by how they play. The
-          words in your name are the measurements where your style sits
-          furthest from your group&rsquo;s average
-          {proof.other
-            ? ' — and the last column is the other style in your group, the players you were separated from.'
-            : '.'}
+          Inside your group, players are grouped again by how they play. Each
+          word in the name is a measurement where players with your style sit
+          furthest from your group&rsquo;s average — so the bars compare your
+          style with your group, and your own number shows where you sit
+          inside your style.
         </p>
         <p>
           Averages only, never anyone&rsquo;s own numbers but yours. A style with
           fewer than three players is never averaged at all.
         </p>
-        <ul className="proof-figures">
-          {proof.rows.map((row) => {
-            const measure = MEASURES[row.feature] ?? { label: row.feature, as: 'swing' }
-            return (
-              <li key={row.feature}>
-                <strong>{measure.label}</strong>
-                {measure.as === 'swing' ? ' (how much it moves between games)' : ''}: you{' '}
-                {showValue(row.you, measure.as)}, your group{' '}
-                {showValue(row.group, measure.as)}
-                {proof.other ? `, the other style ${showValue(row.other, measure.as)}` : ''}.
-              </li>
-            )
-          })}
-        </ul>
       </More>
     </Step>
   )
