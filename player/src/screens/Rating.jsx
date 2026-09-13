@@ -42,7 +42,7 @@
 import { useEffect, useState } from 'react'
 import { fetchStanding } from '../lib/api'
 import { usePlayerData } from '../lib/PlayerData'
-import { navigate } from '../lib/router'
+import { Link, navigate } from '../lib/router'
 import { endingPhrase } from '../lib/endingWords'
 import { styleName } from '../lib/styleName'
 import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
@@ -289,48 +289,152 @@ function NextGroup({ parts }) {
   )
 }
 
-/** Step 1: the player's own rally points, and what is moving them. */
+// What the rows that are not the player's own endings are called.
+const LEDGER_WORDS = {
+  untagged: 'Your rallies with no ending recorded',
+  partner: 'Rallies your partner ended',
+  opponent_winner: 'Winning shots by your opponents',
+  opponent_error: 'Mistakes by your opponents',
+}
+
+function signed(value) {
+  return value > 0 ? `+${value}` : value < 0 ? `−${Math.abs(value)}` : '0'
+}
+
+function shortDate(iso) {
+  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+}
+
+/**
+ * A row with a bar growing left (lost points) or right (gained points)
+ * from a centre line. The same scale the old score's parts used, so the
+ * longest arm is the thing that moved the number most.
+ */
+function PointsArm({ points, widest, label }) {
+  const reach = widest > 0 ? Math.min(1, Math.abs(points) / widest) : 0
+  return (
+    <span className="part-scale" role="img" aria-label={label}>
+      <span className="part-axis" />
+      {points !== 0 && (
+        <span
+          className={`part-arm ${points < 0 ? 'is-behind' : 'is-ahead'}`}
+          style={{ width: `${reach * 50}%` }}
+        />
+      )}
+    </span>
+  )
+}
+
+/**
+ * Step 1: the player's own rally points, and the arithmetic behind them.
+ *
+ * Not a verdict in words: every rally that moved the number is in a row,
+ * with how many rallies and how many points, and the rows add up exactly
+ * to the distance from 1,500 (the server rounds them so they do). Then
+ * each recent match's change, so the trend line has its receipts.
+ */
 function Score({ rallyRating }) {
   const moved = rallyRating.movedMost
+  const rows = [...(rallyRating.breakdown ?? [])].sort((a, b) => b.points - a.points)
+  const widest = Math.max(...rows.map((row) => Math.abs(row.points)), 0)
+  const total = rallyRating.points - 1500
+  const matches = rallyRating.recentMatches ?? []
+  const matchWidest = Math.max(...matches.map((m) => Math.abs(m.change)), 0)
+  const matchTotal = matches.reduce((sum, m) => sum + m.change, 0)
+
   return (
     <Step number={1} title="Your rating">
       <RallyPointsHeadline rallyRating={rallyRating} />
 
-      <div className="moving">
-        <h3 className="moving-head">What&rsquo;s moving it</h3>
-        {moved ? (
-          <ul className="moving-list">
-            {moved.gained[0] && (
-              <li className="is-gain">
-                <strong>{endingPhrase(moved.gained[0].ending)}</strong> earned you the most.
-              </li>
-            )}
-            {moved.gained[1] && (
-              <li className="is-gain">Then {endingPhrase(moved.gained[1].ending).toLowerCase()}.</li>
-            )}
-            {moved.cost[0] && (
-              <li className="is-cost">
-                <strong>{endingPhrase(moved.cost[0].ending)}</strong> cost you the most.
-              </li>
-            )}
-            {moved.cost[1] && (
-              <li className="is-cost">Then {endingPhrase(moved.cost[1].ending).toLowerCase()}.</li>
-            )}
+      {rows.length > 0 && (
+        <div className="moving">
+          <h3 className="moving-head">What&rsquo;s moving it</h3>
+          {/* The headline of the table in words, only once there are
+              enough rallies with an ending to call it a habit. */}
+          {moved && (moved.gained[0] || moved.cost[0]) && (
+            <p className="step-line">
+              {moved.gained[0] && (
+                <><strong>{endingPhrase(moved.gained[0].ending)}</strong> earned you the most</>
+              )}
+              {moved.gained[0] && moved.cost[0] && '; '}
+              {moved.cost[0] && (
+                <><strong>{endingPhrase(moved.cost[0].ending).toLowerCase()}</strong> cost you the most</>
+              )}
+              .
+            </p>
+          )}
+
+          <ul className="parts-list" aria-label="Where your points came from">
+            {rows.map((row) => {
+              const label = row.ending ? endingPhrase(row.ending) : LEDGER_WORDS[row.kind]
+              return (
+                <li key={row.ending ?? row.kind} className="part">
+                  <div className="part-head">
+                    <span className="part-label">{label}</span>
+                    <span className="part-values">
+                      <span className="part-theirs">{row.rallies} {row.rallies === 1 ? 'rally' : 'rallies'} · </span>
+                      <strong className={row.points > 0 ? 'is-up' : row.points < 0 ? 'is-down' : ''}>
+                        {signed(row.points)}
+                      </strong>
+                    </span>
+                  </div>
+                  <PointsArm
+                    points={row.points}
+                    widest={widest}
+                    label={`${label}: ${signed(row.points)} points over ${row.rallies} rallies`}
+                  />
+                </li>
+              )
+            })}
           </ul>
-        ) : (
-          <p className="step-line">
-            This appears after 20 rallies scored with how they ended — a few
-            rallies can&rsquo;t show a habit.
+          <p className="points-sum">
+            Adds up to <strong>{signed(total)}</strong>: from 1,500 to{' '}
+            {rallyRating.points.toLocaleString()}.
           </p>
-        )}
-      </div>
+        </div>
+      )}
+
+      {matches.length > 0 && (
+        <div className="moving">
+          <h3 className="moving-head">The matches behind it</h3>
+          <ul className="parts-list" aria-label="Points from each recent match">
+            {[...matches].reverse().map((m) => (
+              <li key={m.matchId} className="part">
+                <div className="part-head">
+                  <Link className="part-label" to={`/matches/${m.matchId}`}>
+                    {shortDate(m.endedAt)}
+                  </Link>
+                  <strong className={`part-values ${m.change > 0 ? 'is-up' : m.change < 0 ? 'is-down' : ''}`}>
+                    {signed(m.change)}
+                  </strong>
+                </div>
+                <PointsArm
+                  points={m.change}
+                  widest={matchWidest}
+                  label={`${shortDate(m.endedAt)}: ${signed(m.change)} points`}
+                />
+              </li>
+            ))}
+          </ul>
+          <p className="points-sum">
+            {matches.length === rallyRating.matches
+              ? <>Your {matches.length} matches add up to <strong>{signed(matchTotal)}</strong>.</>
+              : <>Your last {matches.length} matches add up to <strong>{signed(matchTotal)}</strong>.</>}
+          </p>
+        </div>
+      )}
 
       <More label="How are the points worked out?">
         <p>
           Every rally is a small contest. Win it with a shot and you gain points;
           lose it with a mistake and you give some away. Beating a stronger side
-          earns more than beating a weaker one. Your partner shares a little of
-          each rally you end, and you share a little of theirs.
+          earns more than beating a weaker one.
+        </p>
+        <p>
+          The rally counts in points too when someone else ends it: your
+          partner&rsquo;s shots and mistakes move your points a little, and your
+          opponents&rsquo; winning shots and mistakes move them too. That is why
+          those rows are in the list — without them it would not add up.
         </p>
         <p>
           Your points only change when you play — never because someone else
@@ -421,30 +525,48 @@ function proofItems(rows) {
   return items
 }
 
-/** One measurement: you, your group and the other style, as bars. */
+/**
+ * The one sentence under "All-Court Player", naming only the habits that
+ * have something recorded and saying which do not.
+ */
+function allCourtSentence(rows) {
+  const shown = rows.filter((row) => row.you !== null).map((row) => MEASURES[row.feature]?.label ?? row.feature)
+  const missing = rows.some((row) => row.feature === 'drop_preference_rate_mean' && row.you === null)
+  if (shown.length === 0) {
+    return 'All-court means your style doesn’t lean towards dropping or driving, or towards the net or power — there is nothing recorded yet to show it.'
+  }
+  return `Your style sits close to your group on ${shown.join(' and ')}, so it’s called all-court — your own numbers can lean one way${
+    missing ? ', and no third shots are recorded yet to compare drops with drives' : ''
+  }.`
+}
+
+/** One measurement: you, your style, your group and the other style, as bars. */
 function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
   const measure = MEASURES[row.feature] ?? {
     label: row.feature, as: 'swing', better: 'neither',
   }
-  // An all-court row compares the player's STYLE with their group,
-  // because that is what the name was chosen from; the player's own
-  // number stays first so they can see where they sit inside it.
-  const bars = row.neutral
-    ? [
-        { who: 'you', value: row.you, mine: true },
-        ...(row.style !== null && row.style !== undefined ? [{ who: 'your style', value: row.style }] : []),
-        { who: 'your group', value: row.group },
-      ]
-    : [
-        { who: 'you', value: row.you, mine: true },
-        { who: 'your group', value: row.group },
-        ...(proof.other ? [{ who: 'the other style', value: row.other }] : []),
-      ]
-  // Bars are drawn against the biggest of the three, so a row is read by
+  // Every word is chosen from where the player's STYLE sits against their
+  // group, so "your style" is the bar that proves it; the player's own
+  // number stays first so they can see where they sit inside it. The
+  // other style is left off the all-court rows, which already carry two
+  // measurements under one word.
+  const hasStyle = row.style !== null && row.style !== undefined
+  const bars = [
+    { who: 'you', value: row.you, mine: true },
+    ...(hasStyle ? [{ who: 'your style', value: row.style }] : []),
+    { who: 'your group', value: row.group },
+    ...(!row.neutral && proof.other ? [{ who: 'the other style', value: row.other }] : []),
+  ]
+  // Bars are drawn against the biggest of them, so a row is read by
   // comparing its own bars and nothing else.
   const widest = Math.max(...bars.map((b) => Math.abs(b.value ?? 0)), 0.0001)
-  const verdict = withVerdict ? compare(row.you, row.group) : null
-  const versus = verdict && proof.other ? compare(row.you, row.other) : null
+
+  // Said as a direction, not a size. On staging the style's number
+  // pointed the word's way for all 124 words, but for most it was within
+  // a quarter of the group's -- which "about the same as" would have
+  // called a contradiction of the word right above it.
+  const styleWay = hasStyle && row.style !== row.group ? (row.style > row.group ? 'higher' : 'lower') : null
+  const yours = compare(row.you, row.group)
 
   return (
     <>
@@ -482,10 +604,11 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
         </ul>
       )}
 
-      {verdict && (
+      {withVerdict && row.you !== null && (styleWay || yours) && (
         <p className="proof-verdict">
-          Yours is {verdict} your group&rsquo;s
-          {versus ? `, and ${versus} the other style's` : ''}.
+          {styleWay
+            ? <>Your style&rsquo;s is {styleWay} than your group&rsquo;s, which is where the word comes from{yours ? `; yours is ${yours} your group's` : ''}.</>
+            : <>Yours is {yours} your group&rsquo;s.</>}
         </p>
       )}
     </>
@@ -537,15 +660,14 @@ function Playstyle({ standing }) {
               <div className="proof-head">
                 <span className="proof-word">{item.label}</span>
               </div>
-              {item.rows.map((row) => (
+              {/* A habit with nothing recorded gets no row of its own: it
+                  has nothing to show, and a stray "nothing recorded" line
+                  between two headings read as clutter. The one sentence
+                  below says it instead. */}
+              {item.rows.filter((row) => row.you !== null).map((row) => (
                 <ProofMeasure key={row.feature} row={row} proof={proof} />
               ))}
-              <p className="proof-verdict">
-                Your style sits close to your group on both — it doesn&rsquo;t
-                lean towards dropping or driving, or towards the net or power —
-                so it&rsquo;s called all-court. Your own numbers can lean one way;
-                the name describes everyone in your style.
-              </p>
+              <p className="proof-verdict">{allCourtSentence(item.rows)}</p>
             </li>
           ) : (
             <li key={item.rows[0].feature} className="proof-row">

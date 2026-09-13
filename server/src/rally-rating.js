@@ -103,6 +103,13 @@ export function rateHistory(matches, options = {}) {
         rallies: 0,
         detailedRallies: 0,
         history: [],
+        // Where every point came from, so the rating screen can show the
+        // arithmetic rather than assert it. Keyed by the ending for rallies
+        // this player ended themselves; otherwise by what happened (see
+        // LEDGER_KINDS). Adds up exactly to points - START_POINTS.
+        ledger: {},
+        // [matchId, endedAt] per counted match, beside `history`.
+        playedIn: [],
         byEnding: {},
       })
     }
@@ -144,7 +151,17 @@ export function rateHistory(matches, options = {}) {
       }
       for (const id of otherSide) changes.set(id, -actorSideChange / otherSide.length)
 
-      for (const [id, change] of changes) player(id).points += change
+      for (const [id, change] of changes) {
+        const p = player(id)
+        p.points += change
+        let row
+        if (id === event.actingPlayerId) row = event.detail ?? 'untagged'
+        else if (actorSide.includes(id)) row = 'partner'
+        else row = actorSideWon ? 'opponent_winner' : 'opponent_error'
+        const entry = (p.ledger[row] ??= { rallies: 0, points: 0 })
+        entry.rallies += 1
+        entry.points += change
+      }
       for (const id of everyone) {
         player(id).rallies += 1
         if (event.detail) player(id).detailedRallies += 1
@@ -158,6 +175,7 @@ export function rateHistory(matches, options = {}) {
     for (const id of everyone) {
       player(id).matches += 1
       player(id).history.push(player(id).points)
+      player(id).playedIn.push([match.id, match.endedAt])
     }
   }
 
@@ -174,6 +192,15 @@ export function rateHistory(matches, options = {}) {
       trend: p.history.slice(-TREND_MATCHES).map((value) => Math.round(value)),
       recentChange: Math.round(p.points - before),
       byEnding: p.byEnding,
+      ledger: p.ledger,
+      // Each recent match's change, as the difference in ROUNDED points
+      // either side of it, so the changes shown add up to the trend.
+      recentMatches: p.history.slice(-TREND_MATCHES).map((after, i, recent) => {
+        const index = p.history.length - recent.length + i
+        const beforeMatch = index === 0 ? START_POINTS : p.history[index - 1]
+        const [matchId, endedAt] = p.playedIn[index]
+        return { matchId, endedAt, change: Math.round(after) - Math.round(beforeMatch) }
+      }),
     })
   }
   return ratings
@@ -196,8 +223,36 @@ export function movedMost(rating) {
   }
 }
 
+/**
+ * The ledger as whole numbers that add up exactly to the rounded points
+ * above or below the start. Rounding each row on its own can leave the
+ * total a point out, which on a screen whose whole purpose is showing
+ * the sum would read as a mistake. Each row is floored, then the points
+ * left over go to the rows with the largest remainders.
+ */
+function wholeBreakdown(rating) {
+  const total = rating.points - START_POINTS
+  const rows = Object.entries(rating.ledger)
+    .filter(([, entry]) => entry.rallies > 0)
+    .map(([key, entry]) => ({
+      ...(LEDGER_KINDS.includes(key) ? { kind: key } : { kind: 'ending', ending: key }),
+      rallies: entry.rallies,
+      exact: entry.points,
+      points: Math.floor(entry.points),
+    }))
+  let left = total - rows.reduce((sum, row) => sum + row.points, 0)
+  const byRemainder = [...rows].sort((a, b) => (b.exact - Math.floor(b.exact)) - (a.exact - Math.floor(a.exact)))
+  for (let i = 0; left > 0 && byRemainder.length > 0; i = (i + 1) % byRemainder.length, left -= 1) {
+    byRemainder[i].points += 1
+  }
+  return rows.map(({ exact, ...row }) => row)
+}
+
+/** Ledger rows that are not one of the player's own endings. */
+export const LEDGER_KINDS = ['untagged', 'partner', 'opponent_winner', 'opponent_error']
+
 /** What one player is sent about their own rally rating. */
-export function rallyRatingFor(ratings, playerId, { withMovedMost = false } = {}) {
+export function rallyRatingFor(ratings, playerId, { forRatingScreen = false } = {}) {
   const rating = ratings.get(playerId)
   const have = rating?.matches ?? 0
   if (have < MIN_MATCHES) return { state: 'not_enough_matches', have, need: MIN_MATCHES }
@@ -211,6 +266,13 @@ export function rallyRatingFor(ratings, playerId, { withMovedMost = false } = {}
     matches: rating.matches,
     winChanceVsStart: Math.round(expectedWin(rating.rawPoints, START_POINTS) * 100),
   }
-  if (withMovedMost) response.movedMost = movedMost(rating)
+  if (forRatingScreen) {
+    response.movedMost = movedMost(rating)
+    // The player's own arithmetic only: their rows and their matches.
+    // Partner and opponent rows are totals of what those rallies did to
+    // THIS player's points, which says nothing about anyone else's.
+    response.breakdown = wholeBreakdown(rating)
+    response.recentMatches = rating.recentMatches
+  }
   return response
 }

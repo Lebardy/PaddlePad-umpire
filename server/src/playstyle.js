@@ -112,17 +112,16 @@ export function buildPlaystyleProof({ traits, mine, peers }) {
         : round(Number(own)),
       group: recorded ? round(mean(valuesOf(peers, feature))) : null,
       other: recorded && other ? round(mean(valuesOf(other.members, feature))) : null,
-      // All-court rows only: the average of this player's own style. The
-      // noun is chosen from where the STYLE sits, not the one player, so
-      // this is the column that proves it. Measured on staging: 17 of 17
-      // all-court styles sat close to their group, while 8 of those 17
-      // players' own numbers did not. Withheld below MIN_STYLE_MEMBERS,
-      // where an average of the style describes the other people in it.
-      ...(neutral && {
-        style: recorded && sameStyle.length >= MIN_STYLE_MEMBERS
-          ? round(mean(valuesOf(sameStyle, feature)))
-          : null,
-      }),
+      // The average of this player's own style. Every word in a style
+      // name is chosen from where the STYLE sits against its group, not
+      // from the one player, so this is the column that proves the word.
+      // Measured on staging: all 17 all-court styles sat close to their
+      // group while 8 of those players' own numbers did not. Withheld
+      // below MIN_STYLE_MEMBERS, where a style average describes the
+      // other people in it.
+      style: recorded && sameStyle.length >= MIN_STYLE_MEMBERS
+        ? round(mean(valuesOf(sameStyle, feature)))
+        : null,
     }
   }
 

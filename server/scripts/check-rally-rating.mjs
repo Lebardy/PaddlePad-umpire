@@ -230,9 +230,64 @@ section('What a player is sent')
     'Put-aways earned the most; the heavier kitchen fault cost more than hitting into the net.')
   check('points in movedMost are whole numbers',
     moved.gained.every((g) => Number.isInteger(g.points)), true, 'Players never see decimals.')
-  check('the standing response includes movedMost when asked',
-    'movedMost' in rallyRatingFor(rateHistory(many), A1, { withMovedMost: true }), true,
-    'Only the rating screen needs it.')
+  check('the rating screen response includes movedMost, the breakdown and recent matches',
+    ['movedMost', 'breakdown', 'recentMatches'].every((key) => key in rallyRatingFor(rateHistory(many), A1, { forRatingScreen: true })), true,
+    'Only the rating screen needs them; the overview card stays small.')
+}
+
+section('Where every point came from')
+{
+  // One put-away by A1 between fresh sides: stake = K * 1 * 0.5.
+  const one = rateHistory([match([rally(A1, 'putaway')])])
+  const stake = DEFAULT_K * 0.5
+  const ledger = (id) => Object.fromEntries(Object.entries(one.get(id).ledger).map(([k, v]) => [k, [v.rallies, Math.round(v.points * 1e6) / 1e6]]))
+  check('the hitter\'s rally is filed under the ending',
+    ledger(A1), { putaway: [1, stake * ACTOR_SHARE] }, 'Their own put-away earned three quarters of the stake.')
+  check('the partner\'s share is filed as their partner\'s rally',
+    ledger(A2), { partner: [1, stake * (1 - ACTOR_SHARE)] }, 'A2 did not end it, but shared in it.')
+  check('an opponent\'s winning shot is filed as such',
+    ledger(B1), { opponent_winner: [1, -stake / 2] }, 'B1 lost points to a shot they could do nothing about.')
+  const fault = rateHistory([match([rally(B1, 'kitchen')])])
+  check('an opponent\'s mistake is filed as such',
+    Object.keys(fault.get(A1).ledger), ['opponent_error'], 'A1 gained from B1 stepping into the kitchen.')
+  const bare = rateHistory([match([rally(A1, 'winner')])])
+  check('a rally the player ended with no ending recorded has its own row',
+    Object.keys(bare.get(A1).ledger), ['untagged'], 'Older rallies still move points and must be counted somewhere.')
+
+  // A longer, mixed history: every ledger adds back to the points.
+  const mixed = Array.from({ length: 7 }, (_, i) =>
+    match([rally(A1, 'putaway'), rally(B2, 'net'), rally(A2, 'lob'), rally(B1, i % 2 ? 'ace' : 'kitchen'), rally(A1, 'out'), rally(A1, 'winner')]))
+  const ratings = rateHistory(mixed)
+  const sums = [A1, A2, B1, B2].map((id) => {
+    const r = ratings.get(id)
+    return near(Object.values(r.ledger).reduce((s, v) => s + v.points, 0), r.rawPoints - START_POINTS, 1e-6)
+  })
+  check('every player\'s ledger adds up to their points above or below 1,500',
+    sums, [true, true, true, true], 'Nothing moves a player\'s points without a row to show for it.')
+
+  const sent = rallyRatingFor(ratings, A1, { forRatingScreen: true })
+  check('the rows sent add up exactly to the points shown, after rounding',
+    sent.breakdown.reduce((s, row) => s + row.points, 0), sent.points - START_POINTS,
+    'Rounded so the whole numbers on screen always add to the headline, never off by one.')
+  check('every row sent is a whole number of points with a rally count',
+    sent.breakdown.every((row) => Number.isInteger(row.points) && Number.isInteger(row.rallies) && row.rallies > 0), true,
+    'Players never see decimals, and a row with no rallies is left out.')
+  check('own endings name the ending, the rest name what they are',
+    sent.breakdown.map((row) => row.ending ?? row.kind).sort(),
+    ['opponent_error', 'opponent_winner', 'out', 'partner', 'putaway', 'untagged'].sort(),
+    'A1 ended put-aways, outs and untagged rallies; the rest came from A2 and the opponents.')
+
+  check('recent matches are the last ten at most, oldest first',
+    sent.recentMatches.map((m) => m.matchId), mixed.map((m) => m.id),
+    'Seven matches, so all seven, in the order they were played.')
+  check('each match\'s change is the difference in the rounded points, so they add up',
+    sent.recentMatches.reduce((s, m) => s + m.change, 0), sent.points - START_POINTS,
+    'With fewer than ten matches the changes add to the whole distance from 1,500.')
+
+  const eleven = Array.from({ length: 11 }, () => match([rally(A1, 'putaway')]))
+  const long = rallyRatingFor(rateHistory(eleven), A1, { forRatingScreen: true })
+  check('only the last ten matches are sent',
+    long.recentMatches.map((m) => m.matchId), eleven.slice(1).map((m) => m.id), 'The strip matches the trend line.')
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

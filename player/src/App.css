@@ -1921,3 +1921,18 @@ a.highlight:active,
 /* The all-court word carries two measurements; keep them apart. */
 .proof-bars + .proof-head,
 .proof-verdict + .proof-head { margin-top: 0.8rem; }
+
+/* Step 1's arithmetic: gains green, losses red, and the sum beneath. */
+.part .is-up { color: var(--status-good); }
+.part .is-down { color: var(--status-critical); }
+.part-values strong { font-variant-numeric: tabular-nums; }
+.part-head a.part-label { color: inherit; text-decoration: underline; text-underline-offset: 0.15em; }
+.points-sum {
+  margin-top: 0.8rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.points-sum strong { color: var(--text); }

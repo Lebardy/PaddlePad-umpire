@@ -108,7 +108,7 @@ router.get('/standing', async (req, res) => {
   res.json({
     standing: {
       ...standing,
-      rallyRating: rallyRatingFor(ratings, req.player.id, { withMovedMost: true }),
+      rallyRating: rallyRatingFor(ratings, req.player.id, { forRatingScreen: true }),
     },
   })
 })
