@@ -383,9 +383,10 @@ def name_skill_groups(skill_clustered, rally_points):
 
     K-Means decides who is grouped with whom and never sees a score. A
     score only decides which group is called higher: the vendored
-    interpret_skill_clusters ranks clusters by their average skill_score.
+    interpret_skill_clusters ranks clusters by the average of its
+    rank_by column.
 
-    That ranking now comes from the players' rally points. On staging's
+    That column is now the players' rally points. On staging's
     synthetic pool, whose players have a hidden ability, group numbers
     ranked by rally points followed that ability (Spearman 0.81 over ten
     random starts) where ranking by the old score barely did (0.17), and
@@ -400,7 +401,7 @@ def name_skill_groups(skill_clustered, rally_points):
     and which number named them.
     """
     if rally_points is None:
-        ranked_by = skill_clustered
+        ranked = skill_clustered
         source = "skill_score"
     else:
         points = skill_clustered["player_id"].map(rally_points)
@@ -413,13 +414,11 @@ def name_skill_groups(skill_clustered, rally_points):
                 f"{len(missing)} rated player(s) have no rally points. "
                 f"Refusing to publish. Missing: {sorted(missing)[:5]}"
             )
-        ranked_by = skill_clustered.assign(skill_score=points.astype(float))
+        ranked = skill_clustered.assign(rally_points=points.astype(float))
         source = "rally_points"
 
-    labels = interpret_skill_clusters(ranked_by)
-    order = (
-        ranked_by.groupby("skill_cluster")["skill_score"].mean().sort_values().index
-    )
+    labels = interpret_skill_clusters(ranked, rank_by=source)
+    order = ranked.groupby("skill_cluster")[source].mean().sort_values().index
     return (
         apply_skill_cluster_labels(skill_clustered, labels),
         [labels[cluster] for cluster in order],
