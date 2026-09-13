@@ -42,7 +42,7 @@ import { fetchStanding } from '../lib/api'
 import { usePlayerData } from '../lib/PlayerData'
 import { navigate } from '../lib/router'
 import { endingPhrase } from '../lib/endingWords'
-import { RallyPointsHeadline } from '../components/RallyRating'
+import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
 import Icon from '../components/Icon'
 import More from '../components/More'
 
@@ -566,11 +566,13 @@ function Rating() {
       {error && <p className="error">{error}</p>}
       {!standing && !error && <p className="muted-inline">Loading…</p>}
 
-      {standing && rally?.state !== 'rated' && (
-        <p className="muted-inline">
-          Your rating appears after {rally?.need ?? 5} matches — the card on your
-          overview shows how close you are.
-        </p>
+      {/* Step 1 is always here, even before five matches, so steps 2
+          and 3 -- which the nightly run can fill in on its own count --
+          never appear without it. */}
+      {standing && rally?.state === 'not_enough_matches' && (
+        <Step number={1} title="Your rating">
+          <RallyProgress rallyRating={rally} />
+        </Step>
       )}
 
       {standing && rally?.state === 'rated' && <Score rallyRating={rally} />}

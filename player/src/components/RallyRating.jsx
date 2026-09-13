@@ -40,22 +40,32 @@ export function RallyPointsHeadline({ rallyRating }) {
   )
 }
 
+/** Progress towards a rating, shared with the rating screen. */
+export function RallyProgress({ rallyRating }) {
+  const left = rallyRating.need - rallyRating.have
+  return (
+    <>
+      <Meter
+        label="Matches played"
+        valueText={`${rallyRating.have} of ${rallyRating.need}`}
+        value={Math.min(1, rallyRating.have / rallyRating.need)}
+        caption={left === 1 ? 'One to go.' : `${left} to go.`}
+      />
+      <p className="muted-inline">
+        A couple of matches can&rsquo;t tell a good day from a good player.
+      </p>
+    </>
+  )
+}
+
 function RallyRating({ rallyRating }) {
   if (!rallyRating) return null
 
   if (rallyRating.state === 'not_enough_matches') {
-    const left = rallyRating.need - rallyRating.have
     return (
       <section className="rating rating-progress" aria-label="Skill rating">
         <h2>Skill rating</h2>
-        <Meter
-          label={`${rallyRating.have} of ${rallyRating.need} matches`}
-          value={rallyRating.have / rallyRating.need}
-          caption={left === 1 ? 'One to go.' : `${left} to go.`}
-        />
-        <p className="muted-inline">
-          A couple of matches can&rsquo;t tell a good day from a good player.
-        </p>
+        <RallyProgress rallyRating={rallyRating} />
       </section>
     )
   }
