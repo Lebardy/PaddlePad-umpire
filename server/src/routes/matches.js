@@ -9,6 +9,7 @@ import {
 } from '../pickleball.js'
 import { isUuid, stackingFromColumns, stackingToColumns } from '../validate.js'
 import { rallyEndingProblem } from '../rally-endings.js'
+import { invalidateRallyRatings } from '../rally-rating-store.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -379,6 +380,10 @@ router.put('/:id/log', async (req, res) => {
     )
   })
 
+  // Events, completion and ending early all arrive here, so any of them
+  // can change the rally rating.
+  invalidateRallyRatings()
+
   const updated = await query(`${MATCH_SELECT} WHERE m.id = $1`, [req.params.id])
   res.json({ match: toClientMatch(updated.rows[0], await loadEvents(req.params.id)) })
 })
@@ -405,6 +410,7 @@ router.delete('/:id', async (req, res) => {
   }
 
   await query('DELETE FROM matches WHERE id = $1', [req.params.id])
+  invalidateRallyRatings()
   res.status(204).end()
 })
 
@@ -432,6 +438,7 @@ router.post('/:id/void', async (req, res) => {
     [req.params.id, voided, req.umpire.id, reason],
   )
   if (rows.length === 0) return res.status(404).json({ error: 'No such match' })
+  invalidateRallyRatings()
 
   const updated = await query(`${MATCH_SELECT} WHERE m.id = $1`, [req.params.id])
   res.json({ match: toClientMatch(updated.rows[0]) })
