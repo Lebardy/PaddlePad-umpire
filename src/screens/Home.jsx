@@ -25,7 +25,8 @@ function SessionList({ sessions, onOpenSession, showOwner = false }) {
               )}
             </span>
             <span className="session-meta">
-              {s.playerIds.length} players
+              {/* The server's count where this device has no roster yet. */}
+              {s.playerCount ?? s.playerIds.length} players
               {showOwner && s.createdByName ? ` \u00b7 by ${s.createdByName}` : ''}
             </span>
           </button>
