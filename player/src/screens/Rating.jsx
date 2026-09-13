@@ -353,8 +353,9 @@ function Score({ rallyRating }) {
               enough rallies with an ending to call it a habit. */}
           {moved && (moved.gained[0] || moved.cost[0]) && (
             <p className="step-line">
+              Of the rallies you ended,{' '}
               {moved.gained[0] && (
-                <><strong>{endingPhrase(moved.gained[0].ending)}</strong> earned you the most</>
+                <><strong>{endingPhrase(moved.gained[0].ending).toLowerCase()}</strong> earned you the most</>
               )}
               {moved.gained[0] && moved.cost[0] && '; '}
               {moved.cost[0] && (
