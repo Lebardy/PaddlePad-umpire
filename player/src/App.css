@@ -1902,3 +1902,18 @@ a.highlight:active,
   vector-effect: non-scaling-stroke;
 }
 .points-basis { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem; }
+.moving { margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.moving-head {
+  font-family: var(--label);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.5rem;
+}
+.moving-list { display: grid; gap: 0.35rem; }
+.moving-list li { font-size: 0.98rem; line-height: 1.45; color: var(--text-secondary); padding-left: 1.1rem; position: relative; }
+.moving-list li::before { position: absolute; left: 0; font-weight: 700; }
+.moving-list li.is-gain::before { content: '▲'; color: var(--status-good); font-size: 0.75rem; top: 0.2rem; }
+.moving-list li.is-cost::before { content: '▼'; color: var(--status-critical); font-size: 0.75rem; top: 0.2rem; }
+.moving-list strong { color: var(--text); }
