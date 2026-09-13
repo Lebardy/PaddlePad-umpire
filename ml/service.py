@@ -18,9 +18,10 @@ re-run the entire clustering on every page load, and would give slightly
 different answers each time as n_init=20 re-seeds. So the work happens
 in batches, and the app reads the last published snapshot.
 
-The nightly schedule runs in a thread here rather than as a separate
-Railway cron service, because the free plan caps the project at five
-services and all five are in use. See scheduler.py.
+In production the nightly run is a separate Railway cron service,
+`ml-cron`, which starts `python run.py` and exits; this service only
+answers /health and POST /run there, with PADDLEPAD_SCHEDULE=off.
+Staging still schedules it from a thread here. See scheduler.py.
 """
 
 import os
