@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // ============================================================
-// What was expected of a match, and the games behind a rating.
+// What was expected of a match.
 //
 //   node server/scripts/check-expectation.mjs
 //
-// Both modules are pure, so the arithmetic and the two rules that
+// The module is pure, so the arithmetic and the two rules that
 // matter -- only what was knowable beforehand, and no number about
 // anybody else -- are provable here with no database and no network.
 // ============================================================
@@ -12,7 +12,6 @@
 import {
   CLEAR_GAP, EVEN_WITHIN, expectationFor, sideRating,
 } from '../src/expectation.js'
-import { MIN_GAMES_FOR_SPREAD, summariseGames } from '../src/game-scores.js'
 
 let pass = 0
 let fail = 0
@@ -86,48 +85,6 @@ section('a match nobody can call')
     expectationFor(40, 62, null),
     { expected: 'loss', margin: 'clear', upset: false },
     'there is no result to have gone against the expectation')
-}
-
-// ============================================================
-section('the games behind a rating')
-// ============================================================
-{
-  // Nine games. Sorted: 30 40 45 50 55 58 62 70 90, summing to 500,
-  // so the mean is 55.6 -- and a rating is the mean of these, exactly.
-  const scores = [50, 90, 45, 62, 30, 55, 70, 40, 58]
-  const games = scores.map((score, i) => ({ matchId: `m${i}`, score }))
-  const summary = summariseGames(games, 55.6)
-
-  check('count, ends and average',
-    [summary.count, summary.worst, summary.best, summary.average],
-    [9, 30, 90, 55.6],
-    'the average is the rating; that is the whole claim the page makes')
-  check('the middle half',
-    [summary.lower, summary.upper], [45, 62],
-    'nine sorted values: the 25th is the 3rd (45) and the 75th the 7th (62)')
-  check('every game keeps the match it was played in',
-    summary.games.length, 9,
-    'so a game on this strip and a game in the history are the same game')
-  check('nothing fell off the scale here',
-    summary.outsideScale, 0,
-    'counted rather than clipped away -- the page clips what it draws and says so')
-}
-
-{
-  const wild = [-8, 20, 50, 75, 104, 60].map((score, i) => ({ matchId: `m${i}`, score }))
-  check('games outside 0-100 are counted, not dropped',
-    summariseGames(wild, 50.2).outsideScale, 2,
-    'the scale is built from players\' averages, so one game can beat the best of them')
-}
-
-{
-  const few = [50, 60, 40].map((score, i) => ({ matchId: `m${i}`, score }))
-  check(`under ${MIN_GAMES_FOR_SPREAD} games there is no spread to describe`,
-    summariseGames(few, 50), null,
-    'a best day out of three is the day you got lucky, and the page says nothing instead')
-  check('and a run that never sent them says nothing either',
-    summariseGames(null, 50), null,
-    'an older pipeline; the rating above it is still true')
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

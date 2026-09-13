@@ -16,13 +16,9 @@
 
 import { deriveMatchState, eventFromRow } from './pickleball.js'
 import { buildPlaystyleProof } from './playstyle.js'
-import { buildRatingParts } from './rating-parts.js'
-import { summariseGames } from './game-scores.js'
-import { orderLadder } from './group-ladder.js'
 import { expectationFor, sideRating } from './expectation.js'
 import {
   MIN_MATCHES_PER_PLAYER,
-  MIN_POOL_FOR_DISTRIBUTION,
   RECOMMENDED_PLAYERS,
 } from './rating-gate.js'
 
@@ -534,34 +530,24 @@ export async function getRatingState(query, playerId, matchCount) {
   }
 }
 
-// How many columns the club's spread is drawn in. Ten is one per ten
-// points of a 0-100 score, which reads without a legend.
-const BUCKETS = 10
-
 /**
- * Where this player sits among everyone the pipeline rated, and who
- * else is in their group.
+ * What the rating screen's playstyle card needs about this player's
+ * place in the latest pipeline run: their group's name and size, and
+ * their style with the numbers that earned each word.
  *
- * Built to answer "am I getting anywhere" without ever producing a
- * rank. It returns counts and a shape, never another player's score,
- * name, id or group -- there is no ordering in it for a caller to
- * reconstruct a leaderboard from.
- *
- * That restraint is not only about competitiveness. skill_score is
- * POOL-RELATIVE (see rating-gate.js): in a small club the best player
- * scores 100 whatever their actual standard, so a ranked list would
- * publish a number that means less than it appears to. A position
- * within a spread, dated and with the pool size attached, is the
- * strongest honest claim available from this model.
+ * It used to also send a ladder of every group, the old score's four
+ * parts against the group above, the spread of the player's games and a
+ * histogram of everyone's scores. Those supported a first card built on
+ * the old 0-100 score; the screen now shows rally points there and folds
+ * the group into one line, so none of them are sent. Still never another
+ * player's score, name, id or group.
  */
 export async function getClubStanding(query, playerId) {
   // The latest completed run this player is actually IN. A later run
-  // they missed would compare their old score against other people's
-  // new ones.
+  // they missed would describe a group they were not part of.
   const { rows: mine } = await query(
-    `SELECT r.run_id, r.skill_score, r.skill_group, r.playstyle_cluster,
-            r.playstyle_archetype, r.playstyle_traits, r.evidence,
-            r.score_parts, r.game_scores, run.computed_at, run.notes
+    `SELECT r.run_id, r.skill_group, r.playstyle_cluster,
+            r.playstyle_archetype, r.playstyle_traits, r.evidence
        FROM player_ratings r
        JOIN rating_runs run ON run.id = r.run_id
       WHERE r.player_id = $1
@@ -576,205 +562,37 @@ export async function getClubStanding(query, playerId) {
   // stand beside rather than repeating the reasoning badly.
   if (!mine[0]) return { state: 'unrated' }
 
-  const { run_id: runId, skill_score: score, skill_group: group } = mine[0]
+  const { run_id: runId, skill_group: group } = mine[0]
 
-  // The player's own column is decided by the SAME expression as
-  // everyone else's, in the same query language. Working it out again in
-  // JavaScript got the edges wrong: width_bucket puts a score of exactly
-  // 40 in the 40-50 column, and Math.ceil(40 / 10) says 30-40, so a
-  // player on a round number saw "You" under the wrong bar.
-  //
-  // least(..., n) folds a score of exactly 100 -- which width_bucket
-  // gives an eleventh column of its own -- back into the tenth, so the
-  // top of the scale does not look like a category.
-  const BUCKET_OF = 'least(width_bucket(skill_score, 0, 100, $2), $2)'
+  // Everyone in the player's group, for its size and for the averages
+  // that prove the style name -- see playstyle.js, including why a style
+  // of one or two is never averaged.
+  const { rows: peers } = group
+    ? await query(
+        `SELECT playstyle_cluster, playstyle_archetype, evidence
+           FROM player_ratings
+          WHERE run_id = $1 AND skill_group = $2`,
+        [runId, group],
+      )
+    : { rows: [] }
 
-  const { rows: counts } = await query(
-    `SELECT count(*)::int AS rated,
-            count(*) FILTER (WHERE skill_score < $3)::int AS below,
-            count(*) FILTER (WHERE skill_group IS NOT DISTINCT FROM $4)::int AS band,
-            count(DISTINCT skill_group)::int AS groups,
-            max(${BUCKET_OF}) FILTER (WHERE player_id = $5)::int AS yours
-       FROM player_ratings
-      WHERE run_id = $1`,
-    [runId, BUCKETS, score, group, playerId],
-  )
-  const { rated, below, band, groups, yours } = counts[0]
-
-  const { rows: histogram } = await query(
-    `SELECT ${BUCKET_OF}::int AS bucket, count(*)::int AS n
-       FROM player_ratings
-      WHERE run_id = $1
-      GROUP BY 1`,
-    [runId, BUCKETS],
-  )
-
-  // Every group in the run, with its size, the range it
-  // covers and where its middle sits. The page shows this as a ladder
-  // with the player's own rung marked, because "your group" means
-  // nothing without the others beside it. Counts and ratings only -- no
-  // names, no ids, the same rule as the rest of this endpoint.
-  //
-  // The middle is what the page NAMES a group by, as a PERCENTILE of
-  // that middle rather than as the rating itself.
-  //
-  // Two earlier namings failed. A range -- "Ratings 28-49" beside
-  // "Ratings 37-91" -- put the same numbers in two names, because
-  // groups are not slices of the rating scale: the clustering sorts on
-  // ten measurements and the rating is a sum of four of them, so two
-  // players can share a rating and land either side. A bare middle --
-  // "Around 43" -- cannot overlap, but a rating is a poor description
-  // of position, because skill_score is min-max scaled and the players
-  // are not spread evenly along it. On the pool this was written
-  // against, 26 of 46 players sat between 40 and 59: a rating of 42 is
-  // the 17th percentile, not the "slightly below middle" the number
-  // suggests, and ten rating points crosses 33 places down there
-  // against 7 places up at the top.
-  //
-  // A percentile says the thing a rating only implies. It is taken from
-  // the group's MEDIAN rather than its mean so one outlier cannot drag
-  // a group's name away from where its players actually are, and the
-  // ladder is ordered by that same middle so the rungs can never
-  // contradict their own names.
-  const { rows: byMiddle } = await query(
-    `WITH rated AS (
-        SELECT skill_score, skill_group
-          FROM player_ratings
-         WHERE run_id = $1 AND skill_group IS NOT NULL
-     ), grouped AS (
-        SELECT skill_group AS name, count(*)::int AS size,
-               min(skill_score) AS lowest, max(skill_score) AS highest,
-               percentile_cont(0.5) WITHIN GROUP (ORDER BY skill_score) AS middle
-          FROM rated
-         GROUP BY skill_group
-     )
-     SELECT g.*,
-            (SELECT count(*) FROM rated r WHERE r.skill_score < g.middle)::float
-              / nullif((SELECT count(*) FROM rated), 0) AS share
-       FROM grouped g
-      ORDER BY g.middle`,
-    [runId],
-  )
-  // Runs whose groups were named by rally points record that order, and
-  // the ladder follows it -- see group-ladder.js.
-  const ladder = orderLadder(byMiddle, mine[0].notes?.structure?.groupOrder)
-
-  // Proof for the playstyle name: this player's own numbers, their
-  // group's average, and the average of the other style in their group.
-  // Read from what the run already stored rather than recomputed -- see
-  // playstyle.js, including why a style of one or two is never averaged.
-  let playstyle = null
-  if (group && Array.isArray(mine[0].playstyle_traits)) {
-    const { rows: peers } = await query(
-      `SELECT playstyle_cluster, playstyle_archetype, evidence
-         FROM player_ratings
-        WHERE run_id = $1 AND skill_group = $2`,
-      [runId, group],
-    )
-    playstyle = buildPlaystyleProof({
-      traits: mine[0].playstyle_traits,
-      mine: {
-        playstyle_cluster: mine[0].playstyle_cluster,
-        evidence: mine[0].evidence,
-      },
-      peers,
-    })
-  }
-
-  // What the rating is made of: this player's four parts, their group's
-  // average of the same four, and the average of the group one rung up
-  // the ladder. Two questions the score alone cannot answer -- what is
-  // moving my number, and what separates me from the group above --
-  // both answered from the score's own arithmetic. See rating-parts.js,
-  // including why a group of fewer than three is never averaged.
-  //
-  // The group above is found by position on the ladder queried above,
-  // so no group name has to be hardcoded and it keeps working whatever
-  // K the clustering picks. The player in the top group has none, which
-  // the page says rather than hides.
-  let parts = null
-  if (group && mine[0].score_parts) {
-    const rung = ladder.findIndex((g) => g.name === group)
-    const aboveName = rung === -1 ? null : (ladder[rung + 1]?.name ?? null)
-    const { rows: peers } = await query(
-      `SELECT skill_group, score_parts
-         FROM player_ratings
-        WHERE run_id = $1 AND skill_group = ANY($2::text[])`,
-      [runId, aboveName ? [group, aboveName] : [group]],
-    )
-    parts = buildRatingParts({
-      mine: mine[0].score_parts,
-      peers: peers.filter((row) => row.skill_group === group),
-      above: peers.filter((row) => row.skill_group === aboveName),
-    })
-  }
-
-  // Every game this player played, on the same scale as their rating.
-  // Their own numbers only -- see game-scores.js, including why the
-  // rating really is the average of these rather than a summary.
-  const games = summariseGames(mine[0].game_scores, score)
-
-  const counted = new Map(histogram.map((row) => [row.bucket, row.n]))
+  const playstyle = group && Array.isArray(mine[0].playstyle_traits)
+    ? buildPlaystyleProof({
+        traits: mine[0].playstyle_traits,
+        mine: { playstyle_cluster: mine[0].playstyle_cluster, evidence: mine[0].evidence },
+        peers,
+      })
+    : null
 
   return {
     state: 'rated',
-    computedAt: mine[0].computed_at,
-    // One number for both the placement sentence and the "as of" line.
-    // rating_runs.player_count records what the pipeline reported; this
-    // counts the rows actually stored, so the sentence can never say
-    // "4 of 46" about a run holding 45 rows.
-    poolSize: rated,
-    // Rounded at the source, as getRatingState does, so two screens
-    // cannot disagree about the same score.
-    yourScore: Math.round(score),
-    below,
-    // Every group in the run, so the page can show the ladder the
-    // player sits on rather than a label on its own.
-    groups: ladder.map((g) => ({
-      name: g.name,
-      size: g.size,
-      lowest: Math.round(g.lowest),
-      highest: Math.round(g.highest),
-      // What the page calls the group: the share of everyone rated who
-      // sits below its middle. The middle and the range stay beside it
-      // because two groups in a small pool can round to the same
-      // percentile, and the page falls back rather than showing one
-      // name on two rungs.
-      middle: Math.round(g.middle),
-      percentile: g.share === null ? null : Math.round(g.share * 100),
-    })),
-    // The four measurements the rating is a weighted sum of -- yours,
-    // your group's average, and the group above's. Null for a run from
-    // a pipeline that did not send them.
-    parts,
-    // The games the rating is the average of. Null for an older run,
-    // or for a player with too few games for a spread to mean much.
-    games,
     // The name the pipeline gave this player's style, and the numbers
     // that earned each word of it.
     playstyleArchetype: mine[0].playstyle_archetype ?? null,
     playstyle,
-    // The clustering's own level-1 grouping, and how many share it.
-    // Never who they are, and never ordered within the band -- the
-    // group is the point, a position inside it is not.
-    // groupCount is there because the pipeline names groups by how many
-    // it found ("Higher-Performance" of two is not "of three"), and past
-    // three it falls back to "Performance Group N", which means nothing
-    // without knowing N of what.
-    band: group ? { name: group, size: band, groupCount: groups } : null,
-    // Null below the floor: the sentence above is honest at any pool
-    // size, a drawn shape is not.
-    distribution:
-      rated < MIN_POOL_FOR_DISTRIBUTION
-        ? null
-        : Array.from({ length: BUCKETS }, (_, i) => {
-            const bucket = i + 1
-            return {
-              from: i * (100 / BUCKETS),
-              to: bucket * (100 / BUCKETS),
-              count: counted.get(bucket) ?? 0,
-              yours: bucket === yours,
-            }
-          }),
+    // The clustering's level-1 group and how many share it -- the players
+    // a style is compared with. Never who they are. The name is what the
+    // app strips from the front of the style name (lib/styleName.js).
+    band: group ? { name: group, size: peers.length } : null,
   }
 }
