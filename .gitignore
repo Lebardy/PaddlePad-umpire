@@ -50,3 +50,11 @@ paddlepad-backup.json
 .claude/settings.json
 .claude/settings.local.json
 .claude/RESUME.md
+
+# Agent skills and design context installed on this machine only: the
+# find-skills and task-observer skills (and the lock file recording where
+# they came from), and Impeccable's PRODUCT.md product brief.
+.agents/
+.claude/skills/
+skills-lock.json
+PRODUCT.md
