@@ -72,6 +72,29 @@ export const DEFAULT_POINT_TARGET = 11
 export const POINT_TARGETS = [11, 15, 21]
 
 /**
+ * How an event is split to be stored in match_events: its id, order,
+ * type and time get columns of their own, and everything else goes in
+ * `payload`.
+ */
+export function eventToRow(event) {
+  const { id, seq, type, at, ...payload } = event
+  return { id, seq, type, at, payload }
+}
+
+/**
+ * The reverse of eventToRow, for a row read back from match_events.
+ *
+ * The id has to come back with it. A rally names the third shot it
+ * followed by that shot's id, and the id lives in its own column, not
+ * in the payload -- so a reader that rebuilt events from `type` and
+ * `payload` alone silently lost every link, and "when you drop, you
+ * win the point" came out empty for every player.
+ */
+export function eventFromRow(row) {
+  return { id: row.id, type: row.type, ...row.payload }
+}
+
+/**
  * The winning team once someone has reached the target with a two-point
  * lead, else null.
  *

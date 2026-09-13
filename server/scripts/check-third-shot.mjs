@@ -15,7 +15,7 @@
 // ============================================================
 
 import { randomUUID } from 'node:crypto'
-import { deriveMatchState } from '../src/pickleball.js'
+import { deriveMatchState, eventFromRow, eventToRow } from '../src/pickleball.js'
 
 let pass = 0
 let fail = 0
@@ -177,6 +177,27 @@ section('the counts stay honest against each other')
   check('and the rate is computed over the linked ones only',
     Math.round((s.drop_rallies_won / s.drop_rallies) * 100), 50,
     '1 of 2, not 1 of 3 -- counting the unlinked drop as a loss would invent a result')
+}
+
+// ============================================================
+section('the link survives being stored and read back')
+// ============================================================
+{
+  // Every stat a player sees is replayed from match_events, not from
+  // what the umpire's device sent. The id lives in its own column
+  // there, so a reader that dropped it lost every link while every
+  // check above -- which never touch storage -- still passed.
+  const drop = thirdShot(A1, 'drop', true)
+  const drive = thirdShot(A1, 'drive')
+  const sent = [drop, rally(B1, 'error', drop), drive, rally(A1, 'error', drive)]
+  const stored = sent.map((event, seq) => eventToRow({ ...event, seq }))
+  const readBack = stored.map((row) => eventFromRow(row))
+  check('a stored and reloaded log links exactly as the original did',
+    conversion(play(readBack), A1), conversion(play(sent), A1),
+    'same four counters either side of the database, or the stat is empty for every real match')
+  check('and it is not empty',
+    conversion(play(readBack), A1), [1, 1, 1, 0],
+    'one drop won, one drive lost')
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
