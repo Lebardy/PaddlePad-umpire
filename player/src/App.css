@@ -1936,3 +1936,78 @@ a.highlight:active,
   font-variant-numeric: tabular-nums;
 }
 .points-sum strong { color: var(--text); }
+
+/* ============ Collapsible ============ */
+
+.collapsible-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.35rem 0;
+  background: none;
+  border: 0;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.collapsible-title {
+  font-family: var(--label);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.collapsible-chevron {
+  display: inline-flex;
+  color: var(--text-muted);
+  transform: rotate(90deg);
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), color 200ms ease;
+}
+.collapsible.is-open .collapsible-chevron { transform: rotate(-90deg); color: var(--text); }
+.collapsible-head:hover .collapsible-chevron { color: var(--text); }
+.collapsible-head:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: 4px; }
+.collapsible-summary .step-line { margin-top: 0.2rem; }
+
+.collapsible-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease;
+}
+.collapsible.is-open .collapsible-body { grid-template-rows: 1fr; opacity: 1; }
+.collapsible-inner { overflow: hidden; min-height: 0; }
+
+/* Rows settle in one after another as it opens. */
+.collapsible-item {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 300ms ease, transform 380ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.collapsible.is-open .collapsible-item {
+  opacity: 1;
+  transform: none;
+  transition-delay: calc(var(--i, 0) * 35ms + 80ms);
+}
+/* The bars grow out from the centre line once their row is in. */
+.collapsible-item .part-arm {
+  transform: scaleX(0);
+  transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.collapsible-item .part-arm.is-ahead { transform-origin: left center; }
+.collapsible-item .part-arm.is-behind { transform-origin: right center; }
+.collapsible.is-open .collapsible-item .part-arm {
+  transform: scaleX(1);
+  transition-delay: calc(var(--i, 0) * 35ms + 180ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .collapsible-chevron,
+  .collapsible-body,
+  .collapsible-item,
+  .collapsible-item .part-arm {
+    transition: none;
+  }
+}
