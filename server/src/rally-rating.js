@@ -168,3 +168,39 @@ export function rateHistory(matches, options = {}) {
   }
   return ratings
 }
+
+export const MOVED_MOST_MIN_RALLIES = 20
+
+/**
+ * The two endings that earned this player the most points, and the two
+ * that cost the most, from the shots they ended themselves. Null until
+ * enough rallies carry an ending to say anything.
+ */
+export function movedMost(rating) {
+  if (!rating || rating.detailedRallies < MOVED_MOST_MIN_RALLIES) return null
+  const entries = Object.entries(rating.byEnding).map(([ending, points]) => ({ ending, points }))
+  const round = ({ ending, points }) => ({ ending, points: Math.round(points) })
+  return {
+    gained: entries.filter((e) => e.points > 0).sort((a, b) => b.points - a.points).slice(0, 2).map(round),
+    cost: entries.filter((e) => e.points < 0).sort((a, b) => a.points - b.points).slice(0, 2).map(round),
+  }
+}
+
+/** What one player is sent about their own rally rating. */
+export function rallyRatingFor(ratings, playerId, { withMovedMost = false } = {}) {
+  const rating = ratings.get(playerId)
+  const have = rating?.matches ?? 0
+  if (have < MIN_MATCHES) return { state: 'not_enough_matches', have, need: MIN_MATCHES }
+
+  const response = {
+    state: 'rated',
+    points: rating.points,
+    recentChange: rating.recentChange,
+    trend: rating.trend,
+    rallies: rating.rallies,
+    matches: rating.matches,
+    winChanceVsStart: Math.round(expectedWin(rating.rawPoints, START_POINTS) * 100),
+  }
+  if (withMovedMost) response.movedMost = movedMost(rating)
+  return response
+}
