@@ -1917,3 +1917,7 @@ a.highlight:active,
 .moving-list li.is-gain::before { content: '▲'; color: var(--status-good); font-size: 0.75rem; top: 0.2rem; }
 .moving-list li.is-cost::before { content: '▼'; color: var(--status-critical); font-size: 0.75rem; top: 0.2rem; }
 .moving-list strong { color: var(--text); }
+
+/* The all-court word carries two measurements; keep them apart. */
+.proof-bars + .proof-head,
+.proof-verdict + .proof-head { margin-top: 0.8rem; }
