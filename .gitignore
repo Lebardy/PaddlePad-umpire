@@ -66,3 +66,4 @@ DESIGN.md
 # to build and to test, and the synthetic pool's hidden abilities.
 server/scripts/.rating-split.json
 server/scripts/.sim-pool-truth.json
+server/scripts/.rally-points.json

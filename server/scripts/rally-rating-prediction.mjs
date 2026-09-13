@@ -141,6 +141,14 @@ writeFileSync(
   JSON.stringify({ train: train.map((m) => m.id), test: test.map((m) => m.id), best: { k: best.k, scale: best.scale } }, null, 2),
 )
 
+// Every player's points over the whole history, for
+// ml/scripts/compare_skill_input.py.
+const allPoints = rateHistory(matches, { k: best.k, scale: best.scale })
+writeFileSync(
+  join(here, '.rally-points.json'),
+  JSON.stringify(Object.fromEntries([...allPoints].map(([id, r]) => [id, r.rawPoints])), null, 2),
+)
+
 const truthPath = join(here, '.sim-pool-truth.json')
 if (existsSync(truthPath)) {
   const truth = JSON.parse(readFileSync(truthPath, 'utf8')).players
