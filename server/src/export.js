@@ -13,6 +13,7 @@
 // ============================================================
 
 import { deriveMatchState, eventFromRow } from './pickleball.js'
+import { RALLY_ENDINGS, rallyEndingColumn } from './rally-endings.js'
 
 // The 12 columns the ML pipeline actually reads today. Kept first and
 // in this exact order so the CSV stays a drop-in superset of what the
@@ -58,7 +59,21 @@ const CONTEXT_COLUMNS = [
   'point_target',
 ]
 
-export const RAW_MATCH_LOG_COLUMNS = [...ML_PIPELINE_COLUMNS, ...CONTEXT_COLUMNS]
+// How each of this player's rallies ended, one count per ending ("out
+// of bounds", "kitchen fault"), from rally-endings.js. Last, so the
+// CSV stays a drop-in superset of what the pipeline already reads.
+//
+// These are a finer split of the four buckets above, not extra rallies:
+// the ended_ columns for winners add up to clean_winners + dink_winners
+// only for matches scored after rallies started recording a detail.
+// Older rallies have no detail, so for those every ended_ column is 0.
+const RALLY_ENDING_COLUMNS = RALLY_ENDINGS.map((ending) => rallyEndingColumn(ending.key))
+
+export const RAW_MATCH_LOG_COLUMNS = [
+  ...ML_PIPELINE_COLUMNS,
+  ...CONTEXT_COLUMNS,
+  ...RALLY_ENDING_COLUMNS,
+]
 
 // Both timestamps come from device clocks, so one phone with a wrong
 // clock would otherwise emit a nonsense duration straight into the
@@ -166,6 +181,13 @@ export async function buildMatchLogRows(query) {
         opponent_2_id: opponents[1] ?? '',
         ended_at: new Date(match.ended_at).toISOString(),
         point_target: match.point_target,
+
+        ...Object.fromEntries(
+          RALLY_ENDINGS.map((ending) => [
+            rallyEndingColumn(ending.key),
+            derived.endings[playerId]?.[ending.key] ?? 0,
+          ]),
+        ),
       })
     }
   }

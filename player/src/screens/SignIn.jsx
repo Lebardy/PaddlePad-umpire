@@ -28,6 +28,9 @@
 import { useState } from 'react'
 import Claim from './Claim'
 import GoogleButton from '../components/GoogleButton'
+
+// Mirrors the check GoogleButton makes before rendering anything.
+const GOOGLE_ENABLED = Boolean(import.meta.env?.VITE_GOOGLE_CLIENT_ID)
 import { googleSignIn, loginPlayer, registerPlayer } from '../lib/api'
 import { claimCodeFromUrl } from '../lib/router'
 import { suggestUsername } from '../lib/username'
@@ -348,7 +351,10 @@ function SignIn({ onSignedIn }) {
 
   return (
     <div className="gate">
-      <h1>PaddlePad</h1>
+      <h1>
+        <img className="gate-logo" src="/favicon.svg" alt="" />
+        PaddlePad
+      </h1>
       <p className="lede">See the matches your umpire has been recording for you.</p>
 
       {/* Withheld from someone who has just scanned a QR. They are one
@@ -359,7 +365,10 @@ function SignIn({ onSignedIn }) {
         <>
           <GoogleButton onToken={handleGoogle} disabled={busy} />
           {error && <p className="error">{error}</p>}
-          <div className="or-divider">or</div>
+          {/* GoogleButton renders nothing without a client ID (a local
+              checkout, say), and an "or" with nothing above it reads as
+              something missing. */}
+          {GOOGLE_ENABLED && <div className="or-divider">or</div>}
         </>
       )}
 

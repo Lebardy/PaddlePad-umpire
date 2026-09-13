@@ -18,6 +18,7 @@ import { deriveMatchState, eventFromRow } from './pickleball.js'
 import { buildPlaystyleProof } from './playstyle.js'
 import { buildRatingParts } from './rating-parts.js'
 import { summariseGames } from './game-scores.js'
+import { orderLadder } from './group-ladder.js'
 import { expectationFor, sideRating } from './expectation.js'
 import {
   MIN_MATCHES_PER_PLAYER,
@@ -560,7 +561,7 @@ export async function getClubStanding(query, playerId) {
   const { rows: mine } = await query(
     `SELECT r.run_id, r.skill_score, r.skill_group, r.playstyle_cluster,
             r.playstyle_archetype, r.playstyle_traits, r.evidence,
-            r.score_parts, r.game_scores, run.computed_at
+            r.score_parts, r.game_scores, run.computed_at, run.notes
        FROM player_ratings r
        JOIN rating_runs run ON run.id = r.run_id
       WHERE r.player_id = $1
@@ -608,7 +609,7 @@ export async function getClubStanding(query, playerId) {
     [runId, BUCKETS],
   )
 
-  // Every group in the run, in score order, with its size, the range it
+  // Every group in the run, with its size, the range it
   // covers and where its middle sits. The page shows this as a ladder
   // with the player's own rung marked, because "your group" means
   // nothing without the others beside it. Counts and ratings only -- no
@@ -635,7 +636,7 @@ export async function getClubStanding(query, playerId) {
   // a group's name away from where its players actually are, and the
   // ladder is ordered by that same middle so the rungs can never
   // contradict their own names.
-  const { rows: ladder } = await query(
+  const { rows: byMiddle } = await query(
     `WITH rated AS (
         SELECT skill_score, skill_group
           FROM player_ratings
@@ -654,6 +655,9 @@ export async function getClubStanding(query, playerId) {
       ORDER BY g.middle`,
     [runId],
   )
+  // Runs whose groups were named by rally points record that order, and
+  // the ladder follows it -- see group-ladder.js.
+  const ladder = orderLadder(byMiddle, mine[0].notes?.structure?.groupOrder)
 
   // Proof for the playstyle name: this player's own numbers, their
   // group's average, and the average of the other style in their group.

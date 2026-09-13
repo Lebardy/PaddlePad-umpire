@@ -133,8 +133,8 @@ function MatchDetail({ id }) {
     <div className="detail">
       <BackLink />
 
-      <header className={`detail-head ${match.won ? 'won' : match.won === false ? 'lost' : ''}`}>
-        <p className="eyebrow">
+      <header className={`match-board ${match.won ? 'won' : match.won === false ? 'lost' : ''}`}>
+        <p className="result-word">
           {match.won === null ? 'No result' : match.won ? 'Won' : 'Lost'}
         </p>
         <p className="detail-score">

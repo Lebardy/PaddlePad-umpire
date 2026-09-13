@@ -17,7 +17,7 @@
 // proven before anything is deployed anywhere.
 // ============================================================
 
-import { deriveMatchState, currentServerPlayerId } from '../src/pickleball.js'
+import { deriveMatchState, currentServerPlayerId, courtSides } from '../src/pickleball.js'
 
 let pass = 0
 let fail = 0
@@ -154,6 +154,80 @@ walk(
     { won: 'A', expect: 'Ana', why: 'and straight back' },
   ],
 )
+
+// ============================================================
+section('where everyone is standing, for the "who" step')
+// ============================================================
+// The scoring screen places each doubles player on the side of the
+// court they are actually on, from the same rule the serve uses: a pair
+// swaps only when their own team scores.
+{
+  const match = {
+    teamA: ['Ana', 'Ben'],
+    teamB: ['Cy', 'Dee'],
+    firstServer: { team: 'A', playerId: 'Ben' },
+    rightStart: { A: 'Ben', B: 'Dee' },
+    pointTarget: 11,
+    events: [],
+  }
+  let seq = 0
+  const rally = (team) =>
+    match.events.push({
+      id: `s${seq}`, seq: seq++, type: 'rally', at: Date.now(),
+      actingPlayerId: team === 'A' ? 'Ana' : 'Cy', outcome: 'winner', zone: 'open',
+    })
+  const sides = () => courtSides(deriveMatchState(match), match)
+  const expectSides = (label, expected, why) => {
+    const actual = sides()
+    const ok = JSON.stringify(actual) === JSON.stringify(expected)
+    if (ok) pass += 1
+    else fail += 1
+    console.log(
+      `  ${ok ? 'ok  ' : 'FAIL'} ${label}` +
+      (ok ? '' : `\n       expected ${JSON.stringify(expected)}\n       got      ${JSON.stringify(actual)}`) +
+      `\n       ${why}`,
+    )
+  }
+
+  expectSides(
+    'at 0-0, as setup said',
+    { A: { left: 'Ana', right: 'Ben' }, B: { left: 'Cy', right: 'Dee' } },
+    'Ben serves from the right; Dee was named as starting on the right.',
+  )
+  rally('A')
+  expectSides(
+    'A scores: A swap, B stay',
+    { A: { left: 'Ben', right: 'Ana' }, B: { left: 'Cy', right: 'Dee' } },
+    'Only the team that scored changes sides.',
+  )
+  rally('B')
+  expectSides(
+    'a side-out: nobody moves',
+    { A: { left: 'Ben', right: 'Ana' }, B: { left: 'Cy', right: 'Dee' } },
+    'The first service of the game had one server, so B gains the serve without anyone scoring, and no one swaps.',
+  )
+  rally('B')
+  expectSides(
+    'B scores: B swap',
+    { A: { left: 'Ben', right: 'Ana' }, B: { left: 'Dee', right: 'Cy' } },
+    'Now B has scored once, so their starting sides are reversed.',
+  )
+  match.events.push({ id: `s${seq}`, seq: seq++, type: 'serverCorrection', at: Date.now(), playerId: 'Cy' })
+  expectSides(
+    'a serve correction flips the pair it names',
+    { A: { left: 'Ben', right: 'Ana' }, B: { left: 'Cy', right: 'Dee' } },
+    'Dee is serving; saying Cy is means the pair began the other way round, so both swap.',
+  )
+
+  const singles = {
+    teamA: ['Ana'], teamB: ['Cy'],
+    firstServer: { team: 'A', playerId: 'Ana' }, pointTarget: 11, events: [],
+  }
+  const none = courtSides(deriveMatchState(singles), singles)
+  if (none === null) pass += 1
+  else fail += 1
+  console.log(`  ${none === null ? 'ok  ' : 'FAIL'} singles has no sides to show\n       One player per team: there is no one to tell apart.`)
+}
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

@@ -1,38 +1,73 @@
 :root {
-  /* --- Surfaces and ink --- */
-  --bg: #f7f6fb;
-  --surface: #ffffff;
-  --surface-sunken: #f1eff7;
-  --text: #1c1626;
-  --text-secondary: #56506a;
-  --text-muted: #837c96;
-  --border: #e5e1ef;
+  /* --- The scoreboard ---
+     PaddlePad reads like the board at the end of a court: black panels,
+     lamp-amber figures, square cells ruled off from each other. The
+     panels are the same black in both themes, because a scoreboard does
+     not change colour with the weather; the page around them does. */
+  --board: #12161c;
+  --board-raised: #1b2029;
+  --board-rule: #2b323d;
+  --board-ink: #f5f1e6;
+  --board-muted: #a3a9b3;
+  --lamp: #ffb81c;
+  --lamp-glow: rgba(255, 184, 28, 0.32);
 
-  --primary: #2a78d6;
-  --primary-soft: rgba(42, 120, 214, 0.1);
+  /* Result lamps. Always lit with their letter (W, L) inside, in a dark
+     ink that reads on both -- the colour is never the only signal. */
+  --win-lamp: #46d37e;
+  --win-ink: #062a12;
+  --loss-lamp: #ff6f5e;
+  --loss-ink: #300805;
+  --none-lamp: #3a414c;
+  --none-ink: #f5f1e6;
+
+  /* --- The page around the board: day game --- */
+  --bg: #e8e6e0;
+  --surface: #fbfaf7;
+  --surface-sunken: #efede7;
+  --text: #15181d;
+  --text-secondary: #454b55;
+  --text-muted: #5b616b;
+  --border: #d6d3cb;
+  --rule: #15181d;
+
+  /* Links and small accents on the page. Lamp amber is far too light to
+     set text in on paper, so the page uses its burnt, readable cousin. */
+  --primary: #8a5300;
+  --primary-soft: rgba(138, 83, 0, 0.1);
+  /* Primary buttons are board-black with lamp lettering in both themes:
+     the one control that looks like it belongs on the scoreboard. */
+  --button: #15181d;
+  --button-ink: #ffb81c;
 
   /* --- Data-visualisation tokens ---
-     Categorical slots 1 and 2 from the validated palette, used only for
-     the winners stacked bar. Both modes were run through the palette
-     validator: all six checks pass (worst CVD deltaE 24.7 light /
-     26.8 dark, well clear of the 8 target). Do not substitute by eye. */
-  --series-1: #2a78d6;
+     Categorical slots 1 and 2, used for the winning-shots stacked bar
+     and the momentum ribbon. Validated as a pair with the dataviz
+     palette validator (worst CVD deltaE 24.7 light / 25.9 dark). Do not
+     substitute by eye. */
+  --series-1: #2358a6;
   --series-2: #eb6834;
 
-  /* Sequential blue, for meters: one hue, light track to dark fill. */
-  --seq-track: #cde2fb;
-  --seq-fill: #2a78d6;
+  /* Sequential, for meters: one hue, light track to dark fill. */
+  --seq-track: #d9dde3;
+  --seq-fill: #2358a6;
 
-  /* Status roles are fixed and never themed, and never carry meaning
-     alone -- every use pairs them with a letter or a word. */
+  /* Status roles never carry meaning alone -- every use pairs them with
+     a letter or a word. */
   --status-good: #0ca30c;
   --status-good-soft: rgba(12, 163, 12, 0.12);
-  --status-critical: #d03b3b;
-  --status-critical-soft: rgba(208, 59, 59, 0.12);
+  --status-critical: #b3261e;
+  --status-critical-soft: rgba(179, 38, 30, 0.1);
 
-  --radius: 16px;
-  --radius-sm: 10px;
-  --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --radius: 6px;
+  --radius-sm: 4px;
+  --gutter: clamp(1rem, 4vw, 1.5rem);
+
+  /* Big Shoulders is stadium signage: every figure and every heading.
+     Barlow Condensed labels the cells; Barlow is for reading. */
+  --display: 'Big Shoulders Display', 'Barlow Condensed', Impact, sans-serif;
+  --label: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --sans: 'Barlow', system-ui, 'Segoe UI', Roboto, sans-serif;
 
   color-scheme: light;
   font: 16px/1.5 var(--sans);
@@ -44,53 +79,61 @@
 
 /* The dark palette, in ONE place.
 
-   It used to live in @media (prefers-color-scheme: dark), and cannot
-   stay there now the theme can be overridden: keeping the media query
-   AND adding an attribute rule would mean writing all fifteen values
-   twice, and two copies drift. lib/theme.js resolves 'system' itself and
-   always writes a real light/dark value to data-theme, which leaves the
-   media query nothing to do -- so please don't add it back. */
+   lib/theme.js resolves 'system' itself and always writes a real
+   light/dark value to data-theme, which leaves a prefers-color-scheme
+   query nothing to do -- so please don't add one back. */
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --bg: #131019;
-  --surface: #1e1928;
-  --surface-sunken: #171320;
-  --text: #f3f0f9;
-  --text-secondary: #b8b0c9;
-  --text-muted: #8d85a0;
-  --border: #302940;
+  /* Night game: the board lifts a step so it still reads as a panel
+     against a page that is nearly black itself. */
+  --board: #1b2029;
+  --board-raised: #242a35;
+  --board-rule: #333b47;
+  --none-lamp: #454d59;
 
-  --primary: #3987e5;
-  --primary-soft: rgba(57, 135, 229, 0.16);
+  --bg: #0a0c0f;
+  --surface: #12161c;
+  --surface-sunken: #0e1116;
+  --text: #f1eee6;
+  --text-secondary: #b9bec6;
+  --text-muted: #8d939c;
+  --border: #262c35;
+  --rule: #f1eee6;
+
+  --primary: #ffb81c;
+  --primary-soft: rgba(255, 184, 28, 0.14);
+  --button: #ffb81c;
+  --button-ink: #15181d;
 
   /* The same two hues stepped for the dark surface -- a selected dark
      palette, not an automatic flip of the light one. */
-  --series-1: #3987e5;
-  --series-2: #d95926;
+  --series-1: #5b93ea;
+  --series-2: #e0662f;
 
-  --seq-track: #26314a;
-  --seq-fill: #3987e5;
+  --seq-track: #242a35;
+  --seq-fill: #5b93ea;
 
   --status-good: #0ca30c;
   --status-good-soft: rgba(12, 163, 12, 0.2);
-  --status-critical: #d03b3b;
-  --status-critical-soft: rgba(208, 59, 59, 0.2);
+  --status-critical: #ff6f5e;
+  --status-critical-soft: rgba(255, 111, 94, 0.14);
 }
 
 * { box-sizing: border-box; }
 
-/* Focus was styled on exactly one input before. With a tab bar and rows
-   of links, a keyboard user previously had no way to tell where they
-   were. :focus-visible rather than :focus so a tap doesn't leave a ring
+/* :focus-visible rather than :focus so a tap doesn't leave a ring
    behind on a phone. */
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 2px;
 }
-body { margin: 0; }
-h1, h2 { margin: 0; font-weight: 600; }
+body { margin: 0; background: var(--bg); }
+::selection { background: var(--lamp); color: #15181d; }
+input, textarea { caret-color: var(--primary); }
+:root { accent-color: var(--primary); }
+h1, h2, h3 { margin: 0; font-weight: 700; }
 p { margin: 0; }
 ol, ul { margin: 0; padding: 0; list-style: none; }
 button { font-family: var(--sans); transition: transform 0.08s ease, filter 0.08s ease; }

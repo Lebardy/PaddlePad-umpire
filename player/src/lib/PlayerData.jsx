@@ -33,6 +33,9 @@ export function PlayerDataProvider({ children }) {
     // the reason there isn't one yet. Never a bare null -- see
     // getRatingState on the server for why the difference matters.
     rating: null,
+    // The player-facing rally rating: points with anchors, or progress
+    // towards five matches.
+    rallyRating: null,
     // Whether this player's name may appear on the monthly board. True
     // until the server says otherwise, which is the server's default too.
     nameVisible: true,
@@ -68,6 +71,7 @@ export function PlayerDataProvider({ children }) {
           matches: history,
           inProgress: me.inProgress ?? 0,
           rating: me.rating ?? null,
+          rallyRating: me.rallyRating ?? null,
           // An older server sends nothing, and nothing means shown -- the
           // column's default, and what was true before it existed.
           nameVisible: me.nameVisible ?? true,
@@ -86,6 +90,7 @@ export function PlayerDataProvider({ children }) {
           error: err.message,
           matches: quiet ? s.matches : [],
           rating: quiet ? s.rating : null,
+          rallyRating: quiet ? s.rallyRating : null,
         }))
       } finally {
         inFlightRef.current = null

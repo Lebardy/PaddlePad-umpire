@@ -18,6 +18,8 @@
 //   6. a game to 15 is not declared won at 11            (point_target)
 // ============================================================
 
+import { RALLY_ENDINGS, rallyEndingColumn } from '../src/rally-endings.js'
+
 const API = (process.argv[2] ?? process.env.API_URL ?? 'http://localhost:3000').replace(/\/$/, '')
 
 let pass = 0
@@ -595,6 +597,9 @@ async function main() {
     'match_duration_mins', 'uses_stacking',
     'team', 'won', 'partner_id', 'opponent_1_id', 'opponent_2_id',
     'ended_at', 'point_target',
+    // How each rally ended, one count per ending, after everything the
+    // pipeline already reads (see rally-endings.js).
+    ...RALLY_ENDINGS.map((ending) => rallyEndingColumn(ending.key)),
   ].join(',')
   check('csv header is exactly the expected columns, in order',
     lines[0] === expectedHeader, lines[0])
@@ -649,6 +654,13 @@ async function main() {
     check('internal carries the rating gate thresholds',
       typeof logs.body.gate?.minMatchesPerPlayer === 'number' &&
       typeof logs.body.gate?.minPlayers === 'number', JSON.stringify(logs.body.gate))
+    // Rally points name the pipeline's skill groups, so every player in
+    // the rows must have some.
+    const rowPlayers = new Set((logs.body.rows ?? []).map((row) => row.player_id))
+    const pointed = logs.body.rallyPoints ?? {}
+    check('internal carries rally points for every player in the rows',
+      [...rowPlayers].every((id) => typeof pointed[id] === 'number'),
+      `${[...rowPlayers].filter((id) => typeof pointed[id] !== 'number').length} of ${rowPlayers.size} missing`)
 
     // A failed run is recorded rather than dropped: "the gate held" and
     // "the service never woke up" must not look identical afterwards.
@@ -867,6 +879,16 @@ async function main() {
       JSON.stringify(linkedMe.body.summary ?? null))
     check('and so does the rating', linkedMe.body.rating?.state === 'rated',
       JSON.stringify(linkedMe.body.rating ?? null).slice(0, 80))
+    check('/player/me carries the rally rating',
+      ['rated', 'not_enough_matches'].includes(linkedMe.body.rallyRating?.state),
+      JSON.stringify(linkedMe.body.rallyRating ?? null).slice(0, 120))
+    check('and never another player\'s points',
+      !JSON.stringify(linkedMe.body.rallyRating ?? {}).includes('byEnding'),
+      'rallyRating is the shaped response, not the raw rating')
+    const standingWithRally = await asPlayer('/player/standing', { bearer: linked.body.token })
+    check('/player/standing carries the rally rating too',
+      ['rated', 'not_enough_matches'].includes(standingWithRally.body.standing?.rallyRating?.state),
+      JSON.stringify(standingWithRally.body.standing?.rallyRating ?? null).slice(0, 120))
     check('/player/me reports the username so the app can stop prompting',
       linkedMe.body.player?.username === `smk_a_${stamp}`.slice(0, 20),
       String(linkedMe.body.player?.username))

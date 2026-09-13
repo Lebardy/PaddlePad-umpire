@@ -21,6 +21,7 @@ import { query, withTransaction } from '../db.js'
 import { requireInternalKey } from '../auth.js'
 import { buildMatchLogRows } from '../export.js'
 import { RATING_GATE } from '../rating-gate.js'
+import { getRallyRatings } from '../rally-rating-store.js'
 
 const router = Router()
 router.use(requireInternalKey)
@@ -34,11 +35,17 @@ router.use(requireInternalKey)
  * rather than by loosening the guard on that route.
  */
 router.get('/match-logs.json', async (_req, res) => {
-  const rows = await buildMatchLogRows(query)
+  const [rows, ratings] = await Promise.all([buildMatchLogRows(query), getRallyRatings(query)])
   // The gate thresholds ride along with the data so the Python side
   // applies the same numbers the player app counts progress against,
   // rather than keeping its own copy that can drift out of step.
-  res.json({ rows, count: rows.length, gate: RATING_GATE })
+  //
+  // Every player's rally points ride along too: the pipeline names its
+  // skill groups by them (see name_skill_groups in ml/run.py). From the
+  // same cached store the player app reads, so the Python side never
+  // needs a second copy of the rating.
+  const rallyPoints = Object.fromEntries([...ratings].map(([id, rating]) => [id, rating.rawPoints]))
+  res.json({ rows, count: rows.length, gate: RATING_GATE, rallyPoints })
 })
 
 /**

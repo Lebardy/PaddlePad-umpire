@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { query, withTransaction } from '../db.js'
 import { requireAuth } from '../auth.js'
 import { isUuid } from '../validate.js'
+import { invalidateRallyRatings } from '../rally-rating-store.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -172,6 +173,7 @@ router.delete('/:id', async (req, res) => {
 
   // ON DELETE CASCADE clears session_players and any unfinished matches.
   await query('DELETE FROM sessions WHERE id = $1', [req.params.id])
+  invalidateRallyRatings()
   res.status(204).end()
 })
 
@@ -203,6 +205,7 @@ router.post('/:id/void', async (req, res) => {
     [req.params.id, voided, req.umpire.id, reason],
   )
   if (rows.length === 0) return res.status(404).json({ error: 'No such session' })
+  invalidateRallyRatings()
 
   const updated = await query(`${SESSION_SELECT} WHERE s.id = $1`, [req.params.id])
   res.json({ session: updated.rows[0] })

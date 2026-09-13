@@ -8,6 +8,8 @@ import {
   eventToRow,
 } from '../pickleball.js'
 import { isUuid, stackingFromColumns, stackingToColumns } from '../validate.js'
+import { rallyEndingProblem } from '../rally-endings.js'
+import { invalidateRallyRatings } from '../rally-rating-store.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -307,6 +309,16 @@ router.put('/:id/log', async (req, res) => {
     ) {
       return res.status(400).json({ error: `Event ${index} has an invalid thirdShotId` })
     }
+    // What ended the rally, when the app says. Optional, because copies
+    // of the app from before this existed are still installed on
+    // phones; but when present it must be a known ending that agrees
+    // with the outcome and zone filed beside it.
+    if (event.type === 'rally') {
+      const problem = rallyEndingProblem(event)
+      if (problem) {
+        return res.status(400).json({ error: `Event ${index} has a ${problem}` })
+      }
+    }
     // Both non-rally types name their player the same way, so the check
     // below covers a correction naming someone outside the match too.
     const actor = event.type === 'rally' ? event.actingPlayerId : event.playerId
@@ -368,6 +380,10 @@ router.put('/:id/log', async (req, res) => {
     )
   })
 
+  // Events, completion and ending early all arrive here, so any of them
+  // can change the rally rating.
+  invalidateRallyRatings()
+
   const updated = await query(`${MATCH_SELECT} WHERE m.id = $1`, [req.params.id])
   res.json({ match: toClientMatch(updated.rows[0], await loadEvents(req.params.id)) })
 })
@@ -394,6 +410,7 @@ router.delete('/:id', async (req, res) => {
   }
 
   await query('DELETE FROM matches WHERE id = $1', [req.params.id])
+  invalidateRallyRatings()
   res.status(204).end()
 })
 
@@ -421,6 +438,7 @@ router.post('/:id/void', async (req, res) => {
     [req.params.id, voided, req.umpire.id, reason],
   )
   if (rows.length === 0) return res.status(404).json({ error: 'No such match' })
+  invalidateRallyRatings()
 
   const updated = await query(`${MATCH_SELECT} WHERE m.id = $1`, [req.params.id])
   res.json({ match: toClientMatch(updated.rows[0]) })

@@ -1,16 +1,22 @@
 // ============================================================
-// Your rating: the three things the model actually did.
+// Your rating: your own points, then the two things the model did.
 //
 // This page used to show a score, a spread, and a "group" named in
 // words of the app's own invention, with no hint of what the group was
 // for -- while the playstyle, the interesting half, sat on the overview
 // as a bare label. It read as unrelated to the pipeline it came from.
 //
-// So it now follows the pipeline, in order:
+// So it now runs in order:
 //
-//   1  a skill score, 0-100, measured against everyone rated
+//   1  the player's rally points, and the endings moving them -- worked
+//      out rally by rally in the API, and never compared with anyone
 //   2  a first split into groups, by results
 //   3  a second split inside each group, by how people play
+//
+// Step 1 used to be the pipeline's 0-100 score, placed among everyone
+// rated. That score moved when other people played; points do not. It
+// shows whenever the player has five matches, whether or not the
+// nightly run has rated them. Steps 2 and 3 still need that run.
 //
 // Step 2 exists FOR step 3: playstyles are clustered within a group, so
 // a style means "compared with players at a similar level". That is why
@@ -23,17 +29,9 @@
 // clustering separated them from. Nobody's individual numbers but their
 // own; see server/src/playstyle.js.
 //
-// Steps 1 and 2 each answer one more question, from the same arithmetic:
-//
-//   under the score   what is moving MY number -- the four measurements
-//                     it is a weighted sum of, against the average of
-//                     players at my level
-//   under the ladder  what separates me from the group above -- the
-//                     same four, against the rung up
-//
-// Neither is a guess about what correlates with a rating. The score IS
-// those four parts added up, and the pipeline refuses to publish a run
-// where they do not add up to it. See server/src/rating-parts.js.
+// Under the ladder, step 2 answers one more question: what separates me
+// from the group above -- the four measurements the pipeline's score is
+// a weighted sum of, against the rung up. See server/src/rating-parts.js.
 //
 // It never shows a ranking and never anyone else's score. Why is one
 // tap away at the bottom.
@@ -42,18 +40,11 @@
 import { useEffect, useState } from 'react'
 import { fetchStanding } from '../lib/api'
 import { usePlayerData } from '../lib/PlayerData'
-import { useCountUp } from '../lib/motion'
 import { navigate } from '../lib/router'
-import Distribution from '../components/Distribution'
+import { endingPhrase } from '../lib/endingWords'
+import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
 import Icon from '../components/Icon'
 import More from '../components/More'
-
-function formatDate(value) {
-  return new Date(value).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-  })
-}
 
 /**
  * Each measurement in everyday words, with how to read its number.
@@ -204,8 +195,9 @@ function points(value) {
  * which point the pipeline's own labels degrade to "Performance Group
  * 4" and mean nothing to anybody.
  *
- * The percentile is not lost; it moves into "Why groups?" with the
- * model's own label, where a reader who wants it will look.
+ * The percentile went too, once the old score stopped being shown at
+ * all: groups are put in order by rally points, and a percentile of the
+ * old score could say a group was lower than the rung beneath it.
  */
 const STEPS = ['', 'A step', 'Two steps', 'Three steps', 'Four steps']
 
@@ -241,234 +233,6 @@ function BackLink() {
     >
       &larr; Back
     </button>
-  )
-}
-
-/**
- * What the number is made of, under the number.
- *
- * A rating nobody can act on is a horoscope. These four are the whole
- * of it -- the score is their sum, not a model of them -- so naming the
- * one earning the most and the one costing the most turns a verdict
- * into something to work on.
- *
- * The bar is the share of that part's own points earned, and the tick
- * is the average for players at this level. Both matter: the bar says
- * how much is left on the table, the tick says whether that is unusual.
- */
-function Parts({ parts }) {
-  const { best, worst } = gainsAndLosses(parts.parts, 'group')
-  const compared = parts.groupAveraged
-
-  // Every bar is drawn against the biggest gap of the four, so the four
-  // rows can be read against each other: the longest arm is the thing
-  // most worth doing something about.
-  const widest = Math.max(
-    ...parts.parts.map((part) =>
-      part.group ? Math.abs(part.you.points - part.group.points) : 0),
-    0.0001,
-  )
-
-  return (
-    <div className="parts">
-      <p className="step-line">
-        Four things are added up to make it, and nothing else is.
-      </p>
-
-      <ul className="parts-list" aria-label="What the rating is made of">
-        {parts.parts.map((part) => {
-          // How far this part sits from the player's level, in POINTS
-          // -- which is the only unit the four can be compared in, and
-          // which already carries the direction: the model subtracts
-          // mistakes rather than adding them, so "ahead" is ahead on
-          // every row, including the ones where fewer is better. The
-          // number itself is never shown; it only sets the bar.
-          const diff = part.group ? part.you.points - part.group.points : null
-          const reach = diff === null ? 0 : Math.min(1, Math.abs(diff) / widest)
-
-          return (
-            <li key={part.key} className="part">
-              <div className="part-head">
-                <span className="part-label">{part.label}</span>
-                <span className="part-values">
-                  {partValue(part.you.value, part.unit)}
-                  {part.group && (
-                    <span className="part-theirs">
-                      {' '}· level {partValue(part.group.value, part.unit)}
-                    </span>
-                  )}
-                </span>
-              </div>
-
-              {diff !== null && (
-                <span
-                  className="part-scale"
-                  role="img"
-                  aria-label={
-                    diff === 0
-                      ? 'level with players at your level'
-                      : `${diff > 0 ? 'ahead of' : 'behind'} players at your level`
-                  }
-                >
-                  <span className="part-axis" />
-                  <span
-                    className={`part-arm ${diff < 0 ? 'is-behind' : 'is-ahead'}`}
-                    style={{ width: `${reach * 50}%` }}
-                  />
-                </span>
-              )}
-            </li>
-          )
-        })}
-      </ul>
-
-      {compared && (
-        <p className="step-line">
-          {best
-            ? `You gain most on players at your level in ${best.part.label}.`
-            : 'No part of your rating is ahead of the average for your level yet.'}
-          {' '}
-          {worst
-            ? `You lose most in ${worst.part.label}.`
-            : 'Every part of it is at or above that average.'}
-        </p>
-      )}
-
-      <More label="How much does each one count?">
-        <p>
-          Not equally. Out of the 100, winning shots are worth 30, drop shots
-          landing 25, mistakes at the net 25, and mistakes away from the net
-          20. That split is the model&rsquo;s, not the app&rsquo;s — and it is
-          why the bars above are drawn from how much each gap moves your
-          rating rather than from the measurements themselves.
-        </p>
-        <p>
-          Full marks on one of them means <em>best of everyone rated</em>,
-          not perfect — each part is measured from the highest and lowest in
-          the pool. So these move when other people play, the same way the
-          rating does.
-        </p>
-        {!compared && (
-          <p>
-            Your group is too small to average without describing one
-            person, so there is nothing to compare yours against yet. It
-            needs three rated players.
-          </p>
-        )}
-        <p>
-          A mistake at the net and a mistake anywhere else are counted
-          separately, and never both.
-        </p>
-      </More>
-    </div>
-  )
-}
-
-/**
- * The games the rating is the average of.
- *
- * Half the model is about how much someone swings between games, and
- * none of it ever reached the player, because the model says it as
- * "your winner rate varies by 1.20". Said as scored games it needs no
- * translating: a 43 beside a 94 is the same fact, legible.
- *
- * The headline is the MIDDLE HALF rather than best and worst. On the
- * pool this was built against the gap between a player's best and
- * worst game had a median of 40 points -- a best game is one game, and
- * one game is mostly luck. The extremes are still shown, named as what
- * they are.
- */
-function Games({ games }) {
-  // Held inside 0-100, for the reader's sake rather than the model's.
-  //
-  // A single game is scored against everyone's season AVERAGE, so a
-  // good player's good game genuinely beats the top of the scale --
-  // the strongest player on the pool this was built against had three
-  // games over 100 and a best of 113, and the weakest had one at -6.
-  // Those are real numbers, and "you played like a 112" still reads as
-  // a bug to anyone holding a rating out of 100. So the ends are
-  // clipped and the tap below says what was clipped and why.
-  //
-  // The scores themselves are stored uncapped, because the claim this
-  // whole section rests on -- that a rating IS the average of these --
-  // only holds on the real ones. Nothing here recomputes it.
-  const shown = (score) => Math.max(0, Math.min(100, score))
-
-  // The strip still spans this player's own games rather than a fixed
-  // 0-100: it answers "how much do you swing", not "where do you sit",
-  // which the bars higher up the page already answer.
-  const low = Math.min(shown(games.worst), shown(games.rating))
-  const high = Math.max(shown(games.best), shown(games.rating))
-  const span = high - low || 1
-  const place = (score) => ((shown(score) - low) / span) * 100
-
-  return (
-    <div className="games">
-      <h3 className="games-head">The games behind it</h3>
-      <p className="step-line">
-        Your rating is the average of your {games.count} games — not a summary
-        of them, the middle. Most land between{' '}
-        <strong>{Math.round(shown(games.lower))}</strong> and{' '}
-        <strong>{Math.round(shown(games.upper))}</strong>.
-      </p>
-
-      <div className="games-strip" role="img"
-           aria-label={`${games.count} games, from ${Math.round(shown(games.worst))} to ${Math.round(shown(games.best))}, averaging ${Math.round(shown(games.average))}`}>
-        {/* The middle half, drawn as the band the dots mostly sit in. */}
-        <span
-          className="games-band"
-          style={{
-            left: `${place(games.lower)}%`,
-            width: `${place(games.upper) - place(games.lower)}%`,
-          }}
-        />
-        {games.games.map((game) => (
-          <span
-            key={game.matchId}
-            className="games-dot"
-            style={{ left: `${place(game.score)}%` }}
-          />
-        ))}
-        <span className="games-mark" style={{ left: `${place(games.rating)}%` }} />
-      </div>
-      <ul className="games-scale" aria-hidden="true">
-        <li>{Math.round(shown(games.worst))}</li>
-        <li>{Math.round(shown(games.best))}</li>
-      </ul>
-
-      <p className="games-ends">
-        Worst <strong>{Math.round(shown(games.worst))}</strong>
-        <span className="games-sep">·</span>
-        Rating <strong>{Math.round(shown(games.rating))}</strong>
-        <span className="games-sep">·</span>
-        Best <strong>{Math.round(shown(games.best))}</strong>
-      </p>
-
-      <More label="Why is the spread so wide?">
-        <p>
-          Because one game is a small sample. A short game where three shots
-          fall your way scores very differently from a long one where they
-          don&rsquo;t, and neither is a fair picture of how you play. The
-          average of all of them is, which is what your rating is.
-        </p>
-        <p>
-          It is also the half of the model nothing else shows. Five of the ten
-          things it measures are about how much you swing between games rather
-          than how well you play — this is that, in a form you can read.
-        </p>
-        {games.outsideScale > 0 && (
-          <p>
-            {games.outsideScale === 1
-              ? 'One of these games ran past the end of the scale and is shown'
-              : `${games.outsideScale} of these games ran past the ends of the scale and are shown`}{' '}
-            at 0 or 100. The scale is built from everyone&rsquo;s{' '}
-            <em>average</em>, so one exceptional game can be better than the
-            best average there is — there is simply nowhere left on the scale
-            to put it.
-          </p>
-        )}
-      </More>
-    </div>
   )
 }
 
@@ -522,50 +286,54 @@ function NextGroup({ parts }) {
   )
 }
 
-/** Step 1: the score, and where it sits among everyone rated. */
-function Score({ rating, standing }) {
-  const shown = useCountUp(rating.skillScore)
-  const others = standing.poolSize - 1
-
+/** Step 1: the player's own rally points, and what is moving them. */
+function Score({ rallyRating }) {
+  const moved = rallyRating.movedMost
   return (
-    <Step
-      number={1}
-      title="Your rating"
-      value={
-        <span aria-label={`${rating.skillScore} out of 100`}>
-          {shown}
-          <span className="step-outof"> / 100</span>
-        </span>
-      }
-    >
-      <ul className="ichips" aria-label="What this rests on">
-        <li className="ichip">
-          <Icon name="people" size={15} />
-          <span>{standing.poolSize} rated</span>
-        </li>
-        <li className="ichip">
-          <Icon name="calendar" size={15} />
-          <span>{formatDate(standing.computedAt)}</span>
-        </li>
-      </ul>
+    <Step number={1} title="Your rating">
+      <RallyPointsHeadline rallyRating={rallyRating} />
 
-      {standing.distribution && <Distribution buckets={standing.distribution} />}
+      <div className="moving">
+        <h3 className="moving-head">What&rsquo;s moving it</h3>
+        {moved ? (
+          <ul className="moving-list">
+            {moved.gained[0] && (
+              <li className="is-gain">
+                <strong>{endingPhrase(moved.gained[0].ending)}</strong> earned you the most.
+              </li>
+            )}
+            {moved.gained[1] && (
+              <li className="is-gain">Then {endingPhrase(moved.gained[1].ending).toLowerCase()}.</li>
+            )}
+            {moved.cost[0] && (
+              <li className="is-cost">
+                <strong>{endingPhrase(moved.cost[0].ending)}</strong> cost you the most.
+              </li>
+            )}
+            {moved.cost[1] && (
+              <li className="is-cost">Then {endingPhrase(moved.cost[1].ending).toLowerCase()}.</li>
+            )}
+          </ul>
+        ) : (
+          <p className="step-line">
+            This appears after 20 rallies scored with how they ended — a few
+            rallies can&rsquo;t show a habit.
+          </p>
+        )}
+      </div>
 
-      <p className="step-line">
-        {others === 0
-          ? 'You are the only rated player so far.'
-          : `Your rating is higher than ${standing.below} of the ${others} other rated players.`}
-      </p>
-
-      {/* Null for a run published before the pipeline sent the
-          breakdown. Nothing is said about it: the score above is still
-          true, and an apology for a missing panel is worse than the
-          panel simply not being there. */}
-      {standing.parts && <Parts parts={standing.parts} />}
-
-      {/* Null for an older run, or for a player with too few games for
-          a spread to describe a habit rather than a fortnight. */}
-      {standing.games && <Games games={standing.games} />}
+      <More label="How are the points worked out?">
+        <p>
+          Every rally is a small contest. Win it with a shot and you gain points;
+          lose it with a mistake and you give some away. Beating a stronger side
+          earns more than beating a weaker one. Your partner shares a little of
+          each rally you end, and you share a little of theirs.
+        </p>
+        <p>
+          Your points only change when you play — never because someone else
+          did.
+        </p>
+      </More>
     </Step>
   )
 }
@@ -603,9 +371,10 @@ function Group({ standing }) {
       )}
 
       <p className="step-line">
-        Everyone rated is split into a few groups first. Which one you land in
-        is worked out from ten measurements, not just your rating — so your own
-        number can sit some way from the rest of your group.
+        Everyone rated is split into a few groups first, from ten measurements
+        of how your matches have gone. Your points above aren&rsquo;t one of
+        them, so a group isn&rsquo;t a range of points — players in it can have
+        quite different points.
       </p>
 
       {/* The rung above, named from the ladder rather than from
@@ -625,19 +394,11 @@ function Group({ standing }) {
           players at this level rather than steady compared with everyone. It
           is also why the name below starts with your group&rsquo;s own word.
         </p>
-        {/* The numbers the rungs used to be named after. Real, and
-            worth having, but they made a reader decode a label before
-            it meant anything -- so they live down here now, where
-            somebody who wants them will look. */}
-        {mine !== -1 && Number.isFinite(groups[mine].percentile) && (
-          <p>
-            Your group&rsquo;s middle sits higher than{' '}
-            <strong>{groups[mine].percentile}%</strong> of everyone rated, and
-            covers ratings {groups[mine].lowest}–{groups[mine].highest}. Those
-            ranges overlap between groups, which is the same thing said another
-            way: the rating is not what decides the group.
-          </p>
-        )}
+        <p>
+          Which group sits higher is decided by the average rally points of the
+          players in it. The points only put the groups in order — they never
+          decide who is in which group.
+        </p>
         {standing.band?.name && (
           <p>
             The model&rsquo;s own name for your group is{' '}
@@ -774,7 +535,7 @@ function Playstyle({ standing }) {
 }
 
 function Rating() {
-  const { rating } = usePlayerData()
+  const { rating, rallyRating } = usePlayerData()
   const [standing, setStanding] = useState(null)
   const [error, setError] = useState(null)
 
@@ -788,7 +549,8 @@ function Rating() {
     return () => controller.abort()
   }, [])
 
-  const rated = standing?.state === 'rated' && rating?.state === 'rated'
+  const mlRated = standing?.state === 'rated' && rating?.state === 'rated'
+  const rally = standing?.rallyRating ?? rallyRating
 
   return (
     <div className="standing">
@@ -798,30 +560,21 @@ function Rating() {
       {error && <p className="error">{error}</p>}
       {!standing && !error && <p className="muted-inline">Loading…</p>}
 
-      {/* The overview's rating card already explains, in the player's
-          own terms, why there is no rating yet. Saying it again here
-          would be worse and would drift. */}
-      {standing && !rated && (
-        <p className="muted-inline">
-          There is no rating to compare yet — the card on your overview says
-          what it is waiting for.
-        </p>
+      {/* Step 1 is always here, even before five matches, so steps 2
+          and 3 -- which the nightly run can fill in on its own count --
+          never appear without it. */}
+      {standing && rally?.state === 'not_enough_matches' && (
+        <Step number={1} title="Your rating">
+          <RallyProgress rallyRating={rally} />
+        </Step>
       )}
 
-      {rated && (
+      {standing && rally?.state === 'rated' && <Score rallyRating={rally} />}
+
+      {mlRated && (
         <>
-          <Score rating={rating} standing={standing} />
           <Group standing={standing} />
           <Playstyle standing={standing} />
-
-          <More label="Why is there no ranking?">
-            <p>
-              Your rating is measured against whoever has played, so it can move
-              when new people join — even if you haven&rsquo;t played at all. A
-              place on a list would claim more than the number can. Where you
-              sit, and the group you are in, is what it can honestly tell you.
-            </p>
-          </More>
         </>
       )}
     </div>

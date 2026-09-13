@@ -4,12 +4,10 @@
 // Most of what follows is a raw count or a simple ratio taken straight
 // from what the umpire tapped, and needs no population to be true.
 //
-// The exception is SkillRating, which carries the ML pipeline's score.
-// That one IS population-dependent, which is why it renders its own
-// progress toward being computable rather than a number that would be
-// confidently wrong -- see the component for the reasoning. It is not
-// the dashed apology box that used to sit here: that one blamed a club
-// concept the player could neither see nor influence.
+// The skill rating is the player's own rally points. It renders its own
+// progress until five matches are in rather than a number that would be
+// confidently wrong, and never compares the player with anyone else --
+// see RallyRating for the reasoning.
 // ============================================================
 
 import { Link } from '../lib/router'
@@ -22,7 +20,7 @@ import Highlights from '../components/Highlights'
 import MatchList from '../components/MatchList'
 import PersonalBests from '../components/PersonalBests'
 import TrendChart from '../components/TrendChart'
-import SkillRating from '../components/SkillRating'
+import RallyRating from '../components/RallyRating'
 import LiveNote from '../components/LiveNote'
 import { SetupCard } from '../components/SetupSignIn'
 
@@ -30,14 +28,18 @@ const TREND_WINDOW = 5
 const RECENT_COUNT = 5
 
 function Overview({ player, onPlayerChange }) {
-  const { summary, matches, inProgress, rating } = usePlayerData()
+  const { summary, matches, inProgress, rallyRating } = usePlayerData()
   const trend = rollingWinRate(matches, TREND_WINDOW)
   const bests = personalBests(matches)
   const recent = matches.slice(0, RECENT_COUNT)
 
   return (
     <div className="overview">
-      <Hero player={player} summary={summary} matches={matches} />
+      {/* The headline statistics hang off the bottom of the scoreboard
+          rather than sitting in tiles of their own below it. */}
+      <Hero player={player} summary={summary} matches={matches}>
+        <StatGrid summary={summary} />
+      </Hero>
 
       {inProgress > 0 && <LiveNote count={inProgress} />}
 
@@ -46,9 +48,7 @@ function Overview({ player, onPlayerChange }) {
           other reason to go looking for it. */}
       <SetupCard player={player} onPlayerChange={onPlayerChange} />
 
-      <StatGrid summary={summary} />
-
-      <SkillRating rating={rating} />
+      <RallyRating rallyRating={rallyRating} />
 
       {trend.length >= 2 ? (
         <TrendChart points={trend} window={TREND_WINDOW} />

@@ -1,20 +1,42 @@
+/* ============================================================
+   PaddlePad, as a scoreboard.
+
+   Three materials, and every screen is built from them:
+
+   1. THE BOARD. Black panels with lamp-amber figures, ruled into square
+      cells. The record, a match's score, a person's head-to-head and
+      your profile all sit on one. Black in both themes.
+   2. THE BAND. Every section is a full-width band: a board-black label
+      strip across the top saying what it is, and the page's paper under
+      it. On a phone the bands run edge to edge, like rows of a results
+      board; on a wider screen they become panels.
+   3. THE ROW. Lists are results tables, not stacks of cards: ruled
+      lines, a lit result letter down the left edge, the score on the
+      right.
+
+   Type does the rest: Big Shoulders for every figure and heading,
+   Barlow Condensed in capitals for every label, Barlow for reading.
+   ============================================================ */
+
 .app {
   min-height: 100svh;
   width: 100%;
-  max-width: 560px;
+  max-width: 600px;
   margin: 0 auto;
-  padding: 1.25rem clamp(1rem, 4vw, 1.5rem) 3rem;
+  padding: 1.25rem var(--gutter) 3rem;
   padding-bottom: max(3rem, env(safe-area-inset-bottom));
 }
 
 /* With a fixed tab bar the last row would otherwise sit under it and be
    permanently unreachable. */
 .app-tabbed {
-  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom));
 }
 
+.app-body { min-height: 60vh; }
+
 .muted { color: var(--text-muted); text-align: center; padding: 3rem 0; }
-.muted-inline { color: var(--text-muted); font-size: 0.88rem; }
+.muted-inline { color: var(--text-muted); font-size: 0.9rem; }
 
 .error {
   color: var(--status-critical);
@@ -22,857 +44,694 @@
   border: 1px solid var(--status-critical);
   border-radius: var(--radius-sm);
   padding: 0.65rem 0.8rem;
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   margin: 0.75rem 0;
 }
 
 .eyebrow {
-  font-size: 0.72rem;
+  font-family: var(--label);
+  font-size: 0.85rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.14em;
   color: var(--text-muted);
 }
 
-/* ============ Claim ============ */
+/* ============ Shared type ============ */
 
-/* ============ The way in ============ */
-
-.gate { padding-top: 2.5rem; }
-.gate h1 { font-size: 2.1rem; letter-spacing: -0.03em; }
-.lede { color: var(--text-secondary); margin: 0.5rem 0 1.5rem; line-height: 1.5; }
-
-/* All three ways in, shown at once. Registration behind a link is what
-   made this app look like it had none. */
-.gate-tabs {
-  display: flex;
-  gap: 0.3rem;
-  padding: 0.3rem;
-  margin-bottom: 1.5rem;
-  background: var(--surface-sunken);
-  border-radius: var(--radius-sm);
+/* Screen titles are stadium signage: tall, heavy, in capitals. */
+.section-head h1,
+.people-screen h1,
+.person-detail h1,
+.you-screen h1,
+.standing h1,
+.not-found h1,
+.gate h1,
+.empty-head h1,
+.board-match h1,
+.crash h1 {
+  font-family: var(--display);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+  overflow-wrap: anywhere;
 }
-/* Three labels sharing one row, and the longest of them is "Create
-   account". On a 360px phone each pill gets about 96px, which 0.8rem
-   semibold very nearly fills -- so the text pressed against the pill
-   edges and, at the narrow end, wrapped onto two lines and made the
-   whole strip taller than the fields below it.
-   The size now scales with the viewport instead of being fixed, and
-   nowrap makes a wrap impossible rather than unlikely, so the padding
-   below is real breathing room at every width. */
-.gate-tab {
-  flex: 1;
-  min-width: 0;
-  padding: 0.6rem 0.4rem;
-  border: 1px solid transparent;
-  border-radius: calc(var(--radius-sm) - 0.2rem);
+
+.people-screen > h1,
+.you-screen h1,
+.standing h1,
+.section-head h1 { font-size: clamp(2.4rem, 11vw, 3rem); }
+.people-screen > h1,
+.standing h1 { margin: 0.25rem 0 1rem; }
+
+/* Every label on the board and in the bands: condensed capitals. */
+.sb-label,
+.stat-label,
+.highlight-label,
+.best-label,
+.detail-label,
+.pr-label,
+.board-label,
+.people-summary,
+.person-when,
+.result-word,
+.board-match-eyebrow {
+  font-family: var(--label);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Every figure: tall and heavy, and aligned when figures stack. */
+.sb-figure,
+.stat-value,
+.ms-yours,
+.ms-theirs,
+.ds-yours,
+.ds-theirs,
+.trend-now,
+.rating-number,
+.step-value,
+.best-value,
+.highlight-value,
+.pr-value,
+.meter-value,
+.board-match-score {
+  font-family: var(--display);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* ============ Links and buttons ============ */
+
+.link {
   background: none;
+  border: 0;
+  color: var(--primary);
+  font-family: var(--label);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  text-decoration: none;
+  padding: 0.3rem;
+}
+
+.back-link {
+  background: none;
+  border: 0;
+  color: var(--text);
+  font-family: var(--label);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.4rem 0;
+  margin-bottom: 0.75rem;
+  cursor: pointer;
+}
+
+/* The one filled button: board-black with lamp lettering. */
+.gate button[type='submit'],
+.signin-form button[type='submit'],
+.retry {
+  width: 100%;
+  padding: 0.9rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--button);
+  color: var(--button-ink);
+  font-family: var(--label);
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+.retry { width: auto; margin-top: 1rem; padding: 0.7rem 1.6rem; }
+.gate button[type='submit']:disabled,
+.signin-form button[type='submit']:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* The outlined button: a ruled box, for the second-most-likely tap. */
+.show-all,
+.setup-card > button,
+.link-code > button,
+.google-btn {
+  width: 100%;
+  padding: 0.8rem;
+  border: 2px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--label);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.show-all { margin-top: 1rem; }
+.setup-card > button,
+.link-code > button { margin-top: 0.9rem; }
+.show-all:active,
+.setup-card > button:active,
+.link-code > button:active { background: var(--surface-sunken); }
+
+.sign-out {
+  width: 100%;
+  padding: 0.8rem;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--status-critical);
+  background: transparent;
+  color: var(--status-critical);
+  font-family: var(--label);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.sign-out-note {
+  font-size: 0.8rem;
   color: var(--text-muted);
-  font: inherit;
-  font-size: clamp(0.72rem, 3vw, 0.82rem);
-  font-weight: 600;
+  text-align: center;
+  margin-top: 0.5rem;
+  line-height: 1.45;
+}
+
+/* ============ Segmented controls ============ */
+
+/* Filters, the theme choice, the board setting and the ways in are all
+   one control: a ruled strip of cells, the chosen one lit. */
+.filter-row,
+.gate-tabs {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  margin-bottom: 0.75rem;
+  border: 2px solid var(--rule);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.gate-tabs { margin-bottom: 1.5rem; }
+
+.filter,
+.gate-tab {
+  min-width: 0;
+  padding: 0.6rem 0.35rem;
+  border: 0;
+  border-left: 2px solid var(--rule);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--label);
+  font-size: clamp(0.85rem, 3.6vw, 1rem);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   white-space: nowrap;
   cursor: pointer;
 }
+.filter:first-child,
+.gate-tab:first-child { border-left: 0; }
+.filter-active,
 .gate-tab[aria-selected='true'] {
-  background: var(--surface);
-  border-color: var(--border);
-  color: var(--text);
+  background: var(--button);
+  color: var(--button-ink);
+}
+.filter:active,
+.gate-tab:active { transform: none; }
+
+/* ============ The board ============ */
+
+.scoreboard,
+.match-board,
+.person-head,
+.you-top,
+.empty-head {
+  position: relative;
+  background-color: var(--board);
+  /* The lamp matrix: a faint dot grid, the texture of a board whose
+     lamps are off. */
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1.3px);
+  background-size: 6px 6px;
+  color: var(--board-ink);
+  margin-inline: calc(var(--gutter) * -1);
+  margin-bottom: 1.5rem;
+  border-bottom: 4px solid var(--lamp);
 }
 
-.gate label,
-.signin-form label {
-  display: block;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  margin-bottom: 0.4rem;
-}
-.gate input,
-.signin-form input {
-  width: 100%;
-  padding: 0.8rem;
-  font: inherit;
-  font-size: 1rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-}
-/* The code is read off a screen and typed a character at a time, so it
-   keeps the large, spaced, centred treatment. A name or a password is
-   ordinary typing and reads better as an ordinary field. */
-.gate input.code-input {
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-align: center;
-  padding: 0.9rem;
-}
-.gate input:focus,
-.signin-form input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-soft);
-}
-.hint { font-size: 0.82rem; color: var(--text-muted); margin: 0.5rem 0 1.1rem; line-height: 1.45; }
-.gate button[type='submit'],
-.signin-form button[type='submit'] {
-  width: 100%; padding: 0.95rem; border: none; border-radius: var(--radius-sm);
-  background: var(--primary); color: #fff; font-size: 1rem; font-weight: 600; cursor: pointer;
-}
-.gate button[type='submit']:disabled,
-.signin-form button[type='submit']:disabled { opacity: 0.45; cursor: not-allowed; }
-.gate .hint:last-child { margin-bottom: 0; margin-top: 1rem; }
+/* The overview's board sits flush with the top of the screen. */
+.overview > .scoreboard { margin-top: -1.25rem; }
 
-/* Editing the profile: one row per field, each opening its own form. */
-/* Every block on the settings page is one of these, so the page reads
-   as a list of sections rather than a stack of unrelated cards. */
-.you-section { margin-bottom: 1.75rem; }
-.you-section h2 { font-size: 0.9rem; margin-bottom: 0.6rem; }
-.you-section p { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.55; margin: 0 0 0.6rem; }
-.you-section .filter-row { margin-bottom: 0; }
-
-.you-details { margin-bottom: 1.5rem; }
-.you-details h2 { font-size: 0.9rem; margin-bottom: 0.6rem; }
-.detail-note {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  line-height: 1.55;
-  margin-top: 0.6rem;
+.sb-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem var(--gutter);
+  border-bottom: 1px solid var(--board-rule);
 }
-.detail-row {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  padding: 0.7rem 0.85rem;
-  margin-bottom: 0.5rem;
-}
-.detail-row.is-open { background: var(--surface-sunken); }
-.detail-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
-.detail-head .link { padding: 0.3rem 0; flex: none; }
-.detail-label {
-  display: block;
-  font-size: 0.72rem;
+.sb-brand {
+  font-family: var(--display);
+  font-size: 1.15rem;
+  font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--text-muted);
+  color: var(--lamp);
 }
-.detail-value {
-  display: block;
-  font-size: 0.95rem;
-  font-weight: 600;
-  /* A long name must wrap rather than push the Edit button off. */
+/* The lamp P sits on the board's own black, so its tile disappears and
+   only the lit lamps show. */
+.sb-brand { display: inline-flex; align-items: center; gap: 0.45rem; }
+.sb-logo { width: 1.75rem; height: 1.75rem; flex: none; }
+.sb-name {
+  font-family: var(--label);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: right;
   overflow-wrap: anywhere;
 }
-.signin-done { color: var(--status-good); font-weight: 600; font-size: 0.8rem; margin-top: 0.4rem; }
-.signin-form { margin-top: 0.75rem; }
-.signin-form .link { display: block; width: 100%; margin-top: 0.5rem; text-align: center; }
 
-/* The offer to set up sign-in, and the offer to link a code.
-   Both are invitations rather than settings, so they read as cards on
-   --primary-soft instead of another row in the details list. */
-.setup-card,
-.link-code {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--primary-soft);
-  padding: 0.95rem 1rem;
-  margin-bottom: 1.5rem;
+.sb-record {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 }
-.setup-card h2,
-.link-code h2 { font-size: 0.95rem; margin: 0 0 0.35rem; }
-.setup-card p,
-.link-code p { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin: 0; }
-.setup-card .hint,
-.link-code .hint { color: var(--text-muted); }
-.setup-card > button,
-.link-code > button { margin-top: 0.85rem; }
-.link-code.is-open { background: var(--surface); }
-
-/* Submit and "Not now" together. The escape is a plain link rather than
-   a second button so it never competes with the action. */
-.setup-actions { margin-top: 0.5rem; }
-.setup-actions .link {
-  display: block;
-  width: 100%;
-  margin-top: 0.5rem;
-  text-align: center;
+.sb-cell {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem var(--gutter) 0.35rem;
+}
+.sb-cell + .sb-cell { border-left: 1px solid var(--board-rule); }
+.sb-label { font-size: 0.85rem; color: var(--board-muted); }
+.sb-figure {
+  font-size: clamp(5rem, 30vw, 7.5rem);
+  font-weight: 900;
+  line-height: 0.85;
+  margin-top: 0.3rem;
+  color: var(--lamp);
+  text-shadow: 0 0 22px var(--lamp-glow);
 }
 
-.link-confirm p + p { margin-top: 0.6rem; }
-.link-headline { font-weight: 600; color: var(--text) !important; }
-.link-result .signin-form { margin-top: 1rem; }
+.sb-caption {
+  padding: 0.35rem var(--gutter) 0.9rem;
+  font-size: 0.95rem;
+  color: var(--board-muted);
+}
+.streak-won { color: var(--status-good); font-weight: 700; }
+.streak-lost { color: var(--status-critical); font-weight: 700; }
+.scoreboard .streak-won { color: var(--win-lamp); }
+.scoreboard .streak-lost { color: var(--loss-lamp); }
 
-/* Native <dialog>, so the focus trap, the backdrop and Escape all come
-   from the browser rather than from code that has to be kept right. */
-.setup-dialog {
-  border: none;
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--text);
-  padding: 1.35rem 1.25rem 1.1rem;
-  width: min(26rem, calc(100vw - 2.5rem));
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.24);
-}
-.setup-dialog::backdrop { background: rgba(28, 22, 38, 0.5); }
-.setup-dialog h2 { font-size: 1.15rem; margin: 0 0 0.5rem; }
-.setup-dialog > p {
-  font-size: 0.88rem;
-  color: var(--text-secondary);
-  line-height: 1.55;
-  margin: 0;
-}
-
-/* Deleting the profile. Set apart and coloured because it is the one
-   irreversible thing on the screen -- everything above it can be
-   changed back. */
-.you-danger {
-  margin-top: 2rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--border);
-}
-.you-danger h2 { font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--status-critical); }
-.you-danger p {
-  font-size: 0.84rem;
-  color: var(--text-secondary);
-  line-height: 1.55;
-  margin-bottom: 0.6rem;
-}
-.you-danger .link.danger { color: var(--status-critical); padding: 0; }
-.you-danger.is-open {
-  background: var(--status-critical-soft);
-  border: 1px solid var(--status-critical);
-  border-radius: var(--radius-sm);
-  padding: 1rem;
-}
-.signin-form button[type='submit'].danger {
-  background: var(--status-critical);
-  border-color: var(--status-critical);
-  color: #fff;
-}
-
-/* ============ Profile ============ */
-
-.profile-top { display: flex; justify-content: flex-end; gap: 0.5rem; margin-bottom: 0.25rem; }
-.link { background: none; border: none; color: var(--text-muted); font-size: 0.85rem; cursor: pointer; padding: 0.3rem; }
-
-/* Hero: the record is a single headline value, so it is a big number
-   rather than a two-bar chart of the same thing. */
-.hero { margin-bottom: 1.5rem; }
-.hero-figure {
-  font-size: clamp(3.4rem, 16vw, 4.5rem);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.04em;
-  /* Proportional figures deliberately: tabular-nums is for numbers that
-     align vertically, and at display size its equal-width digits read
-     loose. The match list below DOES align, so it keeps them. */
-  margin: 0.35rem 0 0.4rem;
-}
-.hero-sep { color: var(--text-muted); margin: 0 0.12em; font-weight: 500; }
-.hero-caption { font-size: 0.9rem; color: var(--text-secondary); }
-.streak-won { color: var(--status-good); font-weight: 600; }
-.streak-lost { color: var(--status-critical); font-weight: 600; }
-
-.form-guide { display: flex; align-items: center; gap: 0.6rem; margin-top: 1rem; }
-.form-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
-.form-pills { display: flex; gap: 0.35rem; }
-/* The letter carries the meaning; the colour only reinforces it. */
-.pill {
-  width: 1.7rem; height: 1.7rem;
-  display: grid; place-items: center;
-  border-radius: 50%;
-  font-size: 0.76rem; font-weight: 700;
-  border: 1px solid transparent;
-}
-.pill-won { background: var(--status-good-soft); color: var(--status-good); border-color: var(--status-good); }
-.pill-lost { background: var(--status-critical-soft); color: var(--status-critical); border-color: var(--status-critical); }
-.pill-none { background: var(--surface-sunken); color: var(--text-muted); border-color: var(--border); }
-
-/* KPI row */
+/* The headline statistics, as the board's lower row of cells. The rules
+   between cells are the board showing through a 1px gap. */
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 0.6rem;
-  margin-bottom: 1.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--board-rule);
+  border-top: 1px solid var(--board-rule);
+}
+@media (min-width: 520px) {
+  .stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 .stat-tile {
-  display: flex; flex-direction: column; gap: 0.1rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.85rem 0.95rem;
-}
-.stat-value { font-size: 1.55rem; font-weight: 700; line-height: 1.1; }
-.stat-label { font-size: 0.8rem; color: var(--text-secondary); }
-.stat-note { font-size: 0.7rem; color: var(--text-muted); }
-
-/* ============ Shot profile ============ */
-
-.shot-profile {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.1rem;
-  margin-bottom: 1.5rem;
-}
-.shot-profile h2 { font-size: 0.95rem; margin-bottom: 0.9rem; }
-
-/* Stacked bar: thin mark, rounded ends, and a surface-coloured gap
-   between segments so they read as separate quantities. */
-.stack {
   display: flex;
-  height: 14px;
-  border-radius: 4px;
-  overflow: hidden;
-  background: var(--surface-sunken);
-  gap: 2px;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.8rem var(--gutter) 0.85rem;
+  background: var(--board);
 }
-.stack-seg { display: block; height: 100%; }
-.stack-seg:first-child { border-radius: 4px 0 0 4px; }
-.stack-seg:last-child { border-radius: 0 4px 4px 0; }
-.stack-seg:only-child { border-radius: 4px; }
-.seg-1 { background: var(--series-1); }
-.seg-2 { background: var(--series-2); }
+.stat-value { font-size: 2.3rem; color: var(--board-ink); }
+.stat-label { font-size: 0.85rem; letter-spacing: 0.06em; color: var(--board-ink); margin-top: 0.2rem; }
+.stat-note { font-size: 0.8rem; color: var(--board-muted); line-height: 1.35; }
 
-.stack-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; margin-top: 0.7rem; }
-.stack-legend li { display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; }
-.swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
-/* Labels and values wear text tokens -- a coloured swatch beside them
-   carries the identity, so the text never has to. */
-.legend-label { color: var(--text-secondary); }
-.legend-value { font-weight: 700; font-variant-numeric: tabular-nums; }
-
-/* Meters: a ratio against a limit, on a same-hue track. */
-.meters { display: grid; gap: 1rem; margin-top: 1.35rem; }
-.meter-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.35rem; }
-.meter-label { font-size: 0.85rem; color: var(--text-secondary); }
-.meter-value { font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-.meter-track { height: 10px; border-radius: 4px; background: var(--seq-track); overflow: hidden; }
-.meter-fill { display: block; height: 100%; border-radius: 4px; background: var(--seq-fill); }
-.meter-caption { font-size: 0.74rem; color: var(--text-muted); margin-top: 0.3rem; }
-
-/* ============ Highlights ============ */
-
-.highlights { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.6rem; margin-bottom: 1.5rem; }
-.highlight {
-  display: flex; flex-direction: column; gap: 0.12rem;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.8rem 0.9rem;
-}
-.highlight-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); }
-.highlight-value { font-size: 1.15rem; font-weight: 700; overflow-wrap: anywhere; }
-.highlight-note { font-size: 0.75rem; color: var(--text-muted); overflow-wrap: anywhere; }
-/* Same card, but the People tab's version opens that person. */
-a.highlight { color: inherit; text-decoration: none; }
-a.highlight:active { background: var(--surface); }
-
-/* ============ Rating slot ============ */
-
-/* ============ Matches ============ */
-
-.match-list h2 { font-size: 0.95rem; margin-bottom: 0.8rem; }
-.match-list ol { display: flex; flex-direction: column; gap: 0.6rem; }
-
-.match {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-/* The row is a link now, so the padding lives here -- the tap target
-   has to be the whole card, not the text inside it. */
-.match-link {
+.sb-form {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
-  padding: 0.85rem 0.95rem;
-  color: inherit;
-  text-decoration: none;
+  gap: 0.85rem;
+  padding: 0.7rem var(--gutter);
+  border-top: 1px solid var(--board-rule);
+  background: var(--board-raised);
 }
-.match-link:active { background: var(--surface-sunken); }
-@media (hover: hover) {
-  .match-link:hover { background: var(--surface-sunken); }
+
+/* Result lamps. Square, lit, and always carrying their letter. */
+.form-pills { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.pill {
+  width: 1.9rem;
+  height: 1.9rem;
+  display: grid;
+  place-items: center;
+  border-radius: 2px;
+  font-family: var(--label);
+  font-size: 1rem;
+  font-weight: 700;
 }
-.match-chevron {
-  color: var(--text-muted);
-  font-size: 1.4rem;
-  line-height: 1;
-  flex-shrink: 0;
+.pill-sm { width: 1.45rem; height: 1.45rem; font-size: 0.82rem; }
+.pill-won { background: var(--win-lamp); color: var(--win-ink); }
+.pill-lost { background: var(--loss-lamp); color: var(--loss-ink); }
+.pill-none { background: var(--none-lamp); color: var(--none-ink); }
+
+/* ============ Bands ============ */
+
+.rating,
+.trend,
+.shot-profile,
+.board,
+.step,
+.detail-shape,
+.detail-stats,
+.bests,
+.recent,
+.matches-screen .match-list,
+.person-detail .match-list,
+.preview,
+.you-section,
+.you-details,
+.setup-card,
+.link-code,
+.error-state {
+  background: var(--surface);
+  margin-inline: calc(var(--gutter) * -1);
+  margin-bottom: 1.25rem;
+  padding: 0 var(--gutter) 1.1rem;
+  border-block: 1px solid var(--border);
 }
-.match.won { border-left-color: var(--status-good); }
-.match.lost { border-left-color: var(--status-critical); }
 
-.match-score {
-  display: flex; align-items: baseline; gap: 0.1rem;
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-  min-width: 3.6rem;
+/* The label strip. Whatever a band opens with -- a bare heading or a
+   heading with something beside it -- becomes the strip. */
+.rating > h2,
+.trend > h2,
+.shot-profile > h2,
+.step > .step-head,
+.detail-shape > h2,
+.detail-stats > h2,
+.bests > h2,
+.match-list > h2,
+.you-section > h2,
+.you-details > h2,
+.setup-card > h2,
+.link-code > h2,
+.rating > .section-head,
+.recent > .section-head,
+.board > .section-head,
+.trend > .trend-head,
+.detail-shape > .board-match-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 calc(var(--gutter) * -1) 1rem;
+  padding: 0.55rem var(--gutter);
+  min-height: 2.6rem;
+  background: var(--board);
+  color: var(--board-ink);
+  font-family: var(--label);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  line-height: 1.2;
 }
-.ms-yours { font-size: 1.5rem; font-weight: 700; }
-.ms-dash { color: var(--text-muted); }
-.ms-theirs { font-size: 1.05rem; color: var(--text-muted); font-weight: 600; }
+.section-head h2,
+.trend-head h2,
+.step-head h2,
+.board-match-head h2 { font: inherit; letter-spacing: inherit; }
 
-.match-body { min-width: 0; flex: 1; }
-.match-versus { font-size: 0.95rem; font-weight: 600; overflow-wrap: anywhere; }
-.match-partner { font-size: 0.82rem; color: var(--text-secondary); overflow-wrap: anywhere; }
-.match-meta { font-size: 0.74rem; color: var(--text-muted); margin-top: 0.2rem; }
-
-.match-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.5rem; }
-.chip {
-  font-size: 0.7rem; font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0.14rem 0.45rem;
+/* Things riding in a strip take the board's colours. */
+.section-head .link,
+.section-head .chip {
+  color: var(--lamp);
 }
-.chip-quiet { color: var(--text-muted); font-weight: 400; }
-
-/* ============ Empty state ============ */
-
-.empty { padding-top: 1rem; }
-
-.empty-head { margin-bottom: 1.5rem; }
-.empty-head h1 {
-  font-size: clamp(1.6rem, 7vw, 2rem);
-  letter-spacing: -0.03em;
-  line-height: 1.15;
-  margin: 0.4rem 0 0.6rem;
-  overflow-wrap: anywhere;
+.section-head .chip {
+  border-color: var(--board-rule);
+  background: transparent;
 }
-.empty-lede { color: var(--text-secondary); line-height: 1.55; }
+.trend-head .trend-now { font-size: 1.7rem; color: var(--lamp); letter-spacing: 0; }
 
-/* A live match is the one thing here that is actually happening, so it
-   gets the only piece of colour on the screen. */
+/* On a wider screen there is room around the column, so bands become
+   panels rather than running into the margin. */
+@media (min-width: 640px) {
+  .scoreboard,
+  .match-board,
+  .person-head,
+  .you-top,
+  .empty-head,
+  .rating,
+  .trend,
+  .shot-profile,
+  .board,
+  .step,
+  .detail-shape,
+  .detail-stats,
+  .bests,
+  .recent,
+  .matches-screen .match-list,
+  .person-detail .match-list,
+  .preview,
+  .you-section,
+  .you-details,
+  .setup-card,
+  .link-code,
+  .error-state,
+  .person-list {
+    margin-inline: 0;
+    border-radius: var(--radius);
+    border-inline: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .scoreboard,
+  .match-board,
+  .person-head,
+  .you-top,
+  .empty-head {
+    border-inline: 0;
+    /* Square along the lamp strip at the bottom, so the strip is a
+       straight edge rather than bending round a corner. */
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+  .overview > .scoreboard { margin-top: 0; }
+}
+
+/* A band holding only a sentence (a failed load, say) has no strip to
+   push it down from the top edge. */
+.board > .muted-inline:first-child { display: block; padding-top: 1rem; }
+
+/* With the profile links above it, the empty-state board can't sit
+   flush with the top of the screen. */
+.profile-top ~ .empty .empty-head { margin-top: 0; }
+
+/* ============ Overview pieces ============ */
+
+/* A live match is the one thing on the page actually happening. */
 .live-note {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.5rem;
-  background: var(--status-good-soft);
-  border: 1px solid var(--status-good);
-  color: var(--status-good);
-  border-radius: 999px;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.82rem;
+  gap: 0.6rem;
+  background: var(--board);
+  color: var(--board-ink);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.85rem;
+  font-family: var(--label);
+  font-size: 0.95rem;
   font-weight: 600;
-  margin-bottom: 1.5rem;
+  letter-spacing: 0.02em;
+  margin-bottom: 1.25rem;
 }
 .live-dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--status-good);
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--win-lamp);
+  box-shadow: 0 0 10px var(--win-lamp);
   animation: live-pulse 2s ease-in-out infinite;
 }
 @keyframes live-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
 }
-/* Respect a stated preference for less motion -- a pulsing dot is
-   decoration, not information. */
-@media (prefers-reduced-motion: reduce) {
-  .live-dot { animation: none; }
-}
 
-/* The shape of the page to come, drawn as empty structure. Deliberately
-   no placeholder numbers: inventing figures to fill it would teach a
-   first-time player that this app shows numbers it made up. */
-.preview {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.1rem;
-  margin-bottom: 1.5rem;
-}
-.preview-card {
-  background: var(--surface-sunken);
-  border-radius: var(--radius-sm);
-  padding: 0.9rem;
-  margin-bottom: 1.1rem;
-}
-.ghost {
-  display: block;
+/* Highlight and personal-best cells: a ruled grid, like the board's
+   stat row but on paper. */
+.highlights,
+.bests-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 1px;
   background: var(--border);
-  border-radius: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
 }
-.ghost-hero { width: 38%; height: 2rem; margin-bottom: 0.55rem; }
-.ghost-line { width: 62%; height: 0.6rem; margin-bottom: 0.9rem; }
-.ghost-row { display: flex; gap: 0.35rem; }
-.ghost-pill { width: 1.55rem; height: 1.55rem; border-radius: 50%; }
-
-.promise-list { display: flex; flex-direction: column; gap: 0.9rem; }
-.promise-list li { display: flex; flex-direction: column; gap: 0.1rem; }
-.promise-title { font-size: 0.9rem; font-weight: 600; }
-.promise-body { font-size: 0.84rem; color: var(--text-secondary); line-height: 1.45; }
-
-.empty-foot {
-  font-size: 0.84rem;
-  color: var(--text-muted);
-  line-height: 1.5;
-  text-align: center;
-}
-
-/* ============ Match sparkline ============ */
-
-/* The shape of a match: one line for the lead, read against a visible
-   zero baseline. Thin marks and no axis -- at this size an axis would
-   be more chrome than the data. */
-.spark {
-  display: block;
-  width: 100%;
-  height: 34px;
-  margin: 0.55rem 0 0.1rem;
-  overflow: visible;
-}
-
-/* A class, not a taller viewBox: height here only sets the viewBox, and
-   the SVG scales with preserveAspectRatio="none", so the rendered size
-   has to come from CSS. */
-.spark-lg { height: 130px; margin: 0.9rem 0 0.4rem; }
-
-.spark-base {
-  stroke: var(--border);
-  stroke-width: 1;
-}
-
-.spark-line {
-  fill: none;
-  stroke-width: 2;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-.spark-line.won { stroke: var(--status-good); }
-.spark-line.lost { stroke: var(--status-critical); }
-
-/* A wash rather than a fill, so the line stays the thing you read. */
-.spark-area { stroke: none; }
-.spark-area.won { fill: var(--status-good-soft); }
-.spark-area.lost { fill: var(--status-critical-soft); }
-
-.match-story {
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-/* ============ Navigation ============ */
-
-/* Fixed to the bottom because this is a one-handed phone app and the
-   top of a modern phone is the hardest place to reach. */
-.tabbar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 10;
-  display: flex;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  backdrop-filter: blur(12px);
-  border-top: 1px solid var(--border);
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-.tab {
-  flex: 1;
+.highlights { margin-bottom: 1.25rem; }
+.highlight,
+.best-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 0.15rem;
-  padding: 0.5rem 0.25rem 0.55rem;
-  color: var(--text-muted);
-  text-decoration: none;
-  font-size: 0.68rem;
-  font-weight: 500;
-  /* Comfortably over the 44px minimum even on a short phone. */
-  min-height: 3rem;
-}
-.tab-active { color: var(--primary); }
-.tab:active { background: var(--surface-sunken); }
-
-.app-body { min-height: 60vh; }
-
-.back-link {
-  background: none;
-  border: 0;
-  color: var(--primary);
-  font-size: 0.9rem;
-  font-weight: 500;
-  padding: 0.35rem 0;
-  margin-bottom: 0.6rem;
-  cursor: pointer;
-}
-
-.section-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.8rem;
-}
-.section-head h1 { font-size: 1.35rem; }
-.section-head h2 { font-size: 0.95rem; }
-
-.link {
-  background: none;
-  border: 0;
-  color: var(--primary);
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.not-found { text-align: center; padding: 4rem 0; }
-.not-found h1 { font-size: 1.4rem; margin-bottom: 0.4rem; }
-.not-found .retry { margin-top: 1rem; }
-
-/* ============ Filters ============ */
-
-.filter-row { display: flex; gap: 0.4rem; margin-bottom: 1rem; }
-.filter {
-  flex: 1;
-  padding: 0.5rem 0.6rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
   background: var(--surface);
-  color: var(--text-secondary);
-  font-size: 0.82rem;
-  font-weight: 500;
-  cursor: pointer;
+  padding: 0.85rem 0.9rem;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
 }
-.filter-active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
+.bests-list li { display: flex; }
+.best-card { flex: 1; }
+a.highlight:active,
+.best-card:active { background: var(--surface-sunken); }
+.highlight-label,
+.best-label { font-size: 0.8rem; letter-spacing: 0.08em; color: var(--text-muted); }
+.highlight-value,
+.best-value { font-size: 1.6rem; line-height: 1.05; overflow-wrap: anywhere; }
+.highlight-note,
+.best-detail { font-size: 0.82rem; color: var(--text-secondary); overflow-wrap: anywhere; }
+
+/* ============ Charts: bars and meters ============ */
+
+/* Stacked bar: a thick mark with a surface-coloured gap between
+   segments so they read as separate quantities. */
+.stack {
+  display: flex;
+  height: 18px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--surface-sunken);
+  gap: 2px;
 }
+.stack-seg { display: block; height: 100%; }
+.seg-1 { background: var(--series-1); }
+.seg-2 { background: var(--series-2); }
+
+.stack-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; margin-top: 0.7rem; }
+.stack-legend li { display: flex; align-items: center; gap: 0.45rem; font-size: 0.9rem; }
+.swatch { width: 12px; height: 12px; border-radius: 1px; flex-shrink: 0; }
+/* Labels and values wear text tokens -- the swatch carries identity. */
+.legend-label { color: var(--text-secondary); }
+.legend-value { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.meters { display: grid; gap: 1.1rem; margin-top: 1.4rem; }
+.meter-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; margin-bottom: 0.35rem; }
+.meter-label { font-size: 0.92rem; color: var(--text-secondary); }
+.meter-value { font-size: 1.6rem; }
+.meter-track { height: 10px; border-radius: 1px; background: var(--seq-track); overflow: hidden; }
+.meter-fill { display: block; height: 100%; background: var(--seq-fill); }
+.meter-caption { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.3rem; }
+
+.shot-ask {
+  font-family: var(--label);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.shot-note { font-size: 0.84rem; color: var(--text-muted); line-height: 1.5; margin-top: 0.6rem; }
 
 /* ============ Form trend ============ */
 
-.trend {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1rem 1.1rem;
-  margin-bottom: 1.5rem;
-}
-.trend-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-}
-.trend-head h2 { font-size: 0.95rem; }
-.trend-now {
-  font-size: 1.35rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-.trend-svg { display: block; width: 100%; height: 90px; overflow: visible; }
-.trend-baseline { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 3; }
+.trend-svg { display: block; width: 100%; height: 96px; overflow: visible; }
+.trend-baseline { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 4; opacity: 0.6; }
 .trend-line {
   fill: none;
   stroke: var(--series-1);
-  stroke-width: 2;
+  stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
-.trend-caption {
-  font-size: 0.74rem;
-  color: var(--text-muted);
-  margin-top: 0.5rem;
-  line-height: 1.45;
-}
-.trend-early h2 { margin-bottom: 0.4rem; }
+.trend-caption { font-size: 0.82rem; color: var(--text-muted); margin-top: 0.6rem; line-height: 1.45; }
+.trend-early > h2 { margin-bottom: 0.9rem; }
 
 /* ============ Skill rating ============ */
 
-/* Same card as .trend rather than a variant of its own: the rating is
-   one more thing the overview says, not a special announcement, and
-   giving it a louder surface than everything around it would read as an
-   advertisement for the feature. */
-.rating {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1rem 1.1rem;
-  margin-bottom: 1.5rem;
-}
-.rating h2 { font-size: 0.95rem; }
-.rating .section-head { margin-bottom: 0.6rem; }
-.rating-progress h2 { margin-bottom: 0.7rem; }
-.rating-progress .muted-inline { margin-top: 0.6rem; display: block; line-height: 1.45; }
+.rating-progress .muted-inline { margin-top: 0.7rem; display: block; line-height: 1.45; }
 
-.rating-score {
-  display: flex;
-  align-items: baseline;
-  gap: 0.3rem;
-  margin-bottom: 0.15rem;
-}
-.rating-number {
-  font-size: 2.6rem;
-  font-weight: 700;
-  line-height: 1;
-  /* Tabular figures so the number does not jump sideways between runs. */
-  font-variant-numeric: tabular-nums;
-  color: var(--primary);
-}
-.rating-outof { font-size: 0.9rem; color: var(--text-muted); }
-
+.rating-score { display: flex; align-items: baseline; gap: 0.4rem; }
+.rating-number { font-size: 4.25rem; font-weight: 900; }
+.rating-outof { font-family: var(--label); font-size: 1.1rem; font-weight: 600; color: var(--text-muted); }
 .rating-archetype {
-  font-size: 1rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
+  font-family: var(--label);
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0.3rem 0 0.2rem;
 }
 .rating-scored .muted-inline { display: block; line-height: 1.45; }
-
-/* The way from the card to the page behind it. Quiet, because the
-   card is the thing; this is a door, not an advert. */
 .rating-more {
   display: inline-block;
-  margin-top: 0.8rem;
-  font-size: 0.85rem;
-  font-weight: 600;
+  margin-top: 1rem;
+  font-family: var(--label);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--primary);
   text-decoration: none;
 }
 .rating-more:hover { text-decoration: underline; }
 
-/* A section heading with its icon, on the settings screen. */
-.you-head { display: flex; align-items: center; gap: 0.4rem; }
-.you-head svg { color: var(--text-muted); }
-/* The one line a section is allowed before the rest goes behind a tap. */
-.you-line { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 0.4rem; }
-.you-version { display: block; margin-top: 0.8rem; }
-
-/* ============ Calm motion ============ */
-
-/* Things settle into place once when a screen opens. Nothing loops, and
-   every animation here runs a single time, under 400ms, so a page never
-   keeps moving while it is being read. The reduced-motion block at the
-   end of this section turns all of it off -- see lib/motion.js for the
-   JavaScript half of the same promise. */
-
-/* Fade and lift. `--i` staggers a list: row two starts 40ms after row
-   one. */
-.rise {
-  animation: rise 280ms ease-out both;
-  animation-delay: calc(var(--i, 0) * 40ms);
+.rating-history { margin-top: 1rem; }
+.rating-history-svg { display: block; width: 100%; height: 64px; overflow: visible; }
+.rating-history-line {
+  fill: none;
+  stroke: var(--series-1);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
-@keyframes rise {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: none; }
-}
-
-/* A bar growing out of its baseline. */
-@keyframes grow {
-  from { transform: scaleY(0); }
-  to   { transform: scaleY(1); }
-}
-
-/* A marker arriving after the thing it marks. No overshoot: calm, not
-   bouncy. */
-@keyframes pop {
-  from { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
-  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-}
-
-/* Revealing a chart left to right. clip-path rather than a curtain in
-   the card's colour, so it cannot go wrong against a different
-   background, and the inset is negative at the end so labels hanging
-   outside the box are not clipped once it settles. */
-@keyframes wipe {
-  from { clip-path: inset(-40px 100% -40px -40px); }
-  to   { clip-path: inset(-40px -40px -40px -40px); }
-}
-
-/* ============ This month on PaddlePad ============ */
-
-/* Same card as the rating and the trend, so the board reads as one
-   more thing the app says rather than a banner competing with the list
-   of people below it. */
-.board {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1rem 1.1rem;
-  margin-bottom: 1.5rem;
-}
-.board h2 { font-size: 0.95rem; }
-.board .section-head { margin-bottom: 0.4rem; }
-
-.board-rows { list-style: none; margin: 0; padding: 0; }
-.board-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 7.5rem) minmax(0, 1fr);
-  gap: 0.6rem;
-  align-items: start;
-  padding: 0.6rem 0;
-  border-top: 1px solid var(--border);
-}
-.board-icon { color: var(--text-muted); margin-top: 0.05rem; }
-.board-row:first-child { border-top: none; }
-.board-label { font-size: 0.8rem; color: var(--text-muted); padding-top: 0.1rem; }
-.board-value {
-  font-size: 0.92rem;
-  font-weight: 600;
-  /* Long names and four-player doubles lines wrap rather than push the
-     row off the side of a phone. */
-  overflow-wrap: anywhere;
-}
-.board-note {
-  display: block;
-  font-size: 0.8rem;
-  font-weight: 400;
+.rating-history-dot { fill: var(--surface); stroke: var(--series-1); stroke-width: 2; }
+.rating-history-caption,
+.rating-history-none {
+  font-size: 0.82rem;
   color: var(--text-muted);
-  margin-top: 0.1rem;
-}
-.board-empty { font-weight: 400; color: var(--text-muted); }
-.board-footer {
-  margin-top: 0.6rem;
-  font-size: 0.78rem;
-  color: var(--text-muted);
+  margin-top: 0.55rem;
   line-height: 1.45;
+  display: block;
 }
 
-/* The match row is a way in, so it looks like one -- but it keeps the
-   row's weight rather than turning blue from end to end. */
-.board-link { color: inherit; text-decoration: none; display: block; }
-.board-link .board-note { color: var(--primary); }
-.board-link:hover .board-note { text-decoration: underline; }
+/* ============ Chips ============ */
 
-/* ---- Icon chips, badges, and an explanation behind a tap ---- */
-
-/* A row of small facts. Replaces sentences like "Level seven times, the
-   lead changed hands three times": the same facts, a fifth of the
-   reading. */
-.ichips {
-  list-style: none;
-  padding: 0;
-  margin: 0.9rem 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
+/* Small ruled tags, not pills: they label, they are never buttons. */
+.chip,
 .ichip {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  font-size: 0.78rem;
-  padding: 0.28rem 0.6rem;
-  border-radius: 999px;
-  background: var(--surface-sunken);
+  font-family: var(--label);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  background: transparent;
   border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 0.08rem 0.45rem;
   white-space: nowrap;
 }
+.chip-quiet { color: var(--text-muted); font-weight: 600; }
+
+.ichips {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.ichip { padding: 0.25rem 0.55rem; }
 .ichip svg { color: var(--text-muted); flex: none; }
 
-/* Why a game was picked: one badge per reason, each only shown when it
-   is true of this game. */
+/* Why a game was picked: lit tags, one per reason. */
 .badges {
   list-style: none;
   padding: 0;
@@ -884,68 +743,281 @@ a.highlight:active { background: var(--surface); }
 .badges li {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.82rem;
-  font-weight: 600;
+  gap: 0.4rem;
+  font-family: var(--label);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   padding: 0.35rem 0.7rem;
-  border-radius: 999px;
-  color: var(--primary);
-  background: var(--primary-soft);
-  border: 1px solid var(--primary-soft);
+  border-radius: 2px;
+  color: var(--board-ink);
+  background: var(--board);
 }
-.badges svg { flex: none; }
+.badges svg { flex: none; color: var(--lamp); }
 
-/* The reasoning, one tap away. Native details/summary: no script, and
-   it announces itself as expandable. */
-.more { margin-top: 0.7rem; }
+/* The reasoning, one tap away. */
+.more { margin-top: 0.9rem; }
 .more-summary {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.8rem;
-  font-weight: 600;
+  gap: 0.4rem;
+  font-family: var(--label);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--text-muted);
   cursor: pointer;
   list-style: none;
-  padding: 0.2rem 0;
+  padding: 0.25rem 0;
 }
 .more-summary::-webkit-details-marker { display: none; }
-.more-summary:hover { color: var(--primary); }
+.more-summary:hover,
 .more[open] .more-summary { color: var(--primary); }
-.more-body { margin-top: 0.4rem; }
+.more-body {
+  margin-top: 0.4rem;
+}
 .more-body p {
-  font-size: 0.82rem;
-  color: var(--text-muted);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
   line-height: 1.55;
-  margin: 0 0 0.4rem;
+  margin: 0 0 0.45rem;
+}
+
+/* ============ Results table ============ */
+
+.match-list ol { display: flex; flex-direction: column; }
+/* On the overview the band's own strip already says "Recent matches". */
+.recent .match-list > h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.matches-screen .match-list ol,
+.person-detail .match-list ol { margin-top: -1rem; }
+.recent > .section-head { margin-bottom: 0; }
+
+.match + .match { border-top: 1px solid var(--border); }
+
+/* The row is the link, so the whole line is the tap target. */
+.match-link {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+  gap: 0.85rem;
+  padding: 0.95rem 0;
+  color: inherit;
+  text-decoration: none;
+}
+.match-link:active { background: var(--surface-sunken); }
+@media (hover: hover) {
+  .match-link:hover .match-versus { text-decoration: underline; text-underline-offset: 3px; }
+}
+
+/* The lit result letter at the head of the row, as tall as the line it
+   marks rather than the whole row, so a long row doesn't turn into a
+   green column. */
+.result-lamp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: start;
+  height: 2.6rem;
+  border-radius: 2px;
+  font-family: var(--display);
+  font-size: 1.45rem;
+  font-weight: 900;
+  line-height: 1;
+}
+.lamp-won { background: var(--win-lamp); color: var(--win-ink); }
+.lamp-lost { background: var(--loss-lamp); color: var(--loss-ink); }
+.lamp-none { background: var(--none-lamp); color: var(--none-ink); }
+
+.match-body { min-width: 0; }
+.match-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.match-versus { font-size: 1.02rem; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.match-score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.1rem;
+  flex: none;
+}
+.ms-yours { font-size: 2rem; }
+.ms-dash { color: var(--text-muted); font-family: var(--display); font-size: 1.3rem; }
+.ms-theirs { font-size: 1.45rem; color: var(--text-muted); }
+.match-partner { font-size: 0.9rem; color: var(--text-secondary); overflow-wrap: anywhere; }
+.match-meta { font-size: 0.82rem; color: var(--text-muted); margin-top: 0.15rem; }
+.match-story { font-size: 0.88rem; font-weight: 600; color: var(--text-secondary); }
+.match-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.55rem; }
+.match-chevron {
+  align-self: center;
+  color: var(--text-muted);
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+/* ============ Match sparkline ============ */
+
+.spark {
+  display: block;
+  width: 100%;
+  height: 30px;
+  margin: 0.5rem 0 0.2rem;
+  overflow: visible;
+}
+.spark-lg { height: 130px; margin: 0.2rem 0 0.5rem; }
+.spark-base { stroke: var(--border); stroke-width: 1; }
+.spark-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.spark-line.won { stroke: var(--status-good); }
+.spark-line.lost { stroke: var(--status-critical); }
+.spark-area { stroke: none; }
+.spark-area.won { fill: var(--status-good-soft); }
+.spark-area.lost { fill: var(--status-critical-soft); }
+
+/* ============ Matches screen ============ */
+
+.matches-screen > .section-head,
+.matches-screen .section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.matches-screen .section-head .muted-inline {
+  font-family: var(--label);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding-bottom: 0.2rem;
+}
+.matches-screen .filter-row:last-of-type { margin-bottom: 1.25rem; }
+
+/* ============ Match detail ============ */
+
+.match-board { padding: 1rem var(--gutter) 1.2rem; margin-bottom: 1rem; }
+.result-word {
+  display: inline-block;
+  font-size: 1rem;
+  letter-spacing: 0.16em;
+  padding: 0.12rem 0.55rem;
+  border-radius: 2px;
+  background: var(--none-lamp);
+  color: var(--none-ink);
+}
+.match-board.won .result-word { background: var(--win-lamp); color: var(--win-ink); }
+.match-board.lost .result-word { background: var(--loss-lamp); color: var(--loss-ink); }
+
+.detail-score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.2rem;
+  margin: 0.5rem 0 0.6rem;
+}
+.ds-yours {
+  font-size: clamp(5rem, 28vw, 6.5rem);
+  font-weight: 900;
+  line-height: 0.85;
+  color: var(--lamp);
+  text-shadow: 0 0 22px var(--lamp-glow);
+}
+.ds-dash { color: var(--board-muted); font-family: var(--display); font-size: 2.5rem; }
+.ds-theirs { font-size: clamp(3rem, 16vw, 3.8rem); color: var(--board-ink); line-height: 0.85; }
+
+.detail-versus { font-size: 1.1rem; font-weight: 600; overflow-wrap: anywhere; }
+.detail-partner { font-size: 0.95rem; color: var(--board-muted); }
+.detail-meta { font-size: 0.85rem; color: var(--board-muted); margin-top: 0.3rem; }
+
+.expectation {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.8rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--board-rule);
+  font-size: 0.9rem;
+  color: var(--board-muted);
+  line-height: 1.5;
+}
+.expectation-upset {
+  font-family: var(--label);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #15181d;
+  background: var(--lamp);
+  border-radius: 2px;
+  padding: 0.05rem 0.45rem;
+}
+.expectation-rated { color: var(--board-muted); }
+
+.fact-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 1rem; }
+.detail-stats .fact-chips { margin: 1.25rem 0 0; }
+.chip-note { font-size: 0.84rem; color: var(--text-muted); line-height: 1.45; margin: -0.4rem 0 1.1rem; }
+
+.detail-story {
+  font-family: var(--label);
+  font-size: 1.15rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 0.3rem;
+}
+
+.detail-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.5rem 0 0.5rem;
+}
+.detail-nav-link {
+  color: var(--text);
+  text-decoration: none;
+  font-family: var(--label);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.5rem 0.75rem;
+  border: 2px solid var(--rule);
+  border-radius: var(--radius-sm);
 }
 
 /* ---- Every point, as a ribbon ---- */
 
-.ribbon { margin-top: 0.3rem; }
+.ribbon { margin-top: 0.2rem; }
 .ribbon-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  font-size: 0.78rem;
-  color: var(--text-muted);
+  gap: 0.35rem 1rem;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
 }
-.ribbon-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
-.ribbon-swatch {
-  width: 10px;
-  height: 14px;
-  border-radius: 2px;
-  display: inline-block;
-}
+.ribbon-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+.ribbon-swatch { width: 10px; height: 14px; border-radius: 1px; display: inline-block; }
 /* Filled against outlined, so the ribbon reads without colour too. */
 .ribbon-swatch.is-winners { background: var(--series-1); }
 .ribbon-swatch.is-losers { border: 2px solid var(--series-2); }
 
 .ribbon-readout {
-  font-size: 0.82rem;
-  font-weight: 600;
-  margin: 0.5rem 0 0.4rem;
-  min-height: 1.2em;
+  font-family: var(--label);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0.6rem 0 0.45rem;
+  min-height: 1.3em;
 }
 
 .ribbon-blocks,
@@ -955,15 +1027,14 @@ a.highlight:active { background: var(--surface); }
   gap: 2px;
 }
 .ribbon-block {
-  height: 30px;
+  height: 32px;
   padding: 0;
-  border-radius: 3px;
+  border-radius: 1px;
   border: 2px solid var(--series-2);
   background: none;
   cursor: pointer;
   animation: rise 220ms ease-out both;
-  /* Paused until the ribbon is scrolled to, so it does not finish
-     off-screen while the top of the page is being read. */
+  /* Paused until the ribbon is scrolled to. */
   animation-play-state: paused;
   animation-delay: calc(var(--i) * 22ms);
 }
@@ -982,72 +1053,55 @@ a.highlight:active { background: var(--surface); }
 }
 .ribbon.is-in .ribbon-mark {
   animation: fade-in 240ms ease-out both;
-  /* After the blocks have finished arriving. */
   animation-delay: calc(var(--points) * 22ms + 120ms);
 }
-@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 .ribbon-icon { color: var(--text-muted); }
 .ribbon-icon.is-star { color: var(--series-1); }
 .ribbon-icon.is-flag { color: var(--series-2); }
 .ribbon-score {
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   color: var(--text);
 }
 
-/* ---- The match of the month, for someone who was not in it ---- */
-.board-match h1 { font-size: 1.2rem; line-height: 1.3; margin: 0.15rem 0 0.4rem; overflow-wrap: anywhere; }
+/* ============ Match of the month ============ */
+
 .board-match-eyebrow {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  margin-top: 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: var(--primary);
+  margin-bottom: 0.4rem;
 }
-.board-match-v { color: var(--text-muted); font-weight: 400; }
-.board-match-score {
-  font-size: 2.2rem;
-  font-weight: 700;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  margin-bottom: 0.8rem;
-}
-.board-match-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-}
-/* The key that replaced "Above the line, X were ahead". */
+.board-match h1 { font-size: clamp(1.9rem, 8vw, 2.4rem); margin-bottom: 0.3rem; }
+.board-match-v { color: var(--text-muted); }
+.board-match-score { font-size: clamp(4rem, 22vw, 5.5rem); font-weight: 900; margin: 0.2rem 0 0.8rem; }
 .board-match-legend {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.75rem;
-  color: var(--text-muted);
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: var(--board-muted);
 }
 .board-match-legend i {
-  width: 10px;
-  height: 3px;
-  border-radius: 2px;
+  width: 12px;
+  height: 4px;
   background: var(--series-1);
+  outline: 1px solid var(--board-rule);
 }
-
-/* The one sentence that says what happened. It is the reason to open
-   the page, so it is the biggest words on it after the score. */
 .board-match-headline {
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   font-weight: 600;
   line-height: 1.45;
   margin: 0 0 0.8rem;
 }
+.board-match .ichips { margin-bottom: 1.25rem; }
+.board-footer { margin-top: 0.8rem; font-size: 0.84rem; color: var(--text-muted); line-height: 1.45; }
+.board-match .board-footer { margin-top: 1rem; }
 
 /* ---- The chart, with its key moments pinned to it ---- */
 .mchart {
@@ -1058,11 +1112,11 @@ a.highlight:active { background: var(--surface); }
 }
 .mchart-svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .mchart-base { stroke: var(--border); stroke-width: 1; }
-.mchart-area { fill: var(--series-1); opacity: 0.1; }
+.mchart-area { fill: var(--series-1); opacity: 0.12; }
 .mchart-line {
   fill: none;
   stroke: var(--series-1);
-  stroke-width: 2.25;
+  stroke-width: 2.5;
   stroke-linejoin: round;
   stroke-linecap: round;
 }
@@ -1073,20 +1127,20 @@ a.highlight:active { background: var(--surface); }
   align-items: center;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  /* After the line has drawn itself past them. */
   animation: pop 260ms ease-out both;
   animation-delay: 620ms;
 }
 .mchart-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 1px;
   background: var(--surface);
   border: 2px solid var(--series-1);
 }
 .mchart-label {
   position: absolute;
-  font-size: 0.72rem;
+  font-family: var(--label);
+  font-size: 0.85rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1094,133 +1148,87 @@ a.highlight:active { background: var(--surface); }
 }
 .mchart-above .mchart-label { bottom: 100%; margin-bottom: 0.2rem; }
 .mchart-below .mchart-label { top: 100%; margin-top: 0.2rem; }
-/* At the edges the label hangs inwards rather than off the screen. */
 .mchart-end .mchart-label { right: 0; }
 .mchart-start .mchart-label { left: 0; }
 
-.board-match-why { font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-top: 0.4rem; }
-.board-match .board-footer { margin-top: 1rem; }
+/* ============ This month on PaddlePad ============ */
 
-/* A narrow phone gives the label its own line rather than squeezing
-   both columns into unreadable slivers. */
+.board-rows { list-style: none; margin: -0.4rem 0 0; padding: 0; }
+.board-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 7.5rem) minmax(0, 1fr);
+  gap: 0.7rem;
+  align-items: start;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--border);
+}
+.board-row:first-child { border-top: none; }
+.board-icon { color: var(--primary); margin-top: 0.1rem; }
+.board-label { font-size: 0.85rem; letter-spacing: 0.06em; color: var(--text-muted); padding-top: 0.15rem; }
+.board-value { font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
+.board-note { display: block; font-size: 0.85rem; font-weight: 400; color: var(--text-muted); margin-top: 0.1rem; }
+.board-empty { font-weight: 400; color: var(--text-muted); }
+.board-link { color: inherit; text-decoration: none; display: block; }
+.board-link .board-note { color: var(--primary); font-weight: 600; }
+.board-link:hover .board-note { text-decoration: underline; }
+
 @media (max-width: 360px) {
   .board-row { grid-template-columns: auto minmax(0, 1fr); gap: 0.1rem 0.5rem; }
   .board-label { grid-column: 2; }
   .board-value { grid-column: 2; }
 }
 
-/* ============ Your rating, in the model's own three steps ============ */
+/* ============ Your rating, in three steps ============ */
 
-.standing h1 { font-size: 1.35rem; margin: 0.5rem 0 1rem; }
-
-/* One card per step, numbered, because the order IS the explanation: a
-   score, then the groups everyone is split into, then the styles inside
-   a group. */
-.step {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1rem 1.1rem;
-  margin-bottom: 1rem;
-}
-.step-head { display: flex; align-items: center; gap: 0.5rem; }
-.step-head h2 { font-size: 0.95rem; }
+.step > .step-head { justify-content: flex-start; }
 .step-n {
   flex: none;
-  width: 1.35rem;
-  height: 1.35rem;
-  border-radius: 50%;
-  background: var(--primary-soft);
-  color: var(--primary);
-  font-size: 0.75rem;
-  font-weight: 700;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 2px;
+  background: var(--lamp);
+  color: #15181d;
+  font-family: var(--display);
+  font-size: 1.15rem;
+  font-weight: 900;
   display: grid;
   place-items: center;
 }
-.step-value {
-  font-size: 1.6rem;
-  font-weight: 700;
-  line-height: 1.2;
-  margin: 0.4rem 0 0.2rem;
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-}
-.step-outof { font-size: 0.85rem; font-weight: 400; color: var(--text-muted); }
-.step-line {
-  font-size: 0.88rem;
-  line-height: 1.5;
-  color: var(--text-secondary);
-  margin-top: 0.5rem;
-}
+.step-value { font-size: clamp(2.2rem, 10vw, 3rem); line-height: 1.05; margin: 0.1rem 0 0.3rem; overflow-wrap: anywhere; }
+.step-outof { font-family: var(--label); font-size: 1rem; font-weight: 600; color: var(--text-muted); }
+.step-line { font-size: 0.95rem; line-height: 1.55; color: var(--text-secondary); margin-top: 0.6rem; }
 
-/* ---- The groups, as a ladder with your own rung marked ---- */
-.ladder { list-style: none; margin: 0.7rem 0 0; padding: 0; }
+/* The groups, as a ladder with your own rung lit. */
+.ladder { list-style: none; margin: 0.8rem 0 0; padding: 0; border-top: 1px solid var(--border); }
 .ladder li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.6rem;
   align-items: center;
-  padding: 0.4rem 0.5rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.82rem;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.92rem;
   color: var(--text-muted);
 }
 .ladder li.is-you {
-  background: var(--primary-soft);
-  color: var(--text);
-  font-weight: 600;
-}
-.ladder-name { display: inline-flex; align-items: center; gap: 0.2rem; min-width: 0; }
-.ladder-name svg { color: var(--primary); flex: none; }
-.ladder-range { font-variant-numeric: tabular-nums; }
-
-/* ---- What the rating is made of ---- */
-
-/* One track per part, filled to the points earned out of the points
-   available, with a tick where players at this level average. The bar
-   answers "how much is left on the table" and the tick answers
-   "is that unusual" -- which is the difference between a number and
-   something to go and practise. */
-.parts { margin-top: 0.9rem; }
-.parts-list { list-style: none; padding: 0; margin: 0.6rem 0 0; }
-.part + .part { margin-top: 0.75rem; }
-.part-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-.part-label { font-size: 0.85rem; font-weight: 600; }
-.part-points {
-  font-size: 0.8rem;
+  background: var(--board);
+  color: var(--board-ink);
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  flex: none;
+  border-bottom-color: var(--board);
 }
-.part-of { font-weight: 400; color: var(--text-muted); }
-/* Your measurement against your level, as a bar either side of centre.
-   The length comes from the gap in POINTS, which already carries the
-   direction -- the model subtracts mistakes rather than adding them --
-   so "right is better" holds on every row, including the two where
-   fewer is better. That is what lets the four rows be read against each
-   other, and what removed the per-row "of 30" nobody could parse. */
-/* The third-shot conversion block on the shot profile. */
-.shot-ask { font-size: 0.88rem; font-weight: 700; margin-top: 1rem; }
-.shot-note {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  line-height: 1.5;
-  margin-top: 0.5rem;
-}
+.ladder-name { display: inline-flex; align-items: center; gap: 0.25rem; min-width: 0; }
+.ladder-name svg { color: var(--lamp); flex: none; }
+.ladder-size { font-variant-numeric: tabular-nums; }
 
-.part-values { font-size: 0.8rem; font-variant-numeric: tabular-nums; flex: none; }
+/* What the rating is made of. */
+.parts { margin-top: 1.1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.parts-list { list-style: none; padding: 0; margin: 0.7rem 0 0; }
+.part + .part { margin-top: 0.85rem; }
+.part-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.part-label { font-size: 0.92rem; font-weight: 600; }
+.part-values { font-size: 0.88rem; font-variant-numeric: tabular-nums; flex: none; }
 .part-theirs { color: var(--text-muted); }
-.part-scale {
-  position: relative;
-  display: block;
-  height: 0.6rem;
-  margin-top: 0.35rem;
-}
+.part-scale { position: relative; display: block; height: 0.75rem; margin-top: 0.35rem; }
 .part-axis {
   position: absolute;
   left: 0;
@@ -1228,8 +1236,7 @@ a.highlight:active { background: var(--surface); }
   top: 50%;
   height: 2px;
   margin-top: -1px;
-  border-radius: 1px;
-  background: var(--surface-sunken);
+  background: var(--border);
 }
 /* The centre: where players at this level sit. */
 .part-scale::before {
@@ -1240,88 +1247,36 @@ a.highlight:active { background: var(--surface); }
   bottom: 0;
   width: 2px;
   margin-left: -1px;
-  border-radius: 1px;
-  background: var(--text-muted);
-  opacity: 0.5;
+  background: var(--text);
 }
-.part-arm {
-  position: absolute;
-  top: 50%;
-  height: 0.4rem;
-  margin-top: -0.2rem;
-  border-radius: 999px;
-}
-.part-arm.is-ahead { left: 50%; background: var(--primary); }
+.part-arm { position: absolute; top: 50%; height: 0.5rem; margin-top: -0.25rem; }
+.part-arm.is-ahead { left: 50%; background: var(--series-1); }
 .part-arm.is-behind { right: 50%; background: var(--text-muted); }
 
-.part-track {
-  position: relative;
-  display: block;
-  height: 0.5rem;
-  margin-top: 0.3rem;
-  border-radius: 999px;
-  background: var(--surface-sunken);
+.next-group,
+.games { margin-top: 1.1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.next-head,
+.games-head {
+  font-family: var(--label);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
-.part-fill {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: var(--primary);
-}
-/* The group's average. A tick rather than a second bar: four parts
-   would otherwise be eight bars, and the comparison is a position,
-   not a quantity of its own. */
-.part-mark {
-  position: absolute;
-  top: -0.15rem;
-  width: 2px;
-  height: 0.8rem;
-  border-radius: 1px;
-  background: var(--text);
-  opacity: 0.55;
-}
-.part-note {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  line-height: 1.5;
-  margin-top: 0.25rem;
-}
-
-.next-group {
-  margin-top: 0.9rem;
-  padding-top: 0.85rem;
-  border-top: 1px solid var(--border);
-}
-.next-head { font-size: 0.88rem; font-weight: 700; }
-.next-group .step-line { margin-top: 0.35rem; }
-
-/* ---- The games a rating is the average of ---- */
-
-/* A strip rather than a chart. Every game is a dot on the 0-100 scale,
-   the band is the middle half where the player actually lives, and the
-   line is their rating -- which really is the mean of the dots, so the
-   picture is the claim. */
-.games {
-  margin-top: 0.9rem;
-  padding-top: 0.85rem;
-  border-top: 1px solid var(--border);
-}
-.games-head { font-size: 0.88rem; font-weight: 700; }
+.next-group .step-line,
 .games .step-line { margin-top: 0.35rem; }
+
+/* The games a rating is the average of: dots on the 0-100 scale. */
 .games-strip {
   position: relative;
-  height: 2rem;
-  margin-top: 0.6rem;
-  border-radius: var(--radius-sm);
+  height: 2.2rem;
+  margin-top: 0.7rem;
+  border-radius: 2px;
   background: var(--surface-sunken);
+  border: 1px solid var(--border);
   overflow: hidden;
 }
-.games-band {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  background: var(--primary-soft);
-}
+.games-band { position: absolute; top: 0; bottom: 0; background: var(--primary-soft); }
 .games-dot {
   position: absolute;
   top: 50%;
@@ -1330,16 +1285,15 @@ a.highlight:active { background: var(--surface); }
   margin: -0.25rem 0 0 -0.25rem;
   border-radius: 50%;
   background: var(--text-muted);
-  opacity: 0.75;
+  opacity: 0.8;
 }
 .games-mark {
   position: absolute;
   top: 0.15rem;
   bottom: 0.15rem;
-  width: 2px;
-  margin-left: -1px;
-  border-radius: 1px;
-  background: var(--primary);
+  width: 3px;
+  margin-left: -1.5px;
+  background: var(--text);
 }
 .games-scale {
   list-style: none;
@@ -1347,111 +1301,70 @@ a.highlight:active { background: var(--surface); }
   justify-content: space-between;
   padding: 0;
   margin: 0.2rem 0 0;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
-.games-ends {
-  margin-top: 0.5rem;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
+.games-ends { margin-top: 0.5rem; font-size: 0.88rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .games-ends strong { color: var(--text); }
 .games-sep { margin: 0 0.45rem; color: var(--text-muted); }
 
-/* ---- What the model expected, on a match ---- */
-.expectation {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.6rem;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-}
-.expectation-upset {
-  font-size: 0.7rem;
+/* Proof for the playstyle name. */
+.proof { list-style: none; padding: 0; margin: 1rem 0 0; }
+.proof-row + .proof-row { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.proof-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.45rem; }
+.proof-word {
+  font-family: var(--label);
+  font-size: 1.1rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--primary);
-  background: var(--primary-soft);
-  border-radius: 999px;
-  padding: 0.12rem 0.5rem;
+  letter-spacing: 0.04em;
 }
-.expectation-rated { color: var(--text-muted); }
-
-/* ---- Proof for the playstyle name ---- */
-
-/* Bars rather than figures. The measurement behind "Steady" is the
-   spread of winning shots per minute between games -- a real quantity,
-   and meaningless to read as "±1.20". The comparison IS the proof, so
-   the bars carry it and the figures sit behind "How this was worked
-   out" for anyone who wants them. Percentages stay as numbers: those
-   mean something on their own. */
-.proof { list-style: none; padding: 0; margin: 0.9rem 0 0; }
-.proof-row + .proof-row { margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
-.proof-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem; }
-.proof-word { font-size: 0.95rem; font-weight: 700; }
-.proof-measure { font-size: 0.8rem; color: var(--text-secondary); }
-/* Never left to be guessed at: some of these are better high, some
-   better low, and most are neither. */
+.proof-measure { font-size: 0.88rem; color: var(--text-secondary); }
 .proof-better {
-  font-size: 0.7rem;
+  font-family: var(--label);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--text-muted);
-  background: var(--surface-sunken);
-  border-radius: 999px;
-  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 0 0.4rem;
   margin-left: auto;
 }
-
-.proof-bars { list-style: none; padding: 0; margin: 0.5rem 0 0; }
+.proof-bars { list-style: none; padding: 0; margin: 0.55rem 0 0; }
 .proof-bars li {
   display: grid;
-  grid-template-columns: 6.5rem minmax(0, 1fr) 2.6rem;
+  grid-template-columns: 6.5rem minmax(0, 1fr) 2.8rem;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.12rem 0;
+  padding: 0.15rem 0;
 }
-.proof-who { font-size: 0.75rem; color: var(--text-muted); }
+.proof-who { font-size: 0.84rem; color: var(--text-muted); }
 .proof-bars li.is-you .proof-who { color: var(--text); font-weight: 700; }
-.proof-track {
-  height: 0.65rem;
-  border-radius: 999px;
-  background: var(--surface-sunken);
-  overflow: hidden;
-}
-.proof-fill { display: block; height: 100%; border-radius: 999px; background: var(--text-muted); }
-.proof-bars li.is-you .proof-fill { background: var(--primary); }
-.proof-number {
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  color: var(--text-muted);
-}
+.proof-track { height: 0.7rem; border-radius: 1px; background: var(--surface-sunken); overflow: hidden; }
+.proof-fill { display: block; height: 100%; background: var(--text-muted); }
+.proof-bars li.is-you .proof-fill { background: var(--series-1); }
+.proof-number { font-size: 0.84rem; font-variant-numeric: tabular-nums; text-align: right; color: var(--text-muted); }
 .proof-bars li.is-you .proof-number { color: var(--text); font-weight: 700; }
-.proof-verdict { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; margin-top: 0.45rem; }
+.proof-verdict { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin-top: 0.5rem; }
+.proof-figures { margin: 0.4rem 0 0; padding-left: 1.1rem; list-style: disc; }
+.proof-figures li { font-size: 0.88rem; color: var(--text-muted); line-height: 1.55; }
 
-.proof-figures { margin: 0.4rem 0 0; padding-left: 1.1rem; }
-.proof-figures li { font-size: 0.8rem; color: var(--text-muted); line-height: 1.55; }
-
-/* The spread. Ten columns, one highlighted; the rest sit back in a
-   neutral so the eye lands on "you" first and the shape second. */
-.dist { margin: 0 0 0.9rem; }
+/* The spread: ten columns, one lit. */
+.dist { margin: 0.9rem 0; }
 .dist-bars {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
   gap: 3px;
   align-items: end;
-  height: 88px;
+  height: 96px;
 }
 .dist-col { display: flex; align-items: flex-end; height: 100%; }
 .dist-bar {
   display: block;
   width: 100%;
-  border-radius: 3px 3px 0 0;
   background: var(--surface-sunken);
   border: 1px solid var(--border);
   border-bottom: none;
@@ -1464,304 +1377,394 @@ a.highlight:active { background: var(--surface); }
   display: grid;
   grid-template-columns: repeat(10, 1fr);
   gap: 3px;
-  border-top: 1px solid var(--border);
+  border-top: 2px solid var(--rule);
   padding-top: 0.25rem;
-  min-height: 1.1rem;
+  min-height: 1.2rem;
 }
 .dist-tick {
-  font-size: 0.7rem;
+  font-family: var(--label);
+  font-size: 0.85rem;
   font-weight: 700;
-  color: var(--series-1);
+  text-transform: uppercase;
+  color: var(--text);
   text-align: center;
-  /* "You" is wider than a tenth of a narrow phone; let it overflow its
-     column rather than wrap into two lines. */
   white-space: nowrap;
   overflow: visible;
 }
-.dist-scale {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  margin-top: 0.1rem;
-}
-
-/* ---- Score history ---- */
-
-.rating-history { margin-top: 0.9rem; }
-.rating-history-svg {
-  display: block;
-  width: 100%;
-  height: 64px;
-  /* The dots are drawn at the extremes of the range, so half of each
-     would be clipped by the viewBox without this. */
-  overflow: visible;
-}
-.rating-history-line {
-  fill: none;
-  stroke: var(--series-1);
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  /* preserveAspectRatio="none" stretches the viewBox horizontally, which
-     would otherwise stretch the stroke with it and give a line that is
-     thinner than it is tall. */
-  vector-effect: non-scaling-stroke;
-}
-.rating-history-dot {
-  fill: var(--surface);
-  stroke: var(--series-1);
-  stroke-width: 2;
-}
-.rating-history-caption,
-.rating-history-none {
-  font-size: 0.74rem;
-  color: var(--text-muted);
-  margin-top: 0.55rem;
-  line-height: 1.45;
-  display: block;
-}
-
-/* ============ Personal bests ============ */
-
-.bests { margin-bottom: 1.5rem; }
-.bests h2 { font-size: 0.95rem; margin-bottom: 0.8rem; }
-.bests-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  gap: 0.6rem;
-}
-.best-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.8rem 0.9rem;
-  color: inherit;
-  text-decoration: none;
-}
-.best-label { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; }
-.best-value { font-size: 1.5rem; font-weight: 700; }
-.best-detail { font-size: 0.74rem; color: var(--text-secondary); overflow-wrap: anywhere; }
-
-/* ============ Match detail ============ */
-
-.detail-head {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.1rem 1.2rem;
-  margin-bottom: 1rem;
-}
-.detail-head.won { border-left-color: var(--status-good); }
-.detail-head.lost { border-left-color: var(--status-critical); }
-
-.detail-score {
-  display: flex;
-  align-items: baseline;
-  gap: 0.25rem;
-  font-variant-numeric: tabular-nums;
-  margin: 0.2rem 0 0.5rem;
-}
-.ds-yours { font-size: 3rem; font-weight: 700; line-height: 1; }
-.ds-dash { color: var(--text-muted); font-size: 1.6rem; }
-.ds-theirs { font-size: 1.9rem; color: var(--text-muted); font-weight: 600; }
-
-.detail-versus { font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
-.detail-partner { font-size: 0.85rem; color: var(--text-secondary); }
-.detail-meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.35rem; }
-
-.fact-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.6rem; }
-.chip-note {
-  font-size: 0.74rem;
-  color: var(--text-muted);
-  line-height: 1.45;
-  margin-bottom: 1rem;
-}
-
-.detail-shape,
-.detail-stats {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1rem 1.1rem;
-  margin-bottom: 1rem;
-}
-.detail-shape h2,
-.detail-stats h2 { font-size: 0.95rem; margin-bottom: 0.4rem; }
-.detail-story { font-size: 0.95rem; font-weight: 600; margin-top: 0.4rem; }
-.detail-notes { margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.25rem; }
-.detail-notes li { font-size: 0.82rem; color: var(--text-secondary); }
-
-.detail-nav {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  margin: 1.25rem 0 0.5rem;
-}
-.detail-nav-link {
-  color: var(--primary);
-  text-decoration: none;
-  font-size: 0.88rem;
-  font-weight: 500;
-}
+.dist-scale { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.1rem; }
 
 /* ============ People ============ */
 
-.people-screen h1,
-.person-detail h1,
-.you-screen h1 { font-size: 1.35rem; margin-bottom: 0.9rem; }
-.people-screen h2 { font-size: 0.9rem; color: var(--text-secondary); margin: 1.25rem 0 0.6rem; }
+.people-summary { font-size: 0.9rem; color: var(--text-muted); margin: 0 0 0.75rem; }
 
-.person-list { display: flex; flex-direction: column; gap: 0.5rem; }
+/* A results table of people. */
+.person-list {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  margin-inline: calc(var(--gutter) * -1);
+  border-block: 1px solid var(--border);
+}
+.person-list li + li { border-top: 1px solid var(--border); }
 .person-row {
   display: flex;
   align-items: flex-start;
-  gap: 0.7rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.7rem 0.85rem;
+  gap: 0.8rem;
+  padding: 0.85rem var(--gutter);
   color: inherit;
   text-decoration: none;
 }
 .person-row:active { background: var(--surface-sunken); }
-.person-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.person-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.25rem; }
 .person-line { display: flex; align-items: baseline; gap: 0.5rem; }
-.person-name { flex: 1; font-weight: 600; font-size: 0.92rem; overflow-wrap: anywhere; }
-.person-record { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 0.95rem; }
-.person-when { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
-.person-roles { font-size: 0.76rem; color: var(--text-secondary); }
-.person-played { font-size: 0.72rem; color: var(--text-muted); }
+.person-name { flex: 1; font-weight: 600; font-size: 1.02rem; overflow-wrap: anywhere; }
+.person-when { font-size: 0.8rem; letter-spacing: 0.06em; color: var(--text-muted); white-space: nowrap; }
+.person-roles { font-size: 0.88rem; color: var(--text-secondary); }
+.person-form { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.15rem; }
 
-/* The overview's form guide, at list size. */
-.person-form { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.1rem; }
-.pill-sm { width: 1.35rem; height: 1.35rem; font-size: 0.66rem; }
-
-.people-summary { font-size: 0.82rem; color: var(--text-muted); margin: -0.5rem 0 1.1rem; }
-.show-all {
-  width: 100%;
-  margin-top: 0.75rem;
-  padding: 0.7rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-.show-all:active { background: var(--surface-sunken); }
-
-.person-head { text-align: center; margin-bottom: 1.25rem; }
-.person-head h1 { margin: 0.6rem 0 0.8rem; }
-.person-records { display: flex; justify-content: center; gap: 1.5rem; }
-.person-records li { display: flex; flex-direction: column; gap: 0.1rem; }
-.pr-label { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; }
-.pr-value { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-.pr-note { font-size: 0.72rem; color: var(--text-muted); }
+.person-head { padding: 1.1rem var(--gutter) 1.2rem; }
+.person-head h1 { font-size: clamp(2.2rem, 10vw, 2.8rem); margin: 0.7rem 0 0.9rem; }
+.person-records { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); border-top: 1px solid var(--board-rule); }
+.person-records li { display: flex; flex-direction: column; gap: 0.1rem; padding-top: 0.75rem; }
+.person-records li + li { border-left: 1px solid var(--board-rule); padding-left: var(--gutter); }
+.pr-label { font-size: 0.85rem; color: var(--board-muted); }
+.pr-value { font-size: 3.2rem; font-weight: 900; color: var(--lamp); text-shadow: 0 0 18px var(--lamp-glow); }
+.pr-note { font-size: 0.85rem; color: var(--board-muted); }
+.person-detail .match-list { margin-top: 0; }
 
 /* ============ Avatar ============ */
 
+/* Initials on a lamp-lit square, like a player's card on the board. */
 .avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background: var(--primary-soft);
-  color: var(--primary);
-  font-weight: 700;
+  border-radius: 2px;
+  background: var(--board);
+  color: var(--lamp);
+  font-family: var(--display);
+  font-weight: 800;
   flex-shrink: 0;
   letter-spacing: 0.02em;
 }
-.avatar-sm { width: 2.1rem; height: 2.1rem; font-size: 0.72rem; }
-.avatar-md { width: 3rem; height: 3rem; font-size: 1rem; }
-.avatar-lg { width: 4.25rem; height: 4.25rem; font-size: 1.4rem; }
+.avatar-sm { width: 2.3rem; height: 2.3rem; font-size: 1.05rem; }
+.avatar-md { width: 3rem; height: 3rem; font-size: 1.3rem; }
+.avatar-lg { width: 4.5rem; height: 4.5rem; font-size: 2rem; }
+.person-head .avatar,
+.you-top .avatar { background: var(--board-raised); box-shadow: inset 0 0 0 1px var(--board-rule); }
 
 /* ============ You ============ */
 
-.you-head { text-align: center; margin-bottom: 1.5rem; }
-.you-head h1 { margin: 0.7rem 0 0.2rem; }
+.you-top { padding: 1.25rem var(--gutter) 1.2rem; margin-top: -1.25rem; }
+.you-top h1 { font-size: clamp(2.2rem, 10vw, 2.9rem); margin: 0.8rem 0 0.25rem; }
+.you-top .muted-inline { color: var(--board-muted); }
+@media (min-width: 640px) { .you-top { margin-top: 0; } }
 
-.you-record { margin-bottom: 1.5rem; }
-.you-record ul {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
-  gap: 0.6rem;
+.you-section > .you-head,
+.you-details > .you-head { gap: 0.5rem; justify-content: flex-start; }
+.you-head svg { color: var(--lamp); flex: none; }
+.you-section p,
+.you-line { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.55; margin: 0 0 0.7rem; }
+.you-section .filter-row { margin-bottom: 0; }
+.you-version { display: block; margin-top: 0.9rem; }
+.detail-note { font-size: 0.88rem; color: var(--text-muted); line-height: 1.55; margin-top: 0.7rem; }
+
+/* One ruled row per editable field. */
+.detail-row { padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+.detail-row:first-of-type { padding-top: 0; }
+.detail-row.is-open { padding-bottom: 1rem; }
+.detail-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.detail-head .link { flex: none; }
+.detail-label { display: block; font-size: 0.8rem; letter-spacing: 0.08em; color: var(--text-muted); }
+.detail-value { display: block; font-size: 1.02rem; font-weight: 600; overflow-wrap: anywhere; }
+.signin-done { color: var(--status-good); font-weight: 700; font-size: 0.88rem; margin-top: 0.4rem; }
+
+/* Deleting the profile: the one irreversible thing, set apart. */
+.you-danger { margin-top: 1.5rem; padding-top: 1.1rem; border-top: 1px solid var(--border); }
+.you-danger h2 {
+  font-family: var(--label);
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.5rem;
+  color: var(--status-critical);
 }
-.you-record li {
+.you-danger p { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.55; margin-bottom: 0.6rem; }
+.you-danger .link.danger { color: var(--status-critical); padding: 0; }
+.you-danger.is-open {
+  background: var(--status-critical-soft);
+  border: 1px solid var(--status-critical);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+}
+.signin-form button[type='submit'].danger { background: var(--status-critical); color: #fff; }
+:root[data-theme='dark'] .signin-form button[type='submit'].danger { color: #15181d; }
+
+/* ============ Invitations ============ */
+
+.setup-card p,
+.link-code p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.55; margin: 0; }
+.setup-card .hint,
+.link-code .hint { color: var(--text-muted); }
+.link-confirm p + p { margin-top: 0.6rem; }
+.link-headline { font-weight: 700; color: var(--text) !important; }
+.link-result .signin-form { margin-top: 1rem; }
+.setup-actions { margin-top: 0.5rem; }
+.setup-actions .link { display: block; width: 100%; margin-top: 0.5rem; text-align: center; }
+
+/* Native <dialog>: the focus trap, backdrop and Escape come free. */
+.setup-dialog {
+  border: none;
+  border-top: 6px solid var(--lamp);
+  /* Square, like a panel off the board: a lamp strip on a rounded box
+     bends round the corners. */
+  border-radius: 0;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.8rem 0.9rem;
+  color: var(--text);
+  padding: 1.35rem 1.25rem 1.1rem;
+  width: min(26rem, calc(100vw - 2.5rem));
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+}
+.setup-dialog::backdrop { background: rgba(10, 12, 15, 0.7); }
+.setup-dialog h2 {
+  font-family: var(--display);
+  font-size: 2rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  line-height: 1;
+  margin: 0 0 0.6rem;
+}
+.setup-dialog > p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.55; margin: 0; }
+
+.profile-top { display: flex; justify-content: flex-end; gap: 0.5rem; margin-bottom: 0.25rem; }
+
+/* ============ The way in ============ */
+
+.gate { padding-top: 0; }
+.gate h1 {
+  font-size: clamp(3.4rem, 17vw, 4.5rem);
+  font-weight: 900;
+  color: var(--lamp);
+  text-shadow: 0 0 22px var(--lamp-glow);
+  background-color: var(--board);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1.3px);
+  background-size: 6px 6px;
+  margin: -1.25rem calc(var(--gutter) * -1) 0;
+  padding: 2.25rem var(--gutter) 1.1rem;
+  border-bottom: 4px solid var(--lamp);
+}
+@media (min-width: 640px) {
+  .gate h1 { margin: 0; }
+}
+.gate h1 { display: flex; align-items: center; gap: 0.6rem; }
+.gate-logo { width: 0.9em; height: 0.9em; flex: none; margin-top: -0.06em; }
+.lede { font-size: 1.05rem; color: var(--text-secondary); margin: 1.1rem 0 1.5rem; line-height: 1.5; }
+
+.gate label,
+.signin-form label {
+  display: block;
+  font-family: var(--label);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+.gate input,
+.signin-form input {
+  width: 100%;
+  padding: 0.8rem;
+  font: inherit;
+  font-size: 1rem;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+/* A code is read off a screen a character at a time: large and spaced,
+   in the board's own lettering. */
+.gate input.code-input,
+.signin-form input.code-input {
+  font-family: var(--display);
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-align: center;
+  padding: 0.7rem;
+}
+.gate input:focus,
+.signin-form input:focus {
+  outline: none;
+  border-color: var(--rule);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+/* Room between one field and the next label, and before the button. */
+.gate input,
+.signin-form input { margin-bottom: 0.9rem; }
+.gate input + .hint,
+.signin-form input + .hint { margin-top: -0.4rem; }
+.gate button[type='submit'],
+.signin-form button[type='submit'] { margin-top: 0.4rem; }
+.hint { font-size: 0.88rem; color: var(--text-muted); margin: 0.5rem 0 1.1rem; line-height: 1.45; }
+.gate .hint:last-child { margin-bottom: 0; margin-top: 1rem; }
+.signin-form { margin-top: 0.75rem; }
+.signin-form .link { display: block; width: 100%; margin-top: 0.5rem; text-align: center; }
+
+.google-signin { display: block; }
+.google-btn { display: flex; align-items: center; justify-content: center; gap: 0.6rem; }
+.google-btn:hover:not(:disabled) { background: var(--surface); }
+.google-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.google-mark { width: 1.15rem; height: 1.15rem; flex: none; }
+.google-unavailable { text-align: center; margin: 0 0 1rem; }
+.google-caption { font-size: 0.84rem; color: var(--text-muted); text-align: center; margin: 0.45rem 0 0; }
+.signin-form .google-signin { margin-top: 0.25rem; }
+
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+  color: var(--text-muted);
+  font-family: var(--label);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.or-divider::before,
+.or-divider::after { content: ''; flex: 1; height: 2px; background: var(--border); }
+.gate-cancel { display: block; width: 100%; margin-top: 0.75rem; text-align: center; }
+
+/* ============ Empty state ============ */
+
+.empty { padding-top: 0; }
+.empty-head { padding: 1.5rem var(--gutter) 1.4rem; margin-top: -1.25rem; }
+@media (min-width: 640px) { .empty-head { margin-top: 0; } }
+.empty-head .eyebrow { color: var(--lamp); }
+.empty-head h1 { font-size: clamp(2.2rem, 10vw, 2.8rem); margin: 0.5rem 0 0.7rem; }
+.empty-lede { color: var(--board-muted); line-height: 1.55; }
+
+/* The shape of the page to come: an unlit miniature board. No invented
+   numbers -- the lamps are simply off. */
+.preview { padding-top: 1.1rem; }
+.preview-card {
+  background: var(--board);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  margin-bottom: 1.2rem;
+}
+.preview-card .ghost { background: var(--board-raised); animation: none; }
+.ghost-hero { width: 38%; height: 2.4rem; margin-bottom: 0.55rem; }
+.ghost-line { width: 62%; height: 0.6rem; margin-bottom: 0.9rem; }
+.ghost-row { display: flex; gap: 0.3rem; }
+.ghost-pill { width: 1.6rem; height: 1.6rem; }
+
+.promise-list { display: flex; flex-direction: column; }
+.promise-list li { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.7rem 0; border-top: 1px solid var(--border); }
+.promise-title {
+  font-family: var(--label);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.promise-body { font-size: 0.92rem; color: var(--text-secondary); line-height: 1.45; }
+.empty-foot { font-size: 0.92rem; color: var(--text-muted); line-height: 1.5; text-align: center; }
+
+/* ============ Navigation ============ */
+
+/* The board's bottom strip. Fixed to the bottom because this is a
+   one-handed phone app, and black in both themes like every board. */
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  background: var(--board);
+  justify-content: center;
+  border-top: 1px solid var(--board-rule);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tab {
+  position: relative;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 0.1rem;
+  padding: 0.55rem 0.25rem 0.5rem;
+  color: var(--board-muted);
+  text-decoration: none;
+  font-family: var(--label);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  min-height: 3.4rem;
+  /* On a wide screen the cells stay a thumb's width, centred under the
+     column, rather than stretching across the monitor. */
+  max-width: 9.5rem;
 }
-.yr-value { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-.yr-label { font-size: 0.72rem; color: var(--text-muted); }
-
-.you-about,
-.you-install { margin-bottom: 1.5rem; }
-.you-about h2,
-.you-install h2 { font-size: 0.9rem; margin-bottom: 0.4rem; }
-.you-about p,
-.you-install p { font-size: 0.84rem; color: var(--text-secondary); line-height: 1.55; margin-bottom: 0.4rem; }
-
-.sign-out {
-  width: 100%;
-  padding: 0.85rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--status-critical);
-  background: transparent;
-  color: var(--status-critical);
-  font-size: 0.92rem;
-  font-weight: 600;
-  cursor: pointer;
+.tab:first-child { border-left: 1px solid var(--board-rule); }
+.tab:last-child { border-right: 1px solid var(--board-rule); }
+@media (max-width: 639px) {
+  .tab:first-child { border-left: 0; }
+  .tab:last-child { border-right: 0; }
 }
-.sign-out-note {
-  font-size: 0.74rem;
-  color: var(--text-muted);
-  text-align: center;
-  margin-top: 0.5rem;
-  line-height: 1.45;
+.tab + .tab { border-left: 1px solid var(--board-rule); }
+.tab-active { color: var(--lamp); background: var(--board-raised); }
+.tab-active::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--lamp);
+  box-shadow: 0 0 12px var(--lamp-glow);
 }
+.tab:active { background: var(--board-raised); }
+.tab:focus-visible { outline-color: var(--lamp); outline-offset: -3px; }
 
 /* ============ Loading, errors, staleness ============ */
 
-.skeleton { padding-top: 0.5rem; }
+.skeleton { padding-top: 0; }
+/* Loading draws an unlit board where the real one will be. */
+.skeleton > .ghost-hero {
+  display: block;
+  width: auto;
+  height: 15rem;
+  margin: -1.25rem calc(var(--gutter) * -1) 1rem;
+  border-radius: 0;
+}
+@media (min-width: 640px) {
+  .skeleton > .ghost-hero { margin: 0 0 1rem; border-radius: var(--radius); }
+}
 .skeleton-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
-  gap: 0.6rem;
+  gap: 1px;
   margin: 1rem 0 1.5rem;
 }
-.skeleton-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.skeleton-list { display: flex; flex-direction: column; }
 .skeleton-row {
   display: flex;
   gap: 0.9rem;
   align-items: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.85rem 0.95rem;
+  padding: 0.9rem 0;
+  border-top: 1px solid var(--border);
 }
 .skeleton-row-body { flex: 1; display: flex; flex-direction: column; gap: 0.4rem; }
-.ghost-score { width: 3.2rem; height: 1.6rem; }
-.ghost-tile { width: 100%; height: 4.2rem; border-radius: var(--radius); }
+.ghost { display: block; border-radius: 2px; }
+.ghost-score { width: 2.25rem; height: 2.6rem; }
+.ghost-tile { width: 100%; height: 4.6rem; }
 
-/* The shimmer says "working", which a static block does not. Motion is
-   removed rather than slowed for anyone who asked for less of it. */
+/* The shimmer says "working"; motion is removed for anyone who asked. */
 .ghost {
-  background: linear-gradient(
-    90deg,
-    var(--surface-sunken) 25%,
-    var(--border) 37%,
-    var(--surface-sunken) 63%
-  );
+  background: linear-gradient(90deg, var(--surface-sunken) 25%, var(--border) 37%, var(--surface-sunken) 63%);
   background-size: 400% 100%;
   animation: ghost-shimmer 1.4s ease-in-out infinite;
 }
@@ -1769,49 +1772,39 @@ a.highlight:active { background: var(--surface); }
   0% { background-position: 100% 50%; }
   100% { background-position: 0 50%; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .ghost { animation: none; }
-}
 
-.error-state {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.5rem 1.2rem;
-  text-align: center;
-  margin-top: 2rem;
+.error-state { padding-top: 1.5rem; padding-bottom: 1.5rem; text-align: center; margin-top: 1rem; }
+.error-state-title {
+  font-family: var(--display);
+  font-size: 2rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  line-height: 1;
+  margin-bottom: 0.5rem;
 }
-.error-state-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.4rem; }
-.error-state-body { font-size: 0.86rem; color: var(--text-secondary); line-height: 1.5; }
+.error-state-body { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; }
 
-.retry {
-  margin-top: 1rem;
-  padding: 0.7rem 1.4rem;
-  border-radius: var(--radius-sm);
-  border: 0;
-  background: var(--primary);
-  color: #fff;
+.stale-note {
+  font-family: var(--label);
   font-size: 0.9rem;
   font-weight: 600;
-  cursor: pointer;
-}
-
-/* A refresh that failed while real numbers are on screen is a footnote,
-   not a takeover. */
-.stale-note {
-  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--text-muted);
   text-align: center;
   margin-bottom: 0.75rem;
 }
 
+.not-found { text-align: center; padding: 4rem 0; }
+.not-found h1 { font-size: 3rem; margin-bottom: 0.5rem; }
+
 .crash { text-align: center; padding: 3rem 1rem; }
-.crash h1 { font-size: 1.3rem; margin-bottom: 0.5rem; }
-.crash p { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; }
+.crash h1 { font-size: 2.6rem; margin-bottom: 0.5rem; }
+.crash p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.5; }
 .crash details { margin-top: 1.5rem; text-align: left; }
-.crash summary { font-size: 0.8rem; color: var(--text-muted); cursor: pointer; }
+.crash summary { font-size: 0.88rem; color: var(--text-muted); cursor: pointer; }
 .crash pre {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   overflow-x: auto;
   background: var(--surface-sunken);
   padding: 0.7rem;
@@ -1819,79 +1812,108 @@ a.highlight:active { background: var(--surface); }
   margin-top: 0.5rem;
 }
 
-/* ============ Google sign-in ============ */
+/* ============ Calm motion ============ */
 
-/* Our own button rather than the one Google renders, for the reasons in
-   components/GoogleButton.jsx: theirs is drawn inside an element we do
-   not control, at a height and corner radius and typeface that are not
-   this app's. Neutral rather than --primary, because this and the panel
-   below it are alternatives and two filled buttons would compete for
-   the same tap. */
-.google-signin { display: block; }
-.google-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-  padding: 0.85rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  font-family: inherit;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
+/* Things settle into place once when a screen opens, under 400ms, and
+   never loop. lib/motion.js does the JavaScript half. */
+.rise {
+  animation: rise 280ms ease-out both;
+  animation-delay: calc(var(--i, 0) * 40ms);
 }
-.google-btn:hover:not(:disabled) { border-color: var(--primary); }
-.google-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.google-mark { width: 1.15rem; height: 1.15rem; flex: none; }
-.google-unavailable { text-align: center; margin: 0 0 1rem; }
-.google-caption {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  text-align: center;
-  margin: 0.45rem 0 0;
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
 }
-
-/* Google is neither of the two things below it until the server has
-   looked, so it is separated from them rather than stacked on top. */
-.or-divider {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin: 1.25rem 0;
-  color: var(--text-muted);
-  font-size: 0.8rem;
+@keyframes grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
 }
-.or-divider::before,
-.or-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border);
+@keyframes pop {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
+/* clip-path rather than a curtain in the card's colour, and a negative
+   inset at the end so labels hanging outside the box are not clipped. */
+@keyframes wipe {
+  from { clip-path: inset(-40px 100% -40px -40px); }
+  to { clip-path: inset(-40px -40px -40px -40px); }
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 
-.gate-cancel { display: block; width: 100%; margin-top: 0.75rem; text-align: center; }
-
-/* Inside a settings row the button is one control among several rather
-   than the headline, so it loses the full-width prominence it has on
-   the way in. */
-.signin-form .google-signin { margin-top: 0.25rem; }
-
-/* Everything above settles once and then stops. For anyone who has asked
-   their device for less motion, it is already settled when they arrive:
-   the same screen, without the arriving. lib/motion.js does the same for
-   the counting numbers and the scroll trigger. */
+/* For anyone who asked their device for less motion, everything is
+   already settled when they arrive. */
 @media (prefers-reduced-motion: reduce) {
   .rise,
   .ribbon-block,
   .ribbon-mark,
   .mchart,
   .mchart-mark,
-  .dist-bar {
+  .dist-bar,
+  .live-dot,
+  .ghost {
     animation: none;
   }
   .ribbon-mark { opacity: 1; }
 }
+
+/* ============ Rally rating ============ */
+
+.points-figure {
+  font-family: var(--display);
+  font-size: clamp(3.4rem, 16vw, 4.4rem);
+  font-weight: 900;
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+}
+.points-unit {
+  font-family: var(--label);
+  font-size: 1.2rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.points-change {
+  font-family: var(--label);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-top: 0.3rem;
+}
+.points-change.is-up { color: var(--status-good); }
+.points-change.is-down { color: var(--status-critical); }
+.points-anchor {
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin-top: 0.8rem;
+  max-width: 34ch;
+}
+.points-anchor strong { color: var(--text); }
+.points-trend { display: block; width: 100%; height: 56px; margin-top: 0.9rem; overflow: visible; }
+.points-trend-line {
+  fill: none;
+  stroke: var(--series-1);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.points-basis { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem; }
+.moving { margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.moving-head {
+  font-family: var(--label);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.5rem;
+}
+.moving-list { display: grid; gap: 0.35rem; }
+.moving-list li { font-size: 0.98rem; line-height: 1.45; color: var(--text-secondary); padding-left: 1.1rem; position: relative; }
+.moving-list li::before { position: absolute; left: 0; font-weight: 700; }
+.moving-list li.is-gain::before { content: '▲'; color: var(--status-good); font-size: 0.75rem; top: 0.2rem; }
+.moving-list li.is-cost::before { content: '▼'; color: var(--status-critical); font-size: 0.75rem; top: 0.2rem; }
+.moving-list strong { color: var(--text); }
