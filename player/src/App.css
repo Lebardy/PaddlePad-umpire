@@ -1336,12 +1336,12 @@ a.highlight:active,
 .proof-bars { list-style: none; padding: 0; margin: 0.55rem 0 0; }
 .proof-bars li {
   display: grid;
-  grid-template-columns: 6.5rem minmax(0, 1fr) 2.8rem;
+  grid-template-columns: 8.5rem minmax(0, 1fr) 3.4rem;
   align-items: center;
   gap: 0.5rem;
   padding: 0.15rem 0;
 }
-.proof-who { font-size: 0.84rem; color: var(--text-muted); }
+.proof-who { font-size: 0.84rem; line-height: 1.25; color: var(--text-muted); }
 .proof-bars li.is-you .proof-who { color: var(--text); font-weight: 700; }
 .proof-track { height: 0.7rem; border-radius: 1px; background: var(--surface-sunken); overflow: hidden; }
 .proof-fill { display: block; height: 100%; background: var(--text-muted); }
