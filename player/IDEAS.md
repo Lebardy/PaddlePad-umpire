@@ -222,6 +222,56 @@ Its home was not a problem after all. The Overview screen's shot profile
 already showed "Drops that landed" and "Drop over drive"; the conversion
 sits beside them.
 
+## What idea 7 is waiting for
+
+Idea 7 is the last one, and it is not waiting on design. It is waiting
+on people playing with the same people.
+
+**The staging pool cannot answer it, and never will.** Its 101 doubles
+matches were seeded by shuffling everyone and cutting the line into
+fours, so partners there are drawn out of a hat: 202 partnerships were
+played and 187 of them were different people, where pure chance on a
+pool that size gives 188. Not one pair reached three matches together.
+So nothing about idea 7 can be checked on it — not whether weighting by
+opponents changes the order, not whether two people gelling is a real
+thing or a story we tell about a coin. This is different from every
+earlier idea, which staging could at least rehearse.
+
+**And production has no matches at all yet**, so there is no pool
+anywhere today that can. This is the first idea whose blocker is not
+work: it needs real people playing real matches with the partners they
+choose, and until that has been happening for a while there is nothing
+to compute and no way to tell whether computing it would be honest.
+
+**And the arithmetic is demanding even on real data.** A win rate over n
+matches wanders by about 98/sqrt(n) percentage points on luck alone, so
+two matches together is plus or minus 69 points — the whole scale.
+Seeing a 20-point difference in how well two people gel takes about 25
+matches together, and that is before any adjustment for opponents, which
+can only ever move a number that already exists.
+
+**Which says what shape the feature has to take.** One match is a single
+win or loss, but about 32 recorded shots. A fit built on HOW a pair
+played — mistakes, winners, whose drops land when they are together --
+has roughly thirty times the material of one built on who won, and
+reaches usefulness while a partnership is still young. The adjusted
+win-loss record the idea describes is the version that needs a hundred
+matches.
+
+**One privacy line is now sharper than the idea's own note.** No figure
+about the opponents may appear on a match, because the match already
+carries an upset verdict, and a verdict is a band on *your side minus
+theirs*. Publish their side's strength beside it and a reader subtracts,
+gets their own side's, and — knowing their own rating — has their
+partner's. So partner fit has to be one career-level statement per
+partner, with no per-match strength figures anywhere near it.
+
+`server/scripts/check-partner.mjs` asks the readiness question of any
+export, so it can be re-asked rather than re-derived:
+
+    curl ... /export/match-logs.json | node server/scripts/check-partner.mjs
+
 ## Still not started
 
-Idea **7** (partner fit).
+Idea **7** (partner fit), blocked on data rather than on work — see
+above.
