@@ -171,10 +171,35 @@ section('the all-court noun is proven by both habits')
   check('the net habit row carries the same three columns as any other',
     net && [net.you, net.group, net.other], [0.52, 0.47, 0.42],
     'you, your group, and the style you were split from')
+  // (0.50 + 0.52 + 0.54) / 3 = 0.52
+  check('an all-court row also carries the style average the name describes',
+    net?.style, 0.52,
+    'the noun is chosen from the style, not the one player: on staging 8 of 17 all-court players\' own net share disagreed with "does not stand out", their style\'s never did')
   const drop = proof?.rows.find((r) => r.feature === 'drop_preference_rate_mean')
   check('a habit with nothing recorded is empty, not zero',
-    drop && [drop.you, drop.group, drop.other], [null, null, null],
+    drop && [drop.you, drop.style, drop.group, drop.other], [null, null, null, null],
     'no third shots logged is not the same as never dropping')
+
+  // The pipeline stores a player with no third shots as 0, not missing.
+  // A whole group of zeros is that, not a group that never drops.
+  const zeroed = peers.map((p) => ({ ...p, evidence: { ...p.evidence, drop_preference_rate_mean: 0 } }))
+  const zeroDrop = buildPlaystyleProof({
+    traits: [{ label: 'All-Court Player', feature: null, family: 'identity', direction: 'above', z: 0 }],
+    mine: { playstyle_cluster: 0, evidence: zeroed[1].evidence },
+    peers: zeroed,
+  })?.rows.find((r) => r.feature === 'drop_preference_rate_mean')
+  check('a group where every value is zero counts as nothing recorded',
+    zeroDrop && [zeroDrop.you, zeroDrop.style, zeroDrop.group, zeroDrop.other], [null, null, null, null],
+    'on staging every group\'s drop preference is 0 because no third shots were logged; 0% bars would claim nobody drops')
+
+  const tinyStyle = buildPlaystyleProof({
+    traits: [{ label: 'All-Court Player', feature: null, family: 'identity', direction: 'above', z: 0 }],
+    mine: { playstyle_cluster: 0, evidence: peers[1].evidence },
+    peers: [peer(0, 1.2, 0.52), peer(0, 1.0, 0.5), peer(1, 4.0, 0.4), peer(1, 4.4, 0.42), peer(1, 4.8, 0.44)],
+  })?.rows.find((r) => r.feature === 'net_game_preference_rate_mean')
+  check('a style of fewer than three is never averaged',
+    tinyStyle?.style, null,
+    `under ${MIN_STYLE_MEMBERS} members a style average describes the other person in it`)
 
   check('the all-court noun alone still proves something',
     buildPlaystyleProof({
