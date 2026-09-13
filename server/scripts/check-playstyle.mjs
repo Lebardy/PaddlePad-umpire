@@ -71,10 +71,10 @@ section('the three columns')
   check('this player, their group, and the style they were split from',
     proof.rows,
     [
-      { label: 'Streaky', feature: 'winner_rate_std', family: 'consistency', direction: 'above', neutral: false, you: 1.2, group: 2.8, other: 4.4 },
-      { label: 'Dinker', feature: 'net_game_preference_rate_mean', family: 'identity', direction: 'above', neutral: false, you: 0.62, group: 0.465, other: 0.31 },
+      { label: 'Streaky', feature: 'winner_rate_std', family: 'consistency', direction: 'above', neutral: false, you: 1.2, group: 2.8, other: 4.4, style: 1.2 },
+      { label: 'Dinker', feature: 'net_game_preference_rate_mean', family: 'identity', direction: 'above', neutral: false, you: 0.62, group: 0.465, other: 0.31, style: 0.62 },
     ],
-    'the group column averages everyone in the group including this player; the other column averages only the other style')
+    'the group column averages everyone in the group including this player; the other column averages only the other style; the style column averages this player\'s style, (1.0+1.2+1.4)/3 = 1.2 and (0.60+0.62+0.64)/3 = 0.62')
   check('how many share this style, and which style the other is',
     [proof.styleSize, proof.other],
     [3, { archetype: 'Intermediate Streaky Driver', size: 3 }],
