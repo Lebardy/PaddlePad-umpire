@@ -271,7 +271,6 @@ export function rallyRatingFor(ratings, playerId, { forRatingScreen = false } = 
     // Partner and opponent rows are totals of what those rallies did to
     // THIS player's points, which says nothing about anyone else's.
     response.breakdown = wholeBreakdown(rating)
-    response.recentMatches = rating.recentMatches
   }
   return response
 }

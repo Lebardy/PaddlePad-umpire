@@ -42,12 +42,13 @@
 import { useEffect, useState } from 'react'
 import { fetchStanding } from '../lib/api'
 import { usePlayerData } from '../lib/PlayerData'
-import { Link, navigate } from '../lib/router'
+import { navigate } from '../lib/router'
 import { endingPhrase } from '../lib/endingWords'
 import { styleName } from '../lib/styleName'
 import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
 import Icon from '../components/Icon'
 import More from '../components/More'
+import Collapsible from '../components/Collapsible'
 
 /**
  * Each measurement in everyday words, with how to read its number.
@@ -301,10 +302,6 @@ function signed(value) {
   return value > 0 ? `+${value}` : value < 0 ? `−${Math.abs(value)}` : '0'
 }
 
-function shortDate(iso) {
-  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
-}
-
 /**
  * A row with a bar growing left (lost points) or right (gained points)
  * from a centre line. The same scale the old score's parts used, so the
@@ -330,17 +327,15 @@ function PointsArm({ points, widest, label }) {
  *
  * Not a verdict in words: every rally that moved the number is in a row,
  * with how many rallies and how many points, and the rows add up exactly
- * to the distance from 1,500 (the server rounds them so they do). Then
- * each recent match's change, so the trend line has its receipts.
+ * to the distance from 1,500 (the server rounds them so they do). Closed
+ * by default -- a long table under the headline was too much at once --
+ * with the one-line answer and the total still showing while it is shut.
  */
 function Score({ rallyRating }) {
   const moved = rallyRating.movedMost
   const rows = [...(rallyRating.breakdown ?? [])].sort((a, b) => b.points - a.points)
   const widest = Math.max(...rows.map((row) => Math.abs(row.points)), 0)
   const total = rallyRating.points - 1500
-  const matches = rallyRating.recentMatches ?? []
-  const matchWidest = Math.max(...matches.map((m) => Math.abs(m.change)), 0)
-  const matchTotal = matches.reduce((sum, m) => sum + m.change, 0)
 
   return (
     <Step number={1} title="Your rating">
@@ -348,80 +343,57 @@ function Score({ rallyRating }) {
 
       {rows.length > 0 && (
         <div className="moving">
-          <h3 className="moving-head">What&rsquo;s moving it</h3>
-          {/* The headline of the table in words, only once there are
-              enough rallies with an ending to call it a habit. */}
-          {moved && (moved.gained[0] || moved.cost[0]) && (
-            <p className="step-line">
-              Of the rallies you ended,{' '}
-              {moved.gained[0] && (
-                <><strong>{endingPhrase(moved.gained[0].ending).toLowerCase()}</strong> earned you the most</>
-              )}
-              {moved.gained[0] && moved.cost[0] && '; '}
-              {moved.cost[0] && (
-                <><strong>{endingPhrase(moved.cost[0].ending).toLowerCase()}</strong> cost you the most</>
-              )}
-              .
+          <Collapsible
+            title="What’s moving it"
+            summary={
+              <p className="step-line">
+                {/* The table's answer in words, only once there are enough
+                    rallies with an ending to call it a habit. */}
+                {moved && (moved.gained[0] || moved.cost[0]) && (
+                  <>
+                    Of the rallies you ended,{' '}
+                    {moved.gained[0] && (
+                      <><strong>{endingPhrase(moved.gained[0].ending).toLowerCase()}</strong> earned you the most</>
+                    )}
+                    {moved.gained[0] && moved.cost[0] && '; '}
+                    {moved.cost[0] && (
+                      <><strong>{endingPhrase(moved.cost[0].ending).toLowerCase()}</strong> cost you the most</>
+                    )}
+                    .{' '}
+                  </>
+                )}
+                {rows.length} kinds of rally add up to <strong>{signed(total)}</strong>.
+              </p>
+            }
+          >
+            <ul className="parts-list" aria-label="Where your points came from">
+              {rows.map((row, i) => {
+                const label = row.ending ? endingPhrase(row.ending) : LEDGER_WORDS[row.kind]
+                return (
+                  <li key={row.ending ?? row.kind} className="part collapsible-item" style={{ '--i': i }}>
+                    <div className="part-head">
+                      <span className="part-label">{label}</span>
+                      <span className="part-values">
+                        <span className="part-theirs">{row.rallies} {row.rallies === 1 ? 'rally' : 'rallies'} · </span>
+                        <strong className={row.points > 0 ? 'is-up' : row.points < 0 ? 'is-down' : ''}>
+                          {signed(row.points)}
+                        </strong>
+                      </span>
+                    </div>
+                    <PointsArm
+                      points={row.points}
+                      widest={widest}
+                      label={`${label}: ${signed(row.points)} points over ${row.rallies} rallies`}
+                    />
+                  </li>
+                )
+              })}
+            </ul>
+            <p className="points-sum collapsible-item" style={{ '--i': rows.length }}>
+              Adds up to <strong>{signed(total)}</strong>: from 1,500 to{' '}
+              {rallyRating.points.toLocaleString()}.
             </p>
-          )}
-
-          <ul className="parts-list" aria-label="Where your points came from">
-            {rows.map((row) => {
-              const label = row.ending ? endingPhrase(row.ending) : LEDGER_WORDS[row.kind]
-              return (
-                <li key={row.ending ?? row.kind} className="part">
-                  <div className="part-head">
-                    <span className="part-label">{label}</span>
-                    <span className="part-values">
-                      <span className="part-theirs">{row.rallies} {row.rallies === 1 ? 'rally' : 'rallies'} · </span>
-                      <strong className={row.points > 0 ? 'is-up' : row.points < 0 ? 'is-down' : ''}>
-                        {signed(row.points)}
-                      </strong>
-                    </span>
-                  </div>
-                  <PointsArm
-                    points={row.points}
-                    widest={widest}
-                    label={`${label}: ${signed(row.points)} points over ${row.rallies} rallies`}
-                  />
-                </li>
-              )
-            })}
-          </ul>
-          <p className="points-sum">
-            Adds up to <strong>{signed(total)}</strong>: from 1,500 to{' '}
-            {rallyRating.points.toLocaleString()}.
-          </p>
-        </div>
-      )}
-
-      {matches.length > 0 && (
-        <div className="moving">
-          <h3 className="moving-head">The matches behind it</h3>
-          <ul className="parts-list" aria-label="Points from each recent match">
-            {[...matches].reverse().map((m) => (
-              <li key={m.matchId} className="part">
-                <div className="part-head">
-                  <Link className="part-label" to={`/matches/${m.matchId}`}>
-                    {shortDate(m.endedAt)}
-                  </Link>
-                  <strong className={`part-values ${m.change > 0 ? 'is-up' : m.change < 0 ? 'is-down' : ''}`}>
-                    {signed(m.change)}
-                  </strong>
-                </div>
-                <PointsArm
-                  points={m.change}
-                  widest={matchWidest}
-                  label={`${shortDate(m.endedAt)}: ${signed(m.change)} points`}
-                />
-              </li>
-            ))}
-          </ul>
-          <p className="points-sum">
-            {matches.length === rallyRating.matches
-              ? <>Your {matches.length} matches add up to <strong>{signed(matchTotal)}</strong>.</>
-              : <>Your last {matches.length} matches add up to <strong>{signed(matchTotal)}</strong>.</>}
-          </p>
+          </Collapsible>
         </div>
       )}
 

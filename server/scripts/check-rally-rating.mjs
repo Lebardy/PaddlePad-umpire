@@ -230,8 +230,8 @@ section('What a player is sent')
     'Put-aways earned the most; the heavier kitchen fault cost more than hitting into the net.')
   check('points in movedMost are whole numbers',
     moved.gained.every((g) => Number.isInteger(g.points)), true, 'Players never see decimals.')
-  check('the rating screen response includes movedMost, the breakdown and recent matches',
-    ['movedMost', 'breakdown', 'recentMatches'].every((key) => key in rallyRatingFor(rateHistory(many), A1, { forRatingScreen: true })), true,
+  check('the rating screen response includes movedMost and the breakdown',
+    ['movedMost', 'breakdown'].every((key) => key in rallyRatingFor(rateHistory(many), A1, { forRatingScreen: true })), true,
     'Only the rating screen needs them; the overview card stays small.')
 }
 
@@ -277,17 +277,10 @@ section('Where every point came from')
     ['opponent_error', 'opponent_winner', 'out', 'partner', 'putaway', 'untagged'].sort(),
     'A1 ended put-aways, outs and untagged rallies; the rest came from A2 and the opponents.')
 
-  check('recent matches are the last ten at most, oldest first',
-    sent.recentMatches.map((m) => m.matchId), mixed.map((m) => m.id),
-    'Seven matches, so all seven, in the order they were played.')
-  check('each match\'s change is the difference in the rounded points, so they add up',
-    sent.recentMatches.reduce((s, m) => s + m.change, 0), sent.points - START_POINTS,
-    'With fewer than ten matches the changes add to the whole distance from 1,500.')
-
-  const eleven = Array.from({ length: 11 }, () => match([rally(A1, 'putaway')]))
-  const long = rallyRatingFor(rateHistory(eleven), A1, { forRatingScreen: true })
-  check('only the last ten matches are sent',
-    long.recentMatches.map((m) => m.matchId), eleven.slice(1).map((m) => m.id), 'The strip matches the trend line.')
+  const internal = ratings.get(A1).recentMatches
+  check('the replay still keeps each recent match\'s change, adding up to the points',
+    internal.reduce((s, m) => s + m.change, 0), sent.points - START_POINTS,
+    'Kept for the match screen; the rating screen no longer sends it.')
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
