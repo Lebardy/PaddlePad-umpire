@@ -31,6 +31,13 @@
 // uses before naming anyone.
 export const MIN_STYLE_MEMBERS = 3
 
+// The two habits a style name's noun is chosen from, in the pipeline's
+// order (IDENTITY_DESCRIPTORS in ml/pipeline/clustering.py): drops
+// rather than drives picks Dropper or Driver, points won at the net
+// picks Net Player or Power Player. When neither stands out the noun is
+// "All-Court Player", and these two are its proof.
+export const IDENTITY_FEATURES = ['drop_preference_rate_mean', 'net_game_preference_rate_mean']
+
 function mean(values) {
   return values.length > 0
     ? values.reduce((sum, v) => sum + v, 0) / values.length
@@ -84,20 +91,33 @@ export function buildPlaystyleProof({ traits, mine, peers }) {
 
   const other = others[0] ?? null
 
-  const rows = traits
-    // A trait with no measurement behind it -- the generic noun the
-    // pipeline falls back to when nothing stood out -- has nothing to
-    // prove, so it is left off rather than shown with empty columns.
-    .filter((trait) => trait.feature)
-    .map((trait) => ({
+  const row = (trait, feature, neutral) => {
+    const own = mine.evidence[feature]
+    return {
       label: trait.label,
-      feature: trait.feature,
+      feature,
       family: trait.family ?? null,
-      direction: trait.direction ?? null,
-      you: round(Number(mine.evidence[trait.feature])),
-      group: round(mean(valuesOf(peers, trait.feature))),
-      other: other ? round(mean(valuesOf(other.members, trait.feature))) : null,
-    }))
+      direction: neutral ? null : (trait.direction ?? null),
+      // True for the all-court rows below: the word was chosen because
+      // this measurement did NOT stand out, so the page reads it that way.
+      neutral,
+      // Null, never 0, when nothing was recorded: no third shots logged is
+      // not the same as never choosing a drop. Number(null) would say 0.
+      you: own === null || own === undefined || !Number.isFinite(Number(own)) ? null : round(Number(own)),
+      group: round(mean(valuesOf(peers, feature))),
+      other: other ? round(mean(valuesOf(other.members, feature))) : null,
+    }
+  }
+
+  const rows = traits.flatMap((trait) => {
+    if (trait.feature) return [row(trait, trait.feature, false)]
+    // The generic noun ("All-Court Player") is what the pipeline picks
+    // when NEITHER shot-selection habit stands out from the group. It
+    // has no single measurement, but it is still a claim about both, so
+    // both are shown as its proof.
+    if (trait.family === 'identity') return IDENTITY_FEATURES.map((feature) => row(trait, feature, true))
+    return []
+  })
 
   if (rows.length === 0) return null
 

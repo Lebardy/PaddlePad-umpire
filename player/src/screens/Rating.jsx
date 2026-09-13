@@ -406,6 +406,83 @@ function Group({ standing }) {
   )
 }
 
+/**
+ * The proof rows gathered by word. Every adjective has one measurement;
+ * the all-court noun arrives as two rows marked neutral (see
+ * server/src/playstyle.js) and is shown as one word with both under it.
+ */
+function proofItems(rows) {
+  const items = []
+  for (const row of rows) {
+    const last = items[items.length - 1]
+    if (row.neutral && last?.neutral && last.label === row.label) last.rows.push(row)
+    else items.push({ label: row.label, neutral: Boolean(row.neutral), rows: [row] })
+  }
+  return items
+}
+
+/** One measurement: you, your group and the other style, as bars. */
+function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
+  const measure = MEASURES[row.feature] ?? {
+    label: row.feature, as: 'swing', better: 'neither',
+  }
+  const bars = [
+    { who: 'you', value: row.you, mine: true },
+    { who: 'your group', value: row.group },
+    ...(proof.other ? [{ who: 'the other style', value: row.other }] : []),
+  ]
+  // Bars are drawn against the biggest of the three, so a row is read by
+  // comparing its own bars and nothing else.
+  const widest = Math.max(...bars.map((b) => Math.abs(b.value ?? 0)), 0.0001)
+  const verdict = withVerdict ? compare(row.you, row.group) : null
+  const versus = verdict && proof.other ? compare(row.you, row.other) : null
+
+  return (
+    <>
+      <div className="proof-head">
+        {word && <span className="proof-word">{word}</span>}
+        <span className="proof-measure">{measure.label}</span>
+        {DIRECTION[measure.better] && (
+          <span className="proof-better">{DIRECTION[measure.better]}</span>
+        )}
+      </div>
+
+      {/* Nothing recorded is said, not drawn as an empty bar that would
+          read as zero: no third shots logged is not "never drops". */}
+      {row.you === null ? (
+        <p className="proof-verdict">Nothing recorded for you yet.</p>
+      ) : (
+        <ul className="proof-bars">
+          {bars.map((bar) => (
+            <li key={bar.who} className={bar.mine ? 'is-you' : undefined}>
+              <span className="proof-who">{bar.who}</span>
+              <span className="proof-track">
+                <span
+                  className="proof-fill"
+                  style={{ width: `${Math.round((Math.abs(bar.value ?? 0) / widest) * 100)}%` }}
+                />
+              </span>
+              {/* A percentage means something on its own, so it is shown.
+                  A spread of a per-minute rate does not, so the bars carry
+                  it and the figures live behind the tap below. */}
+              <span className="proof-number">
+                {measure.as === 'percent' ? showValue(bar.value, 'percent') : ''}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {verdict && (
+        <p className="proof-verdict">
+          Yours is {verdict} your group&rsquo;s
+          {versus ? `, and ${versus} the other style's` : ''}.
+        </p>
+      )}
+    </>
+  )
+}
+
 /** Step 3: the second split, with the numbers that chose its words. */
 function Playstyle({ standing }) {
   const { playstyle: proof, band } = standing
@@ -442,61 +519,30 @@ function Playstyle({ standing }) {
       </p>
 
       <ul className="proof" aria-label="Why this name">
-        {proof.rows.map((row) => {
-          const measure = MEASURES[row.feature] ?? {
-            label: row.feature, as: 'swing', better: 'neither',
-          }
-          const bars = [
-            { who: 'you', value: row.you, mine: true },
-            { who: 'your group', value: row.group },
-            ...(proof.other ? [{ who: 'the other style', value: row.other }] : []),
-          ]
-          // Bars are drawn against the biggest of the three, so a row is
-          // read by comparing its own bars and nothing else.
-          const widest = Math.max(...bars.map((b) => Math.abs(b.value ?? 0)), 0.0001)
-          const verdict = compare(row.you, row.group)
-          const versus = proof.other ? compare(row.you, row.other) : null
-
-          return (
-            <li key={row.feature} className="proof-row">
+        {proofItems(proof.rows).map((item) =>
+          item.neutral ? (
+            // "All-Court Player": chosen because NEITHER habit stood out,
+            // so both are shown under the one word, and the sentence
+            // says that rather than "yours is less than".
+            <li key={`neutral-${item.label}`} className="proof-row">
               <div className="proof-head">
-                <span className="proof-word">{row.label}</span>
-                <span className="proof-measure">{measure.label}</span>
-                {DIRECTION[measure.better] && (
-                  <span className="proof-better">{DIRECTION[measure.better]}</span>
-                )}
+                <span className="proof-word">{item.label}</span>
               </div>
-
-              <ul className="proof-bars">
-                {bars.map((bar) => (
-                  <li key={bar.who} className={bar.mine ? 'is-you' : undefined}>
-                    <span className="proof-who">{bar.who}</span>
-                    <span className="proof-track">
-                      <span
-                        className="proof-fill"
-                        style={{ width: `${Math.round((Math.abs(bar.value ?? 0) / widest) * 100)}%` }}
-                      />
-                    </span>
-                    {/* A percentage means something on its own, so it is
-                        shown. A spread of a per-minute rate does not, so
-                        the bars carry it and the figures live behind the
-                        tap below. */}
-                    <span className="proof-number">
-                      {measure.as === 'percent' ? showValue(bar.value, 'percent') : ''}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-
-              {verdict && (
-                <p className="proof-verdict">
-                  Yours is {verdict} your group&rsquo;s
-                  {versus ? `, and ${versus} the other style's` : ''}.
-                </p>
-              )}
+              {item.rows.map((row) => (
+                <ProofMeasure key={row.feature} row={row} proof={proof} />
+              ))}
+              <p className="proof-verdict">
+                Neither habit stands out from your group — you don&rsquo;t lean
+                towards dropping or driving, or towards the net or power — so
+                you&rsquo;re called an all-court player.
+              </p>
             </li>
-          )
-        })}
+          ) : (
+            <li key={item.rows[0].feature} className="proof-row">
+              <ProofMeasure row={item.rows[0]} proof={proof} word={item.label} withVerdict />
+            </li>
+          ),
+        )}
       </ul>
 
       <More label="How this was worked out">

@@ -71,8 +71,8 @@ section('the three columns')
   check('this player, their group, and the style they were split from',
     proof.rows,
     [
-      { label: 'Streaky', feature: 'winner_rate_std', family: 'consistency', direction: 'above', you: 1.2, group: 2.8, other: 4.4 },
-      { label: 'Dinker', feature: 'net_game_preference_rate_mean', family: 'identity', direction: 'above', you: 0.62, group: 0.465, other: 0.31 },
+      { label: 'Streaky', feature: 'winner_rate_std', family: 'consistency', direction: 'above', neutral: false, you: 1.2, group: 2.8, other: 4.4 },
+      { label: 'Dinker', feature: 'net_game_preference_rate_mean', family: 'identity', direction: 'above', neutral: false, you: 0.62, group: 0.465, other: 0.31 },
     ],
     'the group column averages everyone in the group including this player; the other column averages only the other style')
   check('how many share this style, and which style the other is',
@@ -133,14 +133,57 @@ section('nothing to prove')
   check('no traits at all -> nothing',
     buildPlaystyleProof({ traits: [], mine, peers: [peer(0, 1.2, 0.6)] }), null,
     'a run published before the pipeline recorded them; the page says so rather than inventing a reason')
-  check('a trait with no measurement behind it is left out',
+}
+
+// ============================================================
+section('the all-court noun is proven by both habits')
+// ============================================================
+{
+  // The pipeline falls back to "All-Court Player" when neither
+  // shot-selection habit stands out from the group. That is still a
+  // claim about two measurements, so both are shown. This player's
+  // style: net 0.50, 0.52, 0.54 (you 0.52). The other: 0.40, 0.42, 0.44.
+  //   group (0.50+0.52+0.54+0.40+0.42+0.44)/6 = 0.47   other 0.42
+  // Nobody here has a drop preference recorded, so that row is empty
+  // rather than zero.
+  const peers = [
+    peer(0, 1.0, 0.5), peer(0, 1.2, 0.52), peer(0, 1.4, 0.54),
+    peer(1, 4.0, 0.4), peer(1, 4.4, 0.42), peer(1, 4.8, 0.44),
+  ]
+  const mine = { playstyle_cluster: 0, evidence: peers[1].evidence }
+  const proof = buildPlaystyleProof({
+    traits: [
+      { label: 'Steady', feature: 'winner_rate_std', family: 'consistency', direction: 'below', z: -0.9 },
+      { label: 'All-Court Player', feature: null, family: 'identity', direction: 'above', z: 0 },
+    ],
+    mine,
+    peers,
+  })
+  check('the adjective keeps its own row, then one row per habit',
+    proof?.rows.map((r) => [r.label, r.feature, r.neutral]),
+    [
+      ['Steady', 'winner_rate_std', false],
+      ['All-Court Player', 'drop_preference_rate_mean', true],
+      ['All-Court Player', 'net_game_preference_rate_mean', true],
+    ],
+    'the noun was chosen BECAUSE neither habit stood out, so both habits are its proof')
+  const net = proof?.rows.find((r) => r.feature === 'net_game_preference_rate_mean')
+  check('the net habit row carries the same three columns as any other',
+    net && [net.you, net.group, net.other], [0.52, 0.47, 0.42],
+    'you, your group, and the style you were split from')
+  const drop = proof?.rows.find((r) => r.feature === 'drop_preference_rate_mean')
+  check('a habit with nothing recorded is empty, not zero',
+    drop && [drop.you, drop.group, drop.other], [null, null, null],
+    'no third shots logged is not the same as never dropping')
+
+  check('the all-court noun alone still proves something',
     buildPlaystyleProof({
       traits: [{ label: 'All-Court Player', feature: null, family: 'identity', direction: 'above', z: 0 }],
       mine,
-      peers: [peer(0, 1.2, 0.6)],
-    }),
-    null,
-    'the generic noun is what the pipeline picks when nothing stood out, so there is nothing to show columns for')
+      peers,
+    })?.rows.length,
+    2,
+    'a name that is only the noun used to show nothing at all')
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
