@@ -41,3 +41,8 @@ __pycache__/
 # once already; never again.
 paddlepad-backup.json
 *-backup.json
+
+# Written by the rating scripts in server/scripts: which matches were used
+# to build and to test, and the synthetic pool's hidden abilities.
+server/scripts/.rating-split.json
+server/scripts/.sim-pool-truth.json
