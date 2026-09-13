@@ -18,6 +18,8 @@ import { normalizeInviteCode } from '../invites.js'
 import { getMatchOfTheMonthStory, getMonthlyBoard } from '../board.js'
 import { isUuid, normalizePlayerName, playerNameError } from '../validate.js'
 import { readGame } from '../drama.js'
+import { getRallyRatings, invalidateRallyRatings } from '../rally-rating-store.js'
+import { rallyRatingFor } from '../rally-rating.js'
 
 const router = Router()
 
@@ -64,6 +66,9 @@ router.get('/me', async (req, res) => {
   // alongside them. One extra query on the profile load, and only when
   // the player has no rating yet does it cost a second.
   const rating = await getRatingState(query, req.player.id, matches.length)
+  // The player-facing rating, rally by rally. The ML snapshot above stays
+  // for the group and playstyle steps.
+  const rallyRating = rallyRatingFor(await getRallyRatings(query), req.player.id)
 
   res.json({
     player: profileOf(rows[0]),
@@ -74,6 +79,7 @@ router.get('/me', async (req, res) => {
     // Either a score with the pool it was measured against, or the
     // reason there isn't one yet. Never a bare null.
     rating,
+    rallyRating,
     // Beside the profile rather than inside it. profileOf feeds half a
     // dozen responses built from different RETURNING lists, and a field
     // one of them forgot to select would come back undefined and wipe
@@ -95,7 +101,16 @@ router.get('/me', async (req, res) => {
  * this one even setting competitiveness aside.
  */
 router.get('/standing', async (req, res) => {
-  res.json({ standing: await getClubStanding(query, req.player.id) })
+  const [standing, ratings] = await Promise.all([
+    getClubStanding(query, req.player.id),
+    getRallyRatings(query),
+  ])
+  res.json({
+    standing: {
+      ...standing,
+      rallyRating: rallyRatingFor(ratings, req.player.id, { withMovedMost: true }),
+    },
+  })
 })
 
 /**
@@ -555,6 +570,13 @@ router.post('/link', async (req, res) => {
       },
     }
   })
+
+  // The merge just rewrote team_a/team_b/first_server_player and the
+  // acting player on every match_event, including completed matches --
+  // exactly the history the rally rating is replayed from.
+  if (result.status === 200 && !result.body.preview && !result.body.alreadyYours) {
+    invalidateRallyRatings()
+  }
 
   res.status(result.status).json(result.body)
 })

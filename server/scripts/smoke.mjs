@@ -872,6 +872,16 @@ async function main() {
       JSON.stringify(linkedMe.body.summary ?? null))
     check('and so does the rating', linkedMe.body.rating?.state === 'rated',
       JSON.stringify(linkedMe.body.rating ?? null).slice(0, 80))
+    check('/player/me carries the rally rating',
+      ['rated', 'not_enough_matches'].includes(linkedMe.body.rallyRating?.state),
+      JSON.stringify(linkedMe.body.rallyRating ?? null).slice(0, 120))
+    check('and never another player\'s points',
+      !JSON.stringify(linkedMe.body.rallyRating ?? {}).includes('byEnding'),
+      'rallyRating is the shaped response, not the raw rating')
+    const standingWithRally = await asPlayer('/player/standing', { bearer: linked.body.token })
+    check('/player/standing carries the rally rating too',
+      ['rated', 'not_enough_matches'].includes(standingWithRally.body.standing?.rallyRating?.state),
+      JSON.stringify(standingWithRally.body.standing?.rallyRating ?? null).slice(0, 120))
     check('/player/me reports the username so the app can stop prompting',
       linkedMe.body.player?.username === `smk_a_${stamp}`.slice(0, 20),
       String(linkedMe.body.player?.username))
