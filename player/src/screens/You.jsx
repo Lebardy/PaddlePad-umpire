@@ -581,7 +581,7 @@ function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
 
   return (
     <div className="you-screen">
-      <header className="you-head">
+      <header className="you-top">
         <Avatar name={player.name} size="lg" />
         <h1>{player.name}</h1>
         {joined && <p className="muted-inline">Playing since {joined}</p>}

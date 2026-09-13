@@ -10,7 +10,7 @@
          One meta, not a pair keyed on prefers-color-scheme: the theme can
          now be overridden, so the OS is no longer what decides. applyTheme
          in lib/theme.js keeps this in step. -->
-    <meta name="theme-color" content="#2a78d6" />
+    <meta name="theme-color" content="#12161c" />
     <meta
       name="description"
       content="See the pickleball matches your umpire recorded for you — your record, your shots, and how every game went."
@@ -22,7 +22,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&family=Big+Shoulders+Display:wght@700;800;900&display=swap"
       rel="stylesheet"
     />
     <title>PaddlePad</title>
@@ -43,7 +43,7 @@
           root.dataset.theme = dark ? 'dark' : 'light'
           root.style.colorScheme = dark ? 'dark' : 'light'
           var meta = document.querySelector('meta[name="theme-color"]')
-          if (meta) meta.setAttribute('content', dark ? '#131019' : '#2a78d6')
+          if (meta) meta.setAttribute('content', dark ? '#0a0c0f' : '#12161c')
         } catch (e) {
           /* Private mode, or no matchMedia. Light is a safe first paint. */
         }

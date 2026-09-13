@@ -28,8 +28,8 @@ export default defineConfig({
         name: 'PaddlePad',
         short_name: 'PaddlePad',
         description: 'Your pickleball matches and stats',
-        theme_color: '#2a78d6',
-        background_color: '#f5f3fb',
+        theme_color: '#12161c',
+        background_color: '#e8e6e0',
         display: 'standalone',
         start_url: '/',
         icons: [
