@@ -37,7 +37,11 @@ function Overview({ player, onPlayerChange }) {
 
   return (
     <div className="overview">
-      <Hero player={player} summary={summary} matches={matches} />
+      {/* The headline statistics hang off the bottom of the scoreboard
+          rather than sitting in tiles of their own below it. */}
+      <Hero player={player} summary={summary} matches={matches}>
+        <StatGrid summary={summary} />
+      </Hero>
 
       {inProgress > 0 && <LiveNote count={inProgress} />}
 
@@ -45,8 +49,6 @@ function Overview({ player, onPlayerChange }) {
           the stats, because a player who dismissed the pop-up has no
           other reason to go looking for it. */}
       <SetupCard player={player} onPlayerChange={onPlayerChange} />
-
-      <StatGrid summary={summary} />
 
       <SkillRating rating={rating} />
 

@@ -1,24 +1,39 @@
 import { currentStreak, recentForm } from '../lib/derive'
 
 /**
- * The figure the page leads with.
+ * The scoreboard the page leads with.
  *
- * A win-loss record is a single headline value, so it is a hero number
- * rather than a chart -- a two-bar chart of the same thing would be
- * slower to read and say less.
+ * A win-loss record is two headline values, so it is two lit figures in
+ * their own cells rather than a chart -- a two-bar chart of the same
+ * thing would be slower to read and say less. `children` is the row of
+ * headline statistics, which hangs off the bottom of the same board.
  */
-function Hero({ player, summary, matches }) {
+function Hero({ player, summary, matches, children }) {
   const form = recentForm(matches)
   const streak = currentStreak(matches)
 
   return (
-    <header className="hero">
-      <p className="eyebrow">{player.name}</p>
+    <header className="scoreboard" aria-label="Your record">
+      <div className="sb-top">
+        <span className="sb-brand" aria-hidden="true">
+          <img className="sb-logo" src="/favicon.svg" alt="" />
+          PaddlePad
+        </span>
+        <p className="sb-name">{player.name}</p>
+      </div>
 
-      <p className="hero-figure">
-        {summary.wins}<span className="hero-sep">–</span>{summary.losses}
-      </p>
-      <p className="hero-caption">
+      <div className="sb-record">
+        <p className="sb-cell">
+          <span className="sb-label">Won</span>
+          <span className="sb-figure">{summary.wins}</span>
+        </p>
+        <p className="sb-cell">
+          <span className="sb-label">Lost</span>
+          <span className="sb-figure">{summary.losses}</span>
+        </p>
+      </div>
+
+      <p className="sb-caption">
         {summary.matches} {summary.matches === 1 ? 'match' : 'matches'} played
         {streak && streak.length > 1 && (
           <>
@@ -30,9 +45,11 @@ function Hero({ player, summary, matches }) {
         )}
       </p>
 
+      {children}
+
       {form.length > 0 && (
-        <div className="form-guide">
-          <span className="form-label">Recent</span>
+        <div className="sb-form">
+          <span className="sb-label">Recent</span>
           <ol className="form-pills">
             {/* Reversed so it reads oldest to newest, left to right --
                 the direction people expect a run of results to run. */}

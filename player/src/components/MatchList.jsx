@@ -27,16 +27,24 @@ function MatchList({ matches }) {
                   but cannot open it is the thing that made this app feel
                   like a page rather than an app. */}
               <Link className="match-link" to={`/matches/${match.id}`}>
-              <div className="match-score">
-                <span className="ms-yours">{match.yourScore}</span>
-                <span className="ms-dash">–</span>
-                <span className="ms-theirs">{match.theirScore}</span>
-              </div>
+              {/* The result as a lit letter down the row's left edge, the
+                  way a results board marks each line. The letter carries
+                  it; the colour only reinforces it. */}
+              <span className={`result-lamp lamp-${result}`}>
+                {result === 'won' ? 'W' : result === 'lost' ? 'L' : '–'}
+              </span>
 
               <div className="match-body">
-                <p className="match-versus">
-                  {match.opponents.join(' & ')}
-                </p>
+                <div className="match-line">
+                  <p className="match-versus">
+                    {match.opponents.join(' & ')}
+                  </p>
+                  <p className="match-score">
+                    <span className="ms-yours">{match.yourScore}</span>
+                    <span className="ms-dash">–</span>
+                    <span className="ms-theirs">{match.theirScore}</span>
+                  </p>
+                </div>
                 {match.partner && (
                   <p className="match-partner">with {match.partner}</p>
                 )}
