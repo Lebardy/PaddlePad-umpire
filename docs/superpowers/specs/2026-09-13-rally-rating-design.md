@@ -241,6 +241,12 @@ Sentence shapes: "{gained[0]} earned you the most." and
    not yet rated, rising, falling, level, few rallies with endings, many; phone
    width, light and dark.
 5. **Staging only** until the owner has reviewed it.
+6. **What it would change in the thesis pipeline** — measurement only: run
+   the unchanged pipeline on staging's match logs twice, once with the old
+   `skill_score` and once with rally points in its place, and count how many
+   players' skill group name and playstyle would differ. The owner decides
+   afterwards whether the pipeline should ever use the rally rating; nothing
+   is switched by this project.
 
 ## Out of scope
 

@@ -1936,3 +1936,169 @@ Expected: every card shows points, change, the anchor sentence and "Based on …
 - [ ] **Step 4: Report**
 
 Tell the owner, in plain words: both prediction results before and after regenerating the pool (accuracy with range, and the Spearman lines), the tuned `k`/`scale`, what the screenshots show, and anything that did not match the spec.
+
+---
+
+### Task 10: Would the rally rating change the thesis pipeline?
+
+A measurement only. Nothing in `ml/pipeline/`, `ml/run.py` or the nightly job changes; the owner decides afterwards, with the numbers, whether the pipeline should ever use the rally rating.
+
+The old skill score does two jobs inside the pipeline: `interpret_skill_clusters` names the skill clusters by their average score, and `residualize_playstyle_features` removes the score's linear effect before the second K-Means. This task runs the real pipeline twice on the same staging data, once as it is and once with the rally points standing in for `skill_score`, and counts how many players come out with a different skill group name or playstyle.
+
+**Files:**
+- Modify: `server/scripts/rally-rating-prediction.mjs` (write every player's points)
+- Modify: `.gitignore`
+- Create: `ml/scripts/compare_skill_input.py`
+
+**Interfaces:**
+- Consumes: `run_pipeline(gated_df)` from `ml/run.py` (returns `final, evidence, parts, games, report`; `final` has `player_id`, `skill_group`, `playstyle_archetype`), the export CSV, Task 5's script and Task 6's pool.
+- Produces: `server/scripts/.rally-points.json` = `{ [playerId]: rawPoints }`, and a printed comparison.
+
+- [ ] **Step 1: Write every player's points from the prediction script**
+
+In `server/scripts/rally-rating-prediction.mjs`, directly after the `writeFileSync(join(here, '.rating-split.json'), ...)` call, add:
+
+```js
+// Every player's points over the whole history, for
+// ml/scripts/compare_skill_input.py.
+const allPoints = rateHistory(matches, { k: best.k, scale: best.scale })
+writeFileSync(
+  join(here, '.rally-points.json'),
+  JSON.stringify(Object.fromEntries([...allPoints].map(([id, r]) => [id, r.rawPoints])), null, 2),
+)
+```
+
+Append to `.gitignore`, under the rating scripts' block:
+
+```
+server/scripts/.rally-points.json
+```
+
+- [ ] **Step 2: Write the comparison**
+
+Create `ml/scripts/compare_skill_input.py`:
+
+```python
+"""
+Would using the rally rating inside the pipeline change its results?
+
+    UMPIRE_TOKEN=... .venv/bin/python scripts/compare_skill_input.py \
+        https://api-staging-8ac6.up.railway.app ../server/scripts/.rally-points.json
+
+Read-only, and changes nothing in the pipeline. Runs run.run_pipeline
+twice on the same staging match logs:
+
+  A. exactly as the nightly job does, with the old skill score;
+  B. with each player's rally points standing in for skill_score.
+
+K-Means itself never reads the score and uses a fixed random_state, so
+any difference comes from the two places the score IS used: naming the
+skill clusters and residualising the playstyle features.
+"""
+
+import io
+import json
+import os
+import sys
+from pathlib import Path
+
+import pandas as pd
+import requests
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import run  # noqa: E402
+
+MIN_MATCHES = 5
+
+api = sys.argv[1].rstrip("/")
+rally_points = json.loads(Path(sys.argv[2]).read_text())
+token = os.environ["UMPIRE_TOKEN"]
+
+response = requests.get(f"{api}/export/match-logs.csv", headers={"authorization": f"Bearer {token}"}, timeout=60)
+response.raise_for_status()
+rows = pd.read_csv(io.StringIO(response.text))
+# pandas' datetime parsing crashes on this machine's Python 3.14 build.
+rows["ended_at"] = rows["ended_at"].astype(str)
+
+counts = rows.groupby("player_id")["match_id"].nunique()
+gated = rows[rows["player_id"].isin(counts[counts >= MIN_MATCHES].index)].copy()
+
+# ---- A: the pipeline as it is ----
+final_a, *_ = run.run_pipeline(gated)
+
+# ---- B: rally points in place of the old score ----
+original_build = run.build_skill_model
+original_parts = run.build_score_parts
+original_games = run.build_game_scores
+
+
+def build_with_rally_points(profiles):
+    skill_profiles = original_build(profiles)
+    points = skill_profiles["player_id"].map(rally_points)
+    missing = points.isna().sum()
+    if missing:
+        raise RuntimeError(f"{missing} gated players have no rally points; rerun rally-rating-prediction.mjs")
+    skill_profiles["skill_score"] = points.astype(float)
+    return skill_profiles
+
+
+run.build_skill_model = build_with_rally_points
+# These two re-derive the OLD score's arithmetic and stop if the score no
+# longer matches it -- correctly, for the real job. They are not part of
+# the clustering, so they are skipped for this run only.
+run.build_score_parts = lambda skill_profiles: {}
+run.build_game_scores = lambda gated_df, skill_profiles: {}
+try:
+    final_b, *_ = run.run_pipeline(gated)
+finally:
+    run.build_skill_model = original_build
+    run.build_score_parts = original_parts
+    run.build_game_scores = original_games
+
+# ---- Compare ----
+both = final_a[["player_id", "skill_group", "playstyle_archetype"]].merge(
+    final_b[["player_id", "skill_group", "playstyle_archetype"]],
+    on="player_id",
+    suffixes=("_old", "_rally"),
+)
+n = len(both)
+group_changed = (both["skill_group_old"] != both["skill_group_rally"]).sum()
+style_changed = (
+    both["playstyle_archetype_old"].fillna("-") != both["playstyle_archetype_rally"].fillna("-")
+).sum()
+
+print(f"players compared: {n}")
+print(f"skill group name changed: {group_changed} of {n} ({group_changed / n:.0%})")
+print(f"playstyle changed:        {style_changed} of {n} ({style_changed / n:.0%})")
+print("\nskill groups, old (rows) against rally (columns):")
+print(pd.crosstab(both["skill_group_old"], both["skill_group_rally"]))
+print("\nplaystyles found, old:  ", sorted(both["playstyle_archetype_old"].dropna().unique()))
+print("playstyles found, rally:", sorted(both["playstyle_archetype_rally"].dropna().unique()))
+```
+
+- [ ] **Step 3: Run it on the regenerated pool**
+
+Run (after Task 6, from the repo root):
+
+```bash
+UMPIRE_TOKEN=$UMPIRE_TOKEN node server/scripts/rally-rating-prediction.mjs https://api-staging-8ac6.up.railway.app
+cd ml && UMPIRE_TOKEN=$UMPIRE_TOKEN .venv/bin/python scripts/compare_skill_input.py https://api-staging-8ac6.up.railway.app ../server/scripts/.rally-points.json
+```
+
+Expected: `players compared: N`, the two "changed" lines, a crosstab and both playstyle name lists. Run A must match what the nightly job would publish; if Run A itself errors, stop and report rather than changing the pipeline.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add .gitignore server/scripts/rally-rating-prediction.mjs ml/scripts/compare_skill_input.py
+git commit -m "Measure what the rally rating would change in the pipeline
+
+Runs the unchanged pipeline twice on staging's match logs, once with
+the old skill score and once with rally points in its place, and counts
+how many players' skill group name or playstyle would differ. Changes
+nothing in the pipeline or the nightly job."
+```
+
+- [ ] **Step 5: Report**
+
+Tell the owner, in plain words: how many players would get a different group name and a different playstyle, whether the set of playstyle names changes, and that nothing was switched. The decision on using the rally rating inside the pipeline is theirs.
