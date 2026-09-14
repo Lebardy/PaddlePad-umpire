@@ -2053,7 +2053,14 @@ a.highlight:active,
    page's status colours, which are too dim on it in the light theme. */
 .match-points.is-up { color: var(--win-lamp); }
 .match-points.is-down { color: var(--loss-lamp); }
-.match-points + .expectation { margin-top: 0.5rem; }
+.match-points-split {
+  margin-top: 0.2rem;
+  font-size: 0.9rem;
+  color: var(--board-muted);
+  font-variant-numeric: tabular-nums;
+}
+.match-points + .expectation,
+.match-points-split + .expectation { margin-top: 0.5rem; }
 
 /* ============ How your rallies ended ============ */
 
