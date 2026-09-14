@@ -18,7 +18,7 @@
 // ============================================================
 
 import { deriveMatchState } from './pickleball.js'
-import { RALLY_ENDINGS } from './rally-endings.js'
+import { RALLY_ENDINGS, rallyEnding } from './rally-endings.js'
 
 export const START_POINTS = 1500
 export const DEFAULT_K = 4
@@ -137,6 +137,11 @@ export function rateHistory(matches, options = {}) {
         ledger: {},
         // [matchId, endedAt] per counted match, beside `history`.
         playedIn: [],
+        // What each counted match did, keyed by match id: points either
+        // side of it, each side's average points before it, whether
+        // everyone on court was established, and the rallies this player
+        // ended in it. Feeds the match screen through rallyMatchFor.
+        matchFacts: {},
         byEnding: {},
       })
     }
@@ -147,6 +152,22 @@ export function rateHistory(matches, options = {}) {
   for (const match of [...matches].sort(byWhenEnded)) {
     const everyone = [...match.teamA, ...match.teamB]
     everyone.forEach(player)
+    const onA = new Set(match.teamA)
+    const averageA = average(match.teamA)
+    const averageB = average(match.teamB)
+    // Counted BEFORE this match is added to anyone's total.
+    const established = everyone.every((id) => player(id).matches >= MIN_MATCHES)
+    for (const id of everyone) {
+      player(id).matchFacts[match.id] = {
+        before: player(id).points,
+        after: null,
+        yourSide: onA.has(id) ? averageA : averageB,
+        theirSide: onA.has(id) ? averageB : averageA,
+        established,
+        endings: {},
+        untagged: 0,
+      }
+    }
     const { foldedEvents } = deriveMatchState(match)
 
     for (const event of match.events.slice(0, foldedEvents)) {
@@ -188,6 +209,16 @@ export function rateHistory(matches, options = {}) {
         const entry = (p.ledger[row] ??= { rallies: 0, points: 0 })
         entry.rallies += 1
         entry.points += change
+        if (id === event.actingPlayerId) {
+          const facts = p.matchFacts[match.id]
+          if (event.detail) {
+            const ended = (facts.endings[event.detail] ??= { rallies: 0, points: 0 })
+            ended.rallies += 1
+            ended.points += change
+          } else {
+            facts.untagged += 1
+          }
+        }
       }
       for (const id of everyone) {
         player(id).rallies += 1
@@ -203,6 +234,7 @@ export function rateHistory(matches, options = {}) {
       player(id).matches += 1
       player(id).history.push(player(id).points)
       player(id).playedIn.push([match.id, match.endedAt])
+      player(id).matchFacts[match.id].after = player(id).points
     }
   }
 
@@ -220,6 +252,7 @@ export function rateHistory(matches, options = {}) {
       recentChange: Math.round(p.points - before),
       byEnding: p.byEnding,
       ledger: p.ledger,
+      matchFacts: p.matchFacts,
       // Each recent match's change, as the difference in ROUNDED points
       // either side of it, so the changes shown add up to the trend.
       recentMatches: p.history.slice(-TREND_MATCHES).map((after, i, recent) => {
@@ -301,4 +334,34 @@ export function rallyRatingFor(ratings, playerId, { forRatingScreen = false } = 
     response.breakdown = wholeBreakdown(rating)
   }
   return response
+}
+
+/**
+ * What the match screen is sent about one of this player's matches.
+ *
+ * Their own facts only. The side averages choose the expectation's words
+ * and never leave here, so nobody's points -- a partner's included -- can
+ * be worked out from what is sent. Points (the change, and each ending's
+ * share) wait for the player to be rated, as they do on the overview.
+ */
+export function rallyMatchFor(ratings, playerId, matchId, won) {
+  const rating = ratings?.get(playerId)
+  const facts = rating?.matchFacts?.[matchId]
+  if (!facts) return null
+  const rated = rating.matches >= MIN_MATCHES
+  return {
+    change: rated ? Math.round(facts.after) - Math.round(facts.before) : null,
+    expectation: facts.established
+      ? expectationFromChance(expectedWin(facts.yourSide, facts.theirSide), won)
+      : null,
+    endings: Object.entries(facts.endings)
+      .map(([ending, entry]) => ({
+        ending,
+        outcome: rallyEnding(ending)?.outcome ?? null,
+        rallies: entry.rallies,
+        points: rated ? Math.round(entry.points) : null,
+      }))
+      .sort((a, b) => b.rallies - a.rallies || a.ending.localeCompare(b.ending)),
+    untagged: facts.untagged,
+  }
 }

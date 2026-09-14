@@ -21,6 +21,7 @@ import {
   expectedWin,
   movedMost,
   rallyRatingFor,
+  rallyMatchFor,
   rateHistory,
 } from '../src/rally-rating.js'
 import { RALLY_ENDINGS, rallyEnding } from '../src/rally-endings.js'
@@ -281,6 +282,76 @@ section('Where every point came from')
   check('the replay still keeps each recent match\'s change, adding up to the points',
     internal.reduce((s, m) => s + m.change, 0), sent.points - START_POINTS,
     'Kept for the match screen; the rating screen no longer sends it.')
+}
+
+section('What one match did')
+{
+  const mixed = Array.from({ length: 7 }, (_, i) =>
+    match([rally(A1, 'putaway'), rally(B2, 'net'), rally(A1, 'net'), rally(A2, 'lob'), rally(B1, i % 2 ? 'ace' : 'kitchen'), rally(A1, 'winner')]))
+  const ratings = rateHistory(mixed)
+  const a1 = ratings.get(A1)
+
+  check('every match\'s before-to-after change adds up to the player\'s total',
+    near(mixed.reduce((s, m) => s + a1.matchFacts[m.id].after - a1.matchFacts[m.id].before, 0), a1.rawPoints - START_POINTS, 1e-6),
+    true, 'Nothing moves a player\'s points outside a match.')
+
+  const summed = {}
+  let untagged = 0
+  for (const m of mixed) {
+    for (const [ending, entry] of Object.entries(a1.matchFacts[m.id].endings)) {
+      summed[ending] = (summed[ending] ?? 0) + entry.points
+    }
+    untagged += a1.matchFacts[m.id].untagged
+  }
+  check('each match\'s own endings add up to the same endings over the whole history',
+    Object.keys(summed).sort().map((e) => near(summed[e], a1.ledger[e].points, 1e-6)), [true, true],
+    'A1 ended put-aways and nets in every match; per match and overall must agree.')
+  check('rallies the player ended with no ending are counted per match',
+    untagged, a1.ledger.untagged.rallies, 'One bare winner per match, seven matches.')
+  check('partner and opponent rallies are not the player\'s own endings',
+    Object.keys(a1.matchFacts[mixed[0].id].endings).sort(), ['net', 'putaway'],
+    'A2\'s lob and the opponents\' rallies belong to other rows.')
+
+  const first = rateHistory([mixed[0]])
+  const second = a1.matchFacts[mixed[1].id]
+  check('side averages are the points before the match starts',
+    [near(second.yourSide, (first.get(A1).rawPoints + first.get(A2).rawPoints) / 2),
+      near(second.theirSide, (first.get(B1).rawPoints + first.get(B2).rawPoints) / 2)],
+    [true, true], 'The second match\'s averages carry the first match\'s result and nothing from the second.')
+
+  check('while anyone on court has under 5 matches, nothing is expected',
+    rallyMatchFor(ratings, A1, mixed[4].id, true).expectation, null,
+    'Before the fifth match nobody on court is established.')
+  check('once everyone has 5 matches behind them, the expectation is said',
+    typeof rallyMatchFor(ratings, A1, mixed[5].id, true).expectation?.expected, 'string',
+    'Five counted matches each before the sixth.')
+
+  const sixth = rallyMatchFor(ratings, A1, mixed[5].id, false)
+  check('a rated player\'s change is the difference in rounded points',
+    sixth.change, Math.round(a1.matchFacts[mixed[5].id].after) - Math.round(a1.matchFacts[mixed[5].id].before),
+    'The same rounding as the overview, so changes add up to what it shows.')
+  check('endings are sorted most frequent first, with outcome and whole points',
+    sixth.endings.map((e) => [e.ending, e.outcome, e.rallies, Number.isInteger(e.points)]),
+    [['net', 'error', 1, true], ['putaway', 'winner', 1, true]],
+    'A tie in count falls back to the ending\'s name, so the order is stable.')
+  check('the untagged count comes through',
+    sixth.untagged, 1, 'One bare winner in that match.')
+
+  const early = rateHistory(mixed.slice(0, 2))
+  const unrated = rallyMatchFor(early, A1, mixed[0].id, true)
+  check('an unrated player gets no change and no points on their endings',
+    [unrated.change, unrated.endings.every((e) => e.points === null)], [null, true],
+    'Points stay hidden until 5 matches, as on the overview.')
+  check('an unrated player still gets their ending counts',
+    unrated.endings.map((e) => e.rallies), [1, 1], 'Counts are just what happened.')
+
+  check('a match the replay never counted gives nothing',
+    rallyMatchFor(ratings, A1, randomUUID(), true), null, 'A voided match is not in the history.')
+  check('a player who was not in the match gives nothing',
+    rallyMatchFor(ratings, randomUUID(), mixed[0].id, true), null, 'Nobody reads another player\'s match.')
+  check('the match section never carries a side average or anyone\'s points',
+    Object.keys(sixth).sort(), ['change', 'endings', 'expectation', 'untagged'],
+    'The averages only choose the words.')
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
