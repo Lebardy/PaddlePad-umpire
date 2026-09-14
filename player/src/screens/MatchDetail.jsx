@@ -49,20 +49,34 @@ function formatDate(iso) {
   })
 }
 
+function signed(value) {
+  return value > 0 ? `+${value}` : value < 0 ? `−${Math.abs(value)}` : '0'
+}
+
 /**
- * This match's change in the player's rally points, once they are rated.
- * Their own number only; null (not rated yet) shows nothing.
+ * This match's change in the player's rally points, once they are rated,
+ * and under it how much came from the rallies and how much from the
+ * result. The rallies figure is the change minus the reward, so the two
+ * always add up to the line above even after rounding. Their own numbers
+ * only; null (not rated yet) shows nothing.
  */
-function MatchPoints({ rally }) {
+function MatchPoints({ rally, won }) {
   if (!rally || rally.change === null) return null
-  const { change } = rally
+  const { change, result } = rally
   const unit = Math.abs(change) === 1 ? 'point' : 'points'
   return (
-    <p className={`match-points ${change > 0 ? 'is-up' : change < 0 ? 'is-down' : ''}`}>
-      {change > 0 && `▲ +${change} ${unit} in this match`}
-      {change < 0 && `▼ −${Math.abs(change)} ${unit} in this match`}
-      {change === 0 && 'No change in points'}
-    </p>
+    <>
+      <p className={`match-points ${change > 0 ? 'is-up' : change < 0 ? 'is-down' : ''}`}>
+        {change > 0 && `▲ +${change} ${unit} in this match`}
+        {change < 0 && `▼ −${Math.abs(change)} ${unit} in this match`}
+        {change === 0 && 'No change in points'}
+      </p>
+      {result !== null && (
+        <p className="match-points-split">
+          Rallies {signed(change - result)} · {won ? 'Winning' : 'Losing'} the match {signed(result)}
+        </p>
+      )}
+    </>
   )
 }
 
@@ -142,7 +156,7 @@ function MatchDetail({ id }) {
         <p className="detail-meta">
           {formatDate(match.endedAt)} · {match.sessionName}
         </p>
-        <MatchPoints rally={match.rally} />
+        <MatchPoints rally={match.rally} won={match.won} />
         {/* Nothing at all when anyone on court had fewer than five
             matches beforehand. A missing line is better than a hedged one. */}
         <Expectation match={match} />
