@@ -10,7 +10,7 @@
 //
 //   1  the player's rally points, and every kind of rally moving them --
 //      worked out rally by rally in the API, never compared with anyone
-//   2  what to work on: their costliest faults, each with one tip
+//   2  what to work on: their most frequent faults, each with one tip
 //   3  how they play: a playstyle found among the players closest to
 //      their level, each word proven with numbers
 //
@@ -306,11 +306,12 @@ function Score({ rallyRating }) {
 }
 
 /**
- * Step 2: what to work on -- the faults that cost the most points, each
- * with one tip.
+ * Step 2: what to work on -- the faults the player makes most often, each
+ * with one tip, and how many times. No points: this card is about habits
+ * to change, and step 1 already shows what each one cost.
  *
  * Straight after step 1 because it is that card's "so what": the same
- * rows, the player's own costliest faults, turned into something to
+ * rows, the player's own most frequent faults, turned into something to
  * practise. It needs no nightly run, so it shows for any rated player.
  *
  * Waits for the same 20 rallies with an ending that "What's moving it"
@@ -329,11 +330,11 @@ function WorkOn({ rallyRating }) {
           ended — a few rallies can&rsquo;t show a habit.
         </p>
       ) : faults.length === 0 ? (
-        <p className="step-line">None of your mistakes cost you points yet.</p>
+        <p className="step-line">None of these mistakes show up in your rallies yet.</p>
       ) : (
         <>
           <p className="step-line">
-            The mistakes that cost you the most points, costliest first.
+            The mistakes you make most often, most frequent first.
           </p>
           <ol className="tips" aria-label="Mistakes to work on">
             {faults.map((fault, i) => (
@@ -343,10 +344,7 @@ function WorkOn({ rallyRating }) {
                   <div className="tip-head">
                     <span className="tip-name">{endingPhrase(fault.ending)}</span>
                     <span className="tip-cost">
-                      <span className="tip-times">
-                        {fault.rallies} {fault.rallies === 1 ? 'time' : 'times'} ·{' '}
-                      </span>
-                      <strong>{signed(fault.points)}</strong>
+                      <strong>{fault.rallies}</strong> {fault.rallies === 1 ? 'time' : 'times'}
                     </span>
                   </div>
                   <p className="tip-text">{fault.tip}</p>
