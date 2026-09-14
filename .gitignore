@@ -67,3 +67,7 @@ DESIGN.md
 server/scripts/.rating-split.json
 server/scripts/.sim-pool-truth.json
 server/scripts/.rally-points.json
+
+# Design specs and build plans written while working with Claude Code.
+# Kept locally, not in the repository.
+docs/superpowers/
