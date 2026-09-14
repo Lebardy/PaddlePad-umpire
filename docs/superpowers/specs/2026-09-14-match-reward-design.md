@@ -136,8 +136,8 @@ rerun afterwards and the band edges updated if its recommendation changes.
 - The "Where your points came from" list gains one row, **"Winning and losing
   matches"**, with a count in matches ("9 matches · +14") instead of rallies.
   The list still adds up exactly to the total.
-- The sentence "N kinds of rally add up to" becomes "These add up to", since one
-  row is not a kind of rally.
+- The sentence "N kinds of rally add up to" becomes "Altogether that comes to",
+  since one row is not a kind of rally.
 - "How are the points worked out?" gains one paragraph: winning a match adds
   points and losing one takes some away, more for beating a stronger side and
   less for beating a weaker one.

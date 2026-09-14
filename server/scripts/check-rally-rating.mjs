@@ -420,6 +420,29 @@ section('Winning the match')
     [row?.matches, 'rallies' in (row ?? {})], [6, false], 'Six matches won; the row is not a kind of rally.')
   check('the rating screen rows still add up with the match row',
     sent.breakdown.reduce((s, r) => s + r.points, 0), sent.points - START_POINTS, 'Whole numbers, exactly.')
+
+  // A longer game with the other side serving first, so the reward path
+  // is checked against rules other than the target-11, A-serves-first
+  // default every other check in this section uses.
+  clock += 60 * 60_000
+  const toFifteen = {
+    id: randomUUID(),
+    endedAt: new Date(clock).toISOString(),
+    teamA: [A1, A2],
+    teamB: [B1, B2],
+    firstServer: { team: 'B', playerId: B1 },
+    rightStart: { A: A1, B: B1 },
+    pointTarget: 15,
+    events: Array.from({ length: 15 }, () => rally(B1, 'putaway')),
+  }
+  // Confirmed via deriveMatchState during development that this match
+  // completes with B winning 15-0; if it somehow did not, the check
+  // below would fail loudly since there would be no match_result row.
+  const fifteenRatings = rateHistory([toFifteen])
+  const chanceB = gameWinChance(0.5, { doubles: true, target: 15, firstServer: 'B' })
+  check('a longer game with the other side serving first still rewards from the right game chance',
+    near(reward(fifteenRatings, B1), (MATCH_REWARD * chanceB) / 2, 1e-9), true,
+    'B\'s chance is 1 minus A\'s chance of winning with B serving first, which by symmetry is the same number as A\'s chance with A serving first; B\'s side gets MATCH_REWARD times that chance, split evenly.')
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
