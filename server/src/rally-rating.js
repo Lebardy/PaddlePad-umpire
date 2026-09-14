@@ -12,13 +12,18 @@
 // residualises the playstyle features) and stays exactly as it is; this
 // is the number players see.
 //
+// After each match with a winner, the winning side also gains a match
+// reward scaled by how unlikely the win was, and the losing side gives
+// up the same.
+//
 // Pure: matches in, ratings out. Recomputed from the whole history
 // rather than patched, so voiding a match or undoing a rally can never
 // leave stale points behind.
 // ============================================================
 
-import { deriveMatchState } from './pickleball.js'
-import { RALLY_ENDINGS } from './rally-endings.js'
+import { DEFAULT_POINT_TARGET, deriveMatchState } from './pickleball.js'
+import { gameWinChance } from './game-chance.js'
+import { RALLY_ENDINGS, rallyEnding } from './rally-endings.js'
 
 export const START_POINTS = 1500
 export const DEFAULT_K = 4
@@ -27,6 +32,18 @@ export const ACTOR_SHARE = 0.75
 export const MIN_MATCHES = 5
 export const TREND_MATCHES = 10
 export const RECENT_MATCHES = 5
+
+// The most a side can gain by winning a match, reached only by beating a
+// side they had no chance against: the side's reward is MATCH_REWARD
+// times (1 - their chance of winning the game), and the losers give up
+// the same. Chosen by the owner on 2026-09-14 from
+// server/scripts/match-reward-sizes.mjs over staging's 136 matches: at
+// this size 32/263 winners still lost points (46/263 with
+// no reward), the simulated messy partner averaged +2.7 and the
+// carrying partner +15.5, ranking against true ability was 0.802
+// (0.839 with none), and the favourite won 19/24 (79%). The worst
+// winner's loss moved from −13 with no reward to −15 with it.
+export const MATCH_REWARD = 16
 
 // How much each ending moves. A first guess, agreed before any real
 // match carried endings: self-inflicted faults weigh more, faults that
@@ -69,6 +86,39 @@ export function expectedWin(ratingFor, ratingAgainst, scale = DEFAULT_SCALE) {
   return 1 / (1 + 10 ** ((ratingAgainst - ratingFor) / scale))
 }
 
+// Where a side's chance of winning a rally, before a match, stops being
+// "evenly matched" and becomes a slight or a clear favourite. Distances
+// from an even 0.5. Set from staging's synthetic pool with
+// server/scripts/expectation-bands.mjs on 2026-09-14, rerun after the
+// match reward: of 38 matches where everyone on court had five matches,
+// clear favourites won 30/35, slight favourites 1/1, and team A won 1/2
+// of the even ones. The synthetic pool has few close matchups, so
+// "slight" is a thin band resting on one match. Rerun once real matches
+// exist.
+export const EVEN_WITHIN = 0.01
+export const CLEAR_BEYOND = 0.02
+
+/**
+ * What was expected of a match, in words, from the per-rally chance the
+ * player's side had against the other before it started.
+ *
+ * Never a number: in doubles a side's points are two people, one of them
+ * the reader, so any figure would hand over their partner's points.
+ */
+export function expectationFromChance(chance, won) {
+  if (!Number.isFinite(chance)) return null
+  const lean = chance - 0.5
+  // No favourite, so no upset is possible.
+  if (Math.abs(lean) < EVEN_WITHIN) return { expected: 'even', margin: null, upset: false }
+  const expected = lean > 0 ? 'win' : 'loss'
+  return {
+    expected,
+    margin: Math.abs(lean) >= CLEAR_BEYOND ? 'clear' : 'slight',
+    // A match with no winner cannot have gone against expectation.
+    upset: won === null || won === undefined ? false : (expected === 'win') !== won,
+  }
+}
+
 function endedTime(match) {
   return new Date(match.endedAt).getTime()
 }
@@ -87,11 +137,16 @@ function byWhenEnded(a, b) {
  * won the rally was expected to (the same value the points update uses)
  * and that rally's ending weight. Lets callers (tuning scripts) score
  * per-rally predictions without duplicating the model.
+ *
+ * `options.matchReward` sets the size of the match reward applied after
+ * each match with a winner; defaults to MATCH_REWARD. 0 turns the
+ * reward off and gives the ratings from before it existed.
  */
 export function rateHistory(matches, options = {}) {
   const k = options.k ?? DEFAULT_K
   const scale = options.scale ?? DEFAULT_SCALE
   const actorShare = options.actorShare ?? ACTOR_SHARE
+  const matchReward = options.matchReward ?? MATCH_REWARD
 
   const players = new Map()
   const player = (id) => {
@@ -109,6 +164,11 @@ export function rateHistory(matches, options = {}) {
         ledger: {},
         // [matchId, endedAt] per counted match, beside `history`.
         playedIn: [],
+        // What each counted match did, keyed by match id: points either
+        // side of it, each side's average points before it, whether
+        // everyone on court was established, and the rallies this player
+        // ended in it. Feeds the match screen through rallyMatchFor.
+        matchFacts: {},
         byEnding: {},
       })
     }
@@ -119,7 +179,25 @@ export function rateHistory(matches, options = {}) {
   for (const match of [...matches].sort(byWhenEnded)) {
     const everyone = [...match.teamA, ...match.teamB]
     everyone.forEach(player)
-    const { foldedEvents } = deriveMatchState(match)
+    const onA = new Set(match.teamA)
+    const averageA = average(match.teamA)
+    const averageB = average(match.teamB)
+    // Counted BEFORE this match is added to anyone's total.
+    const established = everyone.every((id) => player(id).matches >= MIN_MATCHES)
+    for (const id of everyone) {
+      player(id).matchFacts[match.id] = {
+        before: player(id).points,
+        after: null,
+        yourSide: onA.has(id) ? averageA : averageB,
+        theirSide: onA.has(id) ? averageB : averageA,
+        established,
+        endings: {},
+        untagged: 0,
+        // This player's share of the match reward; null when none.
+        result: null,
+      }
+    }
+    const { foldedEvents, winner } = deriveMatchState(match)
 
     for (const event of match.events.slice(0, foldedEvents)) {
       if (event.type !== 'rally') continue
@@ -160,6 +238,16 @@ export function rateHistory(matches, options = {}) {
         const entry = (p.ledger[row] ??= { rallies: 0, points: 0 })
         entry.rallies += 1
         entry.points += change
+        if (id === event.actingPlayerId) {
+          const facts = p.matchFacts[match.id]
+          if (event.detail) {
+            const ended = (facts.endings[event.detail] ??= { rallies: 0, points: 0 })
+            ended.rallies += 1
+            ended.points += change
+          } else {
+            facts.untagged += 1
+          }
+        }
       }
       for (const id of everyone) {
         player(id).rallies += 1
@@ -171,10 +259,33 @@ export function rateHistory(matches, options = {}) {
       }
     }
 
+    // The match reward, after every rally. Worked out from each side's
+    // average points BEFORE the match, like the expectation words, and
+    // shared equally within a side: winning is a team result, so the
+    // three-quarters share for whoever ended a rally does not apply.
+    if (matchReward > 0 && winner) {
+      const chanceA = gameWinChance(expectedWin(averageA, averageB, scale), {
+        doubles: match.teamA.length === 2,
+        target: match.pointTarget ?? DEFAULT_POINT_TARGET,
+        firstServer: match.firstServer.team,
+      })
+      const sideA = matchReward * (winner === 'A' ? 1 - chanceA : -chanceA)
+      for (const id of everyone) {
+        const share = onA.has(id) ? sideA / match.teamA.length : -sideA / match.teamB.length
+        const p = player(id)
+        p.points += share
+        const entry = (p.ledger.match_result ??= { matches: 0, points: 0 })
+        entry.matches += 1
+        entry.points += share
+        p.matchFacts[match.id].result = share
+      }
+    }
+
     for (const id of everyone) {
       player(id).matches += 1
       player(id).history.push(player(id).points)
       player(id).playedIn.push([match.id, match.endedAt])
+      player(id).matchFacts[match.id].after = player(id).points
     }
   }
 
@@ -192,6 +303,7 @@ export function rateHistory(matches, options = {}) {
       recentChange: Math.round(p.points - before),
       byEnding: p.byEnding,
       ledger: p.ledger,
+      matchFacts: p.matchFacts,
       // Each recent match's change, as the difference in ROUNDED points
       // either side of it, so the changes shown add up to the trend.
       recentMatches: p.history.slice(-TREND_MATCHES).map((after, i, recent) => {
@@ -232,10 +344,11 @@ export function movedMost(rating) {
 function wholeBreakdown(rating) {
   const total = rating.points - START_POINTS
   const rows = Object.entries(rating.ledger)
-    .filter(([, entry]) => entry.rallies > 0)
+    .filter(([, entry]) => (entry.rallies ?? entry.matches) > 0)
     .map(([key, entry]) => ({
       ...(LEDGER_KINDS.includes(key) ? { kind: key } : { kind: 'ending', ending: key }),
-      rallies: entry.rallies,
+      // Counted in matches for the match reward, in rallies for the rest.
+      ...(key === 'match_result' ? { matches: entry.matches } : { rallies: entry.rallies }),
       exact: entry.points,
       points: Math.floor(entry.points),
     }))
@@ -248,7 +361,7 @@ function wholeBreakdown(rating) {
 }
 
 /** Ledger rows that are not one of the player's own endings. */
-export const LEDGER_KINDS = ['untagged', 'partner', 'opponent_winner', 'opponent_error']
+export const LEDGER_KINDS = ['untagged', 'partner', 'opponent_winner', 'opponent_error', 'match_result']
 
 /** What one player is sent about their own rally rating. */
 export function rallyRatingFor(ratings, playerId, { forRatingScreen = false } = {}) {
@@ -273,4 +386,37 @@ export function rallyRatingFor(ratings, playerId, { forRatingScreen = false } = 
     response.breakdown = wholeBreakdown(rating)
   }
   return response
+}
+
+/**
+ * What the match screen is sent about one of this player's matches.
+ *
+ * Their own facts only. The side averages choose the expectation's words
+ * and never leave here, so nobody's points -- a partner's included -- can
+ * be worked out from what is sent. Points (the change, and each ending's
+ * share) wait for the player to be rated, as they do on the overview.
+ */
+export function rallyMatchFor(ratings, playerId, matchId, won) {
+  const rating = ratings?.get(playerId)
+  const facts = rating?.matchFacts?.[matchId]
+  if (!facts) return null
+  const rated = rating.matches >= MIN_MATCHES
+  return {
+    change: rated ? Math.round(facts.after) - Math.round(facts.before) : null,
+    expectation: facts.established
+      ? expectationFromChance(expectedWin(facts.yourSide, facts.theirSide), won)
+      : null,
+    endings: Object.entries(facts.endings)
+      .map(([ending, entry]) => ({
+        ending,
+        outcome: rallyEnding(ending)?.outcome ?? null,
+        rallies: entry.rallies,
+        points: rated ? Math.round(entry.points) : null,
+      }))
+      .sort((a, b) => b.rallies - a.rallies || a.ending.localeCompare(b.ending)),
+    untagged: facts.untagged,
+    // This player's share of the match reward; null before they are
+    // rated, and when the match had no winner.
+    result: rated && facts.result !== null ? Math.round(facts.result) : null,
+  }
 }

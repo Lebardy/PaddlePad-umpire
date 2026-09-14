@@ -889,6 +889,16 @@ async function main() {
     check('/player/standing carries the rally rating too',
       ['rated', 'not_enough_matches'].includes(standingWithRally.body.standing?.rallyRating?.state),
       JSON.stringify(standingWithRally.body.standing?.rallyRating ?? null).slice(0, 120))
+    const listWithRally = await asPlayer('/player/matches', { bearer: linked.body.token })
+    const listed = listWithRally.body.matches ?? []
+    check('/player/matches carries a rally section with only the agreed fields',
+      listed.length > 0 && listed.every((m) => m.rally === null || (
+        JSON.stringify(Object.keys(m.rally).sort()) === JSON.stringify(['change', 'endings', 'expectation', 'result', 'untagged']) &&
+        m.rally.endings.every((e) => JSON.stringify(Object.keys(e).sort()) === JSON.stringify(['ending', 'outcome', 'points', 'rallies'])))),
+      JSON.stringify(listed[0]?.rally ?? null).slice(0, 160))
+    check('the match list no longer carries the old score',
+      listed.every((m) => !('ratedAs' in m) && !('expectation' in m)),
+      JSON.stringify(Object.keys(listed[0] ?? {})))
     check('/player/me reports the username so the app can stop prompting',
       linkedMe.body.player?.username === `smk_a_${stamp}`.slice(0, 20),
       String(linkedMe.body.player?.username))

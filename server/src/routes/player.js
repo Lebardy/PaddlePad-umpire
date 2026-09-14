@@ -582,7 +582,8 @@ router.post('/link', async (req, res) => {
 })
 
 router.get('/matches', async (req, res) => {
-  res.json({ matches: await getPlayerMatches(query, req.player.id) })
+  const ratings = await getRallyRatings(query)
+  res.json({ matches: await getPlayerMatches(query, req.player.id, ratings) })
 })
 
 export default router
