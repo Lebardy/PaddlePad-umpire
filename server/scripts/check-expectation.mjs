@@ -1,17 +1,16 @@
 #!/usr/bin/env node
 // ============================================================
-// What was expected of a match.
+// What was expected of a match, from rally points.
 //
 //   node server/scripts/check-expectation.mjs
 //
-// The module is pure, so the arithmetic and the two rules that
-// matter -- only what was knowable beforehand, and no number about
-// anybody else -- are provable here with no database and no network.
+// The replay gives each side's chance of winning a rally before the
+// match. This checks how that chance becomes words: even, a slight
+// favourite or a clear one, and when the result was an upset. Pure, so
+// no database and no network.
 // ============================================================
 
-import {
-  CLEAR_GAP, EVEN_WITHIN, expectationFor, sideRating,
-} from '../src/expectation.js'
+import { CLEAR_BEYOND, EVEN_WITHIN, expectationFromChance } from '../src/rally-rating.js'
 
 let pass = 0
 let fail = 0
@@ -28,63 +27,51 @@ function check(label, actual, expected, why) {
 }
 const section = (title) => console.log(`\n${title}`)
 
-// ============================================================
+const clearly = 0.5 + CLEAR_BEYOND + 0.001
+const slightly = 0.5 + (EVEN_WITHIN + CLEAR_BEYOND) / 2
+const barely = 0.5 + EVEN_WITHIN / 2
+
 section('which side was favoured')
-// ============================================================
 {
-  check('a clear gap the wrong way, and you won: an upset',
-    expectationFor(40, 62, true),
-    { expected: 'loss', margin: 'clear', upset: true },
-    `22 points behind is past the ${CLEAR_GAP}-point mark, and the result went against it`)
-  check('the same match, lost as expected',
-    expectationFor(40, 62, false),
-    { expected: 'loss', margin: 'clear', upset: false },
-    'losing the one you were expected to lose is not an upset, and is not called one')
-  check('a modest gap in your favour',
-    expectationFor(58, 50, true),
-    { expected: 'win', margin: 'slight', upset: false },
-    `8 points is over ${EVEN_WITHIN} but under ${CLEAR_GAP}: favoured, not heavily`)
-  check('a favourite who lost',
-    expectationFor(58, 50, false),
-    { expected: 'win', margin: 'slight', upset: true },
-    'the flag is symmetric -- the app calls this one a slip rather than an upset')
+  check('a clear favourite who won',
+    expectationFromChance(clearly, true), { expected: 'win', margin: 'clear', upset: false },
+    `more than ${CLEAR_BEYOND} above an even chance is clear`)
+  check('a clear underdog who won is an upset',
+    expectationFromChance(1 - clearly, true), { expected: 'loss', margin: 'clear', upset: true },
+    'the result went against a named favourite')
+  check('a slight favourite who lost is a slip',
+    expectationFromChance(slightly, false), { expected: 'win', margin: 'slight', upset: true },
+    'upset is symmetric; the app calls this one a slip')
+  check('a slight underdog who lost as expected',
+    expectationFromChance(1 - slightly, false), { expected: 'loss', margin: 'slight', upset: false },
+    'losing the one you were expected to lose is not an upset')
 }
 
-// ============================================================
 section('level is said as level')
-// ============================================================
 {
-  check('inside the even band, nobody is named favourite',
-    expectationFor(51, 49, false),
-    { expected: 'even', margin: null, upset: false },
-    `2 points apart is inside ${EVEN_WITHIN}; naming a favourite on that would be false precision`)
-  check('and a level match can never be an upset',
-    [expectationFor(51, 49, true).upset, expectationFor(51, 49, false).upset],
-    [false, false],
-    'a result that was a coin flip beforehand cannot have gone against expectation')
-  check('exactly on the boundary counts as a gap',
-    expectationFor(56, 50, false).expected, 'win',
-    `${EVEN_WITHIN} points is the first gap wide enough to call, so the band is exclusive at the top`)
+  check('inside the even band nobody is favourite',
+    expectationFromChance(barely, false), { expected: 'even', margin: null, upset: false },
+    `within ${EVEN_WITHIN} of an even chance, naming a favourite would be false precision`)
+  // A hair past each edge rather than exactly on it: 0.5 + 0.1 is
+  // 0.09999999999999998 away from 0.5 in floating point.
+  check('just past the even edge counts as a lean',
+    expectationFromChance(0.5 + EVEN_WITHIN + 1e-9, true).expected, 'win',
+    'the even band ends at its edge')
+  check('just past the clear edge counts as clear',
+    expectationFromChance(0.5 + CLEAR_BEYOND + 1e-9, true).margin, 'clear',
+    'the clear band starts at its edge')
 }
 
-// ============================================================
-section('a match nobody can call')
-// ============================================================
+section('when nothing can be said')
 {
-  const scores = new Map([['a', 60], ['b', 40]])
-  check('a side with an unrated player has no rating',
-    sideRating(['a', 'unknown'], scores), null,
-    'averaging the one rated half of a pair would describe a team that never played')
-  check('and then there is no expectation at all',
-    expectationFor(null, 50, true), null,
-    'the page shows nothing rather than a hedge')
-  check('a rated pair averages both of them',
-    sideRating(['a', 'b'], scores), 50,
-    '(60 + 40) / 2 -- singles is the same call with one player')
-  check('a match stopped at a tie is not an upset either',
-    expectationFor(40, 62, null),
-    { expected: 'loss', margin: 'clear', upset: false },
+  check('no chance, no expectation',
+    expectationFromChance(Number.NaN, true), null, 'the page shows nothing rather than a hedge')
+  check('a match with no winner is never an upset',
+    expectationFromChance(1 - clearly, null), { expected: 'loss', margin: 'clear', upset: false },
     'there is no result to have gone against the expectation')
+  check('the bands are in order',
+    EVEN_WITHIN > 0 && CLEAR_BEYOND > EVEN_WITHIN && CLEAR_BEYOND < 0.5, true,
+    'even sits inside slight, which sits inside clear')
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

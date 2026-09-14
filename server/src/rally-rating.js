@@ -70,6 +70,34 @@ export function expectedWin(ratingFor, ratingAgainst, scale = DEFAULT_SCALE) {
   return 1 / (1 + 10 ** ((ratingAgainst - ratingFor) / scale))
 }
 
+// Where a side's chance of winning a rally, before a match, stops being
+// "evenly matched" and becomes a slight or a clear favourite. Distances
+// from an even 0.5. Provisional until Task 3 sets them from staging's
+// matches; see the comment that task writes here.
+export const EVEN_WITHIN = 0.01
+export const CLEAR_BEYOND = 0.03
+
+/**
+ * What was expected of a match, in words, from the per-rally chance the
+ * player's side had against the other before it started.
+ *
+ * Never a number: in doubles a side's points are two people, one of them
+ * the reader, so any figure would hand over their partner's points.
+ */
+export function expectationFromChance(chance, won) {
+  if (!Number.isFinite(chance)) return null
+  const lean = chance - 0.5
+  // No favourite, so no upset is possible.
+  if (Math.abs(lean) < EVEN_WITHIN) return { expected: 'even', margin: null, upset: false }
+  const expected = lean > 0 ? 'win' : 'loss'
+  return {
+    expected,
+    margin: Math.abs(lean) >= CLEAR_BEYOND ? 'clear' : 'slight',
+    // A match with no winner cannot have gone against expectation.
+    upset: won === null || won === undefined ? false : (expected === 'win') !== won,
+  }
+}
+
 function endedTime(match) {
   return new Date(match.endedAt).getTime()
 }
