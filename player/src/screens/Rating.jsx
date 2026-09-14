@@ -243,7 +243,7 @@ function Score({ rallyRating }) {
                     .{' '}
                   </>
                 )}
-                Altogether that comes to <strong>{signed(total)}</strong>.
+                Everything below comes to <strong>{signed(total)}</strong>.
               </p>
             }
           >
