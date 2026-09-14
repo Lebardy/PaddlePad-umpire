@@ -59,6 +59,10 @@ function signed(value) {
  * result. The rallies figure is the change minus the reward, so the two
  * always add up to the line above even after rounding. Their own numbers
  * only; null (not rated yet) shows nothing.
+ *
+ * A reward of 0 hides the split: a clear favourite's win earns next to
+ * nothing, and "Winning the match 0" under every such win read like a bug.
+ * The points line alone is then all rallies anyway.
  */
 function MatchPoints({ rally, won }) {
   if (!rally || rally.change === null) return null
@@ -71,7 +75,7 @@ function MatchPoints({ rally, won }) {
         {change < 0 && `▼ −${Math.abs(change)} ${unit} in this match`}
         {change === 0 && 'No change in points'}
       </p>
-      {result !== null && (
+      {result !== null && result !== 0 && (
         <p className="match-points-split">
           Rallies {signed(change - result)} · {won ? 'Winning' : 'Losing'} the match {signed(result)}
         </p>
