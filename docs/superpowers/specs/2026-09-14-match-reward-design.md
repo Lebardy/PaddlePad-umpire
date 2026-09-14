@@ -151,7 +151,8 @@ than `rallies`.
 - `rally` gains `result`: this player's reward from the match result, in whole
   points. It is `null` until the player is rated, as `change` is, and `null` when
   the match had no winner.
-- Under the points line, when `result` is not null, the header shows the split:
+- Under the points line, when `result` is neither null nor 0, the header shows
+  the split (a 0 reward, common for a clear favourite's win, hides it):
   *"Rallies −1 · Winning the match +4"* (or *"Losing the match −3"*). The rallies
   figure is `change − result`, so the two always add up to the line above even
   after rounding.
