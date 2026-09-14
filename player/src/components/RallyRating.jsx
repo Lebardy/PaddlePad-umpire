@@ -13,7 +13,7 @@ const START = 1500
 
 function changeLine(change) {
   if (change > 0) return `▲ +${change} over your last 5 matches`
-  if (change < 0) return `▼ ${change} over your last 5 matches`
+  if (change < 0) return `▼ −${Math.abs(change)} over your last 5 matches`
   return 'Level over your last 5 matches'
 }
 
