@@ -71,10 +71,14 @@ export function expectedWin(ratingFor, ratingAgainst, scale = DEFAULT_SCALE) {
 
 // Where a side's chance of winning a rally, before a match, stops being
 // "evenly matched" and becomes a slight or a clear favourite. Distances
-// from an even 0.5. Provisional until Task 3 sets them from staging's
-// matches; see the comment that task writes here.
-export const EVEN_WITHIN = 0.01
-export const CLEAR_BEYOND = 0.03
+// from an even 0.5. Set from staging's synthetic pool with
+// server/scripts/expectation-bands.mjs on 2026-09-14: of 38 matches
+// where everyone on court had five matches, clear favourites won
+// 31/34, slight favourites 1/1, and team A won 1/3 of the even ones.
+// The synthetic pool has few close matchups, so "slight" is a thin band
+// resting on one match. Rerun once real matches exist.
+export const EVEN_WITHIN = 0.015
+export const CLEAR_BEYOND = 0.02
 
 /**
  * What was expected of a match, in words, from the per-rally chance the
