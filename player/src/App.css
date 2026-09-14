@@ -960,7 +960,6 @@ a.highlight:active,
   border-radius: 2px;
   padding: 0.05rem 0.45rem;
 }
-.expectation-rated { color: var(--board-muted); }
 
 .fact-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 1rem; }
 .detail-stats .fact-chips { margin: 1.25rem 0 0; }
@@ -2037,3 +2036,21 @@ a.highlight:active,
 .tip-cost strong { color: var(--status-critical); }
 .tip-times { color: var(--text-muted); }
 .tip-text { margin-top: 0.3rem; font-size: 0.95rem; line-height: 1.5; color: var(--text-secondary); }
+
+/* ============ Match points ============ */
+
+.match-points {
+  margin-top: 0.8rem;
+  font-family: var(--label);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  color: var(--board-muted);
+}
+/* The board is dark in both themes, so the board's own lamps, not the
+   page's status colours, which are too dim on it in the light theme. */
+.match-points.is-up { color: var(--win-lamp); }
+.match-points.is-down { color: var(--loss-lamp); }
+.match-points + .expectation { margin-top: 0.5rem; }

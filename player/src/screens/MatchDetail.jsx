@@ -49,53 +49,45 @@ function formatDate(iso) {
 }
 
 /**
- * What the model expected before this match, and how the game scored.
+ * This match's change in the player's rally points, once they are rated.
+ * Their own number only; null (not rated yet) shows nothing.
+ */
+function MatchPoints({ rally }) {
+  if (!rally || rally.change === null) return null
+  const { change } = rally
+  return (
+    <p className={`match-points ${change > 0 ? 'is-up' : change < 0 ? 'is-down' : ''}`}>
+      {change > 0 && `▲ +${change} points in this match`}
+      {change < 0 && `▼ −${Math.abs(change)} points in this match`}
+      {change === 0 && 'No change in points'}
+    </p>
+  )
+}
+
+/**
+ * Who was favoured before this match, from rally points, in words only.
  *
- * The expectation is read from the newest rating run that finished
- * BEFORE the match -- never the current one, which has already seen the
- * result -- so it is a prediction rather than a verdict written
- * afterwards. See server/src/expectation.js.
- *
- * It says which side was favoured and never by how much. In doubles a
- * team average is two people, one of them the reader, so a figure would
- * hand over their partner's rating by subtraction. A verdict in words
- * gives the player the thing worth having and nobody else's number.
- *
- * Beating a stronger side is the one result worth calling out, so it is
- * the only thing here that gets any emphasis.
+ * The server sends a verdict and never a figure: in doubles a side's
+ * points are two people, one of them the reader, so a number would hand
+ * over their partner's points. Absent when anyone on court had fewer than
+ * five matches beforehand -- a missing line is better than a guess.
  */
 function Expectation({ match }) {
-  const { expectation: what, ratedAs } = match
-  if (!what && ratedAs === null) return null
+  const what = match.rally?.expectation
+  if (!what) return null
 
   const said = {
-    even: 'Evenly matched on paper.',
-    win: what?.margin === 'clear'
-      ? 'You were expected to win this one comfortably.'
-      : 'You were slightly favoured.',
-    loss: what?.margin === 'clear'
-      ? 'You were expected to lose this one.'
-      : 'You were slight underdogs.',
-  }[what?.expected]
+    even: 'Evenly matched.',
+    win: what.margin === 'clear' ? 'You were expected to win comfortably.' : 'You were slight favourites.',
+    loss: what.margin === 'clear' ? 'You were expected to lose.' : 'You were slight underdogs.',
+  }[what.expected]
 
   return (
     <p className="expectation">
-      {what?.upset && (
-        <span className="expectation-upset">
-          {what.expected === 'loss' ? 'Upset' : 'Slip'}
-        </span>
+      {what.upset && (
+        <span className="expectation-upset">{what.expected === 'loss' ? 'Upset' : 'Slip'}</span>
       )}
-      {said && <span>{said}</span>}
-      {/* Held inside 0-100. A game is scored against everyone's season
-          AVERAGE, so an exceptional one genuinely beats the top of the
-          scale -- but "you played like a 112" reads as a bug to anyone
-          holding a rating out of 100, and this line has no room to
-          explain itself. The rating page has that room, and does. */}
-      {ratedAs !== null && (
-        <span className="expectation-rated">
-          You played this one like a {Math.round(Math.max(0, Math.min(100, ratedAs)))}.
-        </span>
-      )}
+      <span>{said}</span>
     </p>
   )
 }
@@ -147,9 +139,9 @@ function MatchDetail({ id }) {
         <p className="detail-meta">
           {formatDate(match.endedAt)} · {match.sessionName}
         </p>
-        {/* Nothing at all for a match played before any rating existed,
-            or one where somebody on court was unrated at the time. A
-            missing line is better than a hedged one. */}
+        <MatchPoints rally={match.rally} />
+        {/* Nothing at all when anyone on court had fewer than five
+            matches beforehand. A missing line is better than a hedged one. */}
         <Expectation match={match} />
       </header>
 
