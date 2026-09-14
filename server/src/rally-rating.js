@@ -12,6 +12,10 @@
 // residualises the playstyle features) and stays exactly as it is; this
 // is the number players see.
 //
+// After each match with a winner, the winning side also gains a match
+// reward scaled by how unlikely the win was, and the losing side gives
+// up the same.
+//
 // Pure: matches in, ratings out. Recomputed from the whole history
 // rather than patched, so voiding a match or undoing a rally can never
 // leave stale points behind.
@@ -37,7 +41,8 @@ export const RECENT_MATCHES = 5
 // this size 32/263 winners still lost points (46/263 with
 // no reward), the simulated messy partner averaged +2.7 and the
 // carrying partner +15.5, ranking against true ability was 0.802
-// (0.839 with none), and the favourite won 19/24 (79%).
+// (0.839 with none), and the favourite won 19/24 (79%). The worst
+// winner's loss moved from −13 with no reward to −15 with it.
 export const MATCH_REWARD = 16
 
 // How much each ending moves. A first guess, agreed before any real
@@ -132,6 +137,10 @@ function byWhenEnded(a, b) {
  * won the rally was expected to (the same value the points update uses)
  * and that rally's ending weight. Lets callers (tuning scripts) score
  * per-rally predictions without duplicating the model.
+ *
+ * `options.matchReward` sets the size of the match reward applied after
+ * each match with a winner; defaults to MATCH_REWARD. 0 turns the
+ * reward off and gives the ratings from before it existed.
  */
 export function rateHistory(matches, options = {}) {
   const k = options.k ?? DEFAULT_K

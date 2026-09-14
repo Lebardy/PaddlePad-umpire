@@ -9,14 +9,27 @@
 //
 // Pure and exact (to floating point): no simulation. Used by the rally
 // rating's match reward.
+//
+// Memoised: a replay asks the same questions for every earlier match on
+// every rebuild, since the history before a match never changes. The
+// cache is a module-level Map keyed on the exact inputs, cleared once it
+// grows past 5,000 entries so it cannot grow without bound.
 // ============================================================
+
+import { DEFAULT_POINT_TARGET } from './pickleball.js'
+
+const cache = new Map()
+const MAX_CACHE_SIZE = 5000
 
 /**
  * Team A's chance of winning a game when A wins any one rally with
  * `rallyChance`. `firstServer` is 'A' or 'B'. NaN in, NaN out.
  */
-export function gameWinChance(rallyChance, { doubles, target = 11, firstServer = 'A' }) {
+export function gameWinChance(rallyChance, { doubles, target = DEFAULT_POINT_TARGET, firstServer = 'A' }) {
   if (!Number.isFinite(rallyChance)) return NaN
+  const key = `${rallyChance}|${doubles}|${target}|${firstServer}`
+  const cached = cache.get(key)
+  if (cached !== undefined) return cached
   const p = Math.min(1, Math.max(0, rallyChance))
   const deuce = target - 1
 
@@ -73,5 +86,8 @@ export function gameWinChance(rallyChance, { doubles, target = 11, firstServer =
       settle([[a, b]])
     }
   }
-  return chance[slot(0, 0, S - 1)]
+  const result = chance[slot(0, 0, S - 1)]
+  if (cache.size >= MAX_CACHE_SIZE) cache.clear()
+  cache.set(key, result)
+  return result
 }

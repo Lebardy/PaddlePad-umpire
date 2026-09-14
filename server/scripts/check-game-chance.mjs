@@ -54,6 +54,10 @@ section('common sense')
   check('no rally chance, no game chance',
     Number.isNaN(gameWinChance(Number.NaN, { doubles: true, target: 11, firstServer: 'A' })), true,
     'A missing number must not quietly become a real one.')
+  check('the same inputs give the identical remembered answer',
+    gameWinChance(0.517, { doubles: true, target: 15, firstServer: 'B' }) ===
+      gameWinChance(0.517, { doubles: true, target: 15, firstServer: 'B' }), true,
+    'A rebuild asks the same questions for every earlier match, so the second call should just hand back what the first worked out.')
 }
 
 section('against the real scoring engine')
