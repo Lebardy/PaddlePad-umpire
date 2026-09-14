@@ -32,8 +32,12 @@ export const RECENT_MATCHES = 5
 // The most a side can gain by winning a match, reached only by beating a
 // side they had no chance against: the side's reward is MATCH_REWARD
 // times (1 - their chance of winning the game), and the losers give up
-// the same. Provisional until it is chosen from
-// server/scripts/match-reward-sizes.mjs; see the comment written here.
+// the same. Chosen by the owner on 2026-09-14 from
+// server/scripts/match-reward-sizes.mjs over staging's 136 matches: at
+// this size 32/263 winners still lost points (46/263 with
+// no reward), the simulated messy partner averaged +2.7 and the
+// carrying partner +15.5, ranking against true ability was 0.802
+// (0.839 with none), and the favourite won 19/24.
 export const MATCH_REWARD = 16
 
 // How much each ending moves. A first guess, agreed before any real
@@ -79,13 +83,11 @@ export function expectedWin(ratingFor, ratingAgainst, scale = DEFAULT_SCALE) {
 
 // Where a side's chance of winning a rally, before a match, stops being
 // "evenly matched" and becomes a slight or a clear favourite. Distances
-// from an even 0.5. Set from staging's synthetic pool with
+// from an even 0.5. Set from staging's matches with
 // server/scripts/expectation-bands.mjs on 2026-09-14: of 38 matches
-// where everyone on court had five matches, clear favourites won
-// 31/34, slight favourites 1/1, and team A won 1/3 of the even ones.
-// The synthetic pool has few close matchups, so "slight" is a thin band
-// resting on one match. Rerun once real matches exist.
-export const EVEN_WITHIN = 0.015
+// where everyone on court had five matches, even band A won 1/2 (50%),
+// slight favourites won 1/1 (100%), clear favourites 30/35 (86%).
+export const EVEN_WITHIN = 0.01
 export const CLEAR_BEYOND = 0.02
 
 /**
