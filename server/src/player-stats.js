@@ -16,7 +16,7 @@
 
 import { deriveMatchState, eventFromRow } from './pickleball.js'
 import { buildPlaystyleProof } from './playstyle.js'
-import { expectationFor, sideRating } from './expectation.js'
+import { rallyMatchFor } from './rally-rating.js'
 import {
   MIN_MATCHES_PER_PLAYER,
   RECOMMENDED_PLAYERS,
@@ -27,8 +27,13 @@ import {
  *
  * `matchNumber` is "this player's Nth match", computed with a window
  * function scoped to them rather than the export's global count.
+ *
+ * `ratings`, when given, is the cached rally rating (getRallyRatings):
+ * each match then carries `rally`, what that match did to this player's
+ * points -- see rallyMatchFor. Callers that only need totals (the
+ * profile summary, the monthly board) leave it out.
  */
-export async function getPlayerMatches(query, playerId) {
+export async function getPlayerMatches(query, playerId, ratings = null) {
   const { rows } = await query(
     `SELECT m.id,
             m.team_a,
@@ -85,65 +90,6 @@ export async function getPlayerMatches(query, playerId) {
   )
   const nameOf = new Map(people.map((p) => [p.id, p.name]))
 
-  // What the model expected of each match BEFORE it was played, and
-  // what this player's own performance in it scored.
-  //
-  // Both come from rating runs, and both are deliberately anchored to
-  // different runs: the expectation to the newest run that finished
-  // before each match (see expectation.js -- a later run has already
-  // seen the result), and the game score to the newest run overall, so
-  // it agrees with the rating and the spread the Rating page shows.
-  const runsNeeded = await query(
-    `SELECT id, computed_at FROM rating_runs
-      WHERE status = 'completed' AND computed_at <= $1
-      ORDER BY computed_at`,
-    [rows[rows.length - 1].ended_at],
-  )
-  const priorRunFor = (endedAt) => {
-    let found = null
-    for (const run of runsNeeded.rows) {
-      if (new Date(run.computed_at) <= new Date(endedAt)) found = run.id
-      else break
-    }
-    return found
-  }
-
-  const wanted = new Set()
-  for (const row of rows) {
-    const runId = priorRunFor(row.ended_at)
-    if (runId) wanted.add(runId)
-  }
-
-  const scoresByRun = new Map()
-  if (wanted.size > 0) {
-    const { rows: scored } = await query(
-      `SELECT run_id, player_id, skill_score
-         FROM player_ratings
-        WHERE run_id = ANY($1::uuid[]) AND player_id = ANY($2::uuid[])`,
-      [[...wanted], [...everyone]],
-    )
-    for (const row of scored) {
-      if (!scoresByRun.has(row.run_id)) scoresByRun.set(row.run_id, new Map())
-      scoresByRun.get(row.run_id).set(row.player_id, Number(row.skill_score))
-    }
-  }
-
-  // This player's own score for each game, from the newest run they are
-  // in. Their own numbers only, so nothing is withheld.
-  const { rows: latest } = await query(
-    `SELECT r.game_scores
-       FROM player_ratings r
-       JOIN rating_runs run ON run.id = r.run_id
-      WHERE r.player_id = $1 AND run.status = 'completed'
-      ORDER BY run.computed_at DESC
-      LIMIT 1`,
-    [playerId],
-  )
-  const scoredGame = new Map(
-    (Array.isArray(latest[0]?.game_scores) ? latest[0].game_scores : [])
-      .map((game) => [game.matchId, Number(game.score)]),
-  )
-
   const result = rows.map((row) => {
     const derived = deriveMatchState({
       teamA: row.team_a,
@@ -196,25 +142,13 @@ export async function getPlayerMatches(query, playerId) {
       usedStacking: team === 'A' ? row.stacking_a : row.stacking_b,
       stats: derived.stats[playerId],
       progression,
-      // A verdict in words and nothing else -- see expectation.js for
-      // why no figure about anybody may appear here. Null when the
-      // match predates every run, or when anyone on court was unrated
-      // at the time.
-      expectation: (() => {
-        const runId = priorRunFor(row.ended_at)
-        const scores = runId ? scoresByRun.get(runId) : null
-        if (!scores) return null
-        const yours = sideRating(ownTeam, scores)
-        const theirs = sideRating(opponents, scores)
-        return expectationFor(
-          yours,
-          theirs,
-          row.winner === null ? null : row.winner === team,
-        )
-      })(),
-      // How this game scored on the rating's own scale. The player's
-      // rating is the average of these across their games.
-      ratedAs: scoredGame.has(row.id) ? Math.round(scoredGame.get(row.id) * 10) / 10 : null,
+      // What this match did to this player's rally points, the
+      // expectation in words, and how the rallies they ended ended.
+      // Null when the caller passed no ratings, or the replay did not
+      // count this match.
+      rally: ratings
+        ? rallyMatchFor(ratings, playerId, row.id, row.winner === null ? null : row.winner === team)
+        : null,
     }
   })
 
