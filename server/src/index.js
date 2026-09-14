@@ -17,6 +17,9 @@ import playerSelfRoutes from './routes/player.js'
 import internalRoutes from './routes/internal.js'
 // Admin site: its own accounts, guarded by the admin token role.
 import adminAuthRoutes from './routes/admin-auth.js'
+import adminAdminsRoutes from './routes/admin-admins.js'
+import adminInviteRoutes from './routes/admin-invites.js'
+import adminActivityRoutes from './routes/admin-activity.js'
 
 const app = express()
 
@@ -172,6 +175,9 @@ app.use('/export', exportRoutes)
 app.use('/player', playerSelfRoutes)
 app.use('/internal', internalRoutes)
 app.use('/admin/auth', adminAuthRoutes)
+app.use('/admin/admins', adminAdminsRoutes)
+app.use('/admin/invites', adminInviteRoutes)
+app.use('/admin/activity', adminActivityRoutes)
 
 // Express 5 forwards rejected promises from async handlers here, so
 // route handlers don't each need their own try/catch.
