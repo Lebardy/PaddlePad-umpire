@@ -893,7 +893,7 @@ async function main() {
     const listed = listWithRally.body.matches ?? []
     check('/player/matches carries a rally section with only the agreed fields',
       listed.length > 0 && listed.every((m) => m.rally === null || (
-        JSON.stringify(Object.keys(m.rally).sort()) === JSON.stringify(['change', 'endings', 'expectation', 'untagged']) &&
+        JSON.stringify(Object.keys(m.rally).sort()) === JSON.stringify(['change', 'endings', 'expectation', 'result', 'untagged']) &&
         m.rally.endings.every((e) => JSON.stringify(Object.keys(e).sort()) === JSON.stringify(['ending', 'outcome', 'points', 'rallies'])))),
       JSON.stringify(listed[0]?.rally ?? null).slice(0, 160))
     check('the match list no longer carries the old score',

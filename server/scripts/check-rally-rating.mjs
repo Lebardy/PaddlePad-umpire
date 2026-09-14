@@ -14,6 +14,7 @@ import {
   ACTOR_SHARE,
   DEFAULT_K,
   ENDING_WEIGHTS,
+  MATCH_REWARD,
   MIN_MATCHES,
   MOVED_MOST_MIN_RALLIES,
   START_POINTS,
@@ -25,6 +26,7 @@ import {
   rateHistory,
 } from '../src/rally-rating.js'
 import { RALLY_ENDINGS, rallyEnding } from '../src/rally-endings.js'
+import { gameWinChance } from '../src/game-chance.js'
 
 let pass = 0
 let fail = 0
@@ -271,7 +273,7 @@ section('Where every point came from')
     sent.breakdown.reduce((s, row) => s + row.points, 0), sent.points - START_POINTS,
     'Rounded so the whole numbers on screen always add to the headline, never off by one.')
   check('every row sent is a whole number of points with a rally count',
-    sent.breakdown.every((row) => Number.isInteger(row.points) && Number.isInteger(row.rallies) && row.rallies > 0), true,
+    sent.breakdown.every((row) => Number.isInteger(row.points) && Number.isInteger(row.rallies ?? row.matches) && (row.rallies ?? row.matches) > 0), true,
     'Players never see decimals, and a row with no rallies is left out.')
   check('own endings name the ending, the rest name what they are',
     sent.breakdown.map((row) => row.ending ?? row.kind).sort(),
@@ -350,8 +352,74 @@ section('What one match did')
   check('a player who was not in the match gives nothing',
     rallyMatchFor(ratings, randomUUID(), mixed[0].id, true), null, 'Nobody reads another player\'s match.')
   check('the match section never carries a side average or anyone\'s points',
-    Object.keys(sixth).sort(), ['change', 'endings', 'expectation', 'untagged'],
+    Object.keys(sixth).sort(), ['change', 'endings', 'expectation', 'result', 'untagged'],
     'The averages only choose the words.')
+}
+
+section('Winning the match')
+{
+  // A1 serves first and A wins eleven rallies in a row: 11-0 to A.
+  const won = () => match(Array.from({ length: 11 }, () => rally(A1, 'putaway')))
+  const reward = (ratings, id) => ratings.get(id).ledger.match_result?.points
+  const levelChance = gameWinChance(0.5, { doubles: true, target: 11, firstServer: 'A' })
+
+  const one = rateHistory([won()])
+  check('each winner gets half their side\'s reward, worked out from the game chance',
+    near(reward(one, A1), (MATCH_REWARD * (1 - levelChance)) / 2, 1e-9), true,
+    'Level sides before the match; the side\'s reward is shared equally, like a rally\'s stake.')
+  check('partners get the same share, and the losers give up the same',
+    [near(reward(one, A1), reward(one, A2)), near(reward(one, B1), -reward(one, A1)), near(reward(one, B2), reward(one, B1))],
+    [true, true, true], 'Winning is a team result; the three-quarters rule is for rallies only.')
+  check('the reward adds up to nothing across the match',
+    near([A1, A2, B1, B2].reduce((s, id) => s + reward(one, id), 0), 0, 1e-9), true,
+    'Points only move between players, so the average stays at 1,500.')
+  check('the ledger, reward included, still adds up to the points',
+    [A1, B1].map((id) => near(Object.values(one.get(id).ledger).reduce((s, v) => s + v.points, 0), one.get(id).rawPoints - START_POINTS, 1e-6)),
+    [true, true], 'The rating screen shows this arithmetic; it must stay exact.')
+  check('without a reward the rallies are untouched',
+    near(rateHistory([won()], { matchReward: 0 }).get(A1).rawPoints, one.get(A1).rawPoints - reward(one, A1), 1e-9), true,
+    'In a single match the reward comes after every rally, so taking it away leaves exactly the rally points.')
+  check('matchReward 0 records no match result at all',
+    'match_result' in rateHistory([won()], { matchReward: 0 }).get(A1).ledger, false, 'Today\'s ratings, row for row.')
+
+  const unfinished = rateHistory([match([rally(A1, 'putaway'), rally(B1, 'out')])])
+  check('a match with no winner gives no reward',
+    'match_result' in unfinished.get(A1).ledger, false, 'A match stopped early has nobody to reward.')
+
+  const singles = rateHistory([match(Array.from({ length: 11 }, () => rally(A1, 'putaway')), { doubles: false })])
+  check('in singles the whole side\'s reward goes to the one player',
+    near(reward(singles, A1), MATCH_REWARD * (1 - gameWinChance(0.5, { doubles: false, target: 11, firstServer: 'A' })), 1e-9), true,
+    'Serving first in singles is a small edge, so the level winner gets a little under half the reward.')
+
+  const pair = [won(), won()]
+  const afterFirst = rateHistory([pair[0]])
+  const both = rateHistory(pair)
+  const chanceBefore = gameWinChance(
+    expectedWin((afterFirst.get(A1).rawPoints + afterFirst.get(A2).rawPoints) / 2, (afterFirst.get(B1).rawPoints + afterFirst.get(B2).rawPoints) / 2),
+    { doubles: true, target: 11, firstServer: 'A' })
+  check('the reward is worked out from points before the match',
+    near(both.get(A1).matchFacts[pair[1].id].result, (MATCH_REWARD * (1 - chanceBefore)) / 2, 1e-9), true,
+    'The second match\'s chance comes from the first match\'s results, not from its own rallies.')
+  check('beating a side you were expected to beat earns less',
+    both.get(A1).matchFacts[pair[1].id].result < both.get(A1).matchFacts[pair[0].id].result, true,
+    'After winning the first, A were favourites for the second.')
+
+  const five = Array.from({ length: 6 }, won)
+  const rated = rateHistory(five)
+  check('a rated player is sent their whole-point share of the reward',
+    rallyMatchFor(rated, A1, five[5].id, true).result, Math.round(rated.get(A1).matchFacts[five[5].id].result),
+    'The same rounding as the change.')
+  check('an unrated player is sent no reward',
+    rallyMatchFor(rateHistory(five.slice(0, 2)), A1, five[0].id, true).result, null, 'Points wait for five matches.')
+  const noWinner = [...Array.from({ length: 5 }, won), match([rally(A1, 'putaway')])]
+  check('a match with no winner sends no reward, even to a rated player',
+    rallyMatchFor(rateHistory(noWinner), A1, noWinner[5].id, null).result, null, 'Nothing to show a split for.')
+  const sent = rallyRatingFor(rated, A1, { forRatingScreen: true })
+  const row = sent.breakdown.find((r) => r.kind === 'match_result')
+  check('the rating screen gets a match row counted in matches',
+    [row?.matches, 'rallies' in (row ?? {})], [6, false], 'Six matches won; the row is not a kind of rally.')
+  check('the rating screen rows still add up with the match row',
+    sent.breakdown.reduce((s, r) => s + r.points, 0), sent.points - START_POINTS, 'Whole numbers, exactly.')
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

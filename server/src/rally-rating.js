@@ -17,7 +17,8 @@
 // leave stale points behind.
 // ============================================================
 
-import { deriveMatchState } from './pickleball.js'
+import { DEFAULT_POINT_TARGET, deriveMatchState } from './pickleball.js'
+import { gameWinChance } from './game-chance.js'
 import { RALLY_ENDINGS, rallyEnding } from './rally-endings.js'
 
 export const START_POINTS = 1500
@@ -27,6 +28,13 @@ export const ACTOR_SHARE = 0.75
 export const MIN_MATCHES = 5
 export const TREND_MATCHES = 10
 export const RECENT_MATCHES = 5
+
+// The most a side can gain by winning a match, reached only by beating a
+// side they had no chance against: the side's reward is MATCH_REWARD
+// times (1 - their chance of winning the game), and the losers give up
+// the same. Provisional until it is chosen from
+// server/scripts/match-reward-sizes.mjs; see the comment written here.
+export const MATCH_REWARD = 16
 
 // How much each ending moves. A first guess, agreed before any real
 // match carried endings: self-inflicted faults weigh more, faults that
@@ -124,6 +132,7 @@ export function rateHistory(matches, options = {}) {
   const k = options.k ?? DEFAULT_K
   const scale = options.scale ?? DEFAULT_SCALE
   const actorShare = options.actorShare ?? ACTOR_SHARE
+  const matchReward = options.matchReward ?? MATCH_REWARD
 
   const players = new Map()
   const player = (id) => {
@@ -170,9 +179,11 @@ export function rateHistory(matches, options = {}) {
         established,
         endings: {},
         untagged: 0,
+        // This player's share of the match reward; null when none.
+        result: null,
       }
     }
-    const { foldedEvents } = deriveMatchState(match)
+    const { foldedEvents, winner } = deriveMatchState(match)
 
     for (const event of match.events.slice(0, foldedEvents)) {
       if (event.type !== 'rally') continue
@@ -231,6 +242,28 @@ export function rateHistory(matches, options = {}) {
       if (event.detail) {
         const mine = player(event.actingPlayerId).byEnding
         mine[event.detail] = (mine[event.detail] ?? 0) + changes.get(event.actingPlayerId)
+      }
+    }
+
+    // The match reward, after every rally. Worked out from each side's
+    // average points BEFORE the match, like the expectation words, and
+    // shared equally within a side: winning is a team result, so the
+    // three-quarters share for whoever ended a rally does not apply.
+    if (matchReward > 0 && winner) {
+      const chanceA = gameWinChance(expectedWin(averageA, averageB, scale), {
+        doubles: match.teamA.length === 2,
+        target: match.pointTarget ?? DEFAULT_POINT_TARGET,
+        firstServer: match.firstServer.team,
+      })
+      const sideA = matchReward * (winner === 'A' ? 1 - chanceA : -chanceA)
+      for (const id of everyone) {
+        const share = onA.has(id) ? sideA / match.teamA.length : -sideA / match.teamB.length
+        const p = player(id)
+        p.points += share
+        const entry = (p.ledger.match_result ??= { matches: 0, points: 0 })
+        entry.matches += 1
+        entry.points += share
+        p.matchFacts[match.id].result = share
       }
     }
 
@@ -297,10 +330,11 @@ export function movedMost(rating) {
 function wholeBreakdown(rating) {
   const total = rating.points - START_POINTS
   const rows = Object.entries(rating.ledger)
-    .filter(([, entry]) => entry.rallies > 0)
+    .filter(([, entry]) => (entry.rallies ?? entry.matches) > 0)
     .map(([key, entry]) => ({
       ...(LEDGER_KINDS.includes(key) ? { kind: key } : { kind: 'ending', ending: key }),
-      rallies: entry.rallies,
+      // Counted in matches for the match reward, in rallies for the rest.
+      ...(key === 'match_result' ? { matches: entry.matches } : { rallies: entry.rallies }),
       exact: entry.points,
       points: Math.floor(entry.points),
     }))
@@ -313,7 +347,7 @@ function wholeBreakdown(rating) {
 }
 
 /** Ledger rows that are not one of the player's own endings. */
-export const LEDGER_KINDS = ['untagged', 'partner', 'opponent_winner', 'opponent_error']
+export const LEDGER_KINDS = ['untagged', 'partner', 'opponent_winner', 'opponent_error', 'match_result']
 
 /** What one player is sent about their own rally rating. */
 export function rallyRatingFor(ratings, playerId, { forRatingScreen = false } = {}) {
@@ -367,5 +401,8 @@ export function rallyMatchFor(ratings, playerId, matchId, won) {
       }))
       .sort((a, b) => b.rallies - a.rallies || a.ending.localeCompare(b.ending)),
     untagged: facts.untagged,
+    // This player's share of the match reward; null before they are
+    // rated, and when the match had no winner.
+    result: rated && facts.result !== null ? Math.round(facts.result) : null,
   }
 }
