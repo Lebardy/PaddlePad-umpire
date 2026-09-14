@@ -90,5 +90,56 @@ section('action names')
   }
 }
 
+section('which tokens each guard lets through')
+{
+  const auth = await import('../src/auth.js')
+  const jwt = (await import('jsonwebtoken')).default
+  const sign = (payload) => jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' })
+
+  const adminToken = auth.signAdminToken({ id: 'a1', name: 'Jan' })
+  const umpireToken = sign({ sub: 'u1', name: 'Ump', role: 'umpire' })
+  const oldUmpireToken = sign({ sub: 'u1', name: 'Ump' })
+  const playerToken = sign({ sub: 'p1', name: 'Pat', role: 'player' })
+
+  const decoded = jwt.decode(adminToken)
+  check('an admin token carries the admin role', decoded.role, 'admin')
+  check('an admin token lasts 12 hours', decoded.exp - decoded.iat, 12 * 3600)
+
+  // Runs a middleware against a fake request and reports what it did.
+  async function run(middleware, token, extra = {}) {
+    const req = { get: (h) => (h.toLowerCase() === 'authorization' && token ? `Bearer ${token}` : undefined), ...extra }
+    const res = { statusCode: 200, body: null, status(c) { this.statusCode = c; return this }, json(b) { this.body = b; return this } }
+    let nextCalled = false
+    await middleware(req, res, () => { nextCalled = true })
+    return { status: nextCalled ? 'next' : res.statusCode, req }
+  }
+
+  const activeRow = { id: 'a1', name: 'Jan', email: 'jan@example.com', role: 'admin', deactivated_at: null }
+  const lookups = []
+  const fakeQuery = (rows) => async (text, params) => { lookups.push(params); return { rows } }
+  const guard = auth.requireAdminAccount(fakeQuery([activeRow]))
+
+  check('the admin guard lets an admin token through', (await run(guard, adminToken)).status, 'next')
+  check('and reads the admin from the database', lookups.at(-1), ['a1'])
+  check('and attaches who it is', (await run(guard, adminToken)).req.admin, { id: 'a1', name: 'Jan', email: 'jan@example.com', role: 'admin' })
+  check('the admin guard refuses no token', (await run(guard, null)).status, 401)
+  check('the admin guard refuses an umpire token', (await run(guard, umpireToken)).status, 403)
+  check('the admin guard refuses an old umpire token with no role', (await run(guard, oldUmpireToken)).status, 403)
+  check('the admin guard refuses a player token', (await run(guard, playerToken)).status, 403)
+  check('the admin guard refuses a switched-off admin',
+    (await run(auth.requireAdminAccount(fakeQuery([{ ...activeRow, deactivated_at: '2026-09-15T00:00:00Z' }])), adminToken)).status, 401)
+  check('the admin guard refuses an admin who no longer exists',
+    (await run(auth.requireAdminAccount(fakeQuery([])), adminToken)).status, 401)
+  check('the role comes from the database, not the token',
+    (await run(auth.requireAdminAccount(fakeQuery([{ ...activeRow, role: 'owner' }])), adminToken)).req.admin.role, 'owner')
+
+  check('the umpire guard refuses an admin token', (await run(auth.requireAuth, adminToken)).status, 403)
+  check('the umpire guard still accepts an old umpire token', (await run(auth.requireAuth, oldUmpireToken)).status, 'next')
+  check('the player guard refuses an admin token', (await run(auth.requirePlayer, adminToken)).status, 403)
+
+  check('the owner guard lets the owner through', (await run(auth.requireOwner, null, { admin: { role: 'owner' } })).status, 'next')
+  check('the owner guard refuses an admin', (await run(auth.requireOwner, null, { admin: { role: 'admin' } })).status, 403)
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

@@ -1,6 +1,7 @@
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
 import jwt from 'jsonwebtoken'
+import { ADMIN_TOKEN_TTL } from './admin-rules.js'
 
 const scryptAsync = promisify(scrypt)
 
@@ -195,6 +196,66 @@ export function requireAdmin(queryFn) {
       next(error)
     }
   }
+}
+
+// ============================================================
+// Admin accounts
+// ============================================================
+
+/**
+ * A token for an ADMIN. Its own role, so it is never accepted where an
+ * umpire or player token is expected, and neither of those is accepted
+ * here. Shorter-lived than theirs: an admin can do far more.
+ */
+export function signAdminToken(admin) {
+  return jwt.sign(
+    { sub: admin.id, name: admin.name, role: 'admin' },
+    JWT_SECRET,
+    { expiresIn: ADMIN_TOKEN_TTL },
+  )
+}
+
+/**
+ * Express middleware: requires an admin token for an admin who still
+ * exists and is still switched on, and attaches
+ * `req.admin = { id, name, email, role }`.
+ *
+ * Reads the row on every request rather than trusting the token, so
+ * switching someone off takes effect on their very next click, and the
+ * role (owner or admin) always comes from the database.
+ */
+export function requireAdminAccount(queryFn) {
+  return async function requireAdminAccountMiddleware(req, res, next) {
+    const payload = verify(req)
+    if (!payload) {
+      return res.status(401).json({ error: 'Missing or invalid token' })
+    }
+    if (payload.role !== 'admin') {
+      return res.status(403).json({ error: 'That action is for admins only' })
+    }
+    try {
+      const { rows } = await queryFn(
+        'SELECT id, name, email, role, deactivated_at FROM admins WHERE id = $1',
+        [payload.sub],
+      )
+      const found = rows[0]
+      if (!found || found.deactivated_at) {
+        return res.status(401).json({ error: 'Your admin access has ended' })
+      }
+      req.admin = { id: found.id, name: found.name, email: found.email, role: found.role }
+      next()
+    } catch (error) {
+      next(error)
+    }
+  }
+}
+
+/** Requires the owner. Must run after requireAdminAccount. */
+export function requireOwner(req, res, next) {
+  if (req.admin?.role !== 'owner') {
+    return res.status(403).json({ error: 'Only the owner can do that' })
+  }
+  next()
 }
 
 // ============================================================
