@@ -334,7 +334,7 @@ function WorkOn({ rallyRating }) {
       ) : (
         <>
           <p className="step-line">
-            The mistakes you make most often, most frequent first.
+            The mistakes you make most often.
           </p>
           <ol className="tips" aria-label="Mistakes to work on">
             {faults.map((fault, i) => (
