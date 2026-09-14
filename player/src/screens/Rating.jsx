@@ -170,10 +170,17 @@ const LEDGER_WORDS = {
   partner: 'Rallies your partner ended',
   opponent_winner: 'Winning shots by your opponents',
   opponent_error: 'Mistakes by your opponents',
+  match_result: 'Winning and losing matches',
 }
 
 function signed(value) {
   return value > 0 ? `+${value}` : value < 0 ? `−${Math.abs(value)}` : '0'
+}
+
+// A row's count: matches for the match reward, rallies for the rest.
+function countWords(row) {
+  if (row.matches !== undefined) return `${row.matches} ${row.matches === 1 ? 'match' : 'matches'}`
+  return `${row.rallies} ${row.rallies === 1 ? 'rally' : 'rallies'}`
 }
 
 /**
@@ -236,7 +243,7 @@ function Score({ rallyRating }) {
                     .{' '}
                   </>
                 )}
-                {rows.length} kinds of rally add up to <strong>{signed(total)}</strong>.
+                Altogether that comes to <strong>{signed(total)}</strong>.
               </p>
             }
           >
@@ -248,7 +255,7 @@ function Score({ rallyRating }) {
                     <div className="part-head">
                       <span className="part-label">{label}</span>
                       <span className="part-values">
-                        <span className="part-theirs">{row.rallies} {row.rallies === 1 ? 'rally' : 'rallies'} · </span>
+                        <span className="part-theirs">{countWords(row)} · </span>
                         <strong className={row.points > 0 ? 'is-up' : row.points < 0 ? 'is-down' : ''}>
                           {signed(row.points)}
                         </strong>
@@ -257,7 +264,7 @@ function Score({ rallyRating }) {
                     <PointsArm
                       points={row.points}
                       widest={widest}
-                      label={`${label}: ${signed(row.points)} points over ${row.rallies} rallies`}
+                      label={`${label}: ${signed(row.points)} points over ${countWords(row)}`}
                     />
                   </li>
                 )
@@ -276,6 +283,12 @@ function Score({ rallyRating }) {
           Every rally is a small contest. Win it with a shot and you gain points;
           lose it with a mistake and you give some away. Beating a stronger side
           earns more than beating a weaker one.
+        </p>
+        <p>
+          Winning the match counts too. The winning side gains points and the
+          losing side gives the same number up, shared equally between partners.
+          Beating a side you were expected to lose to earns much more than
+          beating one you were expected to beat.
         </p>
         <p>
           The rally counts in points too when someone else ends it: your
