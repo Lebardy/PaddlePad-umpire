@@ -15,6 +15,8 @@ import playerSelfRoutes from './routes/player.js'
 // Service-to-service: the ML pipeline reading match logs and writing
 // back a ratings snapshot. Guarded by a shared key, not by a token.
 import internalRoutes from './routes/internal.js'
+// Admin site: its own accounts, guarded by the admin token role.
+import adminAuthRoutes from './routes/admin-auth.js'
 
 const app = express()
 
@@ -151,6 +153,16 @@ app.use('/export', rateLimit({ max: 5, windowMs: 60_000 }))
 // loose enough for a nightly run plus a few manual triggers in a demo.
 app.use('/internal', rateLimit({ max: 20, windowMs: 60_000 }))
 
+// The admin site. Sign-in, setup links and password changes are
+// guessing surfaces, so they get login-grade limits; the parent limit
+// below is the ceiling on everything under /admin, nested paths
+// included (see the note on /auth/google above).
+app.use('/admin/auth/login', rateLimit({ max: 10, windowMs: 60_000 }))
+app.use('/admin/auth/google', rateLimit({ max: 10, windowMs: 60_000 }))
+app.use('/admin/auth/setup', rateLimit({ max: 10, windowMs: 60_000 }))
+app.use('/admin/auth/me/password', rateLimit({ max: 10, windowMs: 60_000 }))
+app.use('/admin', rateLimit({ max: 120, windowMs: 60_000 }))
+
 app.use('/auth', authRoutes)
 app.use('/invites', inviteRoutes)
 app.use('/players', playerAdminRoutes)
@@ -159,6 +171,7 @@ app.use('/matches', matchRoutes)
 app.use('/export', exportRoutes)
 app.use('/player', playerSelfRoutes)
 app.use('/internal', internalRoutes)
+app.use('/admin/auth', adminAuthRoutes)
 
 // Express 5 forwards rejected promises from async handlers here, so
 // route handlers don't each need their own try/catch.
