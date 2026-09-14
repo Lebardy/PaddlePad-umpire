@@ -2054,3 +2054,31 @@ a.highlight:active,
 .match-points.is-up { color: var(--win-lamp); }
 .match-points.is-down { color: var(--loss-lamp); }
 .match-points + .expectation { margin-top: 0.5rem; }
+
+/* ============ How your rallies ended ============ */
+
+.endings { display: grid; gap: 1.1rem; }
+.endings-head {
+  font-family: var(--label);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 0.45rem;
+}
+.endings-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.35rem; }
+.endings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 2rem;
+  align-items: center;
+  gap: 0.6rem;
+}
+.endings-name { font-size: 0.92rem; line-height: 1.3; }
+.endings-track { height: 0.6rem; background: var(--surface-sunken); border-radius: 1px; overflow: hidden; }
+.endings-fill { display: block; height: 100%; }
+.is-won .endings-fill { background: var(--status-good); }
+.is-lost .endings-fill { background: var(--status-critical); }
+.endings-count { font-size: 0.92rem; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.endings-note { font-size: 0.95rem; line-height: 1.5; color: var(--text-secondary); }
+.endings-note strong { color: var(--text); }
+.endings-untagged { font-size: 0.85rem; color: var(--text-muted); }

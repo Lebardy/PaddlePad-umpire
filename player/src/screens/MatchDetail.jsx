@@ -23,6 +23,7 @@ import MomentumRibbon from '../components/MomentumRibbon'
 import Icon from '../components/Icon'
 import StackedBar from '../components/StackedBar'
 import Meter from '../components/Meter'
+import RallyEndings from '../components/RallyEndings'
 
 // Both timestamps come from a device clock, and startedAt is when the
 // umpire CREATED the match rather than when play began -- a match set up
@@ -116,6 +117,7 @@ function MatchDetail({ id }) {
   const story = matchStory(match.progression, match.won, match.pointTarget)
   const run = longestRun(match.progression ?? [])
   const turn = turningPoint(match.progression ?? [])
+  const hasEndings = (match.rally?.endings?.length ?? 0) > 0
 
   // Newest first, so the NEXT match chronologically is the previous index.
   const newer = index > 0 ? matches[index - 1] : null
@@ -190,9 +192,13 @@ function MatchDetail({ id }) {
       <PointByPoint id={match.id} match={match} />
 
       <section className="detail-stats" aria-label="Your shots in this match">
-        <h2>Your shots</h2>
+        <h2>{hasEndings ? 'How your rallies ended' : 'Your shots'}</h2>
 
-        {winners > 0 ? (
+        {hasEndings ? (
+          <RallyEndings rally={match.rally} />
+        ) : winners > 0 ? (
+          // A match scored before rallies recorded how they ended: the
+          // older split is all there is to show.
           <StackedBar
             total={winners}
             segments={[
