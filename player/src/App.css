@@ -2033,8 +2033,8 @@ a.highlight:active,
 .tip-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.25rem 0.75rem; }
 .tip-name { font-weight: 700; font-size: 1rem; }
 .tip-cost { font-size: 0.9rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tip-cost strong { color: var(--status-critical); }
-.tip-times { color: var(--text-muted); }
+.tip-cost { color: var(--text-muted); }
+.tip-cost strong { color: var(--text); }
 .tip-text { margin-top: 0.3rem; font-size: 0.95rem; line-height: 1.5; color: var(--text-secondary); }
 
 /* ============ Match points ============ */
