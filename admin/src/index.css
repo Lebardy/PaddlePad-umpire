@@ -1,0 +1,256 @@
+:root {
+  /* --- The scoreboard ---
+     PaddlePad reads like the board at the end of a court: black panels,
+     lamp-amber figures, square cells ruled off from each other. The
+     panels are the same black in both themes, because a scoreboard does
+     not change colour with the weather; the page around them does. */
+  --board: #12161c;
+  --board-raised: #1b2029;
+  --board-rule: #2b323d;
+  --board-ink: #f5f1e6;
+  --board-muted: #a3a9b3;
+  --lamp: #ffb81c;
+  --lamp-glow: rgba(255, 184, 28, 0.32);
+
+  /* Result lamps. Always lit with their letter (W, L) inside, in a dark
+     ink that reads on both -- the colour is never the only signal. */
+  --win-lamp: #46d37e;
+  --win-ink: #062a12;
+  --loss-lamp: #ff6f5e;
+  --loss-ink: #300805;
+  --none-lamp: #3a414c;
+  --none-ink: #f5f1e6;
+
+  /* --- The page around the board: day game --- */
+  --bg: #e8e6e0;
+  --surface: #fbfaf7;
+  --surface-sunken: #efede7;
+  --text: #15181d;
+  --text-secondary: #454b55;
+  --text-muted: #5b616b;
+  --border: #d6d3cb;
+  --rule: #15181d;
+
+  /* Links and small accents on the page. Lamp amber is far too light to
+     set text in on paper, so the page uses its burnt, readable cousin. */
+  --primary: #8a5300;
+  --primary-soft: rgba(138, 83, 0, 0.1);
+  /* Primary buttons are board-black with lamp lettering in both themes:
+     the one control that looks like it belongs on the scoreboard. */
+  --button: #15181d;
+  --button-ink: #ffb81c;
+
+  /* --- Data-visualisation tokens ---
+     Categorical slots 1 and 2, used for the winning-shots stacked bar
+     and the momentum ribbon. Validated as a pair with the dataviz
+     palette validator (worst CVD deltaE 24.7 light / 25.9 dark). Do not
+     substitute by eye. */
+  --series-1: #2358a6;
+  --series-2: #eb6834;
+
+  /* Sequential, for meters: one hue, light track to dark fill. */
+  --seq-track: #d9dde3;
+  --seq-fill: #2358a6;
+
+  /* Status roles never carry meaning alone -- every use pairs them with
+     a letter or a word. */
+  --status-good: #0ca30c;
+  --status-good-soft: rgba(12, 163, 12, 0.12);
+  --status-critical: #b3261e;
+  --status-critical-soft: rgba(179, 38, 30, 0.1);
+
+  --radius: 6px;
+  --radius-sm: 4px;
+  --gutter: clamp(1rem, 4vw, 1.5rem);
+
+  /* Big Shoulders is stadium signage: every figure and every heading.
+     Barlow Condensed labels the cells; Barlow is for reading. */
+  --display: 'Big Shoulders Display', 'Barlow Condensed', Impact, sans-serif;
+  --label: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --sans: 'Barlow', system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  color-scheme: light;
+  font: 16px/1.5 var(--sans);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* The dark palette, in ONE place.
+
+   lib/theme.js resolves 'system' itself and always writes a real
+   light/dark value to data-theme, which leaves a prefers-color-scheme
+   query nothing to do -- so please don't add one back. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Night game: the board lifts a step so it still reads as a panel
+     against a page that is nearly black itself. */
+  --board: #1b2029;
+  --board-raised: #242a35;
+  --board-rule: #333b47;
+  --none-lamp: #454d59;
+
+  --bg: #0a0c0f;
+  --surface: #12161c;
+  --surface-sunken: #0e1116;
+  --text: #f1eee6;
+  --text-secondary: #b9bec6;
+  --text-muted: #8d939c;
+  --border: #262c35;
+  --rule: #f1eee6;
+
+  --primary: #ffb81c;
+  --primary-soft: rgba(255, 184, 28, 0.14);
+  --button: #ffb81c;
+  --button-ink: #15181d;
+
+  /* The same two hues stepped for the dark surface -- a selected dark
+     palette, not an automatic flip of the light one. */
+  --series-1: #5b93ea;
+  --series-2: #e0662f;
+
+  --seq-track: #242a35;
+  --seq-fill: #5b93ea;
+
+  --status-good: #0ca30c;
+  --status-good-soft: rgba(12, 163, 12, 0.2);
+  --status-critical: #ff6f5e;
+  --status-critical-soft: rgba(255, 111, 94, 0.14);
+}
+
+/* ============================================================
+   The admin site: a desk, not a phone. The menu is a scoreboard panel
+   in both themes; the page beside it follows the theme.
+   ============================================================ */
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Narrower than a large tablet: say so, and show nothing else. */
+.narrow-screen { display: none; }
+@media (max-width: 1023px) {
+  .wide-screen { display: none; }
+  .narrow-screen {
+    display: grid; place-content: center; gap: 0.5rem; min-height: 100vh; padding: 2rem;
+    background: var(--board); color: var(--board-ink); text-align: center;
+  }
+  .narrow-screen p { margin: 0; max-width: 22rem; }
+}
+
+.brand-mark { font-family: var(--display); font-weight: 900; text-transform: uppercase; letter-spacing: 0.02em; }
+.brand-mark span { color: var(--lamp); margin-left: 0.35em; }
+
+/* --- Frame --- */
+.shell { display: grid; grid-template-columns: 15rem 1fr; min-height: 100vh; }
+.menu {
+  position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column;
+  background: var(--board); color: var(--board-ink); border-right: 1px solid var(--board-rule);
+}
+.menu .brand-mark { margin: 0; padding: 1.4rem 1.25rem 1.1rem; font-size: 1.5rem; border-bottom: 1px solid var(--board-rule); }
+.menu ul { list-style: none; margin: 0; padding: 0.75rem 0; flex: 1; }
+.menu-link {
+  display: block; padding: 0.7rem 1.25rem; color: var(--board-muted); text-decoration: none;
+  font-family: var(--label); font-weight: 700; font-size: 1.05rem; text-transform: uppercase; letter-spacing: 0.04em;
+  border-left: 4px solid transparent;
+}
+.menu-link:hover { color: var(--board-ink); background: var(--board-raised); }
+.menu-link.is-current { color: var(--lamp); border-left-color: var(--lamp); background: var(--board-raised); }
+.menu-foot { border-top: 1px solid var(--board-rule); padding: 0.9rem 1.25rem 1.25rem; display: grid; gap: 0.6rem; }
+.menu-who { display: grid; color: var(--board-ink); text-decoration: none; padding: 0.4rem 0; }
+.menu-who span { color: var(--board-muted); font-family: var(--label); text-transform: uppercase; font-size: 0.85rem; }
+.menu-who.is-current strong, .menu-who:hover strong { color: var(--lamp); }
+.menu-signout {
+  justify-self: start; background: none; border: 1px solid var(--board-rule); color: var(--board-muted);
+  border-radius: var(--radius-sm); padding: 0.35rem 0.8rem; cursor: pointer;
+}
+.menu-signout:hover { color: var(--board-ink); border-color: var(--board-muted); }
+
+.page { background: var(--bg); color: var(--text); padding: 2rem clamp(1.5rem, 3vw, 3rem) 4rem; min-width: 0; }
+.page-head { margin-bottom: 1.5rem; border-bottom: 3px solid var(--rule); padding-bottom: 0.9rem; }
+.page-head h1 {
+  margin: 0; font-family: var(--display); font-weight: 900; font-size: 2.6rem; line-height: 1;
+  text-transform: uppercase; letter-spacing: 0.01em;
+}
+.page-head p { margin: 0.5rem 0 0; color: var(--text-secondary); max-width: 46rem; }
+
+/* --- Forms and buttons --- */
+.toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; margin-bottom: 1.25rem; }
+.field { display: grid; gap: 0.3rem; }
+.field.grow { flex: 1 1 16rem; }
+.field > span { font-family: var(--label); font-weight: 700; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); }
+.field input, .field select {
+  min-height: 2.6rem; padding: 0.45rem 0.7rem; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.field input:focus, .field select:focus { border-color: var(--primary); outline: none; }
+.btn-primary, .btn-quiet, .btn-danger {
+  min-height: 2.6rem; padding: 0.45rem 1rem; border-radius: var(--radius-sm); cursor: pointer;
+  font-family: var(--label); font-weight: 700; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.btn-primary { background: var(--button); color: var(--button-ink); border: 1.5px solid var(--button); }
+.btn-quiet { background: var(--surface); border: 1.5px solid var(--border); }
+.btn-quiet:hover { border-color: var(--primary); color: var(--primary); }
+.btn-danger { background: var(--surface); border: 1.5px solid var(--status-critical); color: var(--status-critical); }
+.btn-danger:hover { background: var(--status-critical-soft); }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+.form-error { color: var(--status-critical); background: var(--status-critical-soft); padding: 0.55rem 0.8rem; border-radius: var(--radius-sm); margin: 0 0 1rem; }
+.form-ok { color: var(--status-good); margin: 0.5rem 0 0; }
+.hint { color: var(--text-muted); font-size: 0.9rem; margin: 0.4rem 0 0; }
+.empty { color: var(--text-muted); padding: 2rem 0; }
+
+/* --- Tables --- */
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.table { width: 100%; border-collapse: collapse; }
+.table th {
+  text-align: left; padding: 0.65rem 0.9rem; background: var(--surface-sunken); border-bottom: 2px solid var(--rule);
+  font-family: var(--label); font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);
+  white-space: nowrap;
+}
+.table td { padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.table tr:last-child td { border-bottom: 0; }
+.table tr.is-faded td { color: var(--text-muted); }
+.table tr.is-new td { background: var(--primary-soft); }
+.row-actions { text-align: right; white-space: nowrap; }
+.row-actions > * + * { margin-left: 0.5rem; }
+.code { font-family: var(--label); font-weight: 700; font-size: 1.1rem; letter-spacing: 0.08em; }
+.tag {
+  display: inline-block; padding: 0.15rem 0.5rem; border-radius: var(--radius-sm); white-space: nowrap;
+  font-family: var(--label); font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em;
+}
+.tag-open { color: var(--status-good); background: var(--status-good-soft); }
+.tag-used, .tag-expired, .tag-off { color: var(--text-muted); background: var(--surface-sunken); }
+.more { margin-top: 1rem; }
+
+/* --- Notices and panels --- */
+.notice { border: 2px solid var(--primary); background: var(--primary-soft); border-radius: var(--radius); padding: 1rem 1.1rem; margin-bottom: 1.25rem; }
+.notice p { margin: 0 0 0.7rem; }
+.link-row { display: flex; gap: 0.5rem; }
+.link-row input { flex: 1; min-height: 2.6rem; padding: 0.45rem 0.7rem; border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.panel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: 1.25rem; align-items: start; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.2rem 1.25rem; display: grid; gap: 0.8rem; }
+.panel h2 { margin: 0; font-family: var(--label); font-weight: 700; font-size: 1.25rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.panel p { margin: 0; }
+
+/* --- Sign-in and setup --- */
+.gate { min-height: 100vh; display: grid; place-items: center; background: var(--board); padding: 2rem; }
+.gate-card { width: min(26rem, 100%); background: var(--surface); color: var(--text); border-radius: var(--radius); padding: 2rem; display: grid; gap: 1rem; border-top: 6px solid var(--lamp); }
+.gate-card .brand-mark { margin: 0; font-size: 1.3rem; }
+.gate-card .brand-mark span { color: var(--primary); }
+.gate-card h1 { margin: 0; font-family: var(--display); font-weight: 900; font-size: 2.2rem; text-transform: uppercase; line-height: 1; }
+.gate-card p { margin: 0; }
+.gate-card .form-error { margin: 0; }
+.gate-or { display: flex; align-items: center; gap: 0.75rem; color: var(--text-muted); font-size: 0.9rem; }
+.gate-or::before, .gate-or::after { content: ''; flex: 1; border-top: 1px solid var(--border); }
+.gate-note { color: var(--text-muted); font-size: 0.9rem; }
+
+.google-btn {
+  display: flex; align-items: center; justify-content: center; gap: 0.6rem; width: 100%; min-height: 2.6rem;
+  background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius-sm); cursor: pointer;
+}
+.google-btn:hover:not(:disabled) { border-color: var(--text-muted); }
+.google-mark { width: 1.15rem; height: 1.15rem; flex: none; }
