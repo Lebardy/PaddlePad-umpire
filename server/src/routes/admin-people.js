@@ -54,7 +54,10 @@ function peopleRouter(kind) {
     if (!isUuid(req.params.id)) return res.status(404).json({ error: notFound })
     try {
       await withTransaction(async (client) => {
-        const row = await kind.find(client, req.params.id, { lock: true })
+        // kind.find expects a callable queryFn(text, params), the same
+        // shape as the module-level `query` -- a raw pg client is not
+        // itself callable, only its .query method is.
+        const row = await kind.find(client.query.bind(client), req.params.id, { lock: true })
         if (!row) throw refusal(404, notFound)
         await apply(client, row)
       })
@@ -132,7 +135,7 @@ adminPlayersRoutes.post('/:id/claim-code', async (req, res) => {
   if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such player' })
   try {
     const claimCode = await withTransaction(async (client) => {
-      const row = await findPlayerRow(client, req.params.id, { lock: true })
+      const row = await findPlayerRow(client.query.bind(client), req.params.id, { lock: true })
       if (!row) throw refusal(404, 'No such player')
       if (row.paused_at && !row.deactivated_at) throw refusal(409, 'Switch this player back on before making a new code')
       const code = generateInviteCode()
