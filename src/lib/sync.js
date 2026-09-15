@@ -1,4 +1,4 @@
-import { ApiError, clearSession, getToken } from './api'
+import { ApiError, getToken } from './api'
 import * as api from './api'
 import * as outbox from './outbox'
 import { subscribe } from './localstore'
@@ -253,14 +253,13 @@ async function runDrain() {
       }
 
       if (status === 401) {
-        // A rejected token mid-session -- most commonly a pause taking
-        // effect while already signed in. That can't resolve on its
-        // own, so end the session the same way the launch check does
-        // (App.jsx notices via subscribeStatus and drops the stored
-        // umpire) rather than leaving the screen looking signed in
-        // with a dead token. Nothing queued is discarded by this --
-        // it is still in the outbox for whoever signs back in.
-        clearSession()
+        // api.js has already cleared the session and told App.jsx to
+        // drop the stored umpire (see subscribeSessionEnded there) --
+        // this only needs to stop the queue so nothing here keeps
+        // retrying against a token that is already gone. Nothing
+        // queued is discarded; it is still in the outbox for whoever
+        // signs back in, and resumeAfterSignIn (called from App.jsx's
+        // umpire effect) drains it once they do.
         authPaused = true
         notify()
         break

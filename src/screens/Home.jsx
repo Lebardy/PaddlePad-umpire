@@ -97,11 +97,17 @@ function Home({ onOpenSession, onOpenGuide, onOpenPlayers, umpire }) {
       link.click()
       URL.revokeObjectURL(url)
     } catch (err) {
-      setExportError(
-        err.status === 0
-          ? 'The export needs a connection — it gathers every umpire\u2019s matches from the server.'
-          : err.message,
-      )
+      // A 401 here already means the session just ended (paused, most
+      // commonly) -- api.js has already cleared it and the app is about
+      // to swap this whole screen for Login, so there is nothing useful
+      // to show in the export's own error slot.
+      if (err.status !== 401) {
+        setExportError(
+          err.status === 0
+            ? 'The export needs a connection — it gathers every umpire\u2019s matches from the server.'
+            : err.message,
+        )
+      }
     } finally {
       setExporting(false)
     }

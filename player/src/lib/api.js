@@ -103,6 +103,25 @@ export function takePausedNotice() {
   }
 }
 
+// A 401 on any signed-in request means the session is over -- most
+// commonly a pause taking effect while already signed in -- and every
+// request goes through apiFetch below, so this is the one place that
+// needs to know. App.jsx subscribes to end the player it holds in
+// state, the same way the launch check has always ended it; nothing
+// that calls apiFetch (the overview, matches, board, a profile edit)
+// has to remember to do that itself.
+const sessionEndedListeners = new Set()
+
+/** Notified once, whenever a 401 ends the session from anywhere. */
+export function subscribeSessionEnded(listener) {
+  sessionEndedListeners.add(listener)
+  return () => sessionEndedListeners.delete(listener)
+}
+
+function notifySessionEnded() {
+  for (const listener of sessionEndedListeners) listener()
+}
+
 /**
  * Whether the setup prompt has been waved away for this session.
  *
@@ -155,8 +174,13 @@ async function apiFetch(path, { method = 'GET', body, auth = true, signal } = {}
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
     // A signed-in request (not a sign-in door) rejected as paused --
-    // remembered here, once, for whichever screen shows Sign in next.
-    if (response.status === 401) rememberPausedNotice(data)
+    // remembered here, once, for whichever screen shows Sign in next --
+    // and the session is over, from wherever this call came from.
+    if (response.status === 401) {
+      rememberPausedNotice(data)
+      clearSession()
+      notifySessionEnded()
+    }
     throw new ApiError(
       data.error ?? `Request failed (${response.status})`,
       response.status,
@@ -424,6 +448,9 @@ export async function verifySession() {
     const data = await apiFetch('/auth/player/me')
     return data.player
   } catch (error) {
+    // apiFetch has already cleared the session for a 401; 403 isn't one
+    // of its cases (it's a sign-in-door status, not expected here), so
+    // this still clears it itself -- redundant on 401, needed on 403.
     if (error.status === 401 || error.status === 403) {
       clearSession()
       return null

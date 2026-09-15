@@ -99,6 +99,39 @@ export function takePausedNotice() {
   }
 }
 
+// A 401 on any signed-in request means the session is over -- most
+// commonly a pause taking effect while already signed in -- and every
+// request goes through apiFetch below, so this is the one place that
+// needs to know. App.jsx subscribes to end the umpire it holds in
+// state, the same way the launch check has always ended it; nothing
+// that calls apiFetch (the CSV export, a screen's own request, sync's
+// push loop) has to remember to do that itself.
+const sessionEndedListeners = new Set()
+
+/** Notified once, whenever a 401 ends the session from anywhere. */
+export function subscribeSessionEnded(listener) {
+  sessionEndedListeners.add(listener)
+  return () => sessionEndedListeners.delete(listener)
+}
+
+function notifySessionEnded() {
+  for (const listener of sessionEndedListeners) listener()
+}
+
+/** Builds the ApiError for a failed response, ending the session first if it's a 401. */
+function buildApiError(status, data) {
+  if (status === 401) {
+    rememberPausedNotice(data)
+    clearSession()
+    notifySessionEnded()
+  }
+  const error = new ApiError(data.error ?? `Request failed (${status})`, status, data)
+  // Some errors carry useful payload: a duplicate player carries the
+  // existing player, a busy match carries who is holding it.
+  error.data = data
+  return error
+}
+
 async function apiFetch(
   path,
   { method = 'GET', body, auth = true, signal, raw = false } = {},
@@ -137,25 +170,15 @@ async function apiFetch(
   // `raw` is for responses that aren't JSON -- the CSV export.
   if (raw) {
     if (!response.ok) {
-      throw new ApiError(`Request failed (${response.status})`, response.status)
+      const data = await response.json().catch(() => ({}))
+      throw buildApiError(response.status, data)
     }
     return response
   }
 
   const data = await response.json().catch(() => ({}))
 
-  if (!response.ok) {
-    if (response.status === 401) rememberPausedNotice(data)
-    const error = new ApiError(
-      data.error ?? `Request failed (${response.status})`,
-      response.status,
-      data,
-    )
-    // Some errors carry useful payload: a duplicate player carries the
-    // existing player, a busy match carries who is holding it.
-    error.data = data
-    throw error
-  }
+  if (!response.ok) throw buildApiError(response.status, data)
   return data
 }
 
@@ -291,10 +314,9 @@ export async function fetchCurrentUmpire() {
     storeUmpire(data.umpire)
     return data.umpire
   } catch (error) {
-    if (error.status === 401) {
-      clearSession()
-      return null
-    }
+    // apiFetch has already cleared the session and notified
+    // subscribeSessionEnded listeners for a 401.
+    if (error.status === 401) return null
     throw error
   }
 }

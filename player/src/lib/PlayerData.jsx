@@ -81,6 +81,14 @@ export function PlayerDataProvider({ children }) {
         })
       } catch (err) {
         if (controller.signal.aborted || err?.name === 'AbortError') return
+        // A 401 here already means the session just ended (paused, most
+        // commonly) -- api.js has cleared it and told App.jsx to drop
+        // the player (see subscribeSessionEnded there), which unmounts
+        // this whole provider. There's nothing useful to show in this
+        // provider's own error state -- not the dead-end "couldn't
+        // refresh" note, and not a full-screen error with a Try Again
+        // that would just 401 again.
+        if (err.status === 401) return
         // A failed REFRESH must not wipe data that is already on screen.
         // Being briefly offline courtside is normal, and blanking the
         // page for it would be worse than showing slightly old numbers.
