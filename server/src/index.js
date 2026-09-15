@@ -40,6 +40,17 @@ if (RATE_LIMITS_DISABLED) {
   )
 }
 
+// Fine for local development, where the admin site really does run at
+// the localhost fallback (see setupUrl in admin-accounts.js). Anywhere
+// else this means a setup link just handed to a new admin points at
+// nobody's machine but yours.
+if (!process.env.ADMIN_ORIGIN) {
+  console.warn(
+    'ADMIN_ORIGIN is not set. Any admin setup link created here will point at ' +
+      'http://localhost:5175 rather than the deployed admin site.',
+  )
+}
+
 app.use(express.json({ limit: '1mb' }))
 app.use(requestLog)
 

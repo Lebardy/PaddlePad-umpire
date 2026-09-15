@@ -19,6 +19,15 @@ const IGNORED = new Set(['/health'])
 // need to reconstruct.
 const MUTATIONS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
+// A setup link's secret lives in the path, not the body, so the usual
+// "no bodies" guard above doesn't cover it -- logging the path whole
+// would put a still-usable secret in Railway's logs for anyone who can
+// read them. Real secrets are base64url, so this only ever redacts the
+// thing it means to.
+function redactPath(path) {
+  return path.replace(/\/admin\/auth\/setup\/[^/]+/, '/admin/auth/setup/…')
+}
+
 export function requestLog(req, res, next) {
   if (IGNORED.has(req.path)) return next()
 
@@ -52,7 +61,7 @@ export function requestLog(req, res, next) {
       JSON.stringify({
         t: new Date().toISOString(),
         method: req.method,
-        path: req.originalUrl.split('?')[0],
+        path: redactPath(req.originalUrl.split('?')[0]),
         status: res.statusCode,
         ms: Math.round(ms),
         actor,

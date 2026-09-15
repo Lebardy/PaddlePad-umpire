@@ -10,10 +10,10 @@
 // the point: the file lands on YOUR machine, not on the container's
 // disk, which is thrown away on the next deploy.
 //
-// SENSITIVE. The dump contains umpire password hashes and player claim
-// codes -- a claim code is a bearer credential, so anyone holding this
-// file can claim those players. Keep it off shared drives and delete it
-// once you no longer need it.
+// SENSITIVE. The dump contains umpire and admin password hashes and
+// player claim codes -- a claim code is a bearer credential, so anyone
+// holding this file can claim those players. Keep it off shared drives
+// and delete it once you no longer need it.
 // ============================================================
 
 import pg from 'pg'
@@ -22,6 +22,9 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
 
 const TABLES = [
   'umpires',
+  'admins',
+  'admin_setup_links',
+  'admin_activity',
   'invites',
   'players',
   'sessions',
