@@ -1,4 +1,4 @@
-import { ApiError, getToken } from './api'
+import { ApiError, clearSession, getToken } from './api'
 import * as api from './api'
 import * as outbox from './outbox'
 import { subscribe } from './localstore'
@@ -22,7 +22,7 @@ import {
 // match quietly never arrives.
 //
 //   network / 5xx / 429  transient  -> keep at the head, back off
-//   401                  auth       -> pause everything, prompt, drop nothing
+//   401                  auth       -> end the session, drop nothing queued
 //   409 on a match log   blocked    -> another device is scoring; ask
 //   other 4xx            permanent  -> dead-letter, KEEP DRAINING
 //
@@ -253,8 +253,14 @@ async function runDrain() {
       }
 
       if (status === 401) {
-        // Never sign the umpire out mid-match over this; just stop
-        // pushing until they re-authenticate. Nothing is discarded.
+        // A rejected token mid-session -- most commonly a pause taking
+        // effect while already signed in. That can't resolve on its
+        // own, so end the session the same way the launch check does
+        // (App.jsx notices via subscribeStatus and drops the stored
+        // umpire) rather than leaving the screen looking signed in
+        // with a dead token. Nothing queued is discarded by this --
+        // it is still in the outbox for whoever signs back in.
+        clearSession()
         authPaused = true
         notify()
         break

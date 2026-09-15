@@ -63,12 +63,39 @@ export function clearSession() {
 /**
  * Thrown for any non-2xx response. `status` is kept so callers can
  * distinguish "your token expired" (401) from a genuine failure.
+ * `details` is the whole error body, for callers that need more than
+ * the sentence in `message` -- a paused account's `status: 'paused'`,
+ * say.
  */
 export class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, details) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.details = details
+  }
+}
+
+const PAUSED_NOTICE_KEY = 'paddlepad.pausedNotice'
+
+/** Remembers why a session just ended, for the sign-in screen to show once. */
+function rememberPausedNotice(data) {
+  if (data?.status !== 'paused') return
+  try {
+    sessionStorage.setItem(PAUSED_NOTICE_KEY, data.error)
+  } catch {
+    /* private mode */
+  }
+}
+
+/** The notice left by a paused session, removed as it is read. */
+export function takePausedNotice() {
+  try {
+    const notice = sessionStorage.getItem(PAUSED_NOTICE_KEY)
+    sessionStorage.removeItem(PAUSED_NOTICE_KEY)
+    return notice
+  } catch {
+    return null
   }
 }
 
@@ -118,9 +145,11 @@ async function apiFetch(
   const data = await response.json().catch(() => ({}))
 
   if (!response.ok) {
+    if (response.status === 401) rememberPausedNotice(data)
     const error = new ApiError(
       data.error ?? `Request failed (${response.status})`,
       response.status,
+      data,
     )
     // Some errors carry useful payload: a duplicate player carries the
     // existing player, a busy match carries who is holding it.

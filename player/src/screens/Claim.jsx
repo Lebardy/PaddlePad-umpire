@@ -18,7 +18,7 @@ import { claimCodeFromUrl } from '../lib/router'
  * Prefilled from /claim/CODE so a QR lands straight here with the field
  * already filled and nothing to type.
  */
-function Claim({ onClaimed }) {
+function Claim({ onClaimed, pausedNotice }) {
   // Derived when state is first created rather than set from an effect,
   // which would render once with an empty field and then again with the
   // code -- visible as a flicker on the one screen that must feel like
@@ -51,6 +51,8 @@ function Claim({ onClaimed }) {
 
   return (
     <form onSubmit={handleSubmit}>
+      {pausedNotice && <p className="error">{pausedNotice}</p>}
+
       <label htmlFor="code">Your code</label>
       <input
         id="code"

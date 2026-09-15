@@ -80,6 +80,29 @@ export function clearSession() {
   }
 }
 
+const PAUSED_NOTICE_KEY = 'paddlepad.player.pausedNotice'
+
+/** Remembers why a session just ended, for the sign-in screen to show once. */
+function rememberPausedNotice(details) {
+  if (details?.status !== 'paused') return
+  try {
+    sessionStorage.setItem(PAUSED_NOTICE_KEY, details.error)
+  } catch {
+    /* private mode */
+  }
+}
+
+/** The notice left by a paused session, removed as it is read. */
+export function takePausedNotice() {
+  try {
+    const notice = sessionStorage.getItem(PAUSED_NOTICE_KEY)
+    sessionStorage.removeItem(PAUSED_NOTICE_KEY)
+    return notice
+  } catch {
+    return null
+  }
+}
+
 /**
  * Whether the setup prompt has been waved away for this session.
  *
@@ -131,6 +154,9 @@ async function apiFetch(path, { method = 'GET', body, auth = true, signal } = {}
 
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
+    // A signed-in request (not a sign-in door) rejected as paused --
+    // remembered here, once, for whichever screen shows Sign in next.
+    if (response.status === 401) rememberPausedNotice(data)
     throw new ApiError(
       data.error ?? `Request failed (${response.status})`,
       response.status,

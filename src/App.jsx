@@ -7,7 +7,7 @@ import Login from './screens/Login'
 import Guide from './screens/Guide'
 import Players from './screens/Players'
 import Account from './screens/Account'
-import { clearSession, fetchCurrentUmpire, getStoredUmpire } from './lib/api'
+import { clearSession, fetchCurrentUmpire, getStoredUmpire, getToken } from './lib/api'
 import SyncIndicator from './components/SyncIndicator'
 import UpdateNotice from './components/UpdateNotice'
 import * as sync from './lib/sync'
@@ -86,6 +86,19 @@ function App() {
     sync.init()
     sync.pullCore().catch(() => {})
   }, [umpire])
+
+  // A mid-session 401 -- most commonly a pause taking effect while
+  // already signed in -- clears the stored session from inside sync.js,
+  // not from a component. This mirrors that into the umpire held here,
+  // the same way the launch check above does, so the app actually lands
+  // back on Login instead of looking signed in with a dead token.
+  useEffect(
+    () =>
+      sync.subscribeStatus(() => {
+        if (!getToken()) setUmpire((current) => (current ? null : current))
+      }),
+    [],
+  )
 
   // Signing out clears the local mirror as well as the token.
   //

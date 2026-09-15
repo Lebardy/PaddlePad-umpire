@@ -31,7 +31,7 @@ import GoogleButton from '../components/GoogleButton'
 
 // Mirrors the check GoogleButton makes before rendering anything.
 const GOOGLE_ENABLED = Boolean(import.meta.env?.VITE_GOOGLE_CLIENT_ID)
-import { googleSignIn, loginPlayer, registerPlayer } from '../lib/api'
+import { googleSignIn, loginPlayer, registerPlayer, takePausedNotice } from '../lib/api'
 import { claimCodeFromUrl } from '../lib/router'
 import { suggestUsername } from '../lib/username'
 
@@ -307,6 +307,11 @@ function SignIn({ onSignedIn }) {
   // A scanned QR goes straight to the code panel with the field filled.
   const [scanned] = useState(() => Boolean(claimCodeFromUrl()))
   const [tab, setTab] = useState(() => (scanned ? 'code' : 'signin'))
+  // Read once, on mount, and removed from storage as it's read. Shown
+  // here for the signin/create tabs; handed to Claim below so the code
+  // tab -- the one a scanned QR lands on directly -- shows it too,
+  // without reading (and clearing) it a second time.
+  const [pausedNotice] = useState(() => takePausedNotice())
   // Set only when Google has answered and the server did not recognise
   // the account. Holding the token here rather than in GooglePending
   // keeps it alive across that form's re-renders.
@@ -357,6 +362,8 @@ function SignIn({ onSignedIn }) {
       </h1>
       <p className="lede">See the matches your umpire has been recording for you.</p>
 
+      {pausedNotice && tab !== 'code' && <p className="error">{pausedNotice}</p>}
+
       {/* Withheld from someone who has just scanned a QR. They are one
           tap from being signed in with the code already in the field
           below, and offering a different way in above it would be the
@@ -389,7 +396,7 @@ function SignIn({ onSignedIn }) {
 
       {tab === 'signin' && <SignInPanel onSignedIn={onSignedIn} />}
       {tab === 'create' && <CreatePanel onSignedIn={onSignedIn} />}
-      {tab === 'code' && <Claim onClaimed={onSignedIn} />}
+      {tab === 'code' && <Claim onClaimed={onSignedIn} pausedNotice={pausedNotice} />}
     </div>
   )
 }
