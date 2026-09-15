@@ -33,7 +33,7 @@ export default function Setup({ secret, onSignedIn }) {
   function submitPassword(event) {
     event.preventDefault()
     if (password !== confirm) {
-      setError('The two passwords don\'t match.')
+      setError('The two passwords don’t match.')
       return
     }
     finish({ password })

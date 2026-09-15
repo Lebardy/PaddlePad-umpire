@@ -48,7 +48,7 @@ export default function App() {
     else if (path === '/admins' && admin.role === 'owner') screen = <p className="empty">Admins arrive in Task 9.</p>
     else if (path === '/activity') screen = <p className="empty">Activity arrives in Task 9.</p>
     else if (path === '/account') screen = <p className="empty">Account arrives in Task 9 for {admin.name}.</p>
-    else screen = <p className="empty">There's no page here.</p>
+    else screen = <p className="empty">There’s no page here.</p>
     content = <Layout admin={admin} path={path} onSignOut={signOut}>{screen}</Layout>
   }
 
