@@ -610,3 +610,28 @@ CREATE INDEX IF NOT EXISTS admin_activity_admin_idx
 -- stays for the codes made before the admin site existed.
 ALTER TABLE invites
     ADD COLUMN IF NOT EXISTS created_by_admin UUID REFERENCES admins (id) ON DELETE SET NULL;
+
+-- ============================================================
+-- People: pausing and closing accounts from the admin site
+--
+-- A pause is reversible: the person cannot sign in and any session
+-- they hold ends on its next request, but nothing else changes. The
+-- reason is kept beside it so every admin sees why.
+--
+-- A closed player uses players.deactivated_at, the same state as a
+-- player who closed their own account. Umpires never had that, so
+-- closed_at is theirs. Closing clears a pause.
+--
+-- last_signed_in_at is set by every sign-in door from here on; older
+-- rows stay NULL, which the admin site shows as "Not yet recorded".
+-- ============================================================
+ALTER TABLE umpires ADD COLUMN IF NOT EXISTS paused_at         TIMESTAMPTZ;
+ALTER TABLE umpires ADD COLUMN IF NOT EXISTS paused_reason     TEXT;
+ALTER TABLE umpires ADD COLUMN IF NOT EXISTS closed_at         TIMESTAMPTZ;
+ALTER TABLE umpires ADD COLUMN IF NOT EXISTS last_signed_in_at TIMESTAMPTZ;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS paused_at         TIMESTAMPTZ;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS paused_reason     TEXT;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS last_signed_in_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS umpires_created_idx ON umpires (created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS players_created_idx ON players (created_at DESC, id DESC);

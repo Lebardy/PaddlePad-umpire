@@ -1,11 +1,11 @@
 import { Router } from 'express'
 import { query } from '../db.js'
-import { requireAuth } from '../auth.js'
+import { requireActiveUmpire, requireAuth } from '../auth.js'
 import { generateInviteCode } from '../invites.js'
 import { normalizePlayerName, playerNameError } from '../validate.js'
 
 const router = Router()
-router.use(requireAuth)
+router.use(requireAuth, requireActiveUmpire(query))
 
 const SEARCH_LIMIT = 50
 

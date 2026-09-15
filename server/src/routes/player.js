@@ -15,6 +15,7 @@ import {
   summarisePlayer,
 } from '../player-stats.js'
 import { normalizeInviteCode } from '../invites.js'
+import { wipePlayerCredentials } from '../player-accounts.js'
 import { getMatchOfTheMonthStory, getMonthlyBoard } from '../board.js'
 import { isUuid, normalizePlayerName, playerNameError } from '../validate.js'
 import { readGame } from '../drama.js'
@@ -314,22 +315,8 @@ router.delete('/me', async (req, res) => {
       return { status: 200, body: { deleted: true, matches: 0 } }
     }
 
-    // google_sub goes with the rest of it. Leaving it behind would
-    // make "delete my profile" mean "delete every way in except the
-    // one-tap one", and the closed account would sign straight back in.
-    await client.query(
-      `UPDATE players
-          SET username       = NULL,
-              password_hash  = NULL,
-              google_sub     = NULL,
-              google_email   = NULL,
-              claim_code     = NULL,
-              claimed_at     = NULL,
-              registered_at  = NULL,
-              deactivated_at = now()
-        WHERE id = $1`,
-      [req.player.id],
-    )
+    // google_sub goes with the rest of it -- see wipePlayerCredentials.
+    await wipePlayerCredentials(client, req.player.id)
     return { status: 200, body: { deleted: false, matches } }
   })
 

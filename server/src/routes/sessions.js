@@ -1,11 +1,11 @@
 import { Router } from 'express'
 import { query, withTransaction } from '../db.js'
-import { requireAuth } from '../auth.js'
+import { requireActiveUmpire, requireAuth } from '../auth.js'
 import { isUuid } from '../validate.js'
 import { invalidateRallyRatings } from '../rally-rating-store.js'
 
 const router = Router()
-router.use(requireAuth)
+router.use(requireAuth, requireActiveUmpire(query))
 
 const SESSION_SELECT = `
   SELECT s.id,

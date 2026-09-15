@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { query, withTransaction } from '../db.js'
-import { requireAuth } from '../auth.js'
+import { requireActiveUmpire, requireAuth } from '../auth.js'
 import {
   DEFAULT_POINT_TARGET,
   POINT_TARGETS,
@@ -12,7 +12,7 @@ import { rallyEndingProblem } from '../rally-endings.js'
 import { invalidateRallyRatings } from '../rally-rating-store.js'
 
 const router = Router()
-router.use(requireAuth)
+router.use(requireAuth, requireActiveUmpire(query))
 
 // A game to 11 win-by-2 is 20-60 events, and one to 21 perhaps double
 // that; 500 would be a marathon. The cap is a sanity bound on a single
