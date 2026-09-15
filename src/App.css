@@ -246,7 +246,6 @@ section {
 .account > h2,
 .guide > h2,
 .players-screen > h2,
-.invites > h2,
 .login h2,
 .not-found h2 {
   font-family: var(--display);
@@ -426,7 +425,6 @@ section {
 .match-list,
 .roster ul,
 .tool-list,
-.invite-list,
 .history-list,
 .picker-results {
   list-style: none;
@@ -442,7 +440,6 @@ section {
 .match-list > li + li,
 .roster li + li,
 .tool-list > li + li,
-.invite-list > li + li,
 .history-list > li + li,
 .picker-results > li + li {
   border-top: 1px solid var(--border);
@@ -518,8 +515,7 @@ section {
 .voided-tag,
 .ended-tag,
 .session-ended-tag,
-.match-status,
-.invite-status {
+.match-status {
   display: inline-block;
   margin-left: 0.45rem;
   font-family: var(--label);
@@ -652,8 +648,7 @@ section {
 .match-controls button,
 .sign-out,
 .takeover-btn,
-.dupe-no,
-.invite-actions button {
+.dupe-no {
   width: 100%;
   min-height: 2.9rem;
   padding: 0.65rem;
@@ -1308,30 +1303,6 @@ section {
 .player-search { margin-bottom: 1.25rem; }
 .players-screen .code-card { margin-bottom: 1.25rem; }
 
-/* ============ Invites ============ */
-
-.invite-item { padding: 0.85rem 1rem; }
-.invite-item.used,
-.invite-item.expired { opacity: 0.6; }
-.invite-main { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-.invite-code {
-  font-family: var(--display);
-  font-size: 1.5rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: var(--text);
-  overflow-wrap: anywhere;
-}
-.invite-status { margin-left: 0; color: var(--primary); background: var(--primary-soft); }
-.invite-status.used,
-.invite-status.expired { color: var(--text-muted); background: var(--bg-sunken); }
-.invite-note { font-size: 0.9rem; color: var(--text-muted); margin-top: 0.3rem; }
-.invite-actions { display: flex; gap: 0.5rem; margin-top: 0.7rem; }
-.invite-actions button { flex: 1; min-height: 2.6rem; color: var(--text); }
-.invite-actions button:hover { border-color: var(--primary); color: var(--primary); }
-.invite-actions .remove { border-color: var(--danger); color: var(--danger); }
-.invite-actions .remove:hover { background: var(--danger-soft); }
-
 /* ============ Account ============ */
 
 .account { max-width: 30rem; margin: 0 auto; }
@@ -1585,7 +1556,6 @@ section {
    data. */
 @media (max-width: 420px) {
   .dupe-actions,
-  .invite-actions,
   .match-controls {
     flex-direction: column;
   }

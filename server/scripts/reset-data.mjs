@@ -115,10 +115,6 @@ try {
   await client.query('DELETE FROM players WHERE id <> $1', [player.id])
   await client.query('DELETE FROM invites')
   await client.query('DELETE FROM umpires WHERE id <> $1', [umpire.id])
-  // The survivor must still be able to issue invites afterwards, and
-  // the flag is granted automatically only to the founding umpire --
-  // which this account may no longer be once the others are gone.
-  await client.query('UPDATE umpires SET is_admin = true WHERE id = $1', [umpire.id])
   await client.query('COMMIT')
 } catch (error) {
   await client.query('ROLLBACK')

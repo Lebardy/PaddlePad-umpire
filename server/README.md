@@ -526,7 +526,7 @@ actually did rather than guessing.
 Because player tokens last 30 days and are stateless, `requireActivePlayer`
 re-reads the row on every player request — otherwise "you won't be able
 to get back in" would be false for a month for the person who just read
-it. Same reasoning as `requireAdmin` reading `is_admin` from the
+it. Same reasoning as `requireAdminAccount` reading the admin row from the
 database rather than the token.
 
 **Coming back** works the same way a forgotten password does: an umpire
@@ -566,7 +566,7 @@ after the fact. See the comment above those tables in `schema.sql`.
   endpoint can't be used to discover which emails are registered.
 - **Umpire registration is invite-only.** The API is on the public
   internet, so an open form would let anyone create an account and write
-  into the match data. Only admins can issue invites, and codes are
+  into the match data. Invite codes are made on the admin site, and codes are
   single-use, claimed in the same transaction that creates the umpire.
 - **Player sign-in returns one message** whether the username is unknown
   or the password is wrong, and spends comparable time on both, so it

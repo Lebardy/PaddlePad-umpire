@@ -64,17 +64,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS umpires_google_sub_idx
 CREATE UNIQUE INDEX IF NOT EXISTS umpires_email_lower_idx
     ON umpires (lower(email));
 
--- Only admins may issue invite codes. Ordinary umpires can score
--- matches but cannot bring new people in, so control over who gets an
--- account stays with the project owner rather than spreading to
--- everyone who has ever been given one.
---
--- The founding umpire (the one who registers with BOOTSTRAP_INVITE_CODE)
--- is made admin automatically; see routes/auth.js. Promoting anyone
--- else is a deliberate manual UPDATE -- there is intentionally no
--- endpoint for it.
-ALTER TABLE umpires
-    ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
+-- Umpire accounts used to carry an admin flag for issuing invite codes.
+-- Admin powers now belong to admin accounts (see "Admin accounts" at the
+-- end of this file), so the flag is removed.
+ALTER TABLE umpires DROP COLUMN IF EXISTS is_admin;
 
 -- Registration is invite-only: the API is on the public internet, so
 -- an open signup form would let anyone create an umpire account and

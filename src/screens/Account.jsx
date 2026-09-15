@@ -390,7 +390,6 @@ function Account({ umpire, onUmpireChange, onBack, onSignOut }) {
       )}
 
       <p className="account-footer">
-        {umpire.is_admin ? 'Admin — you can issue invite codes. ' : ''}
         Version {VERSION}
       </p>
     </div>

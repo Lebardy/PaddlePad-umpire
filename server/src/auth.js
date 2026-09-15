@@ -135,7 +135,7 @@ export function requirePlayer(req, res, next) {
  * Express middleware: requires the player's record still to exist and
  * still to be active. Must run after requirePlayer.
  *
- * Same reasoning as requireAdmin below, for the same reason: a player
+ * Same reasoning as requireAdminAccount below: a player
  * token is valid for 30 days and requirePlayer is stateless, so without
  * this a player who has just deleted their profile would keep getting
  * in for a month with the token already in their browser -- which would
@@ -158,38 +158,6 @@ export function requireActivePlayer(queryFn) {
       // way -- clear the session, show the gate.
       if (!rows[0] || rows[0].deactivated_at) {
         return res.status(401).json({ error: 'That player no longer exists' })
-      }
-      next()
-    } catch (error) {
-      next(error)
-    }
-  }
-}
-
-/**
- * Express middleware: requires the caller to be an admin. Must run
- * after requireAuth.
- *
- * Deliberately reads is_admin from the database rather than trusting
- * the token. A token is valid for 30 days, so a token minted while
- * someone was an admin would keep asserting that long after the flag
- * was revoked. The copy of is_admin in the token is only ever used by
- * the app to decide what to show, never to decide what is allowed.
- */
-export function requireAdmin(queryFn) {
-  return async function requireAdminMiddleware(req, res, next) {
-    try {
-      const { rows } = await queryFn(
-        'SELECT is_admin FROM umpires WHERE id = $1',
-        [req.umpire.id],
-      )
-      if (!rows[0]) {
-        return res.status(401).json({ error: 'Account no longer exists' })
-      }
-      if (!rows[0].is_admin) {
-        return res
-          .status(403)
-          .json({ error: 'Only an admin can manage invite codes' })
       }
       next()
     } catch (error) {
