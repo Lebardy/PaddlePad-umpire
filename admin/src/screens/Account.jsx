@@ -86,7 +86,7 @@ export default function Account({ admin, onAdminChange }) {
 
       <div className="sheet">
         <div className="settings">
-          <Setting as="form" title="Your name" about="Shown in the menu and beside everything you do in Activity." onSubmit={saveName}>
+          <Setting as="form" title="Your name" about="Shown at the top of every page and beside everything you do in Activity." onSubmit={saveName}>
             <label className="field"><span>Name</span><input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} required /></label>
             <Status status={nameStatus} />
             <button type="submit" className="btn-primary">Save name</button>

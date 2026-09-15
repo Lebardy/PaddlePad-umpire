@@ -230,7 +230,7 @@ html { scrollbar-color: var(--border) var(--bg); }
   margin: 0; font-family: var(--display); font-weight: 900; font-size: 3.4rem; line-height: 0.92;
   text-transform: uppercase; letter-spacing: 0.01em; overflow-wrap: anywhere; text-wrap: balance;
 }
-.page-board-intro { margin: 0.75rem 0 0; color: var(--board-muted); max-width: 40rem; }
+.page-board-intro { margin: 0.75rem 0 0; color: var(--board-muted); max-width: 40rem; overflow-wrap: anywhere; }
 .page-board-intro strong { color: var(--board-ink); font-weight: 600; }
 
 /* The page's key numbers: a ruled strip of cells on the board. */
@@ -337,6 +337,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .confirm { display: inline-grid; justify-items: end; gap: 0.35rem; }
 .confirm-text { font-size: 0.9rem; font-weight: 500; color: var(--text); line-height: 1.3; }
 .confirm-buttons { display: flex; gap: 0.5rem; }
+/* A failed row action, said under its buttons. It takes the width the
+   buttons already give the column and never widens it. */
+.row-actions > .row-error {
+  display: block; width: 0; min-width: 100%; margin: 0.4rem 0 0; white-space: normal; text-align: right;
+  font-size: 0.88rem; font-weight: 500; line-height: 1.3; color: var(--status-critical);
+}
+button[aria-disabled='true'] { opacity: 0.6; cursor: progress; }
 .code { font-family: var(--label); font-weight: 700; font-size: 1.15rem; letter-spacing: 0.08em; white-space: nowrap; }
 tr.is-faded .code { text-decoration: none; }
 

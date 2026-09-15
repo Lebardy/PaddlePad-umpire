@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import PageBoard, { TallyCell } from '../components/PageBoard'
+import RowConfirm from '../components/RowConfirm'
 import { cancelInvite, createInvite, listInvites } from '../lib/api'
 import { EXPIRY_CHOICES, formatWhen, inviteStatusText, madeByText } from '../lib/format'
 
@@ -21,6 +22,14 @@ export default function Invites() {
   const [copied, setCopied] = useState(null)
   const [showing, setShowing] = useState('all')
   const [confirming, setConfirming] = useState(null)
+  // Said after a code is cancelled. Its row is gone, so keyboard focus
+  // comes here rather than falling back to the top of the page.
+  const [cancelled, setCancelled] = useState(null)
+  const cancelledNote = useRef(null)
+
+  useEffect(() => {
+    if (cancelled) cancelledNote.current?.focus()
+  }, [cancelled])
 
   function loaded(rows) {
     setInvites(rows)
@@ -48,6 +57,7 @@ export default function Invites() {
     event.preventDefault()
     setBusy(true)
     setError(null)
+    setCancelled(null)
     try {
       const invite = await createInvite({
         note: note.trim() || undefined,
@@ -55,7 +65,7 @@ export default function Invites() {
       })
       setNewest(invite.code)
       setNote('')
-      if (showing !== 'open') setShowing('all')
+      if (showing !== 'open') show('all')
       await refresh()
     } catch (err) {
       setError(err.message)
@@ -64,15 +74,17 @@ export default function Invites() {
     }
   }
 
+  // Errors are thrown back to the row's confirmation, which shows them there.
   async function handleCancel(code) {
+    await cancelInvite(code)
+    if (newest === code) setNewest(null)
+    setCancelled({ code })
+    await refresh()
+  }
+
+  function show(key) {
+    setShowing(key)
     setConfirming(null)
-    try {
-      await cancelInvite(code)
-      if (newest === code) setNewest(null)
-      await refresh()
-    } catch (err) {
-      setError(err.message)
-    }
   }
 
   // The clipboard can be blocked; then the code stays on screen to copy by hand.
@@ -101,7 +113,7 @@ export default function Invites() {
         <div className="tally" role="group" aria-label="Show codes">
           {SHOWING.map((s) => (
             <TallyCell key={s.key} figure={invites ? counts[s.key] : '–'} label={s.label}
-              pressed={showing === s.key} onClick={() => setShowing(s.key)} />
+              pressed={showing === s.key} onClick={() => show(s.key)} />
           ))}
         </div>
       </PageBoard>
@@ -142,6 +154,11 @@ export default function Invites() {
 
         {error && <p className="form-error" role="alert">{error}</p>}
         {invites === null && !error && <p className="empty">Loading…</p>}
+        {cancelled && (
+          <p className="form-ok" role="status" tabIndex={-1} ref={cancelledNote}>
+            Cancelled {cancelled.code}. It no longer works.
+          </p>
+        )}
         {invites && rows.length === 0 && <p className="empty">{current.empty}</p>}
 
         {rows.length > 0 && (
@@ -170,21 +187,24 @@ export default function Invites() {
                     </td>
                     <td className="col-when">{formatWhen(invite.created_at)}</td>
                     <td className="row-actions">
-                      {invite.status === 'open' && confirming !== invite.code && (
+                      {invite.status === 'open' && (
                         <>
-                          <button type="button" className="btn-quiet btn-small" onClick={() => handleCopy(invite.code)}>{copied === invite.code ? 'Copied' : 'Copy'}</button>
-                          <button type="button" className="btn-danger btn-small" onClick={() => setConfirming(invite.code)}>Cancel</button>
+                          {confirming !== invite.code && (
+                            <button type="button" className="btn-quiet btn-small" onClick={() => handleCopy(invite.code)}>{copied === invite.code ? 'Copied' : 'Copy'}</button>
+                          )}
+                          <RowConfirm
+                            label="Cancel"
+                            className="btn-danger btn-small"
+                            question="It stops working straight away."
+                            confirmLabel="Cancel code"
+                            busyLabel="Cancelling…"
+                            confirmClass="btn-danger is-solid btn-small"
+                            open={confirming === invite.code}
+                            onOpen={() => { setCancelled(null); setConfirming(invite.code) }}
+                            onClose={() => setConfirming(null)}
+                            onConfirm={() => handleCancel(invite.code)}
+                          />
                         </>
-                      )}
-                      {invite.status === 'open' && confirming === invite.code && (
-                        <span className="confirm">
-                          <span className="confirm-text">It stops working straight away.</span>
-                          <span className="confirm-buttons">
-                            <button type="button" className="btn-danger is-solid btn-small" onClick={() => handleCancel(invite.code)}>Cancel code</button>
-                            {/* Focus lands on the safe choice. */}
-                            <button type="button" className="btn-quiet btn-small" autoFocus onClick={() => setConfirming(null)}>Keep</button>
-                          </span>
-                        </span>
                       )}
                     </td>
                   </tr>

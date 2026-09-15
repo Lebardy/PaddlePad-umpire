@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import PageBoard, { TallyCell } from '../components/PageBoard'
+import RowConfirm from '../components/RowConfirm'
 import { addAdmin, listAdmins, newSetupLink, switchAdmin } from '../lib/api'
 import { formatWhen, signInMethods } from '../lib/format'
 
@@ -52,24 +53,15 @@ export default function Admins({ me }) {
     }
   }
 
+  // Errors are thrown back to the row's confirmation, which shows them there.
   async function handleNewLink(admin) {
-    setConfirming(null)
-    try {
-      setLink({ forName: admin.name, ...(await newSetupLink(admin.id)) })
-      setCopied(false)
-    } catch (err) {
-      setError(err.message)
-    }
+    setLink({ forName: admin.name, ...(await newSetupLink(admin.id)) })
+    setCopied(false)
   }
 
   async function handleSwitch(admin) {
-    setConfirming(null)
-    try {
-      await switchAdmin(admin.id, !admin.active)
-      await refresh()
-    } catch (err) {
-      setError(err.message)
-    }
+    await switchAdmin(admin.id, !admin.active)
+    await refresh()
   }
 
   async function copyLink() {
@@ -86,30 +78,40 @@ export default function Admins({ me }) {
 
   function actions(admin) {
     if (admin.role === 'owner') return null
-    if (confirming?.id === admin.id) {
-      const switching = confirming.what === 'switch'
-      const question = switching
-        ? (admin.active ? 'They are signed out straight away.' : 'They can sign in again straight away.')
-        : 'Any unused link they have stops working.'
-      return (
-        <span className="confirm">
-          <span className="confirm-text">{question}</span>
-          <span className="confirm-buttons">
-            {switching
-              ? <button type="button" className={`btn-small ${admin.active ? 'btn-danger is-solid' : 'btn-primary'}`} onClick={() => handleSwitch(admin)}>{admin.active ? 'Switch off' : 'Switch on'}</button>
-              : <button type="button" className="btn-primary btn-small" onClick={() => handleNewLink(admin)}>Make link</button>}
-            {/* Focus lands on the safe choice. */}
-            <button type="button" className="btn-quiet btn-small" autoFocus onClick={() => setConfirming(null)}>Not now</button>
-          </span>
-        </span>
-      )
-    }
+    const asking = confirming?.id === admin.id ? confirming.what : null
+    const close = () => setConfirming(null)
     return (
       <>
-        {admin.active && <button type="button" className="btn-quiet btn-small" onClick={() => setConfirming({ id: admin.id, what: 'link' })}>New setup link</button>}
-        <button type="button" className={`btn-small ${admin.active ? 'btn-danger' : 'btn-quiet'}`} onClick={() => setConfirming({ id: admin.id, what: 'switch' })}>
-          {admin.active ? 'Switch off' : 'Switch on'}
-        </button>
+        {admin.active && (
+          <RowConfirm
+            label="New setup link"
+            className="btn-quiet btn-small"
+            question="Any unused link they have stops working."
+            confirmLabel="Make link"
+            busyLabel="Making…"
+            confirmClass="btn-primary btn-small"
+            keepLabel="Not now"
+            open={asking === 'link'}
+            hidden={asking === 'switch'}
+            onOpen={() => setConfirming({ id: admin.id, what: 'link' })}
+            onClose={close}
+            onConfirm={() => handleNewLink(admin)}
+          />
+        )}
+        <RowConfirm
+          label={admin.active ? 'Switch off' : 'Switch on'}
+          className={`btn-small ${admin.active ? 'btn-danger' : 'btn-quiet'}`}
+          question={admin.active ? 'They are signed out straight away.' : 'They can sign in again straight away.'}
+          confirmLabel={admin.active ? 'Switch off' : 'Switch on'}
+          busyLabel="Switching…"
+          confirmClass={`btn-small ${admin.active ? 'btn-danger is-solid' : 'btn-primary'}`}
+          keepLabel="Not now"
+          open={asking === 'switch'}
+          hidden={asking === 'link'}
+          onOpen={() => setConfirming({ id: admin.id, what: 'switch' })}
+          onClose={close}
+          onConfirm={() => handleSwitch(admin)}
+        />
       </>
     )
   }
