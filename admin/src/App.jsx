@@ -5,6 +5,10 @@ import { matchPath, navigate, useRoute } from './lib/router'
 import { applyTheme, getThemeChoice, watchSystemTheme } from './lib/theme'
 import SetupScreen from './screens/Setup'
 import SignIn from './screens/SignIn'
+import Account from './screens/Account'
+import Activity from './screens/Activity'
+import Admins from './screens/Admins'
+import Invites from './screens/Invites'
 
 export default function App() {
   const path = useRoute()
@@ -44,10 +48,10 @@ export default function App() {
     content = <SignIn onSignedIn={setAdmin} />
   } else {
     let screen
-    if (path === '/' || path === '/invites') screen = <p className="empty">Invite codes arrive in Task 9.</p>
-    else if (path === '/admins' && admin.role === 'owner') screen = <p className="empty">Admins arrive in Task 9.</p>
-    else if (path === '/activity') screen = <p className="empty">Activity arrives in Task 9.</p>
-    else if (path === '/account') screen = <p className="empty">Account arrives in Task 9 for {admin.name}.</p>
+    if (path === '/' || path === '/invites') screen = <Invites />
+    else if (path === '/admins' && admin.role === 'owner') screen = <Admins me={admin} />
+    else if (path === '/activity') screen = <Activity />
+    else if (path === '/account') screen = <Account admin={admin} onAdminChange={updateAdmin} />
     else screen = <p className="empty">There’s no page here.</p>
     content = <Layout admin={admin} path={path} onSignOut={signOut}>{screen}</Layout>
   }
