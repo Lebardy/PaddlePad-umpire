@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import PageBoard from '../components/PageBoard'
 import { activityFilters, listActivity } from '../lib/api'
 import { actionLabel } from '../lib/format'
@@ -32,22 +32,26 @@ export default function Activity() {
   const [error, setError] = useState(null)
   const [loadingMore, setLoadingMore] = useState(false)
 
+  // Bumped by every filter change and read back when a request lands,
+  // so a "Show older" still in flight for the old filter is recognised
+  // as stale and ignored rather than appended onto the new list.
+  const requestId = useRef(0)
+
   useEffect(() => {
     activityFilters().then(setFilters).catch(() => {})
   }, [])
 
   // A new filter starts again from the newest entry.
   useEffect(() => {
-    let live = true
+    const id = ++requestId.current
     listActivity({ adminId, action })
       .then((data) => {
-        if (!live) return
+        if (requestId.current !== id) return
         setEntries(data.entries)
         setNextBefore(data.nextBefore)
         setError(null)
       })
-      .catch((err) => { if (live) setError(err.message) })
-    return () => { live = false }
+      .catch((err) => { if (requestId.current === id) setError(err.message) })
   }, [adminId, action])
 
   function choose(set, value) {
@@ -56,13 +60,15 @@ export default function Activity() {
   }
 
   async function showOlder() {
+    const id = requestId.current
     setLoadingMore(true)
     try {
       const data = await listActivity({ before: nextBefore, adminId, action })
-      setEntries((current) => [...current, ...data.entries])
+      if (requestId.current !== id) return
+      setEntries((current) => [...(current ?? []), ...data.entries])
       setNextBefore(data.nextBefore)
     } catch (err) {
-      setError(err.message)
+      if (requestId.current === id) setError(err.message)
     } finally {
       setLoadingMore(false)
     }

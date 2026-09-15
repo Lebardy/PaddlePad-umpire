@@ -34,8 +34,16 @@ export function matchPath(pattern, path) {
   if (patternParts.length !== pathParts.length) return null
   const params = {}
   for (let i = 0; i < patternParts.length; i += 1) {
-    if (patternParts[i].startsWith(':')) params[patternParts[i].slice(1)] = decodeURIComponent(pathParts[i])
-    else if (patternParts[i] !== pathParts[i]) return null
+    if (patternParts[i].startsWith(':')) {
+      // Real secrets are base64url and never contain a '%', so this
+      // only ever fires on a hand-mangled link -- treat it as no match
+      // rather than letting decodeURIComponent's throw blank the page.
+      try {
+        params[patternParts[i].slice(1)] = decodeURIComponent(pathParts[i])
+      } catch {
+        return null
+      }
+    } else if (patternParts[i] !== pathParts[i]) return null
   }
   return params
 }
