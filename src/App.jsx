@@ -4,7 +4,6 @@ import SessionDetail from './screens/SessionDetail'
 import MatchSetup from './screens/MatchSetup'
 import LiveMatch from './screens/LiveMatch'
 import Login from './screens/Login'
-import Invites from './screens/Invites'
 import Guide from './screens/Guide'
 import Players from './screens/Players'
 import Account from './screens/Account'
@@ -189,12 +188,6 @@ function App() {
                 onOpenSession={openSession}
                 onOpenGuide={() => setView({ name: 'guide' })}
                 umpire={umpire}
-                // Only admins can issue invites. Hiding the button is a
-                // convenience, not the control -- the API refuses the
-                // request regardless of what the app shows.
-                onOpenInvites={
-                  umpire.is_admin ? () => setView({ name: 'invites' }) : null
-                }
                 onOpenPlayers={() => setView({ name: 'players' })}
               />
             )}
@@ -208,9 +201,6 @@ function App() {
                 onBack={goHome}
                 onSignOut={handleSignOut}
               />
-            )}
-            {view.name === 'invites' && umpire.is_admin && (
-              <Invites onBack={goHome} />
             )}
             {view.name === 'session' && (
               <SessionDetail

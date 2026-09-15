@@ -49,7 +49,6 @@ function umpirePayload(row) {
     id: row.id,
     email: row.email,
     name: row.name,
-    is_admin: row.is_admin ?? false,
     googleEmail: row.google_email ?? null,
     hasPassword: Boolean(row.password_hash),
   }
@@ -90,12 +89,8 @@ async function claimInvite(client, rawCode, umpireId) {
     // The new umpire is already inserted at this point, so "empty
     // before this registration" means exactly one row.
     if (rows[0].n === 1 && code === normalizeInviteCode(BOOTSTRAP_INVITE_CODE)) {
-      // The founding umpire becomes the admin, and is the only account
-      // that gets the flag automatically -- everyone who joins later
-      // arrives through an invite and stays a plain umpire.
-      await client.query('UPDATE umpires SET is_admin = true WHERE id = $1', [
-        umpireId,
-      ])
+      // Lets the very first umpire in. Admin powers live on the admin
+      // site now, so this makes no one an admin.
       return null
     }
   }
@@ -152,14 +147,7 @@ router.post('/register', async (req, res) => {
         throw refusal(403, inviteError)
       }
 
-      // Re-read is_admin rather than using the INSERT's value: the
-      // founding umpire has the flag set by claimInvite() above, after
-      // that insert already returned.
-      const { rows: flags } = await client.query(
-        'SELECT is_admin FROM umpires WHERE id = $1',
-        [created.id],
-      )
-      return { ...created, is_admin: flags[0].is_admin }
+      return created
     })
 
     res.status(201).json({ token: signToken(umpire), umpire: umpirePayload(umpire) })
@@ -194,7 +182,7 @@ router.post('/register', async (req, res) => {
  *   3. Nobody yet -> invite required, and claimed in the same
  *      transaction that creates the umpire, exactly as /auth/register
  *      does. That keeps the single-use guarantee and the
- *      BOOTSTRAP_INVITE_CODE founding-admin path working unchanged.
+ *      BOOTSTRAP_INVITE_CODE first-umpire path working unchanged.
  *
  * The response is the same shape login and register return, so nothing
  * downstream can tell which door was used.
@@ -218,7 +206,7 @@ router.post('/google', async (req, res) => {
   const linked = await query(
     `UPDATE umpires SET google_email = $2
       WHERE google_sub = $1
-      RETURNING id, email, name, is_admin, password_hash, google_email`,
+      RETURNING id, email, name, password_hash, google_email`,
     [profile.sub, profile.email],
   )
   if (linked.rows[0]) {
@@ -231,7 +219,7 @@ router.post('/google', async (req, res) => {
   const byEmail = await query(
     `UPDATE umpires SET google_sub = $2, google_email = $3
       WHERE lower(email) = $1 AND google_sub IS NULL
-      RETURNING id, email, name, is_admin, password_hash, google_email`,
+      RETURNING id, email, name, password_hash, google_email`,
     [profile.email, profile.sub, profile.email],
   )
   if (byEmail.rows[0]) {
@@ -256,11 +244,7 @@ router.post('/google', async (req, res) => {
       // half-made account behind.
       if (inviteError) throw refusal(403, inviteError)
 
-      const { rows: flags } = await client.query(
-        'SELECT is_admin FROM umpires WHERE id = $1',
-        [created.id],
-      )
-      return { ...created, is_admin: flags[0].is_admin }
+      return created
     })
 
     res.status(201).json({ token: signToken(umpire), umpire: umpirePayload(umpire) })
@@ -310,7 +294,7 @@ router.post('/google/link', async (req, res) => {
   const password = String(req.body?.password ?? '')
 
   const { rows } = await query(
-    `SELECT id, email, name, password_hash, google_sub, google_email, is_admin
+    `SELECT id, email, name, password_hash, google_sub, google_email
        FROM umpires WHERE lower(email) = $1`,
     [email],
   )
@@ -340,7 +324,7 @@ router.post('/google/link', async (req, res) => {
   try {
     ;({ rows: linked } = await query(
       `UPDATE umpires SET google_sub = $2, google_email = $3 WHERE id = $1
-        RETURNING id, email, name, is_admin, password_hash, google_email`,
+        RETURNING id, email, name, password_hash, google_email`,
       [found.id, profile.sub, profile.email],
     ))
   } catch (error) {
@@ -362,7 +346,7 @@ router.post('/login', async (req, res) => {
   const password = String(req.body?.password ?? '')
 
   const { rows } = await query(
-    `SELECT id, email, name, password_hash, google_email, is_admin
+    `SELECT id, email, name, password_hash, google_email
        FROM umpires
       WHERE lower(email) = $1`,
     [email],
@@ -398,7 +382,7 @@ router.post('/login', async (req, res) => {
 // the first real request mid-match.
 router.get('/me', requireAuth, async (req, res) => {
   const { rows } = await query(
-    `SELECT id, email, name, is_admin, password_hash, google_email
+    `SELECT id, email, name, password_hash, google_email
        FROM umpires WHERE id = $1`,
     [req.umpire.id],
   )
@@ -428,7 +412,7 @@ router.get('/me', requireAuth, async (req, res) => {
 /** The signed-in umpire's row, or null if the account is gone. */
 async function loadUmpire(id) {
   const { rows } = await query(
-    `SELECT id, email, name, is_admin, password_hash, google_sub, google_email
+    `SELECT id, email, name, password_hash, google_sub, google_email
        FROM umpires WHERE id = $1`,
     [id],
   )
@@ -486,7 +470,7 @@ router.patch('/me', requireAuth, async (req, res) => {
   try {
     ;({ rows: updated } = await query(
       `UPDATE umpires SET name = $2, email = $3 WHERE id = $1
-        RETURNING id, email, name, is_admin, password_hash, google_email`,
+        RETURNING id, email, name, password_hash, google_email`,
       [found.id, name, email],
     ))
   } catch (error) {
@@ -527,7 +511,7 @@ router.post('/me/password', requireAuth, async (req, res) => {
 
   const { rows: updated } = await query(
     `UPDATE umpires SET password_hash = $2 WHERE id = $1
-      RETURNING id, email, name, is_admin, password_hash, google_email`,
+      RETURNING id, email, name, password_hash, google_email`,
     [found.id, await hashPassword(password)],
   )
 
@@ -573,7 +557,7 @@ router.post('/google/connect', requireAuth, async (req, res) => {
   try {
     ;({ rows: updated } = await query(
       `UPDATE umpires SET google_sub = $2, google_email = $3 WHERE id = $1
-        RETURNING id, email, name, is_admin, password_hash, google_email`,
+        RETURNING id, email, name, password_hash, google_email`,
       [found.id, profile.sub, profile.email],
     ))
   } catch (error) {
@@ -619,7 +603,7 @@ router.post('/google/disconnect', requireAuth, async (req, res) => {
 
   const { rows: updated } = await query(
     `UPDATE umpires SET google_sub = NULL, google_email = NULL WHERE id = $1
-      RETURNING id, email, name, is_admin, password_hash, google_email`,
+      RETURNING id, email, name, password_hash, google_email`,
     [found.id],
   )
 

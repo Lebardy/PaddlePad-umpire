@@ -64,17 +64,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS umpires_google_sub_idx
 CREATE UNIQUE INDEX IF NOT EXISTS umpires_email_lower_idx
     ON umpires (lower(email));
 
--- Only admins may issue invite codes. Ordinary umpires can score
--- matches but cannot bring new people in, so control over who gets an
--- account stays with the project owner rather than spreading to
--- everyone who has ever been given one.
---
--- The founding umpire (the one who registers with BOOTSTRAP_INVITE_CODE)
--- is made admin automatically; see routes/auth.js. Promoting anyone
--- else is a deliberate manual UPDATE -- there is intentionally no
--- endpoint for it.
-ALTER TABLE umpires
-    ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
+-- Umpire accounts used to carry an admin flag for issuing invite codes.
+-- Admin powers now belong to admin accounts (see "Admin accounts" at the
+-- end of this file), so the flag is removed.
+ALTER TABLE umpires DROP COLUMN IF EXISTS is_admin;
 
 -- Registration is invite-only: the API is on the public internet, so
 -- an open signup form would let anyone create an umpire account and
@@ -545,3 +538,75 @@ ALTER TABLE player_ratings ADD COLUMN IF NOT EXISTS game_scores JSONB;
 
 CREATE INDEX IF NOT EXISTS player_ratings_player_idx
     ON player_ratings (player_id);
+
+-- ============================================================
+-- Admin accounts
+--
+-- Separate from umpires and players on purpose: running the platform is
+-- a different job from scoring a match or reading your own stats, and
+-- keeping the accounts apart means a leaked umpire password never
+-- reaches admin powers. There is exactly one owner, created by
+-- scripts/create-owner.mjs; only the owner adds or switches off admins.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS admins (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name              TEXT NOT NULL,
+    email             TEXT NOT NULL,
+    -- NULL means this admin signs in with Google only.
+    password_hash     TEXT,
+    -- What a Google sign-in is matched on. Never google_email.
+    google_sub        TEXT,
+    -- Display only, so the account page can say which Google account.
+    google_email      TEXT,
+    role              TEXT NOT NULL DEFAULT 'admin' CHECK (role IN ('owner', 'admin')),
+    deactivated_at    TIMESTAMPTZ,
+    last_signed_in_at TIMESTAMPTZ,
+    created_by        UUID REFERENCES admins (id) ON DELETE SET NULL,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS admins_email_lower_idx
+    ON admins (lower(email));
+CREATE UNIQUE INDEX IF NOT EXISTS admins_google_sub_idx
+    ON admins (google_sub) WHERE google_sub IS NOT NULL;
+-- At most one owner, enforced by the database rather than by hoping
+-- every code path remembers to check.
+CREATE UNIQUE INDEX IF NOT EXISTS admins_one_owner_idx
+    ON admins (role) WHERE role = 'owner';
+
+-- One-time links for choosing a password or connecting Google. Only a
+-- hash of the secret is stored. Making a new link for an admin cancels
+-- their unused older ones, which is also how a forgotten password is
+-- recovered.
+CREATE TABLE IF NOT EXISTS admin_setup_links (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    admin_id     UUID NOT NULL REFERENCES admins (id) ON DELETE CASCADE,
+    secret_hash  TEXT NOT NULL UNIQUE,
+    expires_at   TIMESTAMPTZ NOT NULL,
+    used_at      TIMESTAMPTZ,
+    cancelled_at TIMESTAMPTZ,
+    created_by   UUID REFERENCES admins (id) ON DELETE SET NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Who did what. Rows are only ever inserted, in the same transaction as
+-- the change they describe; no route updates or deletes them. The id
+-- counts up so the page can continue from the last entry it showed.
+CREATE TABLE IF NOT EXISTS admin_activity (
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    -- NULL only for scripts/create-owner.mjs.
+    admin_id    UUID REFERENCES admins (id) ON DELETE SET NULL,
+    action      TEXT NOT NULL,
+    target_type TEXT,
+    target_id   TEXT,
+    summary     TEXT NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS admin_activity_admin_idx
+    ON admin_activity (admin_id, id DESC);
+
+-- Invite codes are made by admins from now on. created_by (an umpire)
+-- stays for the codes made before the admin site existed.
+ALTER TABLE invites
+    ADD COLUMN IF NOT EXISTS created_by_admin UUID REFERENCES admins (id) ON DELETE SET NULL;

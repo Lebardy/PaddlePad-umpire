@@ -136,7 +136,8 @@ you expect is actually in the served bundle.
    | Variable | Value |
    |---|---|
    | `JWT_SECRET` | A fresh random 48-byte hex string — **not** the one from your local `.env` |
-   | `CORS_ORIGIN` | Comma-separated list of every app origin, e.g. `https://paddlepad-umpire.up.railway.app,https://paddlepad.up.railway.app` |
+   | `CORS_ORIGIN` | Comma-separated list of every app origin, e.g. `https://paddlepad-umpire.up.railway.app,https://paddlepad.up.railway.app,https://admin-staging-7af8.up.railway.app` — the admin site's address belongs here too |
+   | `ADMIN_ORIGIN` | The admin site's own URL, e.g. `https://admin-staging-7af8.up.railway.app`. Unset falls back to `http://localhost:5175`, which is fine for local development but wrong for anything deployed: a setup link handed to a new admin would point at nobody's machine. The server prints a startup warning when it's unset, and `scripts/create-owner.mjs` refuses to run at all unless it's set (or `--local` says the fallback is genuinely wanted) |
    | `GOOGLE_CLIENT_ID` | The OAuth 2.0 Web client id from Google Cloud Console. Unset disables Google sign-in rather than weakening it. Not a secret. |
    | `INTERNAL_API_KEY` | A fresh random 48-byte hex string, shared only with the `ml` service in the **same** environment. Different per environment. |
 
@@ -158,6 +159,7 @@ uses; `staging` is an identical copy to deploy to first.
 |---|---|---|
 | api | `api.paddlepad.app` | `api-staging-8ac6.up.railway.app` |
 | web (umpire) | `umpire.paddlepad.app` | `web-staging-e8e9.up.railway.app` |
+| admin | not deployed yet — see below | `admin-staging-7af8.up.railway.app` |
 | play (player) | `paddlepad.app` | `play-staging-7f59.up.railway.app` |
 | ml (pipeline) | no public address | `ml-staging-12f5.up.railway.app` |
 | ml-cron (nightly run) | no public address | none; staging's runs inside `ml` |
@@ -175,6 +177,7 @@ Authorized JavaScript origins.
 railway up --service api  --environment staging
 railway up --service web  --environment staging
 railway up --service play --environment staging
+railway up ./admin --path-as-root --service admin --environment staging
 ```
 
 Then run the smoke test against it, which is safe here in a way it is
@@ -210,6 +213,58 @@ If you ever recreate it, verify these before trusting it:
     | grep -oE 'https://[a-z0-9.-]*railway\.app' | sort -u
   ```
 
+### The admin site
+
+`admin` is a fourth Railway service: a static build of `admin/`, the
+site where the owner adds and switches off other admins, makes invite
+codes, and reads the activity record. It only ever calls the api's
+`/admin/*` routes — like every other app here, it never talks to the
+database directly.
+
+It needs two variables of its own, set before building it (Vite inlines
+them, so a change means a rebuild):
+
+| Variable | Value |
+|---|---|
+| `VITE_API_URL` | The api service's public URL, same idea as the umpire and player apps |
+| `VITE_GOOGLE_CLIENT_ID` | Same OAuth client id as the api's `GOOGLE_CLIENT_ID`. Unset just hides the Google button |
+
+The admin address also has to be added to the Google OAuth client's
+**Authorized JavaScript origins** in Google Cloud Console — the same
+place the umpire and player addresses already live — or Google sign-in
+on the admin site is refused by the browser before it ever reaches the
+server.
+
+**Creating the owner.** There's no sign-up form; the first admin account
+is made once, from the command line, inside the api container:
+
+```bash
+railway ssh --service api --environment <env> \
+  "node scripts/create-owner.mjs --name 'Your Name' --email you@example.com"
+```
+
+`railway ssh` opens a shell in the container that's already running, so
+the api service has to be awake first — open `/health` in a browser and
+give it a few seconds if it's been asleep. The command prints a
+one-time setup link, good for 24 hours, that opens the admin site so
+the owner can choose a password or connect Google.
+
+**Rolling this out to production, in order.** The umpire app's own admin
+switch is gone as of the commit that retires it, so production must
+already have a working admin site — with an owner who has signed in —
+before that commit reaches it, or there is a stretch with no way to make
+an invite code at all.
+
+1. Deploy `api` and `admin` from the commit *before* the umpire admin
+   switch was retired (`459f1b8`), not from the branch's head.
+2. Create the owner (above). Have them open the link, finish setup,
+   sign in, and make one test invite code — then cancel it — to prove
+   the site actually works.
+3. Only then deploy the commit that retires the old switch, for `api`
+   and the umpire web app, and do it at a quiet time with no live
+   matches: the old and new api containers briefly overlap during the
+   deploy, and the old code still expects the column the new one drops.
+
 ## Endpoints
 
 | Method | Path | Auth | Purpose |
@@ -238,8 +293,30 @@ If you ever recreate it, verify these before trusting it:
 | `POST` | `/player/link` | Bearer (player) | Attach an umpire's record to the account you already have — see below |
 | `GET` | `/internal/match-logs.json` | `x-internal-key` | Same rows as the export, for the ML service |
 | `POST` | `/internal/ratings` | `x-internal-key` | Records one pipeline run as a snapshot |
+| `GET`/`POST` | `/admin/auth/setup/:secret` | — | Check a setup link, then use it to choose a password, connect Google, or both |
+| `POST` | `/admin/auth/login` | — | Sign in as an admin, returns an admin token |
+| `POST` | `/admin/auth/google` | — | Sign in an admin with Google |
+| `GET` | `/admin/auth/me` | Bearer (admin) | The signed-in admin's own account |
+| `PATCH` | `/admin/auth/me` | Bearer (admin) | Rename yourself |
+| `POST` | `/admin/auth/me/password` | Bearer (admin) | Change the password, or set the first one |
+| `POST` | `/admin/auth/me/google/connect` | Bearer (admin) | Connect Google to the account already signed in |
+| `POST` | `/admin/auth/me/google/disconnect` | Bearer (admin) | Disconnect it, unless that would leave no way back in |
+| `GET` | `/admin/admins` | Bearer (owner) | List every admin |
+| `POST` | `/admin/admins` | Bearer (owner) | Add a new admin and its first setup link |
+| `POST` | `/admin/admins/:id/setup-link` | Bearer (owner) | Make a fresh setup link, cancelling any unused one |
+| `POST` | `/admin/admins/:id/switch-off` | Bearer (owner) | Switch an admin off; the owner can't be switched off |
+| `POST` | `/admin/admins/:id/switch-on` | Bearer (owner) | Switch an admin back on |
+| `GET` | `/admin/invites` | Bearer (admin) | List invite codes |
+| `POST` | `/admin/invites` | Bearer (admin) | Make a new invite code |
+| `DELETE` | `/admin/invites/:code` | Bearer (admin) | Cancel a code that hasn't been used |
+| `GET` | `/admin/activity` | Bearer (admin) | The activity record, newest first |
+| `GET` | `/admin/activity/filters` | Bearer (admin) | Who and what to filter the record by |
 
 Tokens are JWTs valid for 30 days, sent as `Authorization: Bearer <token>`.
+An admin token is a JWT too, but lasts 12 hours and carries `role: 'admin'`
+rather than an umpire or player id — `requireAuth` and `requirePlayer`
+refuse it, and `requireAdminAccount` refuses an umpire or player token
+right back.
 
 ### Signing in with Google
 
@@ -526,7 +603,7 @@ actually did rather than guessing.
 Because player tokens last 30 days and are stateless, `requireActivePlayer`
 re-reads the row on every player request — otherwise "you won't be able
 to get back in" would be false for a month for the person who just read
-it. Same reasoning as `requireAdmin` reading `is_admin` from the
+it. Same reasoning as `requireAdminAccount` reading the admin row from the
 database rather than the token.
 
 **Coming back** works the same way a forgotten password does: an umpire
@@ -566,7 +643,7 @@ after the fact. See the comment above those tables in `schema.sql`.
   endpoint can't be used to discover which emails are registered.
 - **Umpire registration is invite-only.** The API is on the public
   internet, so an open form would let anyone create an account and write
-  into the match data. Only admins can issue invites, and codes are
+  into the match data. Invite codes are made on the admin site, and codes are
   single-use, claimed in the same transaction that creates the umpire.
 - **Player sign-in returns one message** whether the username is unknown
   or the password is wrong, and spends comparable time on both, so it

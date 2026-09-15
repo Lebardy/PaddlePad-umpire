@@ -7,6 +7,11 @@
 // Needs SMOKE_EMAIL and SMOKE_PASSWORD for an existing umpire, or
 // SMOKE_INVITE to register a new one.
 //
+// The admin section runs only against staging or a local server. Its
+// owner checks need SMOKE_OWNER_EMAIL and SMOKE_OWNER_PASSWORD for
+// staging's owner; each run adds one throwaway admin and switches it
+// off at the end. Production is never given test admins.
+//
 // The six assertions that matter are the sync design's correctness
 // argument, and they are why this file is kept rather than thrown away:
 //
@@ -1395,6 +1400,126 @@ async function main() {
     check('the username they chose still signs them in -> 200', backIn.status === 200)
     check('and lands on the surviving record', backIn.body.player?.id === spelling,
       `${backIn.body.player?.id} vs ${spelling}`)
+  }
+
+  section('admin site — doors that need no owner')
+  const ADMIN_SECTION = /staging|localhost|127\.0\.0\.1/.test(API)
+  if (!ADMIN_SECTION) {
+    console.log('  skip (admin checks run against staging or a local server only)')
+  } else {
+    const noToken = await request('/admin/invites')
+    check('admin routes refuse a request with no token -> 401', noToken.status === 401, String(noToken.status))
+    const asUmpire = await request('/admin/invites', { bearer: token })
+    check('admin routes refuse an umpire token -> 403', asUmpire.status === 403, String(asUmpire.status))
+    const wrong = await request('/admin/auth/login', {
+      method: 'POST', body: { email: `nobody.${uuid().slice(0, 8)}@example.com`, password: 'not-a-real-password' },
+    })
+    check('an unknown admin email is refused -> 401', wrong.status === 401, String(wrong.status))
+    const badLink = await request(`/admin/auth/setup/${'x'.repeat(43)}`)
+    check('an unknown setup link is gone -> 410', badLink.status === 410, String(badLink.status))
+    const badGoogle = await request('/admin/auth/google', { method: 'POST', body: { accessToken: 'not-a-google-token' } })
+    check('a made-up Google token signs no one in', badGoogle.status === 401 || badGoogle.status === 503, String(badGoogle.status))
+  }
+
+  section('admin site — owner, admins, invite codes and the activity record')
+  const OWNER_EMAIL = process.env.SMOKE_OWNER_EMAIL
+  const OWNER_PASSWORD = process.env.SMOKE_OWNER_PASSWORD
+  if (!ADMIN_SECTION || !OWNER_EMAIL || !OWNER_PASSWORD) {
+    console.log('  skip (needs a staging or local server, SMOKE_OWNER_EMAIL and SMOKE_OWNER_PASSWORD)')
+  } else {
+    const ownerIn = await request('/admin/auth/login', { method: 'POST', body: { email: OWNER_EMAIL, password: OWNER_PASSWORD } })
+    check('the owner signs in -> 200', ownerIn.status === 200, JSON.stringify(ownerIn.body).slice(0, 80))
+    const owner = ownerIn.body.token
+    check('as the owner', ownerIn.body.admin?.role === 'owner', ownerIn.body.admin?.role)
+    check('the response never carries a password hash', !JSON.stringify(ownerIn.body).includes('password_hash'))
+
+    const ownerOnUmpire = await request('/auth/me', { bearer: owner })
+    check('an admin token is refused by the umpire app -> 403', ownerOnUmpire.status === 403, String(ownerOnUmpire.status))
+    const ownerOnPlayer = await request('/player/me', { bearer: owner })
+    check('an admin token is refused by the player app -> 403', ownerOnPlayer.status === 403, String(ownerOnPlayer.status))
+
+    const email = `smoke.admin.${uuid().slice(0, 8)}@example.com`
+    const added = await request('/admin/admins', { method: 'POST', bearer: owner, body: { name: 'Smoke Admin', email } })
+    check('the owner adds an admin -> 201', added.status === 201, JSON.stringify(added.body).slice(0, 80))
+    const adminId = added.body.admin?.id
+    const firstLink = added.body.setupLink?.url ?? ''
+    check('and gets a setup link to the admin site', firstLink.includes('/setup/'), firstLink)
+    const hoursLeft = (new Date(added.body.setupLink?.expiresAt) - Date.now()) / 3_600_000
+    check('the link lasts 24 hours', hoursLeft > 23.9 && hoursLeft < 24.1, String(hoursLeft))
+    const dupe = await request('/admin/admins', { method: 'POST', bearer: owner, body: { name: 'Again', email } })
+    check('the same email cannot be added twice -> 409', dupe.status === 409, String(dupe.status))
+
+    // A second link cancels the first.
+    const relinked = await request(`/admin/admins/${adminId}/setup-link`, { method: 'POST', bearer: owner })
+    check('the owner makes a new link -> 200', relinked.status === 200, String(relinked.status))
+    const secret = (url) => url.split('/setup/')[1]
+    const oldLink = await request(`/admin/auth/setup/${secret(firstLink)}`)
+    check('the older link stops working -> 410', oldLink.status === 410, String(oldLink.status))
+    const link = secret(relinked.body.setupLink?.url ?? '')
+    const opened = await request(`/admin/auth/setup/${link}`)
+    check('the newer link opens -> 200, for the right person',
+      opened.status === 200 && opened.body.admin?.email === email, JSON.stringify(opened.body).slice(0, 80))
+
+    const short = await request(`/admin/auth/setup/${link}`, { method: 'POST', body: { password: 'short' } })
+    check('a short password is refused -> 400', short.status === 400, String(short.status))
+    const ADMIN_PASSWORD = `smoke-${uuid()}`
+    const setUp = await request(`/admin/auth/setup/${link}`, { method: 'POST', body: { password: ADMIN_PASSWORD } })
+    check('finishing setup signs the admin in -> 200', setUp.status === 200 && setUp.body.admin?.role === 'admin',
+      JSON.stringify(setUp.body).slice(0, 80))
+    const again = await request(`/admin/auth/setup/${link}`, { method: 'POST', body: { password: ADMIN_PASSWORD } })
+    check('the link works only once -> 410', again.status === 410, String(again.status))
+
+    const adminIn = await request('/admin/auth/login', { method: 'POST', body: { email, password: ADMIN_PASSWORD } })
+    check('the new admin signs in with their password -> 200', adminIn.status === 200, String(adminIn.status))
+    const admin = adminIn.body.token
+
+    const notOwner = await request('/admin/admins', { bearer: admin })
+    check('an admin cannot see the owner-only admins list -> 403', notOwner.status === 403, String(notOwner.status))
+    const noGoogle = await request('/admin/auth/me/google/disconnect', { method: 'POST', bearer: admin })
+    check('disconnecting Google that was never connected -> 409', noGoogle.status === 409, String(noGoogle.status))
+
+    const made = await request('/admin/invites', { method: 'POST', bearer: admin, body: { note: 'smoke test', expiresInDays: 3 } })
+    check('an admin makes an invite code -> 201', made.status === 201, JSON.stringify(made.body).slice(0, 80))
+    const code = made.body.invite?.code
+    const badExpiry = await request('/admin/invites', { method: 'POST', bearer: admin, body: { expiresInDays: 400 } })
+    check('an expiry past a year is refused -> 400', badExpiry.status === 400, String(badExpiry.status))
+    const listed = await request('/admin/invites', { bearer: admin })
+    const row = listed.body.invites?.find((i) => i.code === code)
+    check('the code is listed as open, made by that admin',
+      row?.status === 'open' && row?.created_by_name === 'Smoke Admin' && row?.made_before_admin_site === false,
+      JSON.stringify(row))
+    const cancelled = await request(`/admin/invites/${code}`, { method: 'DELETE', bearer: admin })
+    check('the admin cancels it -> 204', cancelled.status === 204, String(cancelled.status))
+    const cancelledAgain = await request(`/admin/invites/${code}`, { method: 'DELETE', bearer: admin })
+    check('cancelling it again -> 404', cancelledAgain.status === 404, String(cancelledAgain.status))
+
+    const activity = await request(`/admin/activity?adminId=${adminId}`, { bearer: owner })
+    const actions = (activity.body.entries ?? []).map((e) => e.action)
+    const count = (name) => actions.filter((a) => a === name).length
+    check('the record holds exactly one setup, one sign-in, one code made and one cancelled',
+      count('admin.setup_completed') === 1 && count('admin.signed_in') === 1 &&
+        count('invite.created') === 1 && count('invite.cancelled') === 1,
+      JSON.stringify(actions))
+    check('the failed cancel added nothing, and no whole code is recorded',
+      !JSON.stringify(activity.body).includes(code), JSON.stringify(activity.body).slice(0, 120))
+    const byOwner = await request(`/admin/activity?action=admin.added`, { bearer: owner })
+    check('adding the admin was recorded once',
+      (byOwner.body.entries ?? []).filter((e) => e.targetId === adminId).length === 1)
+
+    const ownerOff = await request(`/admin/admins/${ownerIn.body.admin.id}/switch-off`, { method: 'POST', bearer: owner })
+    check('the owner cannot be switched off -> 409', ownerOff.status === 409, String(ownerOff.status))
+    const off = await request(`/admin/admins/${adminId}/switch-off`, { method: 'POST', bearer: owner })
+    check('the owner switches the admin off -> 200', off.status === 200 && off.body.admin?.active === false, String(off.status))
+    const afterOff = await request('/admin/invites', { bearer: admin })
+    check('their still-valid token stops working at once -> 401', afterOff.status === 401, String(afterOff.status))
+    const loginOff = await request('/admin/auth/login', { method: 'POST', body: { email, password: ADMIN_PASSWORD } })
+    check('and the right password says access is switched off -> 403', loginOff.status === 403, String(loginOff.status))
+    const on = await request(`/admin/admins/${adminId}/switch-on`, { method: 'POST', bearer: owner })
+    const afterOn = await request('/admin/invites', { bearer: admin })
+    check('switched back on, the same token works again', on.status === 200 && afterOn.status === 200,
+      `${on.status} ${afterOn.status}`)
+    const offAgain = await request(`/admin/admins/${adminId}/switch-off`, { method: 'POST', bearer: owner })
+    check('the throwaway admin is left switched off', offAgain.status === 200, String(offAgain.status))
   }
 
   if (selfRegistered.length > 0) {

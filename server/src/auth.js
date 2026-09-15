@@ -1,6 +1,7 @@
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
 import jwt from 'jsonwebtoken'
+import { ADMIN_TOKEN_TTL } from './admin-rules.js'
 
 const scryptAsync = promisify(scrypt)
 
@@ -134,7 +135,7 @@ export function requirePlayer(req, res, next) {
  * Express middleware: requires the player's record still to exist and
  * still to be active. Must run after requirePlayer.
  *
- * Same reasoning as requireAdmin below, for the same reason: a player
+ * Same reasoning as requireAdminAccount below: a player
  * token is valid for 30 days and requirePlayer is stateless, so without
  * this a player who has just deleted their profile would keep getting
  * in for a month with the token already in their browser -- which would
@@ -165,36 +166,64 @@ export function requireActivePlayer(queryFn) {
   }
 }
 
+// ============================================================
+// Admin accounts
+// ============================================================
+
 /**
- * Express middleware: requires the caller to be an admin. Must run
- * after requireAuth.
- *
- * Deliberately reads is_admin from the database rather than trusting
- * the token. A token is valid for 30 days, so a token minted while
- * someone was an admin would keep asserting that long after the flag
- * was revoked. The copy of is_admin in the token is only ever used by
- * the app to decide what to show, never to decide what is allowed.
+ * A token for an ADMIN. Its own role, so it is never accepted where an
+ * umpire or player token is expected, and neither of those is accepted
+ * here. Shorter-lived than theirs: an admin can do far more.
  */
-export function requireAdmin(queryFn) {
-  return async function requireAdminMiddleware(req, res, next) {
+export function signAdminToken(admin) {
+  return jwt.sign(
+    { sub: admin.id, name: admin.name, role: 'admin' },
+    JWT_SECRET,
+    { expiresIn: ADMIN_TOKEN_TTL },
+  )
+}
+
+/**
+ * Express middleware: requires an admin token for an admin who still
+ * exists and is still switched on, and attaches
+ * `req.admin = { id, name, email, role }`.
+ *
+ * Reads the row on every request rather than trusting the token, so
+ * switching someone off takes effect on their very next click, and the
+ * role (owner or admin) always comes from the database.
+ */
+export function requireAdminAccount(queryFn) {
+  return async function requireAdminAccountMiddleware(req, res, next) {
+    const payload = verify(req)
+    if (!payload) {
+      return res.status(401).json({ error: 'Missing or invalid token' })
+    }
+    if (payload.role !== 'admin') {
+      return res.status(403).json({ error: 'That action is for admins only' })
+    }
     try {
       const { rows } = await queryFn(
-        'SELECT is_admin FROM umpires WHERE id = $1',
-        [req.umpire.id],
+        'SELECT id, name, email, role, deactivated_at FROM admins WHERE id = $1',
+        [payload.sub],
       )
-      if (!rows[0]) {
-        return res.status(401).json({ error: 'Account no longer exists' })
+      const found = rows[0]
+      if (!found || found.deactivated_at) {
+        return res.status(401).json({ error: 'Your admin access has ended' })
       }
-      if (!rows[0].is_admin) {
-        return res
-          .status(403)
-          .json({ error: 'Only an admin can manage invite codes' })
-      }
+      req.admin = { id: found.id, name: found.name, email: found.email, role: found.role }
       next()
     } catch (error) {
       next(error)
     }
   }
+}
+
+/** Requires the owner. Must run after requireAdminAccount. */
+export function requireOwner(req, res, next) {
+  if (req.admin?.role !== 'owner') {
+    return res.status(403).json({ error: 'Only the owner can do that' })
+  }
+  next()
 }
 
 // ============================================================

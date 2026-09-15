@@ -4,7 +4,6 @@ import { migrate, pool } from './db.js'
 import { RATE_LIMITS_DISABLED, rateLimit } from './ratelimit.js'
 import { requestLog } from './requestlog.js'
 import authRoutes from './routes/auth.js'
-import inviteRoutes from './routes/invites.js'
 // Umpire-facing: search, create and manage the player registry.
 import playerAdminRoutes from './routes/players.js'
 import sessionRoutes from './routes/sessions.js'
@@ -15,6 +14,11 @@ import playerSelfRoutes from './routes/player.js'
 // Service-to-service: the ML pipeline reading match logs and writing
 // back a ratings snapshot. Guarded by a shared key, not by a token.
 import internalRoutes from './routes/internal.js'
+// Admin site: its own accounts, guarded by the admin token role.
+import adminAuthRoutes from './routes/admin-auth.js'
+import adminAdminsRoutes from './routes/admin-admins.js'
+import adminInviteRoutes from './routes/admin-invites.js'
+import adminActivityRoutes from './routes/admin-activity.js'
 
 const app = express()
 
@@ -33,6 +37,17 @@ if (RATE_LIMITS_DISABLED) {
     '\n*** RATE LIMITS ARE DISABLED (DANGEROUSLY_DISABLE_RATE_LIMITS=1) ***\n' +
       '*** Password, invite-code and claim-code guessing are unthrottled. ***\n' +
       '*** This is for automated tests only. Never set it on a deploy.  ***\n',
+  )
+}
+
+// Fine for local development, where the admin site really does run at
+// the localhost fallback (see setupUrl in admin-accounts.js). Anywhere
+// else this means a setup link just handed to a new admin points at
+// nobody's machine but yours.
+if (!process.env.ADMIN_ORIGIN) {
+  console.warn(
+    'ADMIN_ORIGIN is not set. Any admin setup link created here will point at ' +
+      'http://localhost:5175 rather than the deployed admin site.',
   )
 }
 
@@ -151,14 +166,27 @@ app.use('/export', rateLimit({ max: 5, windowMs: 60_000 }))
 // loose enough for a nightly run plus a few manual triggers in a demo.
 app.use('/internal', rateLimit({ max: 20, windowMs: 60_000 }))
 
+// The admin site. Sign-in, setup links and password changes are
+// guessing surfaces, so they get login-grade limits; the parent limit
+// below is the ceiling on everything under /admin, nested paths
+// included (see the note on /auth/google above).
+app.use('/admin/auth/login', rateLimit({ max: 10, windowMs: 60_000 }))
+app.use('/admin/auth/google', rateLimit({ max: 10, windowMs: 60_000 }))
+app.use('/admin/auth/setup', rateLimit({ max: 10, windowMs: 60_000 }))
+app.use('/admin/auth/me/password', rateLimit({ max: 10, windowMs: 60_000 }))
+app.use('/admin', rateLimit({ max: 120, windowMs: 60_000 }))
+
 app.use('/auth', authRoutes)
-app.use('/invites', inviteRoutes)
 app.use('/players', playerAdminRoutes)
 app.use('/sessions', sessionRoutes)
 app.use('/matches', matchRoutes)
 app.use('/export', exportRoutes)
 app.use('/player', playerSelfRoutes)
 app.use('/internal', internalRoutes)
+app.use('/admin/auth', adminAuthRoutes)
+app.use('/admin/admins', adminAdminsRoutes)
+app.use('/admin/invites', adminInviteRoutes)
+app.use('/admin/activity', adminActivityRoutes)
 
 // Express 5 forwards rejected promises from async handlers here, so
 // route handlers don't each need their own try/catch.

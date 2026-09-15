@@ -36,7 +36,7 @@ function SessionList({ sessions, onOpenSession, showOwner = false }) {
   )
 }
 
-function Home({ onOpenSession, onOpenInvites, onOpenGuide, onOpenPlayers, umpire }) {
+function Home({ onOpenSession, onOpenGuide, onOpenPlayers, umpire }) {
   // Subscribed rather than read during render: previously this never
   // updated after a write, and only looked correct because navigating
   // away unmounted the screen.
@@ -196,14 +196,6 @@ function Home({ onOpenSession, onOpenInvites, onOpenGuide, onOpenPlayers, umpire
             <span className="tool-note">Every umpire&rsquo;s matches, for the rating pipeline</span>
           </button>
         </li>
-        {onOpenInvites && (
-          <li>
-            <button className="export-btn" onClick={onOpenInvites}>
-              <span>Invite an umpire</span>
-              <span className="tool-note">Make a one-time code for a new account</span>
-            </button>
-          </li>
-        )}
       </ul>
     </div>
   )

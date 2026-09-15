@@ -140,28 +140,6 @@ export async function register({ email, name, password, invite }) {
   return data.umpire
 }
 
-// ============================================================
-// Invites
-//
-// Registration is invite-only because the API is public. These are
-// how an existing umpire brings in a new one.
-// ============================================================
-
-export function listInvites() {
-  return apiFetch('/invites').then((data) => data.invites)
-}
-
-export function createInvite({ note, expiresInDays } = {}) {
-  return apiFetch('/invites', {
-    method: 'POST',
-    body: { note, ...(expiresInDays === undefined ? {} : { expiresInDays }) },
-  }).then((data) => data.invite)
-}
-
-export function revokeInvite(code) {
-  return apiFetch(`/invites/${encodeURIComponent(code)}`, { method: 'DELETE' })
-}
-
 /**
  * Signs in with Google.
  *
