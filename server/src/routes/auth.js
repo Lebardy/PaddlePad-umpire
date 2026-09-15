@@ -764,10 +764,6 @@ function playerPayload(row) {
  * the moment the two ways in become one flow.
  */
 function assertMayLinkTo(existing, code) {
-  if (existing.paused_at) {
-    throw refusal(403, PAUSED_MESSAGE, { status: 'paused' })
-  }
-
   if (existing.password_hash) {
     throw refusal(
       409,
@@ -787,6 +783,14 @@ function assertMayLinkTo(existing, code) {
         'the matches already recorded for you.',
       { needsCode: true },
     )
+  }
+
+  // Checked last, and only reachable once the right code has matched:
+  // holding it is the only proof that earns the caller the truth about
+  // a pause. Checking it earlier would let anyone typing a paused
+  // player's NAME learn they are paused without ever proving who they are.
+  if (existing.paused_at) {
+    throw refusal(403, PAUSED_MESSAGE, { status: 'paused' })
   }
 }
 

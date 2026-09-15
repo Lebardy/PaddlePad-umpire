@@ -111,7 +111,7 @@ section('which tokens each guard lets through')
     const res = { statusCode: 200, body: null, status(c) { this.statusCode = c; return this }, json(b) { this.body = b; return this } }
     let nextCalled = false
     await middleware(req, res, () => { nextCalled = true })
-    return { status: nextCalled ? 'next' : res.statusCode, req }
+    return { status: nextCalled ? 'next' : res.statusCode, req, body: res.body }
   }
 
   const activeRow = { id: 'a1', name: 'Jan', email: 'jan@example.com', role: 'admin', deactivated_at: null }
@@ -139,6 +139,33 @@ section('which tokens each guard lets through')
 
   check('the owner guard lets the owner through', (await run(auth.requireOwner, null, { admin: { role: 'owner' } })).status, 'next')
   check('the owner guard refuses an admin', (await run(auth.requireOwner, null, { admin: { role: 'admin' } })).status, 403)
+
+  // requireActiveUmpire / requireActivePlayer (Task 2) must run after
+  // requireAuth / requirePlayer, so they read req.umpire.id / req.player.id
+  // rather than a token -- the fake request supplies that directly.
+  const umpireExtra = { umpire: { id: 'u1' } }
+  const runUmpireGuard = (rows) => run(auth.requireActiveUmpire(fakeQuery(rows)), null, umpireExtra)
+
+  check('the active-umpire guard lets an active umpire through',
+    (await runUmpireGuard([{ paused_at: null, closed_at: null }])).status, 'next')
+  check('the active-umpire guard refuses a paused umpire', (await runUmpireGuard([{ paused_at: '2026-09-15T00:00:00Z', closed_at: null }])).status, 401)
+  check('and says which', (await runUmpireGuard([{ paused_at: '2026-09-15T00:00:00Z', closed_at: null }])).body.status, 'paused')
+  check('the active-umpire guard refuses a closed umpire', (await runUmpireGuard([{ paused_at: null, closed_at: '2026-09-15T00:00:00Z' }])).status, 401)
+  check('and says which', (await runUmpireGuard([{ paused_at: null, closed_at: '2026-09-15T00:00:00Z' }])).body.status, 'closed')
+  check('the active-umpire guard treats a missing umpire as closed', (await runUmpireGuard([])).status, 401)
+  check('and says which', (await runUmpireGuard([])).body.status, 'closed')
+
+  const playerExtra = { player: { id: 'p1' } }
+  const runPlayerGuard = (rows) => run(auth.requireActivePlayer(fakeQuery(rows)), null, playerExtra)
+
+  check('the active-player guard lets an active player through',
+    (await runPlayerGuard([{ paused_at: null, deactivated_at: null }])).status, 'next')
+  check('the active-player guard refuses a paused player', (await runPlayerGuard([{ paused_at: '2026-09-15T00:00:00Z', deactivated_at: null }])).status, 401)
+  check('and says which', (await runPlayerGuard([{ paused_at: '2026-09-15T00:00:00Z', deactivated_at: null }])).body.status, 'paused')
+  check('the active-player guard refuses a closed player', (await runPlayerGuard([{ paused_at: null, deactivated_at: '2026-09-15T00:00:00Z' }])).status, 401)
+  check('and says which', (await runPlayerGuard([{ paused_at: null, deactivated_at: '2026-09-15T00:00:00Z' }])).body.status, 'closed')
+  check('the active-player guard treats a missing player as closed', (await runPlayerGuard([])).status, 401)
+  check('and says which', (await runPlayerGuard([])).body.status, 'closed')
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

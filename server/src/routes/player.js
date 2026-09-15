@@ -15,6 +15,7 @@ import {
   summarisePlayer,
 } from '../player-stats.js'
 import { normalizeInviteCode } from '../invites.js'
+import { signInRefusal } from '../people-rules.js'
 import { wipePlayerCredentials } from '../player-accounts.js'
 import { getMatchOfTheMonthStory, getMonthlyBoard } from '../board.js'
 import { isUuid, normalizePlayerName, playerNameError } from '../validate.js'
@@ -356,7 +357,7 @@ router.post('/link', async (req, res) => {
     // the same pair would interleave into a half-merge that no single
     // statement could undo.
     const { rows: sources } = await client.query(
-      `SELECT id, name, password_hash, google_sub
+      `SELECT id, name, password_hash, google_sub, paused_at
          FROM players WHERE claim_code = $1 FOR UPDATE`,
       [code],
     )
@@ -389,6 +390,15 @@ router.post('/link', async (req, res) => {
             "If that's you, sign in as them instead.",
         },
       }
+    }
+
+    // Holding the code is the proof that earns this reply -- the same
+    // rule assertMayLinkTo follows. Without this, merging in a paused
+    // roster player would hand back a token that requireActivePlayer
+    // kills on its very next request.
+    const pauseRefusal = signInRefusal(source, 'deactivated_at')
+    if (pauseRefusal) {
+      return { status: pauseRefusal.statusCode, body: pauseRefusal.body }
     }
 
     const { rows: targets } = await client.query(
