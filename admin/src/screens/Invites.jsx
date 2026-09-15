@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react'
+import PageBoard, { TallyCell } from '../components/PageBoard'
 import { cancelInvite, createInvite, listInvites } from '../lib/api'
 import { EXPIRY_CHOICES, formatWhen, inviteStatusText, madeByText } from '../lib/format'
+
+const SHOWING = [
+  { key: 'all', label: 'All codes', empty: 'No invite codes yet. Make the first one above.' },
+  { key: 'open', label: 'Open', empty: 'No open codes. Every code has been used, cancelled or has stopped working.' },
+  { key: 'used', label: 'Used', empty: 'No code has been used yet.' },
+  { key: 'expired', label: 'Expired', empty: 'No code has stopped working yet.' },
+]
 
 export default function Invites() {
   const [invites, setInvites] = useState(null)
@@ -11,19 +19,30 @@ export default function Invites() {
   const [busy, setBusy] = useState(false)
   const [newest, setNewest] = useState(null)
   const [copied, setCopied] = useState(null)
+  const [showing, setShowing] = useState('all')
+  const [confirming, setConfirming] = useState(null)
+
+  function loaded(rows) {
+    setInvites(rows)
+    setLoadedAt(Date.now())
+    setError(null)
+  }
+
+  useEffect(() => {
+    let live = true
+    listInvites()
+      .then((rows) => { if (live) loaded(rows) })
+      .catch((err) => { if (live) setError(err.message) })
+    return () => { live = false }
+  }, [])
 
   async function refresh() {
     try {
-      const rows = await listInvites()
-      setInvites(rows)
-      setLoadedAt(Date.now())
-      setError(null)
+      loaded(await listInvites())
     } catch (err) {
       setError(err.message)
     }
   }
-
-  useEffect(() => { refresh() }, [])
 
   async function handleCreate(event) {
     event.preventDefault()
@@ -36,6 +55,7 @@ export default function Invites() {
       })
       setNewest(invite.code)
       setNote('')
+      if (showing !== 'open') setShowing('all')
       await refresh()
     } catch (err) {
       setError(err.message)
@@ -45,9 +65,10 @@ export default function Invites() {
   }
 
   async function handleCancel(code) {
-    if (!window.confirm(`Cancel invite code ${code}? It stops working straight away.`)) return
+    setConfirming(null)
     try {
       await cancelInvite(code)
+      if (newest === code) setNewest(null)
       await refresh()
     } catch (err) {
       setError(err.message)
@@ -65,62 +86,114 @@ export default function Invites() {
     }
   }
 
+  const counts = { all: invites?.length ?? 0, open: 0, used: 0, expired: 0 }
+  for (const invite of invites ?? []) counts[invite.status] += 1
+  const rows = (invites ?? []).filter((invite) => showing === 'all' || invite.status === showing)
+  const current = SHOWING.find((s) => s.key === showing)
+  const fresh = newest && invites?.find((invite) => invite.code === newest)
+
   return (
     <section>
-      <header className="page-head">
-        <h1>Invite codes</h1>
-        <p>A new umpire needs a code to create their account. Each code works once. Send it to them yourself.</p>
-      </header>
-
-      <form className="toolbar" onSubmit={handleCreate}>
-        <label className="field grow">
-          <span>Who it’s for (optional)</span>
-          <input value={note} maxLength={120} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Coach Ana" />
-        </label>
-        <label className="field">
-          <span>Stops working</span>
-          <select value={expiry} onChange={(e) => setExpiry(e.target.value)}>
-            {EXPIRY_CHOICES.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
-          </select>
-        </label>
-        <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Making…' : 'Make a code'}</button>
-      </form>
-
-      {error && <p className="form-error" role="alert">{error}</p>}
-      {invites === null && !error && <p className="empty">Loading…</p>}
-      {invites?.length === 0 && <p className="empty">No invite codes yet.</p>}
-
-      {invites?.length > 0 && (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr><th>Code</th><th>For</th><th>Status</th><th>Made by</th><th>Made</th><th><span className="sr-only">Actions</span></th></tr>
-            </thead>
-            <tbody>
-              {invites.map((invite) => (
-                <tr key={invite.code} className={[invite.status !== 'open' && 'is-faded', newest === invite.code && 'is-new'].filter(Boolean).join(' ')}>
-                  <td><span className="code">{invite.code}</span></td>
-                  <td>{invite.note ?? '—'}</td>
-                  <td>
-                    <span className={`tag tag-${invite.status}`}>{inviteStatusText(invite, loadedAt)}</span>
-                    {invite.status === 'used' && invite.used_at && <span className="hint"> {formatWhen(invite.used_at)}</span>}
-                  </td>
-                  <td>{madeByText(invite)}</td>
-                  <td>{formatWhen(invite.created_at)}</td>
-                  <td className="row-actions">
-                    {invite.status === 'open' && (
-                      <>
-                        <button type="button" className="btn-quiet" onClick={() => handleCopy(invite.code)}>{copied === invite.code ? 'Copied' : 'Copy'}</button>
-                        <button type="button" className="btn-danger" onClick={() => handleCancel(invite.code)}>Cancel</button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <PageBoard
+        title="Invite codes"
+        intro="A new umpire needs a code to create their account. Each code works once. Send it to them yourself."
+      >
+        <div className="tally" role="group" aria-label="Show codes">
+          {SHOWING.map((s) => (
+            <TallyCell key={s.key} figure={invites ? counts[s.key] : '–'} label={s.label}
+              pressed={showing === s.key} onClick={() => setShowing(s.key)} />
+          ))}
         </div>
-      )}
+      </PageBoard>
+
+      <div className="sheet">
+        <form className="form-strip" onSubmit={handleCreate}>
+          <h2 className="form-strip-title">New code</h2>
+          <label className="field grow">
+            <span>Who it’s for (optional)</span>
+            <input value={note} maxLength={120} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Coach Ana" />
+          </label>
+          <label className="field">
+            <span>Stops working</span>
+            <select value={expiry} onChange={(e) => setExpiry(e.target.value)}>
+              {EXPIRY_CHOICES.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+            </select>
+          </label>
+          <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Making…' : 'Make a code'}</button>
+        </form>
+
+        {fresh && (
+          <div className="ticket board-texture" role="status">
+            <div>
+              <p className="ticket-code">{fresh.code}</p>
+              <p className="ticket-text">
+                {fresh.note ? <>For <strong>{fresh.note}</strong> · </> : null}
+                {inviteStatusText(fresh, loadedAt)}. Send it to them yourself. It works once.
+              </p>
+            </div>
+            <div className="ticket-actions">
+              <button type="button" className="btn-lamp" onClick={() => handleCopy(fresh.code)}>
+                {copied === fresh.code ? 'Copied' : 'Copy code'}
+              </button>
+              <button type="button" className="btn-board" onClick={() => setNewest(null)}>Done</button>
+            </div>
+          </div>
+        )}
+
+        {error && <p className="form-error" role="alert">{error}</p>}
+        {invites === null && !error && <p className="empty">Loading…</p>}
+        {invites && rows.length === 0 && <p className="empty">{current.empty}</p>}
+
+        {rows.length > 0 && (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th className="col-code">Code</th>
+                  <th>For</th>
+                  <th>Status</th>
+                  <th className="col-when">Made</th>
+                  <th className="col-actions"><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((invite) => (
+                  <tr key={invite.code} className={[invite.status !== 'open' && 'is-faded', newest === invite.code && 'is-new'].filter(Boolean).join(' ')}>
+                    <td className="col-code"><span className="code">{invite.code}</span></td>
+                    <td>
+                      <span className="cell-main">{invite.note ?? '—'}</span>
+                      {invite.created_by_name && <span className="cell-sub">Made by {madeByText(invite)}</span>}
+                    </td>
+                    <td>
+                      <span className={`tag tag-${invite.status}`}>{inviteStatusText(invite, loadedAt)}</span>
+                      {invite.status === 'used' && invite.used_at && <span className="cell-sub nowrap">{formatWhen(invite.used_at)}</span>}
+                    </td>
+                    <td className="col-when">{formatWhen(invite.created_at)}</td>
+                    <td className="row-actions">
+                      {invite.status === 'open' && confirming !== invite.code && (
+                        <>
+                          <button type="button" className="btn-quiet btn-small" onClick={() => handleCopy(invite.code)}>{copied === invite.code ? 'Copied' : 'Copy'}</button>
+                          <button type="button" className="btn-danger btn-small" onClick={() => setConfirming(invite.code)}>Cancel</button>
+                        </>
+                      )}
+                      {invite.status === 'open' && confirming === invite.code && (
+                        <span className="confirm">
+                          <span className="confirm-text">It stops working straight away.</span>
+                          <span className="confirm-buttons">
+                            <button type="button" className="btn-danger is-solid btn-small" onClick={() => handleCancel(invite.code)}>Cancel code</button>
+                            {/* Focus lands on the safe choice. */}
+                            <button type="button" className="btn-quiet btn-small" autoFocus onClick={() => setConfirming(null)}>Keep</button>
+                          </span>
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </section>
   )
 }

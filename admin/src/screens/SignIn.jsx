@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Gate from '../components/Gate'
 import GoogleButton from '../components/GoogleButton'
 import { signIn, signInWithGoogle } from '../lib/api'
 
@@ -20,9 +21,8 @@ export default function SignIn({ onSignedIn }) {
   }
 
   return (
-    <div className="gate">
-      <form className="gate-card" onSubmit={(e) => { e.preventDefault(); run(() => signIn({ email, password })) }}>
-        <p className="brand-mark">PaddlePad<span>Admin</span></p>
+    <Gate>
+      <form className="gate-form" onSubmit={(e) => { e.preventDefault(); run(() => signIn({ email, password })) }}>
         <h1>Sign in</h1>
         <label className="field">
           <span>Email</span>
@@ -34,10 +34,9 @@ export default function SignIn({ onSignedIn }) {
         </label>
         {error && <p className="form-error" role="alert">{error}</p>}
         <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
-        <div className="gate-or">or</div>
-        <GoogleButton disabled={busy} label="Sign in with Google" onToken={(token) => run(() => signInWithGoogle(token))} />
+        <GoogleButton withDivider disabled={busy} label="Sign in with Google" onToken={(token) => run(() => signInWithGoogle(token))} />
         <p className="gate-note">Admin accounts are added by the owner. There is no sign-up here.</p>
       </form>
-    </div>
+    </Gate>
   )
 }

@@ -1,4 +1,5 @@
 import { Link } from '../lib/router'
+import LampMark from './LampMark'
 
 const PAGES = [
   { to: '/invites', label: 'Invite codes', current: (path) => path === '/' || path === '/invites' },
@@ -6,32 +7,30 @@ const PAGES = [
   { to: '/activity', label: 'Activity', current: (path) => path === '/activity' },
 ]
 
-/** The left menu and the page beside it. Only pages that exist are listed. */
+/** The board across the top of every page, and the page under it. Only pages that exist are listed. */
 export default function Layout({ admin, path, onSignOut, children }) {
+  const onAccount = path === '/account'
   return (
     <div className="shell">
-      <nav className="menu" aria-label="Admin pages">
-        <p className="brand-mark">PaddlePad<span>Admin</span></p>
-        <ul>
-          {PAGES.filter((page) => !page.ownerOnly || admin.role === 'owner').map((page) => {
-            const current = page.current(path)
-            return (
+      <div className="topbar board-texture">
+        <Link to="/invites" className="brand-mark"><LampMark />PaddlePad<span>Admin</span></Link>
+        <nav aria-label="Admin pages">
+          <ul className="tabs">
+            {PAGES.filter((page) => !page.ownerOnly || admin.role === 'owner').map((page) => (
               <li key={page.to}>
-                <Link to={page.to} className={`menu-link${current ? ' is-current' : ''}`} aria-current={current ? 'page' : undefined}>
-                  {page.label}
-                </Link>
+                <Link to={page.to} aria-current={page.current(path) ? 'page' : undefined}>{page.label}</Link>
               </li>
-            )
-          })}
-        </ul>
-        <div className="menu-foot">
-          <Link to="/account" className={`menu-who${path === '/account' ? ' is-current' : ''}`}>
+            ))}
+          </ul>
+        </nav>
+        <div className="topbar-who">
+          <Link to="/account" className="who-cell" aria-current={onAccount ? 'page' : undefined}>
             <strong>{admin.name}</strong>
-            <span>{admin.role === 'owner' ? 'Owner' : 'Admin'} · Account</span>
+            <span className="who-role">{admin.role === 'owner' ? 'Owner' : 'Admin'} · Account</span>
           </Link>
-          <button type="button" className="menu-signout" onClick={onSignOut}>Sign out</button>
+          <button type="button" className="signout" onClick={onSignOut}>Sign out</button>
         </div>
-      </nav>
+      </div>
       <main className="page">{children}</main>
     </div>
   )

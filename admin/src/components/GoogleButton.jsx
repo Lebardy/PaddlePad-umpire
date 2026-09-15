@@ -60,7 +60,7 @@ function GoogleMark() {
   )
 }
 
-function GoogleButton({ onToken, disabled, label = 'Continue with Google' }) {
+function GoogleButton({ onToken, disabled, label = 'Continue with Google', withDivider = false }) {
   const [ready, setReady] = useState(false)
   const [failed, setFailed] = useState(false)
   const client = useRef(null)
@@ -98,19 +98,27 @@ function GoogleButton({ onToken, disabled, label = 'Continue with Google' }) {
 
   if (!CLIENT_ID) return null
 
+  // The "or" between the password form and Google belongs to the button:
+  // with no Google sign-in there is nothing for it to stand between.
+  const divider = withDivider ? <div className="gate-or">or</div> : null
+
   // Said plainly rather than left as a button that does nothing. A
   // blocked or unreachable Google is not the end of getting in — the
   // code and the password both still work.
   if (failed) {
     return (
-      <p className="hint google-unavailable">
-        Google sign-in couldn&rsquo;t load. Use your email and password instead.
-      </p>
+      <>
+        {divider}
+        <p className="hint google-unavailable">
+          Google sign-in couldn&rsquo;t load. Use your email and password instead.
+        </p>
+      </>
     )
   }
 
   return (
     <div className="google-signin">
+      {divider}
       <button
         type="button"
         className="google-btn"

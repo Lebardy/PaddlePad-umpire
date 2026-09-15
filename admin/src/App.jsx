@@ -52,7 +52,7 @@ export default function App() {
     else if (path === '/admins' && admin.role === 'owner') screen = <Admins me={admin} />
     else if (path === '/activity') screen = <Activity />
     else if (path === '/account') screen = <Account admin={admin} onAdminChange={updateAdmin} />
-    else screen = <p className="empty">There’s no page here.</p>
+    else screen = <p className="empty missing">There’s no page here.</p>
     content = <Layout admin={admin} path={path} onSignOut={signOut}>{screen}</Layout>
   }
 

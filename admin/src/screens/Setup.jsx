@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Gate from '../components/Gate'
 import GoogleButton from '../components/GoogleButton'
 import { completeSetup, readSetupLink } from '../lib/api'
 
@@ -41,22 +42,21 @@ export default function Setup({ secret, onSignedIn }) {
 
   if (loadError || !link) {
     return (
-      <div className="gate">
-        <div className="gate-card">
-          <p className="brand-mark">PaddlePad<span>Admin</span></p>
+      <Gate>
+        <div className="gate-form" role={loadError ? 'alert' : 'status'}>
           <h1>{loadError ? 'Link not working' : 'Checking your link'}</h1>
           <p>{loadError ?? 'One moment…'}</p>
         </div>
-      </div>
+      </Gate>
     )
   }
 
   return (
-    <div className="gate">
-      <form className="gate-card" onSubmit={submitPassword}>
-        <p className="brand-mark">PaddlePad<span>Admin</span></p>
+    <Gate>
+      <form className="gate-form" onSubmit={submitPassword}>
         <h1>Set up your account</h1>
-        <p>For <strong>{link.admin.name}</strong> ({link.admin.email}). This link works once.</p>
+        <p className="gate-for"><strong>{link.admin.name}</strong>{link.admin.email}</p>
+        <p>This link works once.</p>
         <label className="field">
           <span>Choose a password</span>
           <input type="password" autoComplete="new-password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required />
@@ -69,13 +69,10 @@ export default function Setup({ secret, onSignedIn }) {
         {error && <p className="form-error" role="alert">{error}</p>}
         <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save password and sign in'}</button>
         {link.googleConfigured && (
-          <>
-            <div className="gate-or">or</div>
-            <GoogleButton disabled={busy} label="Continue with Google" onToken={(token) => finish({ accessToken: token })} />
-          </>
+          <GoogleButton withDivider disabled={busy} label="Continue with Google" onToken={(token) => finish({ accessToken: token })} />
         )}
         <p className="gate-note">You can add the other way to sign in later, on your Account page.</p>
       </form>
-    </div>
+    </Gate>
   )
 }
