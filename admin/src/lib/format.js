@@ -84,6 +84,14 @@ export function statusLabel(status) {
   return STATUS_LABELS[status] ?? status
 }
 
+// Mirrors the server's own rule (people-rules.js confirmNameMatches):
+// whoever is closing an account must type its name back, ignoring case
+// and outer spaces, before the button will do anything.
+export function confirmNameMatches(typed, name) {
+  const clean = String(typed ?? '').trim().toLowerCase()
+  return clean !== '' && clean === String(name ?? '').trim().toLowerCase()
+}
+
 export function ratingText(rating) {
   if (!rating) return 'Not rated yet'
   if (rating.state === 'rated') {

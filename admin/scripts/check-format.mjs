@@ -6,8 +6,8 @@
 // ============================================================
 
 import {
-  EXPIRY_CHOICES, actionLabel, formatWhen, inviteStatusText, lastSignedInText, madeByText,
-  ratingText, signInMethods, signInMethodsText, statusLabel,
+  EXPIRY_CHOICES, actionLabel, confirmNameMatches, formatWhen, inviteStatusText, lastSignedInText,
+  madeByText, ratingText, signInMethods, signInMethodsText, statusLabel,
 } from '../src/lib/format.js'
 
 let pass = 0
@@ -61,6 +61,11 @@ check('not enough of their own matches', ratingText({ state: 'not_enough_matches
 check('not enough players in the pool', ratingText({ state: 'not_enough_players', have: 4, need: 8 }), 'Not rated yet: waiting for more players (4 of 8)')
 check('qualified, waiting for the nightly run', ratingText({ state: 'pending' }), 'Rated at the next nightly run')
 check('unrated falls back', ratingText({ state: 'unrated' }), 'Not rated yet')
+
+check('an exact typed name matches', confirmNameMatches('Ana Reyes', 'Ana Reyes'), true)
+check('matching ignores case and outer spaces', confirmNameMatches('  ana reyes  ', 'Ana Reyes'), true)
+check('a different name does not match', confirmNameMatches('Ana', 'Ana Reyes'), false)
+check('an empty or blank typed name never matches', confirmNameMatches('   ', 'Ana Reyes'), false)
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

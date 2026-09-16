@@ -4,13 +4,8 @@ import PageBoard, { TallyCell } from '../components/PageBoard'
 import RowConfirm from '../components/RowConfirm'
 import StatusTag from '../components/StatusTag'
 import { closePerson, fetchPlayer, newClaimCode, pausePerson, unpausePerson } from '../lib/api'
-import { formatWhen, lastSignedInText, ratingText, signInMethodsText } from '../lib/format'
+import { confirmNameMatches, formatWhen, lastSignedInText, ratingText, signInMethodsText } from '../lib/format'
 import { Link } from '../lib/router'
-
-function confirmNameMatches(typed, name) {
-  const clean = typed.trim().toLowerCase()
-  return clean !== '' && clean === name.trim().toLowerCase()
-}
 
 /** One player's page: their details, their recent matches, and what an admin can do about their account. */
 export default function PlayerDetail({ id, me }) {
@@ -102,7 +97,7 @@ export default function PlayerDetail({ id, me }) {
         <div className="tally">
           <TallyCell figure={player.matchCount} label="Matches" />
           <TallyCell figure={player.matchesInProgress} label="Live now" />
-          <TallyCell figure={ratingText(player.rating)} label="Rating" />
+          <TallyCell figure={ratingText(player.rating)} label="Rating" variant="text" />
         </div>
       </PageBoard>
 

@@ -3,13 +3,8 @@ import PageBoard, { TallyCell } from '../components/PageBoard'
 import RowConfirm from '../components/RowConfirm'
 import StatusTag from '../components/StatusTag'
 import { closePerson, fetchUmpire, pausePerson, unpausePerson } from '../lib/api'
-import { formatWhen, lastSignedInText, signInMethodsText } from '../lib/format'
+import { confirmNameMatches, formatWhen, lastSignedInText, signInMethodsText } from '../lib/format'
 import { Link } from '../lib/router'
-
-function confirmNameMatches(typed, name) {
-  const clean = typed.trim().toLowerCase()
-  return clean !== '' && clean === name.trim().toLowerCase()
-}
 
 const inviteText = (invite) => (invite ? `${invite.code}${invite.note ? ` (${invite.note})` : ''}` : 'Unknown')
 const matchStatusText = (status) => (status === 'completed' ? 'Finished' : 'In progress')
