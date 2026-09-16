@@ -143,3 +143,23 @@ export function listActivity({ before, adminId, action } = {}) {
 }
 
 export const activityFilters = () => apiFetch('/admin/activity/filters')
+
+// People
+
+function peopleQuery({ q, status, after } = {}) {
+  const params = new URLSearchParams()
+  if (q) params.set('q', q)
+  if (status && status !== 'all') params.set('status', status)
+  if (after) params.set('after', after)
+  const qs = params.toString()
+  return qs ? `?${qs}` : ''
+}
+
+export const listPlayers = (options) => apiFetch(`/admin/players${peopleQuery(options)}`)
+export const listUmpires = (options) => apiFetch(`/admin/umpires${peopleQuery(options)}`)
+export const fetchPlayer = (id) => apiFetch(`/admin/players/${id}`).then((d) => d.player)
+export const fetchUmpire = (id) => apiFetch(`/admin/umpires/${id}`).then((d) => d.umpire)
+export const pausePerson = (kind, id, reason) => post(`/admin/${kind}/${id}/pause`, { reason })
+export const unpausePerson = (kind, id) => post(`/admin/${kind}/${id}/unpause`)
+export const closePerson = (kind, id, { reason, confirmName }) => post(`/admin/${kind}/${id}/close`, { reason, confirmName })
+export const newClaimCode = (id) => post(`/admin/players/${id}/claim-code`).then((d) => d.claimCode)

@@ -65,3 +65,34 @@ const ACTION_LABELS = {
 export function actionLabel(action) {
   return ACTION_LABELS[action] ?? action
 }
+
+// People
+
+export function lastSignedInText(iso) {
+  return iso ? formatWhen(iso) : 'Not yet recorded'
+}
+
+const capitalize = (word) => word.charAt(0).toUpperCase() + word.slice(1)
+
+export function signInMethodsText(methods) {
+  return methods && methods.length > 0 ? methods.map(capitalize).join(', ') : 'No way in yet'
+}
+
+const STATUS_LABELS = { active: 'Active', paused: 'Paused', closed: 'Closed' }
+
+export function statusLabel(status) {
+  return STATUS_LABELS[status] ?? status
+}
+
+export function ratingText(rating) {
+  if (!rating) return 'Not rated yet'
+  if (rating.state === 'rated') {
+    return rating.playstyle ? `${rating.skillScore} · ${rating.playstyle}` : `${rating.skillScore}`
+  }
+  if (rating.state === 'not_enough_matches') return `Not rated yet: ${rating.have} of ${rating.need} matches`
+  if (rating.state === 'not_enough_players') {
+    return `Not rated yet: waiting for more players (${rating.have} of ${rating.need})`
+  }
+  if (rating.state === 'pending') return 'Rated at the next nightly run'
+  return 'Not rated yet'
+}

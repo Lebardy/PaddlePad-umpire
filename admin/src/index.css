@@ -159,8 +159,8 @@ html { scrollbar-color: var(--border) var(--bg); }
 }
 
 /* Every label on the boards and above fields: condensed capitals. */
-.field > span, .tally-label, .table th, .tag, .tabs a, .who-role, .day-row th, .ticket-label,
-.btn-primary, .btn-quiet, .btn-danger, .btn-lamp, .btn-board, .cells label, .board-field > span {
+.field > span, .tally-label, .table th, .tag, .status-tag, .tabs a, .who-role, .day-row th, .ticket-label,
+.btn-primary, .btn-quiet, .btn-danger, .btn-lamp, .btn-board, .cells label, .board-field > span, .detail-fact span {
   font-family: var(--label); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
 }
 /* Every figure: tall, heavy, aligned. */
@@ -278,13 +278,14 @@ button.tally-cell:focus-visible { outline: 2px solid var(--lamp); outline-offset
 .field { display: grid; gap: 0.3rem; min-width: 0; }
 .field.grow { flex: 1 1 14rem; }
 .field > span { font-size: 0.88rem; color: var(--text-secondary); }
-.field input, .field select, .link-field {
+.field input, .field select, .field textarea, .link-field {
   min-height: 2.75rem; padding: 0.45rem 0.75rem; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
   background: var(--surface); width: 100%;
 }
 .form-strip .field input, .form-strip .field select { background: var(--bg); }
-.field input::placeholder { color: var(--text-muted); }
-.field input:focus, .field select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--primary-soft); }
+.field input::placeholder, .field textarea::placeholder { color: var(--text-muted); }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--primary-soft); }
+.field textarea { min-height: 4.5rem; resize: vertical; font: inherit; }
 
 .btn-primary, .btn-quiet, .btn-danger, .btn-lamp, .btn-board {
   min-height: 2.75rem; padding: 0.45rem 1.1rem; border-radius: var(--radius-sm); cursor: pointer; white-space: nowrap;
@@ -314,6 +315,15 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .form-ok::before { content: ''; width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--status-good); flex: none; }
 .hint { color: var(--text-muted); font-size: 0.9rem; margin: 0; }
 
+/* --- People: the tabs between Players and Umpires --- */
+.subtabs { display: flex; gap: 0.5rem; }
+.subtabs a {
+  padding: 0.5rem 1.1rem; border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--text-secondary); text-decoration: none; font-weight: 600;
+}
+.subtabs a:hover { border-color: var(--primary); color: var(--primary); }
+.subtabs a[aria-current='page'] { background: var(--button); color: var(--button-ink); border-color: var(--button); }
+
 /* --- Tables --- */
 .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 .table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
@@ -327,6 +337,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .table tr.is-new td { background: var(--primary-soft); }
 .cell-main { display: block; overflow-wrap: anywhere; }
 .cell-sub { display: block; margin-top: 0.15rem; color: var(--text-muted); font-size: 0.9rem; overflow-wrap: anywhere; }
+.name-line { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.table a.row-link { color: inherit; text-decoration: none; }
+.table a.row-link:hover, .table a.row-link:focus-visible { text-decoration: underline; }
+.table tr.row-clickable { cursor: pointer; }
+.table tr.row-clickable:hover td { background: var(--surface-sunken); }
 .nowrap { white-space: nowrap; }
 .col-code { width: 1%; }
 .col-when { width: 1%; white-space: nowrap; }
@@ -362,6 +377,23 @@ tr.is-faded .code { text-decoration: none; }
 .tag-waiting::before { background: var(--lamp); }
 tr.is-faded .tag { color: var(--text-muted); }
 
+/* A person's status: active reads as quiet as an open code, paused
+   lights up like the amber "waiting" dot, closed sits muted and
+   outlined the way an expired code does. */
+.status-tag { display: inline-flex; align-items: flex-start; gap: 0.45rem; font-size: 0.9rem; letter-spacing: 0.04em; line-height: 1.35; color: var(--text); }
+.status-tag::before {
+  content: ''; width: 0.62rem; height: 0.62rem; border-radius: 2px; flex: none; margin-top: 0.3em;
+  background: var(--none-lamp); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+.status-paused::before { background: var(--lamp); box-shadow: 0 0 6px var(--lamp); }
+.status-closed { color: var(--text-muted); }
+.status-closed::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--text-muted); }
+/* On the dark board (a person's page header) the tag needs board-safe
+   ink, not the page's own light/dark text colours. */
+.page-board .status-tag { color: var(--board-ink); }
+.page-board .status-closed { color: var(--board-muted); }
+.page-board .status-closed::before { box-shadow: inset 0 0 0 1.5px var(--board-muted); }
+
 td.table-foot { display: table-cell; }
 .table tfoot td { border-bottom: 0; }
 .table-foot {
@@ -395,6 +427,42 @@ td.table-foot { display: table-cell; }
 .log .col-when { color: var(--text-secondary); }
 .log .what { font-family: var(--label); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.92rem; white-space: nowrap; }
 .log .what.is-warning { color: var(--status-critical); }
+
+/* --- A person's page: back link, details, matches, actions --- */
+.back-link { display: inline-block; margin-bottom: 1rem; color: var(--text-secondary); text-decoration: none; font-weight: 600; }
+.back-link:hover { color: var(--primary); }
+.section-title { margin: 0 0 0.75rem; font-family: var(--display); font-weight: 800; font-size: 1.5rem; line-height: 1; text-transform: uppercase; }
+
+.notice {
+  padding: 0.85rem 1.1rem; border-radius: var(--radius); font-weight: 500; color: var(--text);
+  background: rgba(255, 184, 28, 0.12); border: 1px solid var(--lamp);
+}
+
+.detail-facts {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+}
+.detail-fact { padding: 0.85rem 1.25rem; background: var(--surface); min-width: 0; }
+.detail-fact span { display: block; margin-bottom: 0.25rem; font-size: 0.85rem; color: var(--text-secondary); }
+.detail-fact strong { font-weight: 600; overflow-wrap: anywhere; }
+
+.actions-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.85rem 1rem; }
+/* The pause reason box, inside a RowConfirm's question -- left-aligned
+   and wide enough to write in, unlike the short right-aligned questions
+   elsewhere. */
+.confirm-reason { display: grid; gap: 0.3rem; width: 20rem; max-width: 80vw; text-align: left; }
+.confirm-reason .field textarea { min-height: 3.5rem; }
+
+.panel {
+  display: grid; gap: 0.85rem; padding: 1.25rem 1.4rem; margin-top: 0.75rem; max-width: 34rem;
+  background: var(--surface); border: 1.5px solid var(--status-critical); border-radius: var(--radius);
+}
+.panel p { margin: 0; color: var(--text-secondary); }
+.panel-actions { display: flex; gap: 0.75rem; }
+
+.claim-reveal { grid-template-columns: minmax(0, 1fr) auto; }
+.claim-reveal-side { display: grid; justify-items: center; gap: 0.6rem; }
+.claim-reveal-side .qr { display: block; border-radius: var(--radius-sm); }
 
 /* --- Account: rows of settings, heading left, form right --- */
 .settings { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
