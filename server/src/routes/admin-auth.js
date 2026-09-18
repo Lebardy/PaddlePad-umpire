@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { pool, query, withTransaction } from '../db.js'
 import {
   MIN_PASSWORD_LENGTH,
+  NO_SUCH_ACCOUNT_HASH,
   hashPassword,
   requireAdminAccount,
   signAdminToken,
@@ -10,7 +11,7 @@ import {
 import { googleConfigured, resolveGoogleProfile } from '../google.js'
 import { ADMIN_COLUMNS, resetSessions } from '../admin-accounts.js'
 import { recordActivity } from '../admin-activity.js'
-import { countBackupCodesLeft, replaceBackupCodes, useBackupCode } from '../admin-backup-codes.js'
+import { countBackupCodesLeft, dummyBackupCodeCheck, replaceBackupCodes, useBackupCode } from '../admin-backup-codes.js'
 import {
   adminPayload,
   canDisconnectGoogle,
@@ -20,11 +21,6 @@ import {
 } from '../admin-rules.js'
 
 const router = Router()
-
-// Checked against when there is no usable hash, so a missing account, a
-// Google-only account and a wrong password all take about as long to
-// answer. Same shape and reason as routes/auth.js.
-const NO_SUCH_ACCOUNT_HASH = `${'0'.repeat(32)}:${'0'.repeat(128)}`
 
 const LINK_GONE = 'This setup link no longer works. Ask the owner for a new one.'
 const NAME_MAX = 80
@@ -430,6 +426,12 @@ router.post('/backup-code', async (req, res) => {
         resetAt = result.resetAt
         row = result.row
       }
+    } else {
+      // Switched off, so there is no real check to run -- but a
+      // switched-off owner must not answer any faster than an active
+      // one refusing a wrong code, or switched-off-ness itself would be
+      // the thing response time gives away.
+      await dummyBackupCodeCheck()
     }
     // The email really is the owner's, so a wrong or reused code (or an
     // attempt while switched off) is a real failed sign-in, logged
@@ -442,9 +444,11 @@ router.post('/backup-code', async (req, res) => {
     }
   } else {
     // No admin, or a non-owner: nothing real to check, but this still
-    // takes about as long as a real attempt, so guessing at addresses
-    // can't be told apart from guessing at codes by response time.
-    await verifyPassword('x', NO_SUCH_ACCOUNT_HASH)
+    // costs the same as a real attempt against ten codes, so guessing
+    // at addresses can't be told apart from guessing at codes -- or
+    // from an owner with codes left versus one who has none -- by
+    // response time.
+    await dummyBackupCodeCheck()
   }
 
   if (!matched) {

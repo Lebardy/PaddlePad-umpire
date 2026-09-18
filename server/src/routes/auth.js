@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { query, withTransaction } from '../db.js'
 import {
   MIN_PASSWORD_LENGTH,
+  NO_SUCH_ACCOUNT_HASH,
   hashPassword,
   requireActiveUmpire,
   requireAuth,
@@ -28,13 +29,6 @@ const router = Router()
 function normalizeEmail(value) {
   return String(value ?? '').trim().toLowerCase()
 }
-
-// Verified against when no account matches, so a missing account and a
-// wrong password take similar time to answer. Well-formed (`salt:key`
-// with a 64-byte key) so verifyPassword does the real scrypt work rather
-// than bailing early on a malformed hash, which would give the timing
-// away again.
-const NO_SUCH_ACCOUNT_HASH = `${'0'.repeat(32)}:${'0'.repeat(128)}`
 
 /**
  * The umpire half of every auth response, built from a row.

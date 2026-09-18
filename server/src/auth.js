@@ -26,6 +26,14 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) {
 
 export const MIN_PASSWORD_LENGTH = 8
 
+// Verified against when no account matches, so a missing account and a
+// wrong password (or backup code) take similar time to answer.
+// Well-formed (`salt:key` with a 64-byte key) so verifyPassword does the
+// real scrypt work rather than bailing early on a malformed hash, which
+// would give the timing away again. Shared rather than each caller
+// declaring its own copy.
+export const NO_SUCH_ACCOUNT_HASH = `${'0'.repeat(32)}:${'0'.repeat(128)}`
+
 /** Hashes a password as `salt:key`, both hex. */
 export async function hashPassword(password) {
   const salt = randomBytes(SALT_LENGTH).toString('hex')

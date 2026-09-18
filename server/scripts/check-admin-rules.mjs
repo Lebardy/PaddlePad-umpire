@@ -224,6 +224,19 @@ section('backup codes')
   check('nothing is nothing', rules.normalizeBackupCode(undefined), '')
 }
 
+section('padding backup-code hashes for a constant-time check')
+{
+  check('no real hashes is still 10 entries, all the dummy',
+    rules.paddedCodeHashes([], 'dummy'), Array(10).fill('dummy'))
+  check('some real hashes keep their place and the rest is padding',
+    rules.paddedCodeHashes(['h1', 'h2', 'h3'], 'dummy'),
+    ['h1', 'h2', 'h3', 'dummy', 'dummy', 'dummy', 'dummy', 'dummy', 'dummy', 'dummy'])
+  check('a full set is exactly 10 real hashes, nothing padded',
+    rules.paddedCodeHashes(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'h10'], 'dummy'),
+    ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'h10'])
+  check('always exactly 10 entries', rules.paddedCodeHashes(['h1'], 'dummy').length, 10)
+}
+
 section('admin emails')
 {
   check('a normal address is fine', rules.isAdminEmail('ana@example.com'), true)

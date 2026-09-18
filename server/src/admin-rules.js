@@ -168,3 +168,20 @@ export function normalizeBackupCode(value) {
 export function isAdminEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value ?? ''))
 }
+
+/**
+ * The hashes a backup-code check compares against: every unused code's
+ * hash, padded with `dummyHash` so the result always has exactly
+ * BACKUP_CODE_COUNT entries.
+ *
+ * Without this, how many codes an owner has left -- and whether there
+ * is a real account to check at all -- would leak through how many
+ * scrypt comparisons a wrong code costs to refuse. Padding to a fixed
+ * count makes an owner with one code left, an owner with ten, and no
+ * account at all cost exactly the same to check.
+ */
+export function paddedCodeHashes(hashes, dummyHash) {
+  const padded = hashes.slice(0, BACKUP_CODE_COUNT)
+  while (padded.length < BACKUP_CODE_COUNT) padded.push(dummyHash)
+  return padded
+}
