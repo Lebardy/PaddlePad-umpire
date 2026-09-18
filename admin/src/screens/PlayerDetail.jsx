@@ -135,7 +135,7 @@ export default function PlayerDetail({ id, me }) {
             <div className="detail-fact"><span>On the board</span><strong>{player.hiddenFromBoard ? 'Hidden by them' : 'Shown'}</strong></div>
             <div className="detail-fact"><span>Joined</span><strong>{formatWhen(player.joinedAt)}</strong></div>
             <div className="detail-fact"><span>Last signed in</span><strong>{lastSignedInText(player.lastSignedInAt)}</strong></div>
-            <div className="detail-fact"><span>Added by</span><strong>{player.createdBy ?? 'Unknown'}</strong></div>
+            <div className="detail-fact"><span>Added by</span><strong>{player.createdBy ?? 'Signed up themselves'}</strong></div>
           </div>
         </div>
 
