@@ -9,7 +9,7 @@ import { deriveMatchState, eventFromRow } from './pickleball.js'
 
 const PLAYER_COLUMNS = `p.id, p.name, p.username, p.password_hash, p.google_sub, p.google_email,
   p.claim_code, p.claimed_at, p.name_visible, p.created_at, p.last_signed_in_at,
-  p.paused_at, p.paused_reason, p.deactivated_at, p.created_by`
+  p.paused_at, p.paused_reason, p.deactivated_at, p.closed_by_admin_at, p.created_by`
 const UMPIRE_COLUMNS = `u.id, u.name, u.email, u.password_hash, u.google_sub, u.google_email,
   u.created_at, u.last_signed_in_at, u.paused_at, u.paused_reason, u.closed_at`
 
@@ -91,9 +91,11 @@ const RECENT = 20
 /** Everything the player page shows. Never the claim code or password hash. */
 export async function playerDetail(queryFn, row) {
   const matches = await getPlayerMatches(queryFn, row.id)
-  const [matchesInProgress, rating] = await Promise.all([
+  const recent = matches.slice(0, RECENT)
+  const [matchesInProgress, rating, scoredBy] = await Promise.all([
     countMatchesInProgress(queryFn, row.id),
     getRatingState(queryFn, row.id, matches.length),
+    scoringUmpireNames(queryFn, recent),
   ])
   return {
     ...playerListItem(row),
@@ -101,11 +103,13 @@ export async function playerDetail(queryFn, row) {
     pausedAt: row.paused_at ?? null,
     pausedReason: row.paused_reason ?? null,
     closedAt: row.deactivated_at ?? null,
+    closedByAdmin: Boolean(row.closed_by_admin_at),
     createdBy: row.created_by_name ?? null,
     matchCount: matches.length,
-    matches: matches.slice(0, RECENT).map((m) => ({
+    matches: recent.map((m) => ({
       id: m.id, endedAt: m.endedAt, sessionName: m.sessionName, isDoubles: m.isDoubles,
       partner: m.partner, opponents: m.opponents, yourScore: m.yourScore, theirScore: m.theirScore, won: m.won,
+      scoredBy: scoredBy.get(m.id) ?? 'Unknown',
     })),
     matchesInProgress,
     rating: rating.state === 'rated'
@@ -114,9 +118,28 @@ export async function playerDetail(queryFn, row) {
   }
 }
 
+/**
+ * Which umpire scored each of these matches, by match id.
+ *
+ * getPlayerMatches doesn't carry recorded_by -- it is built for the
+ * player's own history screen, which has no reason to name the umpire.
+ * The admin page does, so this is one small extra lookup rather than a
+ * change to a function several other screens share.
+ */
+async function scoringUmpireNames(queryFn, matches) {
+  if (matches.length === 0) return new Map()
+  const { rows } = await queryFn(
+    `SELECT m.id, u.name
+       FROM matches m LEFT JOIN umpires u ON u.id = m.recorded_by
+      WHERE m.id = ANY($1::uuid[])`,
+    [matches.map((m) => m.id)],
+  )
+  return new Map(rows.map((r) => [r.id, r.name ?? null]))
+}
+
 /** Everything the umpire page shows. */
 export async function umpireDetail(queryFn, row) {
-  const [{ rows: invite }, { rows: scored }, { rows: live }] = await Promise.all([
+  const [{ rows: invite }, { rows: scored }, { rows: live }, { rows: total }] = await Promise.all([
     queryFn('SELECT code, note FROM invites WHERE used_by = $1 ORDER BY used_at DESC LIMIT 1', [row.id]),
     queryFn(
       `SELECT m.id, m.team_a, m.team_b, m.first_server_team, m.first_server_player, m.right_start_a, m.right_start_b,
@@ -129,6 +152,14 @@ export async function umpireDetail(queryFn, row) {
     queryFn(
       `SELECT count(*)::int AS n FROM matches m JOIN sessions s ON s.id = m.session_id
         WHERE m.recorded_by = $1 AND m.status = 'in_progress' AND m.voided_at IS NULL AND s.voided_at IS NULL`,
+      [row.id],
+    ),
+    // The same filters as `scored` above, but every match rather than
+    // the 20 shown -- so the page can tell 20 from 200 rather than
+    // showing "20+" forever.
+    queryFn(
+      `SELECT count(*)::int AS n FROM matches m JOIN sessions s ON s.id = m.session_id
+        WHERE m.recorded_by = $1 AND m.voided_at IS NULL AND s.voided_at IS NULL`,
       [row.id],
     ),
   ])
@@ -170,6 +201,7 @@ export async function umpireDetail(queryFn, row) {
     closedAt: row.closed_at ?? null,
     invite: invite[0] ? { code: invite[0].code, note: invite[0].note } : null,
     matches,
+    matchCount: total[0].n,
     matchesInProgress: live[0].n,
   }
 }
