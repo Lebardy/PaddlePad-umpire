@@ -1926,14 +1926,17 @@ async function main() {
     }
 
     // A failure detail below is a JSON dump of a response body -- never
-    // one that could itself be a credential. A session token or a set
-    // of backup codes is swapped out before it ever reaches JSON.stringify.
+    // one that could itself be a credential. A session token, a set of
+    // backup codes, an invite code or a setup link's secret URL is
+    // swapped out before it ever reaches JSON.stringify.
     const redacted = (body) => {
-      const { token, codes, ...rest } = body ?? {}
+      const { token, codes, invite, setupLink, ...rest } = body ?? {}
       return JSON.stringify({
         ...rest,
         ...(token !== undefined ? { token: '[redacted]' } : {}),
         ...(codes !== undefined ? { codes: `[redacted, ${Array.isArray(codes) ? codes.length : 0} codes]` } : {}),
+        ...(invite !== undefined ? { invite: { ...invite, code: '[redacted]' } } : {}),
+        ...(setupLink !== undefined ? { setupLink: '[redacted]' } : {}),
       })
     }
 
@@ -2109,6 +2112,48 @@ async function main() {
 
     const bcUsedAdded = await newEntriesSince('admin.backup_code_used', ownerId, ownerToken, bcUsedWatermark)
     check('one admin.backup_code_used entry', bcUsedAdded === 1, String(bcUsedAdded))
+
+    // --- 4b: the session that backup-code sign-in just opened can
+    // actually repair the account -- set a new password with no
+    // currentPassword at all -- which is the whole point of a backup
+    // code existing (Important I1). There is only one owner on staging,
+    // so this runs against the real smoke owner and restores its real
+    // password in a finally, exactly as case 2 above does; the
+    // temporary password is never printed. ---
+    const BACKUP_TEMP_PASSWORD = `smoke-temp-${uuid()}`
+    let backupProofRestored = false
+    try {
+      const viaBackupCodeToken = ownerToken
+      const setFromBackupCode = await request('/admin/auth/me/password', {
+        method: 'POST', bearer: viaBackupCodeToken, body: { newPassword: BACKUP_TEMP_PASSWORD },
+      })
+      check('a backup-code session sets a password with no currentPassword -> 200 with a fresh token',
+        setFromBackupCode.status === 200 && typeof setFromBackupCode.body.token === 'string',
+        redacted(setFromBackupCode.body).slice(0, 80))
+      ownerToken = setFromBackupCode.body.token
+    } finally {
+      let back = await request('/admin/auth/me/password', {
+        method: 'POST', bearer: ownerToken, body: { currentPassword: BACKUP_TEMP_PASSWORD, newPassword: OWNER_PASSWORD },
+      })
+      if (back.status === 200 && typeof back.body.token === 'string') {
+        ownerToken = back.body.token
+        backupProofRestored = true
+      } else {
+        const already = await request('/admin/auth/login', { method: 'POST', body: { email: OWNER_EMAIL, password: OWNER_PASSWORD } })
+        if (already.status === 200) {
+          ownerToken = already.body.token
+          backupProofRestored = true
+        }
+      }
+      check('the smoke owner password is back to what it was after the backup-code proof check', backupProofRestored)
+      if (!backupProofRestored) {
+        console.log('\n  !!!! could not confirm the smoke owner password was restored after the backup-code proof check -- fix it by hand before running this again !!!!')
+      }
+    }
+    if (!backupProofRestored) {
+      console.log(`\n${pass} passed, ${fail} failed`)
+      process.exit(1)
+    }
 
     // --- 5: a used invite code cannot be cancelled ---
     const hInvite = await request('/admin/invites', { method: 'POST', bearer: ownerToken, body: { note: 'smoke hardening' } })
