@@ -1798,6 +1798,41 @@ async function main() {
       ownerClaimAfterClose.status === 200 && Boolean(ownerClaimAfterClose.body.claimCode),
       JSON.stringify(ownerClaimAfterClose.body).slice(0, 80))
 
+    // --- 12b: linking the owner-reopened code must clear the
+    // owner-closed mark too, not just the plain closed one -- otherwise
+    // a player who comes back this way would stay stuck looking
+    // owner-closed forever. Same flow as
+    // section('linking a code to an account you already have'): a
+    // brand new throwaway account registers on its own, then hands its
+    // token to /player/link with the code the owner just re-minted.
+    const reopenUsername = `smk_reopen_${pStamp}`.slice(0, 20)
+    const reopenPassword = `smk-${uuid()}`
+    const reopenName = `Smoke People Reopen ${pStamp}`
+    const reopenAccount = await request('/auth/player/register', {
+      method: 'POST',
+      body: { name: reopenName, username: reopenUsername, password: reopenPassword },
+    })
+    check('a fresh throwaway account registers -> 201', reopenAccount.status === 201,
+      JSON.stringify(reopenAccount.body).slice(0, 80))
+    const reopenId = reopenAccount.body.player?.id
+    if (reopenId) selfRegistered.push(reopenId)
+    const reopenToken = reopenAccount.body.token
+
+    const reopenLink = await request('/player/link', {
+      method: 'POST',
+      bearer: reopenToken,
+      body: { code: ownerClaimAfterClose.body.claimCode, confirm: true },
+    })
+    check('linking the owner-reopened code merges -> 200', reopenLink.status === 200,
+      JSON.stringify(reopenLink.body).slice(0, 120))
+    check('the owner-closed player\'s row is the one that survives',
+      reopenLink.body.player?.id === playerId, `${reopenLink.body.player?.id} vs ${playerId}`)
+
+    const claimCodeAfterLink = await request(`/players/${playerId}/claim-code`, { bearer: umpToken })
+    check('the umpire route mints a code for the reopened row -> 200, not the owner-only 403',
+      claimCodeAfterLink.status === 200 && Boolean(claimCodeAfterLink.body.claimCode),
+      JSON.stringify(claimCodeAfterLink.body).slice(0, 80))
+
     const peopleAdminOff = await request(`/admin/admins/${peopleAdminId}/switch-off`, { method: 'POST', bearer: ownerToken })
     check('the owner switches the throwaway admin off -> 200',
       peopleAdminOff.status === 200 && peopleAdminOff.body.admin?.active === false, String(peopleAdminOff.status))
@@ -1850,6 +1885,17 @@ async function main() {
     })
     check('and that throwaway is closed too, leaving nothing behind -> 200',
       reClose.status === 200 && reClose.body.umpire?.status === 'closed', JSON.stringify(reClose.body).slice(0, 80))
+
+    // --- 16: the row the reopen-by-linking check revived (12b) is left
+    // active by that check on purpose, so the assertions above about
+    // it having been closed exactly once still hold; close it again
+    // here, after everything else, so nothing is left behind.
+    const recloseReopened = await request(`/admin/players/${playerId}/close`, {
+      method: 'POST', bearer: ownerToken, body: { reason: 'smoke cleanup', confirmName: plName },
+    })
+    check('closing the reopened-by-link player again -> 200, leaving nothing active',
+      recloseReopened.status === 200 && recloseReopened.body.player?.status === 'closed',
+      JSON.stringify(recloseReopened.body).slice(0, 80))
   }
 
   if (selfRegistered.length > 0) {

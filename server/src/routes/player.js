@@ -535,7 +535,8 @@ router.post('/link', async (req, res) => {
               google_email   = $6,
               registered_at  = COALESCE(registered_at, $4),
               claimed_at     = COALESCE(claimed_at, now()),
-              deactivated_at = NULL
+              deactivated_at = NULL,
+              closed_by_admin_at = NULL
         WHERE id = $1
         RETURNING id, name, claimed_at, username, google_email`,
       // Google moves across with the username and password because the

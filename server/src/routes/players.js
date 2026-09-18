@@ -3,7 +3,7 @@ import { query } from '../db.js'
 import { requireActiveUmpire, requireAuth } from '../auth.js'
 import { generateInviteCode } from '../invites.js'
 import { mayMintClaimCode } from '../people-rules.js'
-import { normalizePlayerName, playerNameError } from '../validate.js'
+import { isUuid, normalizePlayerName, playerNameError } from '../validate.js'
 
 const router = Router()
 router.use(requireAuth, requireActiveUmpire(query))
@@ -136,6 +136,8 @@ router.post('/', async (req, res) => {
  * account is unaffected -- this stays their recovery path.
  */
 router.get('/:id/claim-code', async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such player' })
+
   const { rows: existing } = await query(
     'SELECT closed_by_admin_at FROM players WHERE id = $1',
     [req.params.id],
@@ -147,14 +149,31 @@ router.get('/:id/claim-code', async (req, res) => {
     })
   }
 
+  // The WHERE guards the same thing the SELECT above just checked: an
+  // owner close landing between the two statements must not mint a
+  // code. Zero rows updated is ambiguous between "closed just now" and
+  // "row gone", so it is resolved with one more read rather than a
+  // bare 404 that would hide the real reason.
   const { rows } = await query(
     `UPDATE players
         SET claim_code = COALESCE(claim_code, $2)
       WHERE id = $1
+        AND closed_by_admin_at IS NULL
       RETURNING claim_code`,
     [req.params.id, generateInviteCode()],
   )
-  if (!rows[0]) return res.status(404).json({ error: 'No such player' })
+  if (!rows[0]) {
+    const { rows: recheck } = await query(
+      'SELECT closed_by_admin_at FROM players WHERE id = $1',
+      [req.params.id],
+    )
+    if (recheck[0] && !mayMintClaimCode(recheck[0])) {
+      return res.status(403).json({
+        error: "This player's account was closed by the owner. Only the owner can reopen it.",
+      })
+    }
+    return res.status(404).json({ error: 'No such player' })
+  }
   res.json({ claimCode: rows[0].claim_code })
 })
 

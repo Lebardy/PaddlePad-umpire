@@ -56,11 +56,14 @@ export default function PlayerDetail({ id, me }) {
 
   async function handleClaimCode() {
     const code = await newClaimCode(id)
+    // Shown right away: the code already exists server-side and has
+    // already replaced any old one, so a failed refetch below must
+    // never hide it.
+    setClaimCode(code)
     // "Ways in" changes the moment a code exists, so the page must not
     // keep showing the stale answer until the next reload.
     const fresh = await fetchPlayer(id)
     setResult({ id, player: fresh })
-    setClaimCode(code)
   }
 
   async function handleClose() {
