@@ -3,7 +3,8 @@ import PageBoard from '../components/PageBoard'
 import StatusTag from '../components/StatusTag'
 import { listPlayers, listUmpires } from '../lib/api'
 import { formatWhen, lastSignedInText, signInMethodsText } from '../lib/format'
-import { Link, navigate } from '../lib/router'
+import { navigate } from '../lib/navigation'
+import { Link } from '../lib/router'
 
 const STATUSES = [
   { key: 'all', label: 'All' },

@@ -6,7 +6,7 @@
 // they take rather than the details of each rule.
 // ============================================================
 
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes, randomInt } from 'node:crypto'
 
 // Shorter than the umpire and player apps' 30 days: an admin can do far
 // more with a stolen session.
@@ -27,6 +27,9 @@ export const ACTIONS = [
   'admin.password_changed',
   'admin.google_connected',
   'admin.google_disconnected',
+  'admin.signed_out_others',
+  'admin.backup_codes_created',
+  'admin.backup_code_used',
   'invite.created',
   'invite.cancelled',
   'player.paused',
@@ -105,4 +108,96 @@ export function inviteExpiryDays(body) {
  */
 export function inviteCodeHint(code) {
   return `${String(code).split('-')[0]}-…`
+}
+
+/**
+ * Whether a token issued at `iatSeconds` (a JWT `iat`, whole seconds)
+ * belongs to a session that has since been ended. Compared in whole
+ * seconds, so a token handed back in the same response as the reset
+ * still works.
+ */
+export function sessionEnded(iatSeconds, resetAt) {
+  if (!resetAt) return false
+  if (!Number.isFinite(iatSeconds)) return true
+  return iatSeconds < Math.floor(new Date(resetAt).getTime() / 1000)
+}
+
+/**
+ * The `iat` to sign a fresh token with right after a session reset.
+ *
+ * `resetAt` comes from Postgres's clock; `now` comes from this server's
+ * own. If Postgres runs even slightly ahead, a token signed with a
+ * plain "now" could carry an `iat` before the reset it is meant to
+ * survive, and sessionEnded would refuse it on the very next request.
+ * Using whichever moment is later avoids that.
+ */
+export function adminTokenIat(resetAt, now = Date.now()) {
+  const nowSeconds = Math.floor(now / 1000)
+  if (!resetAt) return nowSeconds
+  return Math.max(nowSeconds, Math.floor(new Date(resetAt).getTime() / 1000))
+}
+
+/**
+ * Whether the session itself already proves who is asking, without a
+ * password or a fresh Google check.
+ *
+ * True only right after a backup-code sign-in (the token's
+ * `viaBackupCode` claim, carried onto `req.admin` by requireAdminAccount).
+ * That is safe to treat as proof: the code that opened the session is
+ * single-use, the sign-in reset every other session on the account, and
+ * for an owner who has already lost both their password and Google it
+ * is the only way back in at all -- refusing to let that session repair
+ * the account would turn ten one-time sign-ins into ten dead ends.
+ */
+export function proofFromSession(admin) {
+  return Boolean(admin?.viaBackupCode)
+}
+
+export const BACKUP_CODE_COUNT = 10
+export const BACKUP_CODE_LOW = 3
+// The invite-code alphabet: no letters or digits that look alike.
+const BACKUP_ALPHABET = 'ACDEFGHJKMNPQRTUVWXY2346789'
+const BACKUP_LENGTH = 10
+
+function oneBackupCode() {
+  let raw = ''
+  for (let i = 0; i < BACKUP_LENGTH; i += 1) raw += BACKUP_ALPHABET[randomInt(BACKUP_ALPHABET.length)]
+  return `${raw.slice(0, 5)}-${raw.slice(5)}`
+}
+
+/** A fresh set of plain codes, shown to the owner once and stored only as hashes. */
+export function newBackupCodes() {
+  const codes = new Set()
+  while (codes.size < BACKUP_CODE_COUNT) codes.add(oneBackupCode())
+  return [...codes]
+}
+
+/** A typed code as it is compared: capitals, no spaces or dashes; '' if it can't be a code. */
+export function normalizeBackupCode(value) {
+  const cleaned = String(value ?? '').toUpperCase().replace(/[\s-]/g, '')
+  if (cleaned.length !== BACKUP_LENGTH) return ''
+  for (const ch of cleaned) if (!BACKUP_ALPHABET.includes(ch)) return ''
+  return cleaned
+}
+
+/** something@something.something, one @, no spaces. */
+export function isAdminEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value ?? ''))
+}
+
+/**
+ * The hashes a backup-code check compares against: every unused code's
+ * hash, padded with `dummyHash` so the result always has exactly
+ * BACKUP_CODE_COUNT entries.
+ *
+ * Without this, how many codes an owner has left -- and whether there
+ * is a real account to check at all -- would leak through how many
+ * scrypt comparisons a wrong code costs to refuse. Padding to a fixed
+ * count makes an owner with one code left, an owner with ten, and no
+ * account at all cost exactly the same to check.
+ */
+export function paddedCodeHashes(hashes, dummyHash) {
+  const padded = hashes.slice(0, BACKUP_CODE_COUNT)
+  while (padded.length < BACKUP_CODE_COUNT) padded.push(dummyHash)
+  return padded
 }

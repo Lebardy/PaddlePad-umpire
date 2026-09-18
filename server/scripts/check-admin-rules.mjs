@@ -133,6 +133,22 @@ section('which tokens each guard lets through')
   check('the role comes from the database, not the token',
     (await run(auth.requireAdminAccount(fakeQuery([{ ...activeRow, role: 'owner' }])), adminToken)).req.admin.role, 'owner')
 
+  // A token issued before admins.sessions_reset_at must be refused, even
+  // though it is otherwise valid and the admin is still switched on.
+  // The reset moment sits between the two tokens' iat, and everything
+  // is close to "now" so a 1h expiresIn never makes a token expired.
+  const nowSecond = Math.floor(Date.now() / 1000)
+  const resetAt = new Date(nowSecond * 1000).toISOString()
+  const tokenBeforeReset = sign({ sub: 'a1', name: 'Jan', role: 'admin', iat: nowSecond - 5 })
+  const tokenAfterReset = sign({ sub: 'a1', name: 'Jan', role: 'admin', iat: nowSecond + 5 })
+  const resetRow = { ...activeRow, sessions_reset_at: resetAt }
+
+  const beforeResult = await run(auth.requireAdminAccount(fakeQuery([resetRow])), tokenBeforeReset)
+  check('the admin guard refuses a token from before a session reset', beforeResult.status, 401)
+  check('and says the session ended', beforeResult.body, { error: 'Your session has ended. Sign in again.' })
+  check('the admin guard lets a token from after a session reset through',
+    (await run(auth.requireAdminAccount(fakeQuery([resetRow])), tokenAfterReset)).status, 'next')
+
   check('the umpire guard refuses an admin token', (await run(auth.requireAuth, adminToken)).status, 403)
   check('the umpire guard still accepts an old umpire token', (await run(auth.requireAuth, oldUmpireToken)).status, 'next')
   check('the player guard refuses an admin token', (await run(auth.requirePlayer, adminToken)).status, 403)
@@ -166,6 +182,109 @@ section('which tokens each guard lets through')
   check('and says which', (await runPlayerGuard([{ paused_at: null, deactivated_at: '2026-09-15T00:00:00Z' }])).body.status, 'closed')
   check('the active-player guard treats a missing player as closed', (await runPlayerGuard([])).status, 401)
   check('and says which', (await runPlayerGuard([])).body.status, 'closed')
+}
+
+section('a backup-code session counts as proof')
+{
+  check('no viaBackupCode claim is not proof', rules.proofFromSession({ id: 'a1' }), false)
+  check('viaBackupCode true is proof', rules.proofFromSession({ id: 'a1', viaBackupCode: true }), true)
+  check('viaBackupCode false is not proof', rules.proofFromSession({ id: 'a1', viaBackupCode: false }), false)
+  check('nothing at all is not proof', rules.proofFromSession(undefined), false)
+
+  const auth = await import('../src/auth.js')
+  const jwt = (await import('jsonwebtoken')).default
+
+  const withClaim = auth.signAdminToken({ id: 'a1', name: 'Jan' }, null, { viaBackupCode: true })
+  const withoutClaim = auth.signAdminToken({ id: 'a1', name: 'Jan' })
+  check('signAdminToken carries an extra claim when asked', jwt.decode(withClaim).viaBackupCode, true)
+  check('and carries none by default', 'viaBackupCode' in jwt.decode(withoutClaim), false)
+
+  const sign = (payload) => jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' })
+  const activeRow = { id: 'a1', name: 'Jan', email: 'jan@example.com', role: 'admin', deactivated_at: null }
+  const fakeQuery = (rows) => async () => ({ rows })
+  const guard = auth.requireAdminAccount(fakeQuery([activeRow]))
+  async function run(middleware, token) {
+    const req = { get: (h) => (h.toLowerCase() === 'authorization' && token ? `Bearer ${token}` : undefined) }
+    const res = { statusCode: 200, body: null, status(c) { this.statusCode = c; return this }, json(b) { this.body = b; return this } }
+    await middleware(req, res, () => {})
+    return req
+  }
+
+  const tokenWithClaim = sign({ sub: 'a1', name: 'Jan', role: 'admin', viaBackupCode: true })
+  const tokenWithoutClaim = sign({ sub: 'a1', name: 'Jan', role: 'admin' })
+  check('the admin guard carries viaBackupCode onto req.admin', (await run(guard, tokenWithClaim)).admin.viaBackupCode, true)
+  check('and leaves it off an ordinary token', 'viaBackupCode' in (await run(guard, tokenWithoutClaim)).admin, false)
+}
+
+section('ending sessions')
+{
+  const reset = '2026-09-18T01:00:00.700Z'
+  const second = Math.floor(Date.parse(reset) / 1000)
+  check('no reset never ends a session', rules.sessionEnded(second - 1000, null), false)
+  check('a token from before the reset has ended', rules.sessionEnded(second - 1, reset), true)
+  check('a token from the same second as the reset survives', rules.sessionEnded(second, reset), false)
+  check('a token from after the reset survives', rules.sessionEnded(second + 5, reset), false)
+  check('a token with no issue time has ended once there is a reset', rules.sessionEnded(undefined, reset), true)
+}
+
+section('signing a token right after a reset')
+{
+  const reset = '2026-09-18T01:00:00.700Z'
+  const resetSecond = Math.floor(Date.parse(reset) / 1000)
+  check('the reset wins when this server is behind Postgres',
+    rules.adminTokenIat(reset, Date.parse(reset) - 5000), resetSecond)
+  check('now wins when this server is ahead of the reset',
+    rules.adminTokenIat(reset, Date.parse(reset) + 5000), resetSecond + 5)
+  check('the same second as the reset counts as now, not before it',
+    rules.adminTokenIat(reset, Date.parse(reset)), resetSecond)
+  check('no reset just means now', rules.adminTokenIat(null, Date.parse(reset)), resetSecond)
+}
+
+section('backup codes')
+{
+  const codes = rules.newBackupCodes()
+  check('a set has 10 codes', codes.length, 10)
+  check('the count is 10', rules.BACKUP_CODE_COUNT, 10)
+  check('low means 3 or fewer', rules.BACKUP_CODE_LOW, 3)
+  check('every code is XXXXX-XXXXX from the invite alphabet',
+    codes.every((c) => /^[ACDEFGHJKMNPQRTUVWXY2346789]{5}-[ACDEFGHJKMNPQRTUVWXY2346789]{5}$/.test(c)), true)
+  check('codes in a set are all different', new Set(codes).size, 10)
+  check('typing ignores case, spaces and dashes', rules.normalizeBackupCode(' acdef - ghjkm '), 'ACDEFGHJKM')
+  check('the shown form normalises to itself without the dash', rules.normalizeBackupCode(codes[0]), codes[0].replace('-', ''))
+  check('too short is nothing', rules.normalizeBackupCode('ACDEF'), '')
+  check('letters outside the alphabet are nothing', rules.normalizeBackupCode('ABCDEFGHIJ'), '')
+  check('nothing is nothing', rules.normalizeBackupCode(undefined), '')
+}
+
+section('padding backup-code hashes for a constant-time check')
+{
+  check('no real hashes is still 10 entries, all the dummy',
+    rules.paddedCodeHashes([], 'dummy'), Array(10).fill('dummy'))
+  check('some real hashes keep their place and the rest is padding',
+    rules.paddedCodeHashes(['h1', 'h2', 'h3'], 'dummy'),
+    ['h1', 'h2', 'h3', 'dummy', 'dummy', 'dummy', 'dummy', 'dummy', 'dummy', 'dummy'])
+  check('a full set is exactly 10 real hashes, nothing padded',
+    rules.paddedCodeHashes(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'h10'], 'dummy'),
+    ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'h10'])
+  check('always exactly 10 entries', rules.paddedCodeHashes(['h1'], 'dummy').length, 10)
+}
+
+section('admin emails')
+{
+  check('a normal address is fine', rules.isAdminEmail('ana@example.com'), true)
+  check('a subdomain is fine', rules.isAdminEmail('ana.cruz@mail.example.co'), true)
+  check('no dot after the @ is refused', rules.isAdminEmail('ana@example'), false)
+  check('a space is refused', rules.isAdminEmail('ana cruz@example.com'), false)
+  check('two @ are refused', rules.isAdminEmail('a@b@example.com'), false)
+  check('nothing before the @ is refused', rules.isAdminEmail('@example.com'), false)
+  check('empty is refused', rules.isAdminEmail(''), false)
+}
+
+section('new action names')
+{
+  for (const name of ['admin.signed_out_others', 'admin.backup_codes_created', 'admin.backup_code_used']) {
+    check(`${name} is an action`, rules.ACTIONS.includes(name), true)
+  }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

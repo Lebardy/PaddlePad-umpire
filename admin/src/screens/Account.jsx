@@ -1,14 +1,49 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import BackupCodes from '../components/BackupCodes'
 import GoogleButton from '../components/GoogleButton'
 import PageBoard from '../components/PageBoard'
-import { changePassword, connectGoogle, disconnectGoogle, renameMe } from '../lib/api'
+import RowConfirm from '../components/RowConfirm'
+import {
+  changePassword,
+  connectGoogle,
+  disconnectGoogle,
+  fetchMeWithCodes,
+  makeBackupCodes,
+  renameMe,
+  signOutOthers,
+} from '../lib/api'
 import { signInMethods } from '../lib/format'
 import { THEMES, getThemeChoice, setThemeChoice } from '../lib/theme'
 
-/** One section's saving state: a message, and whether it is an error. */
+const USED_BACKUP_CODE_NOTICE =
+  "You signed in with a backup code. Set a new password or reconnect Google, then make new backup codes if you’re running low."
+
+/** One section's saving state: a message, whether it's an error, and
+    whether its request is running right now. */
 function useStatus() {
   const [status, setStatus] = useState(null)
-  return [status, (message, isError = false) => setStatus(message ? { message, isError } : null)]
+  const [busy, setBusy] = useState(false)
+
+  function setMessage(message, isError = false) {
+    setStatus(message ? { message, isError } : null)
+  }
+
+  async function run(action, doneMessage) {
+    setBusy(true)
+    setMessage(null)
+    try {
+      const result = await action()
+      setMessage(doneMessage)
+      return result
+    } catch (err) {
+      setMessage(err.message, true)
+      throw err
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return [status, setMessage, busy, run]
 }
 
 function Status({ status }) {
@@ -29,23 +64,90 @@ function Setting({ title, about, children, as: Tag = 'div', ...rest }) {
   )
 }
 
+/** Proof that whoever is making a sign-in change is really this admin:
+    their current password, or -- when they have none -- a fresh Google
+    sign-in done again right now. `bypass` skips both: the session itself
+    already proved it, because it was opened with a backup code (see
+    requireReproof / proofFromSession on the server). */
+function useProof(admin, bypass = false) {
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [reproofToken, setReproofToken] = useState(null)
+  const ready = bypass || (admin.hasPassword ? currentPassword.length > 0 : Boolean(reproofToken))
+  const proof = bypass ? {} : (admin.hasPassword ? { currentPassword } : { reproofAccessToken: reproofToken })
+  function reset() {
+    setCurrentPassword('')
+    setReproofToken(null)
+  }
+  return { currentPassword, setCurrentPassword, reproofToken, setReproofToken, ready, proof, reset }
+}
+
+function ProofField({ admin, proof, busy, bypass }) {
+  if (bypass) return <p className="form-ok" role="status">Confirmed by your backup-code sign-in.</p>
+  if (admin.hasPassword) {
+    return (
+      <label className="field"><span>Current password</span>
+        <input type="password" autoComplete="current-password" value={proof.currentPassword}
+          onChange={(e) => proof.setCurrentPassword(e.target.value)} required />
+      </label>
+    )
+  }
+  if (proof.reproofToken) return <p className="form-ok" role="status">Confirmed with Google.</p>
+  return <GoogleButton label="Confirm with Google" disabled={busy} onToken={proof.setReproofToken} />
+}
+
 export default function Account({ admin, onAdminChange }) {
   const [name, setName] = useState(admin.name)
-  const [nameStatus, setNameStatus] = useStatus()
-  const [currentPassword, setCurrentPassword] = useState('')
+  const [nameStatus, , nameBusy, runName] = useStatus()
+
   const [newPassword, setNewPassword] = useState('')
   const [confirm, setConfirm] = useState('')
-  const [passwordStatus, setPasswordStatus] = useStatus()
-  const [googleStatus, setGoogleStatus] = useStatus()
+  const [passwordStatus, setPasswordStatus, passwordBusy, runPassword] = useStatus()
+
+  const [googleStatus, , googleBusy, runGoogle] = useStatus()
+
+  const [sessionsStatus, , sessionsBusy, runSessions] = useStatus()
+
+  const [codes, setCodes] = useState(null)
+  const [backupCodesLeft, setBackupCodesLeft] = useState(null)
+  const [backupCodesLoaded, setBackupCodesLoaded] = useState(false)
+  const [askingNewCodes, setAskingNewCodes] = useState(false)
+  const [codesStatus, , codesBusy, runCodes] = useStatus()
+
   const [theme, setTheme] = useState(getThemeChoice)
+  // Whether this session still counts as its own proof (see
+  // requireReproof / proofFromSession on the server): true from a
+  // backup-code sign-in until the first sign-in change goes through, at
+  // which point the fresh token it comes back with drops the claim.
+  // Always read from the server, never guessed from something the
+  // browser remembers -- fetched below on every mount, and kept in step
+  // by every response that mints a fresh token, so it survives a reload
+  // and clears itself the moment "Sign out everywhere else" (or any
+  // other change) takes it away.
+  const [viaBackupCode, setViaBackupCode] = useState(false)
+
+  const passwordProof = useProof(admin, viaBackupCode)
+  const googleProof = useProof(admin, viaBackupCode)
+  const codesProof = useProof(admin, viaBackupCode)
+
+  useEffect(() => {
+    let live = true
+    fetchMeWithCodes()
+      .then((data) => {
+        if (!live) return
+        setBackupCodesLeft(data.backupCodesLeft)
+        setBackupCodesLoaded(true)
+        setViaBackupCode(Boolean(data.viaBackupCode))
+      })
+      .catch(() => {})
+    return () => { live = false }
+  }, [])
 
   async function saveName(event) {
     event.preventDefault()
     try {
-      onAdminChange(await renameMe(name.trim()))
-      setNameStatus('Name saved.')
-    } catch (err) {
-      setNameStatus(err.message, true)
+      onAdminChange(await runName(() => renameMe(name.trim()), 'Name saved.'))
+    } catch {
+      // Status already shown by runName.
     }
   }
 
@@ -56,27 +158,69 @@ export default function Account({ admin, onAdminChange }) {
       return
     }
     try {
-      onAdminChange(await changePassword({ currentPassword, newPassword }))
-      setCurrentPassword('')
+      const { admin: updated, viaBackupCode: stillVia } = await runPassword(
+        () => changePassword({ proof: passwordProof.proof, newPassword }), 'Password saved.')
+      onAdminChange(updated)
       setNewPassword('')
       setConfirm('')
-      setPasswordStatus('Password saved.')
-    } catch (err) {
-      setPasswordStatus(err.message, true)
+      passwordProof.reset()
+      setViaBackupCode(Boolean(stillVia))
+    } catch {
+      // Status already shown by runPassword.
     }
   }
 
-  async function runGoogle(action, done) {
+  async function saveConnectGoogle(accessToken) {
     try {
-      onAdminChange(await action())
-      setGoogleStatus(done)
-    } catch (err) {
-      setGoogleStatus(err.message, true)
+      const { admin: updated, viaBackupCode: stillVia } = await runGoogle(
+        () => connectGoogle(accessToken, googleProof.proof), 'Google connected.')
+      onAdminChange(updated)
+      googleProof.reset()
+      setViaBackupCode(Boolean(stillVia))
+    } catch {
+      // Status already shown by runGoogle.
     }
   }
+
+  async function saveDisconnectGoogle() {
+    try {
+      const { admin: updated, viaBackupCode: stillVia } = await runGoogle(
+        () => disconnectGoogle(googleProof.proof), 'Google disconnected.')
+      onAdminChange(updated)
+      googleProof.reset()
+      setViaBackupCode(Boolean(stillVia))
+    } catch {
+      // Status already shown by runGoogle.
+    }
+  }
+
+  async function signOutEverywhereElse() {
+    try {
+      const { admin: updated, viaBackupCode: stillVia } = await runSessions(() => signOutOthers(), 'Signed out everywhere else.')
+      onAdminChange(updated)
+      setViaBackupCode(Boolean(stillVia))
+    } catch {
+      // Status already shown by runSessions.
+    }
+  }
+
+  async function makeNewCodes() {
+    try {
+      const { codes: newCodes, viaBackupCode: stillVia } = await runCodes(() => makeBackupCodes(codesProof.proof))
+      setCodes(newCodes)
+      setBackupCodesLeft(newCodes.length)
+      codesProof.reset()
+      setViaBackupCode(Boolean(stillVia))
+    } catch {
+      // Status already shown by runCodes.
+    }
+  }
+
+  const codesGone = backupCodesLeft === 0 || backupCodesLeft == null
 
   return (
     <section>
+      {viaBackupCode && <p className="notice" role="status">{USED_BACKUP_CODE_NOTICE}</p>}
       <PageBoard title="Account" intro={<><strong>{admin.name}</strong> · {admin.email}</>}>
         <div className="facts">
           <div className="fact"><span className="tally-label">Role</span><strong>{admin.role === 'owner' ? 'Owner' : 'Admin'}</strong></div>
@@ -89,7 +233,7 @@ export default function Account({ admin, onAdminChange }) {
           <Setting as="form" title="Your name" about="Shown at the top of every page and beside everything you do in Activity." onSubmit={saveName}>
             <label className="field"><span>Name</span><input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} required /></label>
             <Status status={nameStatus} />
-            <button type="submit" className="btn-primary">Save name</button>
+            <button type="submit" className="btn-primary" disabled={nameBusy}>{nameBusy ? 'Saving…' : 'Save name'}</button>
           </Setting>
 
           <Setting
@@ -98,11 +242,7 @@ export default function Account({ admin, onAdminChange }) {
             about="At least 8 characters. There are no reset emails, so keep it somewhere safe."
             onSubmit={savePassword}
           >
-            {admin.hasPassword && (
-              <label className="field"><span>Current password</span>
-                <input type="password" autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
-              </label>
-            )}
+            <ProofField admin={admin} proof={passwordProof} busy={passwordBusy} bypass={viaBackupCode} />
             <div className="pair">
               <label className="field"><span>New password</span>
                 <input type="password" autoComplete="new-password" minLength={8} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
@@ -112,7 +252,9 @@ export default function Account({ admin, onAdminChange }) {
               </label>
             </div>
             <Status status={passwordStatus} />
-            <button type="submit" className="btn-primary">Save password</button>
+            <button type="submit" className="btn-primary" disabled={passwordBusy || !passwordProof.ready}>
+              {passwordBusy ? 'Saving…' : 'Save password'}
+            </button>
           </Setting>
 
           <Setting title="Google" about="Sign in with a Google account instead of typing a password.">
@@ -120,18 +262,60 @@ export default function Account({ admin, onAdminChange }) {
               <>
                 <p>Connected to <strong>{admin.googleEmail}</strong>.</p>
                 {!admin.hasPassword && <p className="hint">Set a password before disconnecting. Google is your only way in.</p>}
+                {admin.hasPassword && <ProofField admin={admin} proof={googleProof} busy={googleBusy} bypass={viaBackupCode} />}
                 <Status status={googleStatus} />
-                <button type="button" className="btn-danger" disabled={!admin.hasPassword}
-                  onClick={() => runGoogle(disconnectGoogle, 'Google disconnected.')}>Disconnect Google</button>
+                <button type="button" className="btn-danger" disabled={googleBusy || !admin.hasPassword || !googleProof.ready}
+                  onClick={saveDisconnectGoogle}>{googleBusy ? 'Saving…' : 'Disconnect Google'}</button>
               </>
             ) : (
               <>
                 <p>No Google account connected.</p>
+                <ProofField admin={admin} proof={googleProof} busy={googleBusy} bypass={viaBackupCode} />
                 <Status status={googleStatus} />
-                <GoogleButton label="Connect Google" onToken={(token) => runGoogle(() => connectGoogle(token), 'Google connected.')} />
+                <GoogleButton label={googleBusy ? 'Saving…' : 'Connect Google'} disabled={googleBusy || !googleProof.ready}
+                  onToken={saveConnectGoogle} />
               </>
             )}
           </Setting>
+
+          <Setting title="Sessions" about="Signs out every other browser where you’re signed in as you. You stay signed in here.">
+            <Status status={sessionsStatus} />
+            <button type="button" className="btn-quiet" disabled={sessionsBusy} onClick={signOutEverywhereElse}>
+              {sessionsBusy ? 'Saving…' : 'Sign out everywhere else'}
+            </button>
+          </Setting>
+
+          {admin.role === 'owner' && (
+            <Setting title="Backup codes" about="A way back in if you ever lose your password and your Google account both.">
+              {backupCodesLoaded && (
+                codesGone
+                  ? <p>You don’t have backup codes yet.</p>
+                  : (
+                    <>
+                      <p>You have {backupCodesLeft} backup code{backupCodesLeft === 1 ? '' : 's'} left.</p>
+                      {backupCodesLeft <= 3 && <p className="notice">Running low. Make a new set.</p>}
+                    </>
+                  )
+              )}
+              {askingNewCodes && <ProofField admin={admin} proof={codesProof} busy={codesBusy} bypass={viaBackupCode} />}
+              <Status status={codesStatus} />
+              <RowConfirm
+                label="Make new backup codes"
+                className="btn-primary"
+                question="Your old codes stop working."
+                confirmLabel="Make new codes"
+                busyLabel="Making…"
+                confirmClass="btn-primary"
+                keepLabel="Not now"
+                open={askingNewCodes}
+                disabled={askingNewCodes && !codesProof.ready}
+                onOpen={() => setAskingNewCodes(true)}
+                onClose={() => setAskingNewCodes(false)}
+                onConfirm={makeNewCodes}
+              />
+              {codes && <BackupCodes codes={codes} onDone={() => setCodes(null)} />}
+            </Setting>
+          )}
 
           <Setting title="Look" about="Only changes this computer.">
             <fieldset className="cells">

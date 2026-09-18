@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from 'react'
  */
 export default function RowConfirm({
   label, className, question, confirmLabel, confirmClass, busyLabel, keepLabel = 'Keep',
-  open, hidden = false, onOpen, onClose, onConfirm,
+  open, hidden = false, disabled = false, onOpen, onClose, onConfirm,
 }) {
   const trigger = useRef(null)
   const returnFocus = useRef(false)
@@ -34,7 +34,7 @@ export default function RowConfirm({
   }
 
   async function confirm() {
-    if (running.current) return
+    if (running.current || disabled) return
     running.current = true
     setBusy(true)
     setError(null)
@@ -58,6 +58,7 @@ export default function RowConfirm({
           ref={trigger}
           type="button"
           className={className}
+          disabled={disabled}
           onClick={() => { setError(null); onOpen() }}
         >
           {label}
@@ -84,7 +85,7 @@ export default function RowConfirm({
       <span className="confirm-buttons">
         {/* aria-disabled rather than disabled: a disabled button drops
             keyboard focus to the page, the thing this is here to avoid. */}
-        <button type="button" className={confirmClass} aria-disabled={busy} onClick={confirm}>
+        <button type="button" className={confirmClass} aria-disabled={busy || disabled} onClick={confirm}>
           {busy ? busyLabel : confirmLabel}
         </button>
         {/* Focus lands on the safe choice. */}

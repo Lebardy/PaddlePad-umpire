@@ -1515,9 +1515,15 @@ async function main() {
     const loginOff = await request('/admin/auth/login', { method: 'POST', body: { email, password: ADMIN_PASSWORD } })
     check('and the right password says access is switched off -> 403', loginOff.status === 403, String(loginOff.status))
     const on = await request(`/admin/admins/${adminId}/switch-on`, { method: 'POST', bearer: owner })
-    const afterOn = await request('/admin/invites', { bearer: admin })
-    check('switched back on, the same token works again', on.status === 200 && afterOn.status === 200,
-      `${on.status} ${afterOn.status}`)
+    check('switched back on -> 200', on.status === 200 && on.body.admin?.active === true, String(on.status))
+    // Switching off ends every session that admin held (see Task 5's
+    // "ending sessions" section); switching back on does not restore
+    // them, so the token from before switch-off stays ended.
+    const stillOldToken = await request('/admin/invites', { bearer: admin })
+    check('the pre-switch-off token stays ended even after being switched back on -> 401',
+      stillOldToken.status === 401, String(stillOldToken.status))
+    const backIn = await request('/admin/auth/login', { method: 'POST', body: { email, password: ADMIN_PASSWORD } })
+    check('signing in fresh works again -> 200', backIn.status === 200, String(backIn.status))
     const offAgain = await request(`/admin/admins/${adminId}/switch-off`, { method: 'POST', bearer: owner })
     check('the throwaway admin is left switched off', offAgain.status === 200, String(offAgain.status))
   }
@@ -1896,6 +1902,295 @@ async function main() {
     check('closing the reopened-by-link player again -> 200, leaving nothing active',
       recloseReopened.status === 200 && recloseReopened.body.player?.status === 'closed',
       JSON.stringify(recloseReopened.body).slice(0, 80))
+  }
+
+  section('admin site — ending sessions, proof and backup codes')
+  if (!ADMIN_SECTION || !OWNER_EMAIL || !OWNER_PASSWORD) {
+    console.log('  skip (needs a staging or local server, SMOKE_OWNER_EMAIL and SMOKE_OWNER_PASSWORD)')
+  } else {
+    const hStamp = Date.now()
+    const SESSION_ENDED = 'Your session has ended. Sign in again.'
+
+    // The owner's account is reused across every run of this script, so
+    // its activity never starts empty -- a plain count can never read
+    // "exactly one". These watermark on the newest entry id for one
+    // action against one admin BEFORE doing a thing, then count only
+    // entries newer than that after.
+    const newestActivityId = async (action, adminId, bearer) => {
+      const r = await request(`/admin/activity?action=${action}&adminId=${adminId}`, { bearer })
+      return Number((r.body.entries ?? [])[0]?.id ?? 0)
+    }
+    const newEntriesSince = async (action, adminId, bearer, since) => {
+      const r = await request(`/admin/activity?action=${action}&adminId=${adminId}`, { bearer })
+      return (r.body.entries ?? []).filter((e) => Number(e.id) > since).length
+    }
+
+    // A failure detail below is a JSON dump of a response body -- never
+    // one that could itself be a credential. A session token, a set of
+    // backup codes, an invite code or a setup link's secret URL is
+    // swapped out before it ever reaches JSON.stringify.
+    const redacted = (body) => {
+      const { token, codes, invite, setupLink, ...rest } = body ?? {}
+      return JSON.stringify({
+        ...rest,
+        ...(token !== undefined ? { token: '[redacted]' } : {}),
+        ...(codes !== undefined ? { codes: `[redacted, ${Array.isArray(codes) ? codes.length : 0} codes]` } : {}),
+        ...(invite !== undefined ? { invite: { ...invite, code: '[redacted]' } } : {}),
+        ...(setupLink !== undefined ? { setupLink: '[redacted]' } : {}),
+      })
+    }
+
+    // --- 1: signing out everywhere else ends every OTHER session, not this one ---
+    const loginA = await request('/admin/auth/login', { method: 'POST', body: { email: OWNER_EMAIL, password: OWNER_PASSWORD } })
+    check('the owner signs in for token A -> 200', loginA.status === 200, redacted(loginA.body).slice(0, 80))
+    const tokenA = loginA.body.token
+    const ownerId = loginA.body.admin?.id
+
+    const loginB = await request('/admin/auth/login', { method: 'POST', body: { email: OWNER_EMAIL, password: OWNER_PASSWORD } })
+    check('a second sign-in for token B -> 200', loginB.status === 200, String(loginB.status))
+    const tokenB = loginB.body.token
+
+    const signedOutWatermark = await newestActivityId('admin.signed_out_others', ownerId, tokenB)
+    const signedOut = await request('/admin/auth/me/sign-out-others', { method: 'POST', bearer: tokenB })
+    check('sign-out-others with token B -> 200 with a fresh token',
+      signedOut.status === 200 && typeof signedOut.body.token === 'string', redacted(signedOut.body).slice(0, 80))
+    let ownerToken = signedOut.body.token
+
+    const aEnded = await request('/admin/auth/me', { bearer: tokenA })
+    check('token A has ended -> 401', aEnded.status === 401 && aEnded.body.error === SESSION_ENDED, redacted(aEnded.body))
+    const cWorks = await request('/admin/auth/me', { bearer: ownerToken })
+    check('token C (the fresh one) still works', cWorks.status === 200, String(cWorks.status))
+    const signedOutAdded = await newEntriesSince('admin.signed_out_others', ownerId, ownerToken, signedOutWatermark)
+    check('one admin.signed_out_others entry', signedOutAdded === 1, String(signedOutAdded))
+
+    // --- 2: proof before a password change, and a temporary password
+    // that is always changed back, even if a step in between throws. ---
+    const pwWatermark = await newestActivityId('admin.password_changed', ownerId, ownerToken)
+    const wrongCurrent = await request('/admin/auth/me/password', {
+      method: 'POST', bearer: ownerToken, body: { currentPassword: 'definitely-the-wrong-password', newPassword: 'a-temporary-password-1' },
+    })
+    check('a wrong currentPassword -> 403', wrongCurrent.status === 403 && wrongCurrent.body.error === 'Your current password is wrong',
+      redacted(wrongCurrent.body))
+    const noEntryYet = await newEntriesSince('admin.password_changed', ownerId, ownerToken, pwWatermark)
+    check('the wrong attempt added no activity entry', noEntryYet === 0, String(noEntryYet))
+
+    const TEMP_PASSWORD = `smoke-temp-${uuid()}`
+    let restored = false
+    try {
+      const beforeChangeToken = ownerToken
+      const toTemp = await request('/admin/auth/me/password', {
+        method: 'POST', bearer: ownerToken, body: { currentPassword: OWNER_PASSWORD, newPassword: TEMP_PASSWORD },
+      })
+      check('the right currentPassword changes it -> 200 with a fresh token',
+        toTemp.status === 200 && typeof toTemp.body.token === 'string', redacted(toTemp.body).slice(0, 80))
+      ownerToken = toTemp.body.token
+
+      const oldEnded = await request('/admin/auth/me', { bearer: beforeChangeToken })
+      check('the token from before the change has ended -> 401',
+        oldEnded.status === 401 && oldEnded.body.error === SESSION_ENDED, redacted(oldEnded.body))
+    } finally {
+      // Try changing it back with the temporary password first; if that
+      // is refused, the change to temporary may itself never have gone
+      // through, so check whether the smoke password already still works.
+      let back = await request('/admin/auth/me/password', {
+        method: 'POST', bearer: ownerToken, body: { currentPassword: TEMP_PASSWORD, newPassword: OWNER_PASSWORD },
+      })
+      if (back.status === 200 && typeof back.body.token === 'string') {
+        ownerToken = back.body.token
+        restored = true
+      } else {
+        const already = await request('/admin/auth/login', { method: 'POST', body: { email: OWNER_EMAIL, password: OWNER_PASSWORD } })
+        if (already.status === 200) {
+          ownerToken = already.body.token
+          restored = true
+        }
+      }
+      check('the smoke owner password is back to what it was', restored)
+      if (!restored) {
+        console.log('\n  !!!! could not confirm the smoke owner password was restored -- fix it by hand before running this again !!!!')
+      }
+    }
+    if (!restored) {
+      console.log(`\n${pass} passed, ${fail} failed`)
+      process.exit(1)
+    }
+    const signInAgain = await request('/admin/auth/login', { method: 'POST', body: { email: OWNER_EMAIL, password: OWNER_PASSWORD } })
+    check('signing in with the smoke password works at the end of the section', signInAgain.status === 200, String(signInAgain.status))
+    ownerToken = signInAgain.body.token
+
+    // --- 3: a throwaway admin -- switching off ends its sessions even
+    // though switching back on does not bring them back. ---
+    const hAdminEmail = `smoke.hardening.${uuid().slice(0, 8)}@example.com`
+    const hAdminAdded = await request('/admin/admins', {
+      method: 'POST', bearer: ownerToken, body: { name: 'Smoke Hardening Admin', email: hAdminEmail },
+    })
+    check('the owner adds a throwaway admin -> 201', hAdminAdded.status === 201, redacted(hAdminAdded.body).slice(0, 80))
+    const hAdminId = hAdminAdded.body.admin?.id
+    const hSecret = (hAdminAdded.body.setupLink?.url ?? '').split('/setup/')[1]
+    const HARDENING_ADMIN_PASSWORD = `smoke-${uuid()}`
+    const hSetup = await request(`/admin/auth/setup/${hSecret}`, { method: 'POST', body: { password: HARDENING_ADMIN_PASSWORD } })
+    check('it completes setup through the API and signs in -> 200',
+      hSetup.status === 200 && typeof hSetup.body.token === 'string', redacted(hSetup.body).slice(0, 80))
+    let hAdminToken = hSetup.body.token
+
+    // sessionEnded compares whole seconds so a token handed back in the
+    // SAME response as a reset still works (see admin-rules.js). Setup
+    // itself resets sessions and pins this token to that second, so the
+    // switch-off below needs to land in a LATER second, or its own
+    // reset would land in the same one and this token would wrongly
+    // survive it.
+    await new Promise((resolve) => setTimeout(resolve, 1100))
+
+    const hOff = await request(`/admin/admins/${hAdminId}/switch-off`, { method: 'POST', bearer: ownerToken })
+    check('the owner switches it off -> 200', hOff.status === 200 && hOff.body.admin?.active === false, String(hOff.status))
+    const hOn = await request(`/admin/admins/${hAdminId}/switch-on`, { method: 'POST', bearer: ownerToken })
+    check('and back on -> 200', hOn.status === 200 && hOn.body.admin?.active === true, String(hOn.status))
+
+    const hOldTokenAfter = await request('/admin/auth/me', { bearer: hAdminToken })
+    check('its token from before the switch-off has ended -> 401',
+      hOldTokenAfter.status === 401 && hOldTokenAfter.body.error === SESSION_ENDED, redacted(hOldTokenAfter.body))
+
+    const hSignInAgain = await request('/admin/auth/login', { method: 'POST', body: { email: hAdminEmail, password: HARDENING_ADMIN_PASSWORD } })
+    check('it signs in again fine -> 200', hSignInAgain.status === 200, String(hSignInAgain.status))
+    hAdminToken = hSignInAgain.body.token
+
+    const hNoCodes = await request('/admin/auth/me/backup-codes', { method: 'POST', bearer: hAdminToken, body: {} })
+    check('a non-owner asking for backup codes -> 403',
+      hNoCodes.status === 403 && hNoCodes.body.error === 'Only the owner has backup codes', redacted(hNoCodes.body))
+    const hBadBackup = await request('/admin/auth/backup-code', { method: 'POST', body: { email: hAdminEmail, code: 'ACDEF-GHJKM' } })
+    check("a non-owner's email and any code -> 401",
+      hBadBackup.status === 401 && hBadBackup.body.error === "That email and backup code don't match", redacted(hBadBackup.body))
+
+    const hOffAgain = await request(`/admin/admins/${hAdminId}/switch-off`, { method: 'POST', bearer: ownerToken })
+    check('the throwaway admin is left switched off -> 200',
+      hOffAgain.status === 200 && hOffAgain.body.admin?.active === false, String(hOffAgain.status))
+
+    // --- 4: the owner's own backup codes ---
+    const bcWrong = await request('/admin/auth/me/backup-codes', { method: 'POST', bearer: ownerToken, body: { currentPassword: 'definitely-the-wrong-password' } })
+    check('making backup codes with a wrong currentPassword -> 403',
+      bcWrong.status === 403 && bcWrong.body.error === 'Your current password is wrong', redacted(bcWrong.body))
+
+    const bcCreatedWatermark = await newestActivityId('admin.backup_codes_created', ownerId, ownerToken)
+    const bcMade = await request('/admin/auth/me/backup-codes', { method: 'POST', bearer: ownerToken, body: { currentPassword: OWNER_PASSWORD } })
+    check('the right currentPassword makes 10 codes -> 200',
+      bcMade.status === 200 && Array.isArray(bcMade.body.codes) && bcMade.body.codes.length === 10,
+      redacted(bcMade.body).slice(0, 80))
+    const CODE_PATTERN = /^[ACDEFGHJKMNPQRTUVWXY2346789]{5}-[ACDEFGHJKMNPQRTUVWXY2346789]{5}$/
+    const madeCodes = bcMade.body.codes ?? []
+    // Never the codes themselves, or any part of one -- just which
+    // positions (if any) didn't match, and how many there were.
+    const badCodeIndexes = madeCodes.map((c, i) => (CODE_PATTERN.test(c) ? -1 : i)).filter((i) => i !== -1)
+    check('every code is XXXXX-XXXXX from the invite alphabet', badCodeIndexes.length === 0,
+      `${madeCodes.length} codes, bad indexes: ${JSON.stringify(badCodeIndexes)}`)
+    check('a fresh token comes with them', typeof bcMade.body.token === 'string')
+    ownerToken = bcMade.body.token
+    const bcCreatedAdded = await newEntriesSince('admin.backup_codes_created', ownerId, ownerToken, bcCreatedWatermark)
+    check('one admin.backup_codes_created entry', bcCreatedAdded === 1, String(bcCreatedAdded))
+
+    const meAfterCodes = await request('/admin/auth/me', { bearer: ownerToken })
+    check('backupCodesLeft is 10', meAfterCodes.body.backupCodesLeft === 10, String(meAfterCodes.body.backupCodesLeft))
+
+    const firstCode = bcMade.body.codes[0]
+    const messyCode = firstCode.toLowerCase().replace('-', '')
+    const bcUsedWatermark = await newestActivityId('admin.backup_code_used', ownerId, ownerToken)
+    const tokenBeforeBackupUse = ownerToken
+    const bcUse = await request('/admin/auth/backup-code', { method: 'POST', body: { email: OWNER_EMAIL, code: messyCode } })
+    check('a lower-cased, dash-less code signs in -> 200, usedBackupCode',
+      bcUse.status === 200 && bcUse.body.usedBackupCode === true, redacted(bcUse.body).slice(0, 80))
+    ownerToken = bcUse.body.token
+
+    const bcReuse = await request('/admin/auth/backup-code', { method: 'POST', body: { email: OWNER_EMAIL, code: messyCode } })
+    check('the same code again -> 401',
+      bcReuse.status === 401 && bcReuse.body.error === "That email and backup code don't match", redacted(bcReuse.body))
+
+    const meAfterUse = await request('/admin/auth/me', { bearer: ownerToken })
+    check('backupCodesLeft is now 9', meAfterUse.body.backupCodesLeft === 9, String(meAfterUse.body.backupCodesLeft))
+    check('and this session still answers viaBackupCode true, before it is used to repair anything',
+      meAfterUse.body.viaBackupCode === true, String(meAfterUse.body.viaBackupCode))
+
+    const olderEnded = await request('/admin/auth/me', { bearer: tokenBeforeBackupUse })
+    check("the owner's older token has ended -> 401",
+      olderEnded.status === 401 && olderEnded.body.error === SESSION_ENDED, redacted(olderEnded.body))
+
+    const bcUsedAdded = await newEntriesSince('admin.backup_code_used', ownerId, ownerToken, bcUsedWatermark)
+    check('one admin.backup_code_used entry', bcUsedAdded === 1, String(bcUsedAdded))
+
+    // --- 4b: the session that backup-code sign-in just opened can
+    // actually repair the account -- set a new password with no
+    // currentPassword at all -- which is the whole point of a backup
+    // code existing (Important I1). There is only one owner on staging,
+    // so this runs against the real smoke owner and restores its real
+    // password in a finally, exactly as case 2 above does; the
+    // temporary password is never printed. ---
+    const BACKUP_TEMP_PASSWORD = `smoke-temp-${uuid()}`
+    let backupProofRestored = false
+    try {
+      const viaBackupCodeToken = ownerToken
+      const setFromBackupCode = await request('/admin/auth/me/password', {
+        method: 'POST', bearer: viaBackupCodeToken, body: { newPassword: BACKUP_TEMP_PASSWORD },
+      })
+      check('a backup-code session sets a password with no currentPassword -> 200 with a fresh token',
+        setFromBackupCode.status === 200 && typeof setFromBackupCode.body.token === 'string',
+        redacted(setFromBackupCode.body).slice(0, 80))
+      check('and the fresh token no longer answers viaBackupCode true, so the shortcut does not carry forward',
+        setFromBackupCode.body.viaBackupCode === false, String(setFromBackupCode.body.viaBackupCode))
+      ownerToken = setFromBackupCode.body.token
+
+      const secondChangeNoProof = await request('/admin/auth/me/password', {
+        method: 'POST', bearer: ownerToken, body: { newPassword: `smoke-temp-${uuid()}` },
+      })
+      check('a further change with that token and no currentPassword is refused -> 403',
+        secondChangeNoProof.status === 403, redacted(secondChangeNoProof.body))
+    } finally {
+      let back = await request('/admin/auth/me/password', {
+        method: 'POST', bearer: ownerToken, body: { currentPassword: BACKUP_TEMP_PASSWORD, newPassword: OWNER_PASSWORD },
+      })
+      if (back.status === 200 && typeof back.body.token === 'string') {
+        ownerToken = back.body.token
+        backupProofRestored = true
+      } else {
+        const already = await request('/admin/auth/login', { method: 'POST', body: { email: OWNER_EMAIL, password: OWNER_PASSWORD } })
+        if (already.status === 200) {
+          ownerToken = already.body.token
+          backupProofRestored = true
+        }
+      }
+      check('the smoke owner password is back to what it was after the backup-code proof check', backupProofRestored)
+      if (!backupProofRestored) {
+        console.log('\n  !!!! could not confirm the smoke owner password was restored after the backup-code proof check -- fix it by hand before running this again !!!!')
+      }
+    }
+    if (!backupProofRestored) {
+      console.log(`\n${pass} passed, ${fail} failed`)
+      process.exit(1)
+    }
+
+    // --- 5: a used invite code cannot be cancelled ---
+    const hInvite = await request('/admin/invites', { method: 'POST', bearer: ownerToken, body: { note: 'smoke hardening' } })
+    check('an invite code is made -> 201', hInvite.status === 201, redacted(hInvite.body).slice(0, 80))
+    const hInviteCode = hInvite.body.invite?.code
+
+    const hUmpEmail = `smoke.hardening.umpire.${hStamp}@example.com`
+    const hUmpName = `Smoke Hardening Umpire ${hStamp}`
+    const hUmpReg = await request('/auth/register', {
+      method: 'POST', body: { email: hUmpEmail, name: hUmpName, password: `smk-${uuid()}`, invite: hInviteCode },
+    })
+    check('the throwaway umpire registers with the code -> 201', hUmpReg.status === 201, redacted(hUmpReg.body).slice(0, 80))
+    const hUmpireId = hUmpReg.body.umpire?.id
+
+    const hCancelUsed = await request(`/admin/invites/${hInviteCode}`, { method: 'DELETE', bearer: ownerToken })
+    check('a used invite code cannot be cancelled -> 404',
+      hCancelUsed.status === 404 && hCancelUsed.body.error === 'No unused invite with that code', redacted(hCancelUsed.body))
+
+    const hCloseUmp = await request(`/admin/umpires/${hUmpireId}/close`, {
+      method: 'POST', bearer: ownerToken, body: { reason: 'smoke hardening cleanup', confirmName: hUmpName },
+    })
+    check('the owner closes the throwaway umpire -> 200',
+      hCloseUmp.status === 200 && hCloseUmp.body.umpire?.status === 'closed', redacted(hCloseUmp.body).slice(0, 80))
+
+    // --- 6: disconnecting Google as the only way in is a pure rule,
+    // already pinned offline in check-admin-rules.mjs (canDisconnectGoogle) ---
+    console.log('  ...  disconnecting Google when it is the only way in is covered by the offline canDisconnectGoogle checks')
   }
 
   if (selfRegistered.length > 0) {

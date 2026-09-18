@@ -36,8 +36,19 @@ function refusal(statusCode, message) {
   return error
 }
 
+// The message a network-level failure to reach Google is turned into --
+// fetch throws a plain TypeError with no statusCode for a DNS failure, a
+// refused connection or similar, and that would otherwise fall through
+// as a generic 500 instead of the 503 an unreachable Google deserves.
+const GOOGLE_UNREACHABLE = 'Google sign-in is unavailable right now. Try again in a moment.'
+
 async function fetchKeys() {
-  const res = await fetch(CERTS_URL)
+  let res
+  try {
+    res = await fetch(CERTS_URL)
+  } catch {
+    throw refusal(503, GOOGLE_UNREACHABLE)
+  }
   if (!res.ok) throw refusal(503, 'Could not reach Google to verify that sign-in')
 
   const { keys } = await res.json()
@@ -154,9 +165,12 @@ export async function verifyGoogleAccessToken(accessToken) {
   if (!clientId) throw refusal(503, 'Google sign-in is not configured on this server')
   if (!accessToken) throw refusal(400, 'Missing Google credential')
 
-  const res = await fetch(
-    `${TOKENINFO_URL}?access_token=${encodeURIComponent(accessToken)}`,
-  )
+  let res
+  try {
+    res = await fetch(`${TOKENINFO_URL}?access_token=${encodeURIComponent(accessToken)}`)
+  } catch {
+    throw refusal(503, GOOGLE_UNREACHABLE)
+  }
   if (!res.ok) throw refusal(401, 'That Google sign-in could not be verified')
 
   const info = await res.json()

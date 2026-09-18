@@ -8,6 +8,11 @@ const API_URL = (import.meta.env?.VITE_API_URL ?? 'http://localhost:3000').repla
 // overwrite each other's sessions.
 const TOKEN_KEY = 'paddlepad.admin.token'
 const ADMIN_KEY = 'paddlepad.admin'
+// No longer written: Account now asks the server (`viaBackupCode` on
+// `/admin/auth/me` and on every response that mints a fresh token)
+// instead of remembering a flag from the moment someone signed in. Kept
+// only so any leftover key from before this change is cleared away.
+const USED_BACKUP_CODE_KEY = 'paddlepad.admin.usedBackupCode'
 
 /** Fired when the server says a signed-in session has ended. */
 export const SIGNED_OUT_EVENT = 'paddlepad-admin-signed-out'
@@ -47,6 +52,7 @@ export function clearSession() {
   try {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(ADMIN_KEY)
+    sessionStorage.removeItem(USED_BACKUP_CODE_KEY)
   } catch { /* nothing to do */ }
 }
 
@@ -112,11 +118,49 @@ export async function completeSetup(secret, { password, accessToken }) {
 // Your own account
 
 export const fetchMe = () => apiFetch('/admin/auth/me').then((d) => d.admin)
+export const fetchMeWithCodes = () => apiFetch('/admin/auth/me')
 export const renameMe = (name) => apiFetch('/admin/auth/me', { method: 'PATCH', body: { name } }).then((d) => d.admin)
-export const changePassword = ({ currentPassword, newPassword }) =>
-  post('/admin/auth/me/password', { currentPassword: currentPassword || undefined, newPassword }).then((d) => d.admin)
-export const connectGoogle = (accessToken) => post('/admin/auth/me/google/connect', { accessToken }).then((d) => d.admin)
-export const disconnectGoogle = () => post('/admin/auth/me/google/disconnect').then((d) => d.admin)
+
+// The four calls below mint a fresh token, and the server always mints
+// it with no backup-code claim (see admin-auth.js), so each also hands
+// back `viaBackupCode: false` for Account to fold into its own state
+// straight away, rather than waiting on a fresh `/me`.
+
+export async function changePassword({ proof, newPassword }) {
+  const data = await post('/admin/auth/me/password', { ...proof, newPassword })
+  storeSession(data.token, data.admin)
+  return { admin: data.admin, viaBackupCode: data.viaBackupCode }
+}
+
+export async function connectGoogle(accessToken, proof) {
+  const data = await post('/admin/auth/me/google/connect', { ...proof, accessToken })
+  storeSession(data.token, data.admin)
+  return { admin: data.admin, viaBackupCode: data.viaBackupCode }
+}
+
+export async function disconnectGoogle(proof) {
+  const data = await post('/admin/auth/me/google/disconnect', { ...proof })
+  storeSession(data.token, data.admin)
+  return { admin: data.admin, viaBackupCode: data.viaBackupCode }
+}
+
+export async function signOutOthers() {
+  const data = await post('/admin/auth/me/sign-out-others')
+  storeSession(data.token, data.admin)
+  return { admin: data.admin, viaBackupCode: data.viaBackupCode }
+}
+
+export async function makeBackupCodes(proof) {
+  const data = await post('/admin/auth/me/backup-codes', { ...proof })
+  storeSession(data.token, data.admin)
+  return { codes: data.codes, viaBackupCode: data.viaBackupCode }
+}
+
+export async function signInWithBackupCode({ email, code }) {
+  const data = await apiFetch('/admin/auth/backup-code', { method: 'POST', auth: false, body: { email, code } })
+  storeSession(data.token, data.admin)
+  return data.admin
+}
 
 // Invite codes
 

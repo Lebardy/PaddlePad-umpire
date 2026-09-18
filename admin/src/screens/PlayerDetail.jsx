@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
+import AccountActions from '../components/AccountActions'
 import ClaimCodeReveal from '../components/ClaimCodeReveal'
 import PageBoard, { TallyCell } from '../components/PageBoard'
 import RowConfirm from '../components/RowConfirm'
 import StatusTag from '../components/StatusTag'
-import { closePerson, fetchPlayer, newClaimCode, pausePerson, unpausePerson } from '../lib/api'
-import { confirmNameMatches, formatWhen, lastSignedInText, ratingText, signInMethodsText } from '../lib/format'
+import { fetchPlayer, newClaimCode } from '../lib/api'
+import { formatWhen, lastSignedInText, ratingText, signInMethodsText } from '../lib/format'
 import { Link } from '../lib/router'
 
 /** One player's page: their details, their recent matches, and what an admin can do about their account. */
@@ -14,14 +15,7 @@ export default function PlayerDetail({ id, me }) {
   // inside the effect) is what tells a still-loading id apart from one
   // already answered.
   const [result, setResult] = useState(null)
-  const [confirming, setConfirming] = useState(null)
-  const [reason, setReason] = useState('')
   const [claimCode, setClaimCode] = useState(null)
-  const [closing, setClosing] = useState(false)
-  const [closeReason, setCloseReason] = useState('')
-  const [closeName, setCloseName] = useState('')
-  const [closeError, setCloseError] = useState(null)
-  const [closeBusy, setCloseBusy] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -38,20 +32,12 @@ export default function PlayerDetail({ id, me }) {
   const loading = !result || result.id !== id
   const player = loading ? null : result.player
 
-  async function handlePause() {
-    const trimmed = reason.trim()
-    if (!trimmed) throw new Error('Write a short reason (up to 300 characters)')
-    const { player: fresh } = await pausePerson('players', id, trimmed)
+  // Pausing or closing wipes a revealed claim code's use -- it would
+  // not work again until the account is active, so it must not keep
+  // looking usable on screen.
+  function handleChanged(fresh) {
     setResult({ id, player: fresh })
-    setReason('')
-    // A code revealed earlier would not work again until they are
-    // switched back on, so it must not keep looking usable on screen.
     setClaimCode(null)
-  }
-
-  async function handleUnpause() {
-    const { player: fresh } = await unpausePerson('players', id)
-    setResult({ id, player: fresh })
   }
 
   async function handleClaimCode() {
@@ -64,25 +50,6 @@ export default function PlayerDetail({ id, me }) {
     // keep showing the stale answer until the next reload.
     const fresh = await fetchPlayer(id)
     setResult({ id, player: fresh })
-  }
-
-  async function handleClose() {
-    setCloseBusy(true)
-    setCloseError(null)
-    try {
-      const { player: fresh } = await closePerson('players', id, { reason: closeReason.trim(), confirmName: closeName })
-      setResult({ id, player: fresh })
-      setClosing(false)
-      setCloseReason('')
-      setCloseName('')
-      // Closing wipes the claim code, so a previously revealed one is
-      // stale the moment this succeeds.
-      setClaimCode(null)
-    } catch (err) {
-      setCloseError(err.message)
-    } finally {
-      setCloseBusy(false)
-    }
   }
 
   if (loading) return <section className="sheet"><p className="empty">Loading…</p></section>
@@ -175,48 +142,13 @@ export default function PlayerDetail({ id, me }) {
           )}
         </div>
 
-        <div>
-          <h2 className="section-title">Actions</h2>
-          <div className="actions-row">
-            {player.status !== 'closed' && player.status !== 'paused' && (
-              <RowConfirm
-                label="Pause account"
-                className="btn-danger btn-small"
-                question={
-                  <span className="confirm-reason">
-                    <label className="field">
-                      <span>Reason</span>
-                      <textarea value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} />
-                    </label>
-                    <span className="hint">{reason.length}/300</span>
-                  </span>
-                }
-                confirmLabel="Pause"
-                busyLabel="Pausing…"
-                confirmClass="btn-danger is-solid btn-small"
-                open={confirming === 'pause'}
-                onOpen={() => setConfirming('pause')}
-                onClose={() => setConfirming(null)}
-                onConfirm={handlePause}
-              />
-            )}
-
-            {player.status === 'paused' && (
-              <RowConfirm
-                label="Switch back on"
-                className="btn-quiet btn-small"
-                question="They can sign in again straight away."
-                confirmLabel="Switch back on"
-                busyLabel="Switching…"
-                confirmClass="btn-primary btn-small"
-                open={confirming === 'unpause'}
-                onOpen={() => setConfirming('unpause')}
-                onClose={() => setConfirming(null)}
-                onConfirm={handleUnpause}
-              />
-            )}
-
-            {player.status !== 'paused' && (!player.closedByAdmin || me.role === 'owner') && (
+        <AccountActions
+          kind="players"
+          person={player}
+          me={me}
+          onChanged={handleChanged}
+          extraActions={(confirming, setConfirming) => (
+            player.status !== 'paused' && (!player.closedByAdmin || me.role === 'owner') && (
               <RowConfirm
                 label="New claim code"
                 className="btn-quiet btn-small"
@@ -229,40 +161,9 @@ export default function PlayerDetail({ id, me }) {
                 onClose={() => setConfirming(null)}
                 onConfirm={handleClaimCode}
               />
-            )}
-
-            {me.role === 'owner' && player.status !== 'closed' && !closing && (
-              <button type="button" className="btn-danger btn-small" onClick={() => setClosing(true)}>Close for good</button>
-            )}
-          </div>
-
-          {me.role === 'owner' && player.status !== 'closed' && closing && (
-            <div className="panel">
-              <p>
-                Closing wipes their username, password, Google link and claim code. Their matches and rating history
-                stay. This can’t be undone, but a new claim code can reopen the account.
-              </p>
-              <label className="field"><span>Reason</span>
-                <textarea value={closeReason} maxLength={300} onChange={(e) => setCloseReason(e.target.value)} />
-              </label>
-              <label className="field"><span>Type their name to confirm</span>
-                <input value={closeName} onChange={(e) => setCloseName(e.target.value)} />
-              </label>
-              {closeError && <p className="form-error" role="alert">{closeError}</p>}
-              <div className="panel-actions">
-                <button
-                  type="button"
-                  className="btn-danger is-solid"
-                  disabled={closeBusy || !confirmNameMatches(closeName, player.name)}
-                  onClick={handleClose}
-                >
-                  {closeBusy ? 'Closing…' : 'Close account'}
-                </button>
-                <button type="button" className="btn-quiet" onClick={() => { setClosing(false); setCloseError(null) }}>Cancel</button>
-              </div>
-            </div>
+            )
           )}
-        </div>
+        />
 
         {claimCode && <ClaimCodeReveal code={claimCode} playerName={player.name} />}
       </div>

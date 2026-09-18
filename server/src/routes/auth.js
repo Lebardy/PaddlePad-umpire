@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { query, withTransaction } from '../db.js'
 import {
   MIN_PASSWORD_LENGTH,
+  NO_SUCH_ACCOUNT_HASH,
   hashPassword,
   requireActiveUmpire,
   requireAuth,
@@ -28,13 +29,6 @@ const router = Router()
 function normalizeEmail(value) {
   return String(value ?? '').trim().toLowerCase()
 }
-
-// Verified against when no account matches, so a missing account and a
-// wrong password take similar time to answer. Well-formed (`salt:key`
-// with a 64-byte key) so verifyPassword does the real scrypt work rather
-// than bailing early on a malformed hash, which would give the timing
-// away again.
-const NO_SUCH_ACCOUNT_HASH = `${'0'.repeat(32)}:${'0'.repeat(128)}`
 
 /**
  * The umpire half of every auth response, built from a row.
@@ -244,16 +238,24 @@ router.post('/google', async (req, res) => {
   )
   if (byEmailFound[0]) {
     if (refuseSignIn(res, byEmailFound[0], 'closed_at')) return
+    // AND google_sub IS NULL guards the same race the SELECT above
+    // does: if a concurrent request already linked a Google account to
+    // this row between that SELECT and this UPDATE, this one matches no
+    // row rather than overwriting it. Falls through to the invite path
+    // below exactly as if nobody had matched by email at all.
     const { rows: byEmail } = await query(
-      `UPDATE umpires SET google_sub = $2, google_email = $3 WHERE id = $1
+      `UPDATE umpires SET google_sub = $2, google_email = $3
+        WHERE id = $1 AND google_sub IS NULL
         RETURNING id, email, name, password_hash, google_email`,
       [byEmailFound[0].id, profile.sub, profile.email],
     )
-    await noteSignIn(query, 'umpires', byEmail[0].id)
-    return res.json({
-      token: signToken(byEmail[0]),
-      umpire: umpirePayload(byEmail[0]),
-    })
+    if (byEmail[0]) {
+      await noteSignIn(query, 'umpires', byEmail[0].id)
+      return res.json({
+        token: signToken(byEmail[0]),
+        umpire: umpirePayload(byEmail[0]),
+      })
+    }
   }
 
   try {
