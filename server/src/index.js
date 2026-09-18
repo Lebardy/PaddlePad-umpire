@@ -172,6 +172,7 @@ app.use('/internal', rateLimit({ max: 20, windowMs: 60_000 }))
 // below is the ceiling on everything under /admin, nested paths
 // included (see the note on /auth/google above).
 app.use('/admin/auth/login', rateLimit({ max: 10, windowMs: 60_000 }))
+app.use('/admin/auth/backup-code', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/admin/auth/google', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/admin/auth/setup', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/admin/auth/me/password', rateLimit({ max: 10, windowMs: 60_000 }))

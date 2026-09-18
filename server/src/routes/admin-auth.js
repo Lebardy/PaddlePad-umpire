@@ -10,6 +10,7 @@ import {
 import { googleConfigured, resolveGoogleProfile } from '../google.js'
 import { ADMIN_COLUMNS, resetSessions } from '../admin-accounts.js'
 import { recordActivity } from '../admin-activity.js'
+import { countBackupCodesLeft, replaceBackupCodes, useBackupCode } from '../admin-backup-codes.js'
 import {
   adminPayload,
   canDisconnectGoogle,
@@ -253,7 +254,11 @@ async function loadMe(id) {
 }
 
 router.get('/me', async (req, res) => {
-  res.json({ admin: adminPayload(await loadMe(req.admin.id)) })
+  const me = await loadMe(req.admin.id)
+  res.json({
+    admin: adminPayload(me),
+    backupCodesLeft: me.role === 'owner' ? await countBackupCodesLeft(query, me.id) : null,
+  })
 })
 
 router.patch('/me', async (req, res) => {
@@ -352,6 +357,81 @@ router.post('/me/sign-out-others', async (req, res) => {
   })
   const row = await loadMe(req.admin.id)
   res.json({ token: signAdminToken(row), admin: adminPayload(row) })
+})
+
+router.post('/me/backup-codes', async (req, res) => {
+  const me = await loadMe(req.admin.id)
+  if (me.role !== 'owner') {
+    return res.status(403).json({ error: 'Only the owner has backup codes' })
+  }
+  if (!(await requireReproof(req, res, me))) return
+
+  const codes = await withTransaction(async (client) => {
+    const codes = await replaceBackupCodes(client, me.id)
+    await resetSessions(client, me.id)
+    await recordActivity(client, {
+      adminId: me.id, action: 'admin.backup_codes_created', targetType: 'admin', targetId: me.id,
+      summary: `${me.name} made a new set of backup codes`,
+    })
+    return codes
+  })
+  res.json({ codes, token: signAdminToken(me), admin: adminPayload(me) })
+})
+
+// ------------------------------------------------------------
+// Signing in with a backup code
+// ------------------------------------------------------------
+
+router.post('/backup-code', async (req, res) => {
+  const email = normalizeEmail(req.body?.email)
+  const typedCode = req.body?.code
+
+  const { rows } = await query(`SELECT ${ADMIN_COLUMNS} FROM admins WHERE lower(email) = $1`, [email])
+  const found = rows[0]
+
+  let matched = false
+  let row = null
+
+  if (found?.role === 'owner') {
+    if (!found.deactivated_at) {
+      const result = await withTransaction(async (client) => {
+        const used = await useBackupCode(client, found.id, typedCode)
+        if (!used) return { used: false }
+        await resetSessions(client, found.id)
+        const { rows: updated } = await client.query(
+          `UPDATE admins SET last_signed_in_at = now() WHERE id = $1 RETURNING ${ADMIN_COLUMNS}`,
+          [found.id],
+        )
+        await recordActivity(client, {
+          adminId: found.id, action: 'admin.backup_code_used', targetType: 'admin', targetId: found.id,
+          summary: `${updated[0].name} signed in with a backup code`,
+        })
+        return { used: true, row: updated[0] }
+      })
+      matched = result.used
+      if (matched) row = result.row
+    }
+    // The email really is the owner's, so a wrong or reused code (or an
+    // attempt while switched off) is a real failed sign-in, logged
+    // outside the refused transaction, exactly as /login does with pool.
+    if (!matched) {
+      await recordActivity(pool, {
+        adminId: found.id, action: 'admin.sign_in_failed', targetType: 'admin', targetId: found.id,
+        summary: `Failed sign-in for ${found.email}`,
+      })
+    }
+  } else {
+    // No admin, or a non-owner: nothing real to check, but this still
+    // takes about as long as a real attempt, so guessing at addresses
+    // can't be told apart from guessing at codes by response time.
+    await verifyPassword('x', NO_SUCH_ACCOUNT_HASH)
+  }
+
+  if (!matched) {
+    return res.status(401).json({ error: "That email and backup code don't match" })
+  }
+
+  res.json({ token: signAdminToken(row), admin: adminPayload(row), usedBackupCode: true })
 })
 
 export default router

@@ -651,3 +651,14 @@ ALTER TABLE players ADD COLUMN IF NOT EXISTS closed_by_admin_at TIMESTAMPTZ;
 -- NULL means never reset.
 -- ============================================================
 ALTER TABLE admins ADD COLUMN IF NOT EXISTS sessions_reset_at TIMESTAMPTZ;
+
+-- The owner's backup codes: one-time ways back in if they lose their
+-- password and Google. Stored only as hashes, like passwords.
+CREATE TABLE IF NOT EXISTS admin_backup_codes (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    admin_id   UUID NOT NULL REFERENCES admins (id) ON DELETE CASCADE,
+    code_hash  TEXT NOT NULL,
+    used_at    TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS admin_backup_codes_admin_idx ON admin_backup_codes (admin_id) WHERE used_at IS NULL;

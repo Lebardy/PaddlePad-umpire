@@ -25,6 +25,7 @@ const TABLES = [
   'admins',
   'admin_setup_links',
   'admin_activity',
+  'admin_backup_codes',
   'invites',
   'players',
   'sessions',
