@@ -6,7 +6,8 @@
 // ============================================================
 
 import {
-  EXPIRY_CHOICES, actionLabel, formatWhen, inviteStatusText, madeByText, signInMethods,
+  EXPIRY_CHOICES, actionLabel, confirmNameMatches, formatWhen, inviteStatusText, lastSignedInText,
+  madeByText, ratingText, signInMethods, signInMethodsText, statusLabel,
 } from '../src/lib/format.js'
 
 let pass = 0
@@ -42,6 +43,29 @@ check('an unknown action falls back to its name', actionLabel('something.new'), 
 
 check('expiry choices default to 14 days and include never',
   [EXPIRY_CHOICES.find((c) => c.value === '14')?.label, EXPIRY_CHOICES.at(-1)?.value], ['In 14 days', 'never'])
+
+check('never signed in', lastSignedInText(null), 'Not yet recorded')
+check('signed in shows Manila time', lastSignedInText('2026-09-14T17:05:00Z'), 'Sep 15, 1:05 AM')
+
+check('two ways in, comma style', signInMethodsText(['password', 'google']), 'Password, Google')
+check('a two-word way in is capitalised on its first word', signInMethodsText(['claim code']), 'Claim code')
+check('no way in yet', signInMethodsText([]), 'No way in yet')
+
+check('active status', statusLabel('active'), 'Active')
+check('paused status', statusLabel('paused'), 'Paused')
+check('closed status', statusLabel('closed'), 'Closed')
+
+check('rated with a playstyle', ratingText({ state: 'rated', skillScore: 62, playstyle: 'Baseliner' }), '62 · Baseliner')
+check('rated with no playstyle yet', ratingText({ state: 'rated', skillScore: 62, playstyle: null }), '62')
+check('not enough of their own matches', ratingText({ state: 'not_enough_matches', have: 2, need: 5 }), 'Not rated yet: 2 of 5 matches')
+check('not enough players in the pool', ratingText({ state: 'not_enough_players', have: 4, need: 8 }), 'Not rated yet: waiting for more players (4 of 8)')
+check('qualified, waiting for the nightly run', ratingText({ state: 'pending' }), 'Rated at the next nightly run')
+check('unrated falls back', ratingText({ state: 'unrated' }), 'Not rated yet')
+
+check('an exact typed name matches', confirmNameMatches('Ana Reyes', 'Ana Reyes'), true)
+check('matching ignores case and outer spaces', confirmNameMatches('  ana reyes  ', 'Ana Reyes'), true)
+check('a different name does not match', confirmNameMatches('Ana', 'Ana Reyes'), false)
+check('an empty or blank typed name never matches', confirmNameMatches('   ', 'Ana Reyes'), false)
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

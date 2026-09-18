@@ -3,6 +3,7 @@ import LampMark from './LampMark'
 
 const PAGES = [
   { to: '/invites', label: 'Invite codes', current: (path) => path === '/' || path === '/invites' },
+  { to: '/people', label: 'People', current: (path) => path === '/people' || path.startsWith('/people/') },
   { to: '/admins', label: 'Admins', ownerOnly: true, current: (path) => path === '/admins' },
   { to: '/activity', label: 'Activity', current: (path) => path === '/activity' },
 ]

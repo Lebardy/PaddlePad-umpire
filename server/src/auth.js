@@ -2,6 +2,7 @@ import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
 import jwt from 'jsonwebtoken'
 import { ADMIN_TOKEN_TTL } from './admin-rules.js'
+import { sessionRefusal } from './people-rules.js'
 
 const scryptAsync = promisify(scrypt)
 
@@ -118,6 +119,28 @@ export function requireAuth(req, res, next) {
   next()
 }
 
+/**
+ * Must run after requireAuth. An umpire token lasts 30 days and
+ * requireAuth reads only the token, so without this a paused or closed
+ * umpire would keep scoring for a month. One primary-key lookup, the
+ * same trade requireActivePlayer makes.
+ */
+export function requireActiveUmpire(queryFn) {
+  return async function requireActiveUmpireMiddleware(req, res, next) {
+    try {
+      const { rows } = await queryFn(
+        'SELECT paused_at, closed_at FROM umpires WHERE id = $1',
+        [req.umpire.id],
+      )
+      const refused = sessionRefusal(rows[0], 'closed_at')
+      if (refused) return res.status(refused.statusCode).json(refused.body)
+      next()
+    } catch (error) {
+      next(error)
+    }
+  }
+}
+
 /** Requires a token belonging to a claimed PLAYER, not an umpire. */
 export function requirePlayer(req, res, next) {
   const payload = verify(req)
@@ -149,16 +172,13 @@ export function requireActivePlayer(queryFn) {
   return async function requireActivePlayerMiddleware(req, res, next) {
     try {
       const { rows } = await queryFn(
-        'SELECT deactivated_at FROM players WHERE id = $1',
+        'SELECT paused_at, deactivated_at FROM players WHERE id = $1',
         [req.player.id],
       )
-      // One message for both cases. Whether the record was deleted
-      // outright or the account was closed is not the holder of a dead
-      // token's business, and the app treats a 401 the same way either
-      // way -- clear the session, show the gate.
-      if (!rows[0] || rows[0].deactivated_at) {
-        return res.status(401).json({ error: 'That player no longer exists' })
-      }
+      // Closed and paused players both get a 401 the app treats as the
+      // end of the session; the body's `status` says which.
+      const refused = sessionRefusal(rows[0], 'deactivated_at')
+      if (refused) return res.status(refused.statusCode).json(refused.body)
       next()
     } catch (error) {
       next(error)

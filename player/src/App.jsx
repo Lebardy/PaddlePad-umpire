@@ -14,7 +14,7 @@ import TabBar from './components/TabBar'
 import { OverviewSkeleton } from './components/Skeleton'
 import { PlayerDataProvider, usePlayerData } from './lib/PlayerData'
 import { matchPath, navigate, restoreScroll, useRoute } from './lib/router'
-import { clearSession, getStoredPlayer, verifySession } from './lib/api'
+import { clearSession, getStoredPlayer, subscribeSessionEnded, verifySession } from './lib/api'
 import { SetupCard, SetupPrompt } from './components/SetupSignIn'
 import { applyTheme, getThemeChoice, watchSystemTheme } from './lib/theme'
 import { canReturnUnaided } from './lib/account'
@@ -197,6 +197,15 @@ function App() {
       cancelled = true
     }
   }, [])
+
+  // A mid-session 401 -- most commonly a pause taking effect while
+  // already signed in -- ends the session from inside api.js itself
+  // (see subscribeSessionEnded there), not from a component, because it
+  // can come from anywhere that calls apiFetch: the overview, matches,
+  // a profile edit, not just the launch check above. This mirrors that
+  // into the player held here so the app actually lands back on
+  // sign-in instead of looking signed in with a dead token.
+  useEffect(() => subscribeSessionEnded(() => setPlayer(null)), [])
 
   // The state reset on its own, with nothing to confirm. Deleting a
   // profile ends here too: that flow has already asked for a password

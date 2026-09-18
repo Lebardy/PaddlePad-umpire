@@ -11,11 +11,17 @@ export default function PageBoard({ title, intro, children }) {
   )
 }
 
-/** One lit number on a board. Given `onClick`, it is also a filter. */
-export function TallyCell({ figure, label, pressed, onClick }) {
+/**
+ * One lit number on a board. Given `onClick`, it is also a filter.
+ *
+ * `variant="text"` is for a figure that can be a whole sentence (a
+ * player's rating, unrated) rather than a short number -- it reads as
+ * wrapped text instead of giant scoreboard type.
+ */
+export function TallyCell({ figure, label, pressed, onClick, variant }) {
   const inner = (
     <>
-      <span className="tally-figure">{figure}</span>
+      <span className={`tally-figure${variant ? ` tally-figure-${variant}` : ''}`}>{figure}</span>
       <span className="tally-label">{label}</span>
     </>
   )

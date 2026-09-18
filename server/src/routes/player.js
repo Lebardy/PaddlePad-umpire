@@ -15,6 +15,8 @@ import {
   summarisePlayer,
 } from '../player-stats.js'
 import { normalizeInviteCode } from '../invites.js'
+import { signInRefusal } from '../people-rules.js'
+import { wipePlayerCredentials } from '../player-accounts.js'
 import { getMatchOfTheMonthStory, getMonthlyBoard } from '../board.js'
 import { isUuid, normalizePlayerName, playerNameError } from '../validate.js'
 import { readGame } from '../drama.js'
@@ -314,22 +316,8 @@ router.delete('/me', async (req, res) => {
       return { status: 200, body: { deleted: true, matches: 0 } }
     }
 
-    // google_sub goes with the rest of it. Leaving it behind would
-    // make "delete my profile" mean "delete every way in except the
-    // one-tap one", and the closed account would sign straight back in.
-    await client.query(
-      `UPDATE players
-          SET username       = NULL,
-              password_hash  = NULL,
-              google_sub     = NULL,
-              google_email   = NULL,
-              claim_code     = NULL,
-              claimed_at     = NULL,
-              registered_at  = NULL,
-              deactivated_at = now()
-        WHERE id = $1`,
-      [req.player.id],
-    )
+    // google_sub goes with the rest of it -- see wipePlayerCredentials.
+    await wipePlayerCredentials(client, req.player.id)
     return { status: 200, body: { deleted: false, matches } }
   })
 
@@ -369,7 +357,7 @@ router.post('/link', async (req, res) => {
     // the same pair would interleave into a half-merge that no single
     // statement could undo.
     const { rows: sources } = await client.query(
-      `SELECT id, name, password_hash, google_sub
+      `SELECT id, name, password_hash, google_sub, paused_at
          FROM players WHERE claim_code = $1 FOR UPDATE`,
       [code],
     )
@@ -402,6 +390,15 @@ router.post('/link', async (req, res) => {
             "If that's you, sign in as them instead.",
         },
       }
+    }
+
+    // Holding the code is the proof that earns this reply -- the same
+    // rule assertMayLinkTo follows. Without this, merging in a paused
+    // roster player would hand back a token that requireActivePlayer
+    // kills on its very next request.
+    const pauseRefusal = signInRefusal(source, 'deactivated_at')
+    if (pauseRefusal) {
+      return { status: pauseRefusal.statusCode, body: pauseRefusal.body }
     }
 
     const { rows: targets } = await client.query(
@@ -538,7 +535,8 @@ router.post('/link', async (req, res) => {
               google_email   = $6,
               registered_at  = COALESCE(registered_at, $4),
               claimed_at     = COALESCE(claimed_at, now()),
-              deactivated_at = NULL
+              deactivated_at = NULL,
+              closed_by_admin_at = NULL
         WHERE id = $1
         RETURNING id, name, claimed_at, username, google_email`,
       // Google moves across with the username and password because the

@@ -1,11 +1,12 @@
 import { Router } from 'express'
 import { query } from '../db.js'
-import { requireAuth } from '../auth.js'
+import { requireActiveUmpire, requireAuth } from '../auth.js'
 import { generateInviteCode } from '../invites.js'
-import { normalizePlayerName, playerNameError } from '../validate.js'
+import { mayMintClaimCode } from '../people-rules.js'
+import { isUuid, normalizePlayerName, playerNameError } from '../validate.js'
 
 const router = Router()
-router.use(requireAuth)
+router.use(requireAuth, requireActiveUmpire(query))
 
 const SEARCH_LIMIT = 50
 
@@ -128,16 +129,51 @@ router.post('/', async (req, res) => {
  * migration. Nothing consumes this yet; it is groundwork for letting a
  * player claim their own record (by QR or by typing it) and inherit the
  * history an umpire already logged for them.
+ *
+ * Refuses a player the OWNER closed from the admin site: that close is
+ * meant to be final, so only the owner may reopen it, from
+ * POST /admin/players/:id/claim-code. A player who closed their own
+ * account is unaffected -- this stays their recovery path.
  */
 router.get('/:id/claim-code', async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such player' })
+
+  const { rows: existing } = await query(
+    'SELECT closed_by_admin_at FROM players WHERE id = $1',
+    [req.params.id],
+  )
+  if (!existing[0]) return res.status(404).json({ error: 'No such player' })
+  if (!mayMintClaimCode(existing[0])) {
+    return res.status(403).json({
+      error: "This player's account was closed by the owner. Only the owner can reopen it.",
+    })
+  }
+
+  // The WHERE guards the same thing the SELECT above just checked: an
+  // owner close landing between the two statements must not mint a
+  // code. Zero rows updated is ambiguous between "closed just now" and
+  // "row gone", so it is resolved with one more read rather than a
+  // bare 404 that would hide the real reason.
   const { rows } = await query(
     `UPDATE players
         SET claim_code = COALESCE(claim_code, $2)
       WHERE id = $1
+        AND closed_by_admin_at IS NULL
       RETURNING claim_code`,
     [req.params.id, generateInviteCode()],
   )
-  if (!rows[0]) return res.status(404).json({ error: 'No such player' })
+  if (!rows[0]) {
+    const { rows: recheck } = await query(
+      'SELECT closed_by_admin_at FROM players WHERE id = $1',
+      [req.params.id],
+    )
+    if (recheck[0] && !mayMintClaimCode(recheck[0])) {
+      return res.status(403).json({
+        error: "This player's account was closed by the owner. Only the owner can reopen it.",
+      })
+    }
+    return res.status(404).json({ error: 'No such player' })
+  }
   res.json({ claimCode: rows[0].claim_code })
 })
 

@@ -29,6 +29,13 @@ export const ACTIONS = [
   'admin.google_disconnected',
   'invite.created',
   'invite.cancelled',
+  'player.paused',
+  'player.unpaused',
+  'player.closed',
+  'player.claim_code_created',
+  'umpire.paused',
+  'umpire.unpaused',
+  'umpire.closed',
 ]
 
 export function normalizeEmail(value) {

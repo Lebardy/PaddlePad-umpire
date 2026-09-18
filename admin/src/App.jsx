@@ -9,6 +9,9 @@ import Account from './screens/Account'
 import Activity from './screens/Activity'
 import Admins from './screens/Admins'
 import Invites from './screens/Invites'
+import People from './screens/People'
+import PlayerDetail from './screens/PlayerDetail'
+import UmpireDetail from './screens/UmpireDetail'
 
 export default function App() {
   const path = useRoute()
@@ -52,6 +55,10 @@ export default function App() {
     else if (path === '/admins' && admin.role === 'owner') screen = <Admins me={admin} />
     else if (path === '/activity') screen = <Activity />
     else if (path === '/account') screen = <Account admin={admin} onAdminChange={updateAdmin} />
+    else if (path === '/people') screen = <People key="players" kind="players" />
+    else if (path === '/people/umpires') screen = <People key="umpires" kind="umpires" />
+    else if (matchPath('/people/players/:id', path)) screen = <PlayerDetail id={matchPath('/people/players/:id', path).id} me={admin} />
+    else if (matchPath('/people/umpires/:id', path)) screen = <UmpireDetail id={matchPath('/people/umpires/:id', path).id} me={admin} />
     else screen = <p className="empty missing">There’s no page here.</p>
     content = <Layout admin={admin} path={path} onSignOut={signOut}>{screen}</Layout>
   }

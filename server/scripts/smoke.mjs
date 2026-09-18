@@ -1522,6 +1522,382 @@ async function main() {
     check('the throwaway admin is left switched off', offAgain.status === 200, String(offAgain.status))
   }
 
+  section('admin site — people: looking up, pausing and closing')
+  if (!ADMIN_SECTION || !OWNER_EMAIL || !OWNER_PASSWORD) {
+    console.log('  skip (needs a staging or local server, SMOKE_OWNER_EMAIL and SMOKE_OWNER_PASSWORD)')
+  } else {
+    // Neither the JSON text nor a row's own keys may carry a password
+    // hash or a claim code, whichever spelling -- the same thing "never
+    // leaks claim_code in the response" above checks for the
+    // create-player response. Not a bare "password": signInMethods
+    // legitimately lists the WORD "password" as a sign-in method, and
+    // that is not a leak.
+    const clean = (value) => {
+      const text = JSON.stringify(value)
+      return !/password_hash/i.test(text) && !/claim_code|claimcode/i.test(text)
+    }
+    const countByAction = async (action, targetId, bearer) => {
+      const activity = await request(`/admin/activity?action=${action}`, { bearer })
+      return (activity.body.entries ?? []).filter((e) => e.targetId === targetId).length
+    }
+    const countAny = async (targetId, bearer) => {
+      const activity = await request('/admin/activity', { bearer })
+      return (activity.body.entries ?? []).filter((e) => e.targetId === targetId).length
+    }
+
+    const pStamp = Date.now()
+
+    // --- 1: owner signs in, mints an invite, registers a throwaway umpire ---
+    const ownerIn2 = await request('/admin/auth/login', {
+      method: 'POST', body: { email: OWNER_EMAIL, password: OWNER_PASSWORD },
+    })
+    check('the owner signs in for the people section -> 200', ownerIn2.status === 200,
+      JSON.stringify(ownerIn2.body).slice(0, 80))
+    const ownerToken = ownerIn2.body.token
+
+    const pInvite = await request('/admin/invites', {
+      method: 'POST', bearer: ownerToken, body: { note: 'smoke people' },
+    })
+    check('an invite code is made for the throwaway umpire -> 201', pInvite.status === 201,
+      JSON.stringify(pInvite.body).slice(0, 80))
+    const inviteCode = pInvite.body.invite?.code
+
+    const umpEmail = `smoke.people.${pStamp}@example.com`
+    const umpName = `Smoke People Umpire ${pStamp}`
+    const umpPassword = `smk-${uuid()}`
+    const umpReg = await request('/auth/register', {
+      method: 'POST', body: { email: umpEmail, name: umpName, password: umpPassword, invite: inviteCode },
+    })
+    check('the throwaway umpire registers -> 201', umpReg.status === 201,
+      JSON.stringify(umpReg.body).slice(0, 80))
+    let umpToken = umpReg.body.token
+    const umpireId = umpReg.body.umpire?.id
+
+    // --- 2: as that umpire, create, claim and register a throwaway player ---
+    const plName = `Smoke People Player ${pStamp}`
+    const plCreate = await request('/players', { method: 'POST', bearer: umpToken, body: { name: plName } })
+    check('the umpire creates the throwaway player -> 201', plCreate.status === 201,
+      JSON.stringify(plCreate.body).slice(0, 80))
+    const playerId = plCreate.body.player?.id
+
+    const plCode1 = await request(`/players/${playerId}/claim-code`, { bearer: umpToken })
+    const plClaim = await request('/auth/player/claim', { method: 'POST', body: { code: plCode1.body.claimCode } })
+    check('claiming the throwaway player -> 200', plClaim.status === 200,
+      JSON.stringify(plClaim.body).slice(0, 80))
+
+    const plUsername = `smk_ppl_${pStamp}`.slice(0, 20)
+    const plPassword = `smk-${uuid()}`
+    const plReg = await request('/auth/player/register', {
+      method: 'POST',
+      body: { name: plName, username: plUsername, password: plPassword, code: plCode1.body.claimCode },
+    })
+    check('registering a username and password for it -> 201', plReg.status === 201,
+      JSON.stringify(plReg.body).slice(0, 80))
+    check('it links to the same player', plReg.body.player?.id === playerId,
+      `${plReg.body.player?.id} vs ${playerId}`)
+    let playerToken = plReg.body.token
+
+    // --- 3: lists ---
+    const umpList = await request(`/admin/umpires?q=${pStamp}`, { bearer: ownerToken })
+    const foundUmp = (umpList.body.umpires ?? []).filter((u) => u.id === umpireId)
+    check('the umpire list finds exactly the throwaway umpire', foundUmp.length === 1, JSON.stringify(foundUmp))
+    check('and it is active', foundUmp[0]?.status === 'active', foundUmp[0]?.status)
+
+    const plList = await request(`/admin/players?q=${pStamp}`, { bearer: ownerToken })
+    const foundPl = (plList.body.players ?? []).filter((p) => p.id === playerId)
+    check('the player list finds the throwaway player', foundPl.length === 1, JSON.stringify(foundPl))
+    check('claimed is true', foundPl[0]?.claimed === true, String(foundPl[0]?.claimed))
+    check('its row has no claimCode/claim_code key', clean(foundPl[0] ?? {}), JSON.stringify(foundPl[0] ?? {}))
+
+    const umpPaused0 = await request(`/admin/umpires?q=${pStamp}&status=paused`, { bearer: ownerToken })
+    check('status=paused does not list the active umpire',
+      (umpPaused0.body.umpires ?? []).every((u) => u.id !== umpireId))
+    const plPaused0 = await request(`/admin/players?q=${pStamp}&status=paused`, { bearer: ownerToken })
+    check('status=paused does not list the active player',
+      (plPaused0.body.players ?? []).every((p) => p.id !== playerId))
+
+    // --- 4: one person ---
+    const plDetail0 = await request(`/admin/players/${playerId}`, { bearer: ownerToken })
+    check('player detail -> 200', plDetail0.status === 200, JSON.stringify(plDetail0.body).slice(0, 80))
+    check('matches is an array', Array.isArray(plDetail0.body.player?.matches))
+    check('rating is an object',
+      typeof plDetail0.body.player?.rating === 'object' && plDetail0.body.player?.rating !== null)
+    check('no password or claim key on the player detail', clean(plDetail0.body.player),
+      JSON.stringify(plDetail0.body.player).slice(0, 200))
+
+    const umpDetail0 = await request(`/admin/umpires/${umpireId}`, { bearer: ownerToken })
+    check('umpire detail -> 200', umpDetail0.status === 200, JSON.stringify(umpDetail0.body).slice(0, 80))
+    check('invite.code matches the code used to register',
+      umpDetail0.body.umpire?.invite?.code === inviteCode, `${umpDetail0.body.umpire?.invite?.code} vs ${inviteCode}`)
+
+    // --- 5: pause the umpire ---
+    const beforePauseUmp = await countAny(umpireId, ownerToken)
+    const blankReason = await request(`/admin/umpires/${umpireId}/pause`, {
+      method: 'POST', bearer: ownerToken, body: { reason: '   ' },
+    })
+    check('a blank pause reason -> 400', blankReason.status === 400, String(blankReason.status))
+    const pauseUmp = await request(`/admin/umpires/${umpireId}/pause`, {
+      method: 'POST', bearer: ownerToken, body: { reason: 'smoke test' },
+    })
+    check('pausing the umpire -> 200, status paused',
+      pauseUmp.status === 200 && pauseUmp.body.umpire?.status === 'paused',
+      JSON.stringify(pauseUmp.body).slice(0, 80))
+
+    const meOldToken = await request('/auth/me', { bearer: umpToken })
+    check('the umpire\'s old token -> 401, status paused',
+      meOldToken.status === 401 && meOldToken.body.status === 'paused', JSON.stringify(meOldToken.body))
+    const loginRightPw = await request('/auth/login', { method: 'POST', body: { email: umpEmail, password: umpPassword } })
+    check('signing in with the right password while paused -> 403, status paused',
+      loginRightPw.status === 403 && loginRightPw.body.status === 'paused', JSON.stringify(loginRightPw.body))
+    const loginWrongPw = await request('/auth/login', { method: 'POST', body: { email: umpEmail, password: 'definitely-wrong' } })
+    check('a wrong password while paused -> 401, revealing nothing', loginWrongPw.status === 401,
+      String(loginWrongPw.status))
+
+    const pauseAgain = await request(`/admin/umpires/${umpireId}/pause`, {
+      method: 'POST', bearer: ownerToken, body: { reason: 'again' },
+    })
+    check('pausing an already-paused umpire -> 409', pauseAgain.status === 409, String(pauseAgain.status))
+    const afterPauseUmp = await countAny(umpireId, ownerToken)
+    check('only the one successful pause added activity; the refusals added none',
+      afterPauseUmp === beforePauseUmp + 1, `${beforePauseUmp} -> ${afterPauseUmp}`)
+
+    // --- 6: unpause ---
+    const unpauseUmp = await request(`/admin/umpires/${umpireId}/unpause`, { method: 'POST', bearer: ownerToken })
+    check('unpausing the umpire -> 200, status active',
+      unpauseUmp.status === 200 && unpauseUmp.body.umpire?.status === 'active',
+      JSON.stringify(unpauseUmp.body).slice(0, 80))
+    const loginAfterUnpause = await request('/auth/login', { method: 'POST', body: { email: umpEmail, password: umpPassword } })
+    check('the umpire can sign in again -> 200', loginAfterUnpause.status === 200, String(loginAfterUnpause.status))
+    umpToken = loginAfterUnpause.body.token
+    const meNewToken = await request('/auth/me', { bearer: umpToken })
+    check('the new token works on /auth/me', meNewToken.status === 200, String(meNewToken.status))
+    const unpauseAgain = await request(`/admin/umpires/${umpireId}/unpause`, { method: 'POST', bearer: ownerToken })
+    check('unpausing an already-active umpire -> 409', unpauseAgain.status === 409, String(unpauseAgain.status))
+
+    // --- 7: pause the player ---
+    const pausePl = await request(`/admin/players/${playerId}/pause`, {
+      method: 'POST', bearer: ownerToken, body: { reason: 'smoke test' },
+    })
+    check('pausing the player -> 200, status paused',
+      pausePl.status === 200 && pausePl.body.player?.status === 'paused', JSON.stringify(pausePl.body).slice(0, 80))
+
+    const plMePaused = await request('/auth/player/me', { bearer: playerToken })
+    check('the player\'s token -> 401, status paused',
+      plMePaused.status === 401 && plMePaused.body.status === 'paused', JSON.stringify(plMePaused.body))
+    const plLoginPaused = await request('/auth/player/login', { method: 'POST', body: { username: plUsername, password: plPassword } })
+    check('signing in as the paused player -> 403', plLoginPaused.status === 403, String(plLoginPaused.status))
+    const plCodeWhilePaused = await request(`/admin/players/${playerId}/claim-code`, { method: 'POST', bearer: ownerToken })
+    check('a new claim code for a paused player -> 409', plCodeWhilePaused.status === 409, String(plCodeWhilePaused.status))
+
+    const unpausePl = await request(`/admin/players/${playerId}/unpause`, { method: 'POST', bearer: ownerToken })
+    check('unpausing the player -> 200, status active',
+      unpausePl.status === 200 && unpausePl.body.player?.status === 'active', JSON.stringify(unpausePl.body).slice(0, 80))
+
+    // --- 8: new claim code ---
+    const newCode = await request(`/admin/players/${playerId}/claim-code`, { method: 'POST', bearer: ownerToken })
+    check('a new claim code is minted -> 200', newCode.status === 200, JSON.stringify(newCode.body).slice(0, 80))
+    check('it differs from the old one', newCode.body.claimCode !== plCode1.body.claimCode, newCode.body.claimCode)
+    const claimOldCode = await request('/auth/player/claim', { method: 'POST', body: { code: plCode1.body.claimCode } })
+    check('claiming the old code -> 404', claimOldCode.status === 404, String(claimOldCode.status))
+    const claimNewCode = await request('/auth/player/claim', { method: 'POST', body: { code: newCode.body.claimCode } })
+    check('claiming the new code -> 200, same player',
+      claimNewCode.status === 200 && claimNewCode.body.player?.id === playerId,
+      JSON.stringify(claimNewCode.body).slice(0, 80))
+    playerToken = claimNewCode.body.token
+
+    // --- 9: activity ---
+    const umpirePausedCount = await countByAction('umpire.paused', umpireId, ownerToken)
+    check('exactly one umpire.paused entry', umpirePausedCount === 1, String(umpirePausedCount))
+    const umpireUnpausedCount = await countByAction('umpire.unpaused', umpireId, ownerToken)
+    check('exactly one umpire.unpaused entry', umpireUnpausedCount === 1, String(umpireUnpausedCount))
+    const playerPausedCount = await countByAction('player.paused', playerId, ownerToken)
+    check('exactly one player.paused entry', playerPausedCount === 1, String(playerPausedCount))
+    const playerUnpausedCount = await countByAction('player.unpaused', playerId, ownerToken)
+    check('exactly one player.unpaused entry', playerUnpausedCount === 1, String(playerUnpausedCount))
+    const claimCodeCreatedCount = await countByAction('player.claim_code_created', playerId, ownerToken)
+    check('exactly one player.claim_code_created entry', claimCodeCreatedCount === 1, String(claimCodeCreatedCount))
+
+    // --- 10: non-owner admin ---
+    const peopleAdminEmail = `smoke.people.admin.${uuid().slice(0, 8)}@example.com`
+    const addedAdmin = await request('/admin/admins', {
+      method: 'POST', bearer: ownerToken, body: { name: 'Smoke People Admin', email: peopleAdminEmail },
+    })
+    check('the owner adds a throwaway admin -> 201', addedAdmin.status === 201,
+      JSON.stringify(addedAdmin.body).slice(0, 80))
+    const peopleAdminId = addedAdmin.body.admin?.id
+    const setupSecret = (addedAdmin.body.setupLink?.url ?? '').split('/setup/')[1]
+    const peopleAdminPassword = `smk-${uuid()}`
+    const setupDone = await request(`/admin/auth/setup/${setupSecret}`, {
+      method: 'POST', body: { password: peopleAdminPassword },
+    })
+    check('the throwaway admin completes setup -> 200', setupDone.status === 200,
+      JSON.stringify(setupDone.body).slice(0, 80))
+    const peopleAdminIn = await request('/admin/auth/login', {
+      method: 'POST', body: { email: peopleAdminEmail, password: peopleAdminPassword },
+    })
+    check('the throwaway admin signs in -> 200', peopleAdminIn.status === 200, String(peopleAdminIn.status))
+    const peopleAdmin = peopleAdminIn.body.token
+
+    const nonOwnerClose = await request(`/admin/players/${playerId}/close`, {
+      method: 'POST', bearer: peopleAdmin, body: { confirmName: plName },
+    })
+    check('a non-owner admin cannot close a player -> 403, the owner-only message',
+      nonOwnerClose.status === 403 && nonOwnerClose.body.error === 'Only the owner can close accounts',
+      JSON.stringify(nonOwnerClose.body))
+
+    const nonOwnerPause = await request(`/admin/umpires/${umpireId}/pause`, {
+      method: 'POST', bearer: peopleAdmin, body: { reason: 'any admin can pause' },
+    })
+    check('any admin can pause an umpire -> 200, status paused',
+      nonOwnerPause.status === 200 && nonOwnerPause.body.umpire?.status === 'paused',
+      JSON.stringify(nonOwnerPause.body).slice(0, 80))
+    const nonOwnerUnpause = await request(`/admin/umpires/${umpireId}/unpause`, { method: 'POST', bearer: peopleAdmin })
+    check('and unpauses it again -> 200, status active',
+      nonOwnerUnpause.status === 200 && nonOwnerUnpause.body.umpire?.status === 'active',
+      JSON.stringify(nonOwnerUnpause.body).slice(0, 80))
+
+    // Kept switched on a little longer: --- 12 below needs it to try
+    // reopening the player the owner is about to close.
+
+    // --- 11: close ---
+    const wrongConfirm = await request(`/admin/players/${playerId}/close`, {
+      method: 'POST', bearer: ownerToken, body: { reason: 'smoke test', confirmName: 'not the right name' },
+    })
+    check('closing with the wrong confirmName -> 400', wrongConfirm.status === 400, String(wrongConfirm.status))
+
+    const plDetailBefore = await request(`/admin/players/${playerId}`, { bearer: ownerToken })
+    const closePl = await request(`/admin/players/${playerId}/close`, {
+      method: 'POST', bearer: ownerToken, body: { reason: 'smoke test', confirmName: plName },
+    })
+    check('closing the player with the right name -> 200, status closed',
+      closePl.status === 200 && closePl.body.player?.status === 'closed', JSON.stringify(closePl.body).slice(0, 80))
+    const plUsernameLogin = await request('/auth/player/login', { method: 'POST', body: { username: plUsername, password: plPassword } })
+    check('the closed player\'s username login -> 401', plUsernameLogin.status === 401, String(plUsernameLogin.status))
+    const plDetailAfter = await request(`/admin/players/${playerId}`, { bearer: ownerToken })
+    check('the match count is unchanged after closing',
+      plDetailAfter.body.player?.matchCount === plDetailBefore.body.player?.matchCount,
+      `${plDetailBefore.body.player?.matchCount} -> ${plDetailAfter.body.player?.matchCount}`)
+
+    // --- 12: only the owner may reopen a player the owner closed ---
+    const umpClaimAfterClose = await request(`/players/${playerId}/claim-code`, { bearer: umpToken })
+    check('the umpire route refuses a claim code for an owner-closed player -> 403',
+      umpClaimAfterClose.status === 403 &&
+        umpClaimAfterClose.body.error === "This player's account was closed by the owner. Only the owner can reopen it.",
+      JSON.stringify(umpClaimAfterClose.body))
+    const nonOwnerClaimAfterClose = await request(`/admin/players/${playerId}/claim-code`, {
+      method: 'POST', bearer: peopleAdmin,
+    })
+    check('a non-owner admin cannot reopen an owner-closed player -> 403',
+      nonOwnerClaimAfterClose.status === 403 &&
+        nonOwnerClaimAfterClose.body.error === 'Only the owner can reopen a closed account',
+      JSON.stringify(nonOwnerClaimAfterClose.body))
+    const ownerClaimAfterClose = await request(`/admin/players/${playerId}/claim-code`, {
+      method: 'POST', bearer: ownerToken,
+    })
+    check('the owner can still make a new code for the player they closed -> 200',
+      ownerClaimAfterClose.status === 200 && Boolean(ownerClaimAfterClose.body.claimCode),
+      JSON.stringify(ownerClaimAfterClose.body).slice(0, 80))
+
+    // --- 12b: linking the owner-reopened code must clear the
+    // owner-closed mark too, not just the plain closed one -- otherwise
+    // a player who comes back this way would stay stuck looking
+    // owner-closed forever. Same flow as
+    // section('linking a code to an account you already have'): a
+    // brand new throwaway account registers on its own, then hands its
+    // token to /player/link with the code the owner just re-minted.
+    const reopenUsername = `smk_reopen_${pStamp}`.slice(0, 20)
+    const reopenPassword = `smk-${uuid()}`
+    const reopenName = `Smoke People Reopen ${pStamp}`
+    const reopenAccount = await request('/auth/player/register', {
+      method: 'POST',
+      body: { name: reopenName, username: reopenUsername, password: reopenPassword },
+    })
+    check('a fresh throwaway account registers -> 201', reopenAccount.status === 201,
+      JSON.stringify(reopenAccount.body).slice(0, 80))
+    const reopenId = reopenAccount.body.player?.id
+    if (reopenId) selfRegistered.push(reopenId)
+    const reopenToken = reopenAccount.body.token
+
+    const reopenLink = await request('/player/link', {
+      method: 'POST',
+      bearer: reopenToken,
+      body: { code: ownerClaimAfterClose.body.claimCode, confirm: true },
+    })
+    check('linking the owner-reopened code merges -> 200', reopenLink.status === 200,
+      JSON.stringify(reopenLink.body).slice(0, 120))
+    check('the owner-closed player\'s row is the one that survives',
+      reopenLink.body.player?.id === playerId, `${reopenLink.body.player?.id} vs ${playerId}`)
+
+    const claimCodeAfterLink = await request(`/players/${playerId}/claim-code`, { bearer: umpToken })
+    check('the umpire route mints a code for the reopened row -> 200, not the owner-only 403',
+      claimCodeAfterLink.status === 200 && Boolean(claimCodeAfterLink.body.claimCode),
+      JSON.stringify(claimCodeAfterLink.body).slice(0, 80))
+
+    const peopleAdminOff = await request(`/admin/admins/${peopleAdminId}/switch-off`, { method: 'POST', bearer: ownerToken })
+    check('the owner switches the throwaway admin off -> 200',
+      peopleAdminOff.status === 200 && peopleAdminOff.body.admin?.active === false, String(peopleAdminOff.status))
+
+    const closeUmp = await request(`/admin/umpires/${umpireId}/close`, {
+      method: 'POST', bearer: ownerToken, body: { reason: 'smoke test done', confirmName: umpName },
+    })
+    check('closing the umpire -> 200, status closed',
+      closeUmp.status === 200 && closeUmp.body.umpire?.status === 'closed', JSON.stringify(closeUmp.body).slice(0, 80))
+    const umpDetailAfter = await request(`/admin/umpires/${umpireId}`, { bearer: ownerToken })
+    check('its email is the closed placeholder',
+      umpDetailAfter.body.umpire?.email === `closed+${umpireId}@paddlepad.invalid`, umpDetailAfter.body.umpire?.email)
+    const oldPwLogin = await request('/auth/login', { method: 'POST', body: { email: umpEmail, password: umpPassword } })
+    check('the old password no longer signs in -> 401', oldPwLogin.status === 401, String(oldPwLogin.status))
+    const closeUmpAgain = await request(`/admin/umpires/${umpireId}/close`, {
+      method: 'POST', bearer: ownerToken, body: { reason: 'again', confirmName: umpName },
+    })
+    check('closing the umpire again -> 409', closeUmpAgain.status === 409, String(closeUmpAgain.status))
+
+    // --- 13: closing is recorded exactly once, wrong-name and repeat attempts add nothing ---
+    const playerClosedCount = await countByAction('player.closed', playerId, ownerToken)
+    check('exactly one player.closed entry; the wrong-name attempt added none',
+      playerClosedCount === 1, String(playerClosedCount))
+    const umpireClosedCount = await countByAction('umpire.closed', umpireId, ownerToken)
+    check('exactly one umpire.closed entry; closing it again added none',
+      umpireClosedCount === 1, String(umpireClosedCount))
+
+    // --- 14: a closed umpire's existing token ends the session, not just future sign-ins ---
+    const umpTokenAfterClose = await request('/auth/me', { bearer: umpToken })
+    check('the closed umpire\'s existing token -> 401, status closed',
+      umpTokenAfterClose.status === 401 && umpTokenAfterClose.body.status === 'closed',
+      JSON.stringify(umpTokenAfterClose.body))
+
+    // --- 15: the freed email can register again ---
+    const reInvite = await request('/admin/invites', {
+      method: 'POST', bearer: ownerToken, body: { note: 'smoke people reuse' },
+    })
+    check('a new invite code is made for the freed email -> 201', reInvite.status === 201,
+      JSON.stringify(reInvite.body).slice(0, 80))
+    const reUmpName = `Smoke People Umpire ${pStamp} Again`
+    const reRegister = await request('/auth/register', {
+      method: 'POST',
+      body: { email: umpEmail, name: reUmpName, password: `smk-${uuid()}`, invite: reInvite.body.invite?.code },
+    })
+    check('the freed email can register again with a new invite code -> 201', reRegister.status === 201,
+      JSON.stringify(reRegister.body).slice(0, 80))
+    const reUmpireId = reRegister.body.umpire?.id
+    const reClose = await request(`/admin/umpires/${reUmpireId}/close`, {
+      method: 'POST', bearer: ownerToken, body: { reason: 'smoke cleanup', confirmName: reUmpName },
+    })
+    check('and that throwaway is closed too, leaving nothing behind -> 200',
+      reClose.status === 200 && reClose.body.umpire?.status === 'closed', JSON.stringify(reClose.body).slice(0, 80))
+
+    // --- 16: the row the reopen-by-linking check revived (12b) is left
+    // active by that check on purpose, so the assertions above about
+    // it having been closed exactly once still hold; close it again
+    // here, after everything else, so nothing is left behind.
+    const recloseReopened = await request(`/admin/players/${playerId}/close`, {
+      method: 'POST', bearer: ownerToken, body: { reason: 'smoke cleanup', confirmName: plName },
+    })
+    check('closing the reopened-by-link player again -> 200, leaving nothing active',
+      recloseReopened.status === 200 && recloseReopened.body.player?.status === 'closed',
+      JSON.stringify(recloseReopened.body).slice(0, 80))
+  }
+
   if (selfRegistered.length > 0) {
     console.log(
       `\nself-registered players left behind (no umpire owns them):\n` +

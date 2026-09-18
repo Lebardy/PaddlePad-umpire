@@ -7,7 +7,7 @@ import Login from './screens/Login'
 import Guide from './screens/Guide'
 import Players from './screens/Players'
 import Account from './screens/Account'
-import { clearSession, fetchCurrentUmpire, getStoredUmpire } from './lib/api'
+import { clearSession, fetchCurrentUmpire, getStoredUmpire, subscribeSessionEnded } from './lib/api'
 import SyncIndicator from './components/SyncIndicator'
 import UpdateNotice from './components/UpdateNotice'
 import * as sync from './lib/sync'
@@ -84,8 +84,23 @@ function App() {
     // hold device-minted player ids that no longer resolve.
     migrateLegacyData()
     sync.init()
+    // Undoes a stale authPaused from a previous session in this tab --
+    // without this, one pause that has since been lifted would leave
+    // every push silently dropped for the rest of the browser session,
+    // even after a completely fresh sign-in.
+    sync.resumeAfterSignIn()
     sync.pullCore().catch(() => {})
   }, [umpire])
+
+  // A mid-session 401 -- most commonly a pause taking effect while
+  // already signed in -- ends the session from inside api.js itself
+  // (see subscribeSessionEnded there), not from a component, because it
+  // can come from anywhere that calls apiFetch: sync's push loop, the
+  // CSV export, any screen's own request. This mirrors that into the
+  // umpire held here, the same way the launch check above does, so the
+  // app actually lands back on Login instead of looking signed in with
+  // a dead token.
+  useEffect(() => subscribeSessionEnded(() => setUmpire(null)), [])
 
   // Signing out clears the local mirror as well as the token.
   //

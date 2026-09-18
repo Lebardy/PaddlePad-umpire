@@ -1,10 +1,10 @@
 import { Router } from 'express'
 import { query } from '../db.js'
-import { requireAuth } from '../auth.js'
+import { requireActiveUmpire, requireAuth } from '../auth.js'
 import { buildMatchLogRows, matchLogsToCSV } from '../export.js'
 
 const router = Router()
-router.use(requireAuth)
+router.use(requireAuth, requireActiveUmpire(query))
 
 function filename(extension) {
   const stamp = new Date().toISOString().slice(0, 10)

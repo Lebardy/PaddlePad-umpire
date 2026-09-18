@@ -235,6 +235,15 @@ place the umpire and player addresses already live — or Google sign-in
 on the admin site is refused by the browser before it ever reaches the
 server.
 
+**Pausing, closing and claim codes.** Any admin can pause an umpire or a
+player, with a short reason — it switches off every way in (their current
+token, their password, a player's claim code) while leaving their history
+untouched, and unpausing switches it straight back on. Closing does the
+same for good, so only the owner can do it; closing an umpire also frees
+their email address to sign up again later. A new claim code replaces the
+old one outright — the old one stops working the moment the new one is
+made, which is how a lost or leaked code is dealt with.
+
 **Creating the owner.** There's no sign-up form; the first admin account
 is made once, from the command line, inside the api container:
 
@@ -311,6 +320,17 @@ an invite code at all.
 | `DELETE` | `/admin/invites/:code` | Bearer (admin) | Cancel a code that hasn't been used |
 | `GET` | `/admin/activity` | Bearer (admin) | The activity record, newest first |
 | `GET` | `/admin/activity/filters` | Bearer (admin) | Who and what to filter the record by |
+| `GET` | `/admin/players` | Bearer (admin) | List players, searchable and filterable by status |
+| `GET` | `/admin/players/:id` | Bearer (admin) | One player's detail: matches, rating, sign-in methods |
+| `POST` | `/admin/players/:id/pause` | Bearer (admin) | Pause a player, with a reason |
+| `POST` | `/admin/players/:id/unpause` | Bearer (admin) | Switch a paused player back on |
+| `POST` | `/admin/players/:id/close` | Bearer (owner) | Close a player for good |
+| `POST` | `/admin/players/:id/claim-code` | Bearer (admin) | Make a new claim code, replacing the old one |
+| `GET` | `/admin/umpires` | Bearer (admin) | List umpires, searchable and filterable by status |
+| `GET` | `/admin/umpires/:id` | Bearer (admin) | One umpire's detail: recent matches, the invite that brought them in |
+| `POST` | `/admin/umpires/:id/pause` | Bearer (admin) | Pause an umpire, with a reason |
+| `POST` | `/admin/umpires/:id/unpause` | Bearer (admin) | Switch a paused umpire back on |
+| `POST` | `/admin/umpires/:id/close` | Bearer (owner) | Close an umpire for good and free their email address |
 
 Tokens are JWTs valid for 30 days, sent as `Authorization: Bearer <token>`.
 An admin token is a JWT too, but lasts 12 hours and carries `role: 'admin'`

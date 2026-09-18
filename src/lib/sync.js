@@ -22,7 +22,7 @@ import {
 // match quietly never arrives.
 //
 //   network / 5xx / 429  transient  -> keep at the head, back off
-//   401                  auth       -> pause everything, prompt, drop nothing
+//   401                  auth       -> end the session, drop nothing queued
 //   409 on a match log   blocked    -> another device is scoring; ask
 //   other 4xx            permanent  -> dead-letter, KEEP DRAINING
 //
@@ -253,8 +253,13 @@ async function runDrain() {
       }
 
       if (status === 401) {
-        // Never sign the umpire out mid-match over this; just stop
-        // pushing until they re-authenticate. Nothing is discarded.
+        // api.js has already cleared the session and told App.jsx to
+        // drop the stored umpire (see subscribeSessionEnded there) --
+        // this only needs to stop the queue so nothing here keeps
+        // retrying against a token that is already gone. Nothing
+        // queued is discarded; it is still in the outbox for whoever
+        // signs back in, and resumeAfterSignIn (called from App.jsx's
+        // umpire effect) drains it once they do.
         authPaused = true
         notify()
         break

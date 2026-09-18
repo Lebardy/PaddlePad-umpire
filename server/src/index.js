@@ -19,6 +19,7 @@ import adminAuthRoutes from './routes/admin-auth.js'
 import adminAdminsRoutes from './routes/admin-admins.js'
 import adminInviteRoutes from './routes/admin-invites.js'
 import adminActivityRoutes from './routes/admin-activity.js'
+import { adminPlayersRoutes, adminUmpiresRoutes } from './routes/admin-people.js'
 
 const app = express()
 
@@ -187,6 +188,8 @@ app.use('/admin/auth', adminAuthRoutes)
 app.use('/admin/admins', adminAdminsRoutes)
 app.use('/admin/invites', adminInviteRoutes)
 app.use('/admin/activity', adminActivityRoutes)
+app.use('/admin/players', adminPlayersRoutes)
+app.use('/admin/umpires', adminUmpiresRoutes)
 
 // Express 5 forwards rejected promises from async handlers here, so
 // route handlers don't each need their own try/catch.

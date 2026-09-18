@@ -3,6 +3,7 @@ import { query, withTransaction } from '../db.js'
 import {
   MIN_PASSWORD_LENGTH,
   hashPassword,
+  requireActiveUmpire,
   requireAuth,
   requireActivePlayer,
   requirePlayer,
@@ -12,6 +13,8 @@ import {
 } from '../auth.js'
 import { generateInviteCode, normalizeInviteCode } from '../invites.js'
 import { resolveGoogleProfile } from '../google.js'
+import { PAUSED_MESSAGE, signInRefusal } from '../people-rules.js'
+import { noteSignIn } from '../player-accounts.js'
 import {
   USERNAME_RULE,
   isValidUsername,
@@ -60,6 +63,14 @@ function refusal(statusCode, message, extra = {}) {
   error.statusCode = statusCode
   error.extra = extra
   return error
+}
+
+/** Sends the refusal for a paused or closed person, or returns false. */
+function refuseSignIn(res, row, closedColumn) {
+  const refused = signInRefusal(row, closedColumn)
+  if (!refused) return false
+  res.status(refused.statusCode).json(refused.body)
+  return true
 }
 
 // Lets the very first umpire register before any invite can exist.
@@ -150,6 +161,9 @@ router.post('/register', async (req, res) => {
       return created
     })
 
+    // A new account is never paused, so there is nothing to refuse here.
+    await noteSignIn(query, 'umpires', umpire.id)
+
     res.status(201).json({ token: signToken(umpire), umpire: umpirePayload(umpire) })
   } catch (error) {
     if (error.statusCode === 403) {
@@ -206,26 +220,39 @@ router.post('/google', async (req, res) => {
   const linked = await query(
     `UPDATE umpires SET google_email = $2
       WHERE google_sub = $1
-      RETURNING id, email, name, password_hash, google_email`,
+      RETURNING id, email, name, password_hash, google_email, paused_at, closed_at`,
     [profile.sub, profile.email],
   )
   if (linked.rows[0]) {
+    if (refuseSignIn(res, linked.rows[0], 'closed_at')) return
+    await noteSignIn(query, 'umpires', linked.rows[0].id)
     return res.json({
       token: signToken(linked.rows[0]),
       umpire: umpirePayload(linked.rows[0]),
     })
   }
 
-  const byEmail = await query(
-    `UPDATE umpires SET google_sub = $2, google_email = $3
-      WHERE lower(email) = $1 AND google_sub IS NULL
-      RETURNING id, email, name, password_hash, google_email`,
-    [profile.email, profile.sub, profile.email],
+  // A SELECT first, refusing a paused or closed umpire before anything
+  // is written -- unlike the `linked` branch above, this one would
+  // otherwise attach a brand-new Google link to the account, which is a
+  // new way IN, not just a display refresh. A pause made because an
+  // account looked taken over must not hand it one anyway.
+  const { rows: byEmailFound } = await query(
+    `SELECT id, email, name, password_hash, google_email, paused_at, closed_at
+       FROM umpires WHERE lower(email) = $1 AND google_sub IS NULL`,
+    [profile.email],
   )
-  if (byEmail.rows[0]) {
+  if (byEmailFound[0]) {
+    if (refuseSignIn(res, byEmailFound[0], 'closed_at')) return
+    const { rows: byEmail } = await query(
+      `UPDATE umpires SET google_sub = $2, google_email = $3 WHERE id = $1
+        RETURNING id, email, name, password_hash, google_email`,
+      [byEmailFound[0].id, profile.sub, profile.email],
+    )
+    await noteSignIn(query, 'umpires', byEmail[0].id)
     return res.json({
-      token: signToken(byEmail.rows[0]),
-      umpire: umpirePayload(byEmail.rows[0]),
+      token: signToken(byEmail[0]),
+      umpire: umpirePayload(byEmail[0]),
     })
   }
 
@@ -246,6 +273,9 @@ router.post('/google', async (req, res) => {
 
       return created
     })
+
+    // A new account is never paused, so there is nothing to refuse here.
+    await noteSignIn(query, 'umpires', umpire.id)
 
     res.status(201).json({ token: signToken(umpire), umpire: umpirePayload(umpire) })
   } catch (error) {
@@ -294,7 +324,7 @@ router.post('/google/link', async (req, res) => {
   const password = String(req.body?.password ?? '')
 
   const { rows } = await query(
-    `SELECT id, email, name, password_hash, google_sub, google_email
+    `SELECT id, email, name, password_hash, google_sub, google_email, paused_at, closed_at
        FROM umpires WHERE lower(email) = $1`,
     [email],
   )
@@ -311,6 +341,8 @@ router.post('/google/link', async (req, res) => {
   if (!found || !found.password_hash || !ok) {
     return res.status(401).json({ error: 'Incorrect email or password' })
   }
+
+  if (refuseSignIn(res, found, 'closed_at')) return
 
   // Already wearing a different Google account. Silently replacing it
   // would quietly lock out whoever had been using the old one.
@@ -338,6 +370,8 @@ router.post('/google/link', async (req, res) => {
     throw error
   }
 
+  await noteSignIn(query, 'umpires', linked[0].id)
+
   res.json({ token: signToken(linked[0]), umpire: umpirePayload(linked[0]) })
 })
 
@@ -346,7 +380,7 @@ router.post('/login', async (req, res) => {
   const password = String(req.body?.password ?? '')
 
   const { rows } = await query(
-    `SELECT id, email, name, password_hash, google_email
+    `SELECT id, email, name, password_hash, google_email, paused_at, closed_at
        FROM umpires
       WHERE lower(email) = $1`,
     [email],
@@ -374,13 +408,19 @@ router.post('/login', async (req, res) => {
     return res.status(401).json({ error: 'Incorrect email or password' })
   }
 
+  // Comes after the password check, so a wrong password still answers
+  // "Incorrect email or password" and pausing reveals nothing to
+  // someone who doesn't know it.
+  if (refuseSignIn(res, found, 'closed_at')) return
+  await noteSignIn(query, 'umpires', found.id)
+
   res.json({ token: signToken(found), umpire: umpirePayload(found) })
 })
 
 // Lets the app confirm a stored token is still valid on launch, so an
 // expired session shows the login screen instead of failing later on
 // the first real request mid-match.
-router.get('/me', requireAuth, async (req, res) => {
+router.get('/me', requireAuth, requireActiveUmpire(query), async (req, res) => {
   const { rows } = await query(
     `SELECT id, email, name, password_hash, google_email
        FROM umpires WHERE id = $1`,
@@ -447,7 +487,7 @@ async function confirmedWithPassword(row, req, res, action) {
  * attacker who could quietly move this account to an address they own
  * could then walk in through Google without ever knowing the password.
  */
-router.patch('/me', requireAuth, async (req, res) => {
+router.patch('/me', requireAuth, requireActiveUmpire(query), async (req, res) => {
   const found = await loadUmpire(req.umpire.id)
   if (!found) return res.status(401).json({ error: 'Account no longer exists' })
 
@@ -496,7 +536,7 @@ router.patch('/me', requireAuth, async (req, res) => {
  * disconnect Google, since that is refused while it is their only way
  * in.
  */
-router.post('/me/password', requireAuth, async (req, res) => {
+router.post('/me/password', requireAuth, requireActiveUmpire(query), async (req, res) => {
   const found = await loadUmpire(req.umpire.id)
   if (!found) return res.status(401).json({ error: 'Account no longer exists' })
 
@@ -527,7 +567,7 @@ router.post('/me/password', requireAuth, async (req, res) => {
  * neither can stand in for the other -- an umpire mid-session must not
  * have to sign out, and someone who cannot get in has no token to use.
  */
-router.post('/google/connect', requireAuth, async (req, res) => {
+router.post('/google/connect', requireAuth, requireActiveUmpire(query), async (req, res) => {
   // Google first, before a single row is read, so this can never be
   // used to ask questions about accounts.
   let profile
@@ -583,7 +623,7 @@ router.post('/google/connect', requireAuth, async (req, res) => {
  * Google-only umpire who disconnected would be locked out for good, and
  * the honest answer is to refuse and say what to do first.
  */
-router.post('/google/disconnect', requireAuth, async (req, res) => {
+router.post('/google/disconnect', requireAuth, requireActiveUmpire(query), async (req, res) => {
   const found = await loadUmpire(req.umpire.id)
   if (!found) return res.status(401).json({ error: 'Account no longer exists' })
 
@@ -638,16 +678,35 @@ router.post('/player/claim', async (req, res) => {
 
   if (!code) return res.status(400).json({ error: 'Enter your code to continue' })
 
+  // A claim code must never un-pause anyone, so a pause is checked
+  // before it can do anything -- the UPDATE below also guards against
+  // one landing between this check and that statement.
+  const { rows: holder } = await query(
+    'SELECT paused_at FROM players WHERE claim_code = $1',
+    [code],
+  )
+  if (holder[0]?.paused_at) {
+    const refused = signInRefusal({ paused_at: holder[0].paused_at }, 'deactivated_at')
+    return res.status(refused.statusCode).json(refused.body)
+  }
+
   // Clearing deactivated_at is the whole recovery path for a deleted
   // profile. Deleting an account wipes its claim code, so holding a
   // working one means an umpire minted a fresh one and handed it over --
   // the same trusted human in the loop as the forgotten-password case.
   // Without this a closed account would be unreachable forever.
+  //
+  // closed_by_admin_at clears the same way: reaching this row at all
+  // means the umpire route already refused to mint a code for it while
+  // that column was set (see people-rules.js mayMintClaimCode), so a
+  // working code here only ever came from the owner.
   const { rows } = await query(
     `UPDATE players
-        SET claimed_at     = COALESCE(claimed_at, now()),
-            deactivated_at = NULL
+        SET claimed_at         = COALESCE(claimed_at, now()),
+            deactivated_at     = NULL,
+            closed_by_admin_at = NULL
       WHERE claim_code = $1
+        AND paused_at IS NULL
       RETURNING id, name, claimed_at, username, google_email`,
     [code],
   )
@@ -657,6 +716,7 @@ router.post('/player/claim', async (req, res) => {
   }
 
   const player = rows[0]
+  await noteSignIn(query, 'players', player.id)
   // The payload carries `username`, which is null unless they have
   // already set up sign-in -- so a registered player recovering with
   // their code is not shown the prompt to set up something they
@@ -739,6 +799,14 @@ function assertMayLinkTo(existing, code) {
       { needsCode: true },
     )
   }
+
+  // Checked last, and only reachable once the right code has matched:
+  // holding it is the only proof that earns the caller the truth about
+  // a pause. Checking it earlier would let anyone typing a paused
+  // player's NAME learn they are paused without ever proving who they are.
+  if (existing.paused_at) {
+    throw refusal(403, PAUSED_MESSAGE, { status: 'paused' })
+  }
 }
 
 /**
@@ -787,7 +855,7 @@ router.post('/player/register', async (req, res) => {
       // The name is taken. Either this is the person an umpire has been
       // recording matches for, or it is not.
       const { rows } = await client.query(
-        `SELECT id, name, claim_code, password_hash
+        `SELECT id, name, claim_code, password_hash, paused_at
            FROM players
           WHERE lower(name) = lower($1)`,
         [name],
@@ -798,23 +866,26 @@ router.post('/player/register', async (req, res) => {
       if (!rows[0]) throw refusal(409, 'That name is taken. Try again.')
       assertMayLinkTo(rows[0], code)
 
-      // deactivated_at is cleared for the same reason /player/claim
-      // clears it: a closed account whose code was re-minted is being
-      // legitimately recovered, and assertMayLinkTo has already checked
-      // that code.
+      // deactivated_at (and closed_by_admin_at with it) is cleared for
+      // the same reason /player/claim clears it: a closed account whose
+      // code was re-minted is being legitimately recovered, and
+      // assertMayLinkTo has already checked that code.
       const updated = await client.query(
         `UPDATE players
-            SET username       = $2,
-                password_hash  = $3,
-                registered_at  = now(),
-                claimed_at     = COALESCE(claimed_at, now()),
-                deactivated_at = NULL
+            SET username           = $2,
+                password_hash       = $3,
+                registered_at       = now(),
+                claimed_at          = COALESCE(claimed_at, now()),
+                deactivated_at      = NULL,
+                closed_by_admin_at  = NULL
           WHERE id = $1
           RETURNING id, name, claimed_at, username, google_email`,
         [rows[0].id, username, password_hash],
       )
       return updated.rows[0]
     })
+
+    await noteSignIn(query, 'players', player.id)
 
     res.status(201).json({
       token: signPlayerToken(player),
@@ -846,7 +917,7 @@ router.post('/player/login', async (req, res) => {
   const password = String(req.body?.password ?? '')
 
   const { rows } = await query(
-    `SELECT id, name, claimed_at, username, google_email, password_hash
+    `SELECT id, name, claimed_at, username, google_email, password_hash, paused_at
        FROM players
       WHERE lower(username) = $1`,
     [username],
@@ -864,6 +935,9 @@ router.post('/player/login', async (req, res) => {
   if (!found || !found.password_hash || !ok) {
     return res.status(401).json({ error: 'Incorrect username or password' })
   }
+
+  if (refuseSignIn(res, found, 'deactivated_at')) return
+  await noteSignIn(query, 'players', found.id)
 
   res.json({ token: signPlayerToken(found), player: playerPayload(found) })
 })
@@ -917,11 +991,13 @@ router.post('/player/google', async (req, res) => {
   const linked = await query(
     `UPDATE players SET google_email = $2
       WHERE google_sub = $1
-      RETURNING id, name, claimed_at, username, google_email`,
+      RETURNING id, name, claimed_at, username, google_email, paused_at, deactivated_at`,
     [profile.sub, profile.email],
   )
   if (linked.rows[0]) {
     const player = linked.rows[0]
+    if (refuseSignIn(res, player, 'deactivated_at')) return
+    await noteSignIn(query, 'players', player.id)
     return res.json({ token: signPlayerToken(player), player: playerPayload(player) })
   }
 
@@ -961,7 +1037,7 @@ router.post('/player/google', async (req, res) => {
       if (inserted.rowCount === 1) return inserted.rows[0]
 
       const { rows } = await client.query(
-        `SELECT id, name, claim_code, password_hash, google_sub
+        `SELECT id, name, claim_code, password_hash, google_sub, paused_at
            FROM players
           WHERE lower(name) = lower($1)`,
         [name],
@@ -983,23 +1059,26 @@ router.post('/player/google', async (req, res) => {
 
       assertMayLinkTo(rows[0], code)
 
-      // deactivated_at clears for the same reason it does in
-      // /player/claim and /player/register: assertMayLinkTo has just
-      // checked a working claim code, which only exists because an
-      // umpire minted one and handed it over.
+      // deactivated_at (and closed_by_admin_at with it) clears for the
+      // same reason it does in /player/claim and /player/register:
+      // assertMayLinkTo has just checked a working claim code, which
+      // only exists because an umpire minted one and handed it over.
       const updated = await client.query(
         `UPDATE players
-            SET google_sub     = $2,
-                google_email   = $3,
-                registered_at  = COALESCE(registered_at, now()),
-                claimed_at     = COALESCE(claimed_at, now()),
-                deactivated_at = NULL
+            SET google_sub         = $2,
+                google_email       = $3,
+                registered_at      = COALESCE(registered_at, now()),
+                claimed_at         = COALESCE(claimed_at, now()),
+                deactivated_at     = NULL,
+                closed_by_admin_at = NULL
           WHERE id = $1
           RETURNING id, name, claimed_at, username, google_email`,
         [rows[0].id, profile.sub, profile.email],
       )
       return updated.rows[0]
     })
+
+    await noteSignIn(query, 'players', player.id)
 
     res.status(201).json({
       token: signPlayerToken(player),

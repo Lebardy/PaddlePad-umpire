@@ -1,5 +1,11 @@
 import { useState } from 'react'
-import { login, linkGoogleAccount, loginWithGoogle, register } from '../lib/api'
+import {
+  login,
+  linkGoogleAccount,
+  loginWithGoogle,
+  register,
+  takePausedNotice,
+} from '../lib/api'
 import GoogleButton from '../components/GoogleButton'
 
 // Sign-in / sign-up gate shown when no umpire is authenticated.
@@ -8,6 +14,9 @@ import GoogleButton from '../components/GoogleButton'
 // API is reachable from the public internet, so an open form would let
 // anyone create an account and write into the match data.
 function Login({ onSignedIn }) {
+  // Read once, on mount, and removed from storage as it's read -- this
+  // is not something to show again on a later visit to this screen.
+  const [pausedNotice] = useState(() => takePausedNotice())
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
@@ -114,6 +123,8 @@ function Login({ onSignedIn }) {
   return (
     <div className="login">
       <h2>{isRegister ? 'Create umpire account' : 'Umpire sign in'}</h2>
+
+      {pausedNotice && <p className="form-error">{pausedNotice}</p>}
 
       {/* Mid-Google-signup this takes over the screen. Leaving the
           email form below it would offer a second, unrelated way in at
