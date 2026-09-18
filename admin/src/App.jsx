@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import Layout from './components/Layout'
 import { SIGNED_OUT_EVENT, clearSession, fetchMe, getStoredAdmin, getToken, storeAdmin } from './lib/api'
-import { matchPath, navigate, useRoute } from './lib/router'
+import { matchPath, navigate, useRoute } from './lib/navigation'
 import { applyTheme, getThemeChoice, watchSystemTheme } from './lib/theme'
 import SetupScreen from './screens/Setup'
 import SignIn from './screens/SignIn'

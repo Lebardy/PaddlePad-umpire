@@ -273,7 +273,7 @@ export default function Account({ admin, onAdminChange }) {
                     </>
                   )
               )}
-              <ProofField admin={admin} proof={codesProof} busy={codesBusy} />
+              {askingNewCodes && <ProofField admin={admin} proof={codesProof} busy={codesBusy} />}
               <RowConfirm
                 label="Make new backup codes"
                 className="btn-primary"
@@ -283,6 +283,7 @@ export default function Account({ admin, onAdminChange }) {
                 confirmClass="btn-primary"
                 keepLabel="Not now"
                 open={askingNewCodes}
+                disabled={askingNewCodes && !codesProof.ready}
                 onOpen={() => setAskingNewCodes(true)}
                 onClose={() => setAskingNewCodes(false)}
                 onConfirm={makeNewCodes}

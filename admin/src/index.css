@@ -353,49 +353,40 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .col-code { width: 1%; }
 .col-when { width: 1%; white-space: nowrap; }
 .col-actions { width: 1%; }
-.row-actions { text-align: right; white-space: nowrap; }
+.row-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem 0.5rem; }
 .table td.row-actions { vertical-align: top; padding-block: 0.5rem; }
-.row-actions > * + * { margin-left: 0.5rem; }
 .confirm { display: inline-grid; justify-items: end; gap: 0.35rem; }
 .confirm-text { font-size: 0.9rem; font-weight: 500; color: var(--text); line-height: 1.3; }
 .confirm-buttons { display: flex; gap: 0.5rem; }
-/* A failed row action, said under its buttons. It takes the width the
-   buttons already give the column and never widens it. */
+/* A failed row action, said under its buttons -- always last and full
+   width, whichever of the row's buttons it followed, so it never pushes
+   another button onto its own line. */
 .row-actions > .row-error {
-  display: block; width: 0; min-width: 100%; margin: 0.4rem 0 0; white-space: normal; text-align: right;
+  order: 1; flex: 1 0 100%; white-space: normal; text-align: right;
   font-size: 0.88rem; font-weight: 500; line-height: 1.3; color: var(--status-critical);
 }
 button[aria-disabled='true'] { opacity: 0.6; cursor: progress; }
 .code { font-family: var(--label); font-weight: 700; font-size: 1.15rem; letter-spacing: 0.08em; white-space: nowrap; }
 tr.is-faded .code { text-decoration: none; }
 
-/* A status: a small lamp and its words. The words always carry it. */
-.tag {
+/* A status: a small lamp and its words, shared by invite-code tags and
+   a person's status (active reads as quiet as an open code, paused
+   lights up like the amber "waiting" dot, closed sits muted and
+   outlined the way an expired code does). The words always carry it. */
+.tag, .status-tag {
   display: inline-flex; align-items: flex-start; gap: 0.45rem; font-size: 0.9rem; letter-spacing: 0.04em; line-height: 1.35;
   color: var(--text);
 }
-.tag::before {
+.tag::before, .status-tag::before {
   content: ''; width: 0.62rem; height: 0.62rem; border-radius: 2px; flex: none; margin-top: 0.3em;
   background: var(--none-lamp); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
 }
-.tag-open::before, .tag-on::before { background: var(--win-lamp); box-shadow: 0 0 6px var(--win-lamp); }
+.tag-open::before, .tag-on::before, .status-active::before { background: var(--win-lamp); box-shadow: 0 0 6px var(--win-lamp); }
 .tag-used::before { background: var(--text-muted); }
-.tag-expired::before, .tag-off::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--text-muted); }
+.tag-expired::before, .tag-off::before, .status-closed::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--text-muted); }
 .tag-waiting::before { background: var(--lamp); }
-tr.is-faded .tag { color: var(--text-muted); }
-
-/* A person's status: active reads as quiet as an open code, paused
-   lights up like the amber "waiting" dot, closed sits muted and
-   outlined the way an expired code does. */
-.status-tag { display: inline-flex; align-items: flex-start; gap: 0.45rem; font-size: 0.9rem; letter-spacing: 0.04em; line-height: 1.35; color: var(--text); }
-.status-tag::before {
-  content: ''; width: 0.62rem; height: 0.62rem; border-radius: 2px; flex: none; margin-top: 0.3em;
-  background: var(--none-lamp); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
-}
-.status-active::before { background: var(--win-lamp); box-shadow: 0 0 6px var(--win-lamp); }
 .status-paused::before { background: var(--lamp); box-shadow: 0 0 6px var(--lamp); }
-.status-closed { color: var(--text-muted); }
-.status-closed::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--text-muted); }
+tr.is-faded .tag, .status-closed { color: var(--text-muted); }
 /* On the dark board (a person's page header) the tag needs board-safe
    ink, not the page's own light/dark text colours. */
 .page-board .status-tag { color: var(--board-ink); }

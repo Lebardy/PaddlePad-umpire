@@ -46,6 +46,21 @@ export function formatWhen(iso) {
   return WHEN.format(new Date(iso)).replace(/\s+/g, ' ')
 }
 
+const DAY = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', weekday: 'long', month: 'short', day: 'numeric' })
+const DAY_WITH_YEAR = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })
+const YEAR = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', year: 'numeric' })
+const TIME = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit' })
+
+/** "Friday, Sep 18", with the year added when it isn't this year in Manila. */
+export function dayHeading(iso, now = Date.now()) {
+  const date = new Date(iso)
+  return YEAR.format(date) === YEAR.format(new Date(now)) ? DAY.format(date) : DAY_WITH_YEAR.format(date)
+}
+
+export function timeOfDay(iso) {
+  return TIME.format(new Date(iso))
+}
+
 const ACTION_LABELS = {
   'owner.created': 'Owner created',
   'admin.added': 'Added an admin',

@@ -6,8 +6,8 @@
 // ============================================================
 
 import {
-  EXPIRY_CHOICES, actionLabel, confirmNameMatches, formatWhen, inviteStatusText, lastSignedInText,
-  madeByText, ratingText, signInMethods, signInMethodsText, statusLabel,
+  EXPIRY_CHOICES, actionLabel, confirmNameMatches, dayHeading, formatWhen, inviteStatusText, lastSignedInText,
+  madeByText, ratingText, signInMethods, signInMethodsText, statusLabel, timeOfDay,
 } from '../src/lib/format.js'
 
 let pass = 0
@@ -66,6 +66,11 @@ check('an exact typed name matches', confirmNameMatches('Ana Reyes', 'Ana Reyes'
 check('matching ignores case and outer spaces', confirmNameMatches('  ana reyes  ', 'Ana Reyes'), true)
 check('a different name does not match', confirmNameMatches('Ana', 'Ana Reyes'), false)
 check('an empty or blank typed name never matches', confirmNameMatches('   ', 'Ana Reyes'), false)
+
+check('a day heading this year has no year', dayHeading('2026-09-18T01:00:00Z', Date.parse('2026-09-18T12:00:00Z')), 'Friday, Sep 18')
+check('a day heading from a past year gets one', dayHeading('2025-12-31T15:00:00Z', Date.parse('2026-09-18T12:00:00Z')), 'Wednesday, Dec 31, 2025')
+check('Manila can already be the next day', dayHeading('2025-12-31T17:00:00Z', Date.parse('2026-09-18T12:00:00Z')), 'Thursday, Jan 1')
+check('a time of day in Manila', timeOfDay('2026-09-18T01:05:00Z'), '9:05 AM')
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

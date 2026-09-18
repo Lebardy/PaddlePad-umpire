@@ -159,7 +159,7 @@ export default function Invites() {
             Cancelled {cancelled.code}. It no longer works.
           </p>
         )}
-        {invites && rows.length === 0 && <p className="empty">{current.empty}</p>}
+        {invites && rows.length === 0 && <p className="empty">{invites.length === 0 ? SHOWING[0].empty : current.empty}</p>}
 
         {rows.length > 0 && (
           <div className="table-wrap">

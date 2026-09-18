@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Gate from '../components/Gate'
 import GoogleButton from '../components/GoogleButton'
 import { signIn, signInWithBackupCode, signInWithGoogle } from '../lib/api'
-import { navigate } from '../lib/router'
+import { navigate } from '../lib/navigation'
 
 export default function SignIn({ onSignedIn }) {
   const [usingBackupCode, setUsingBackupCode] = useState(false)

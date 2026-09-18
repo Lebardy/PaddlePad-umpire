@@ -1,14 +1,12 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import PageBoard from '../components/PageBoard'
 import { activityFilters, listActivity } from '../lib/api'
-import { actionLabel } from '../lib/format'
+import { actionLabel, dayHeading, timeOfDay } from '../lib/format'
 
-// Manila, like every other time on the admin site, so a day break falls
-// at the same moment for every admin.
-const DAY = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', weekday: 'long', month: 'short', day: 'numeric' })
-const TIME = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit' })
-const dayOf = (iso) => DAY.format(new Date(iso))
-const timeOf = (iso) => TIME.format(new Date(iso)).replace(/\s+/g, ' ')
+// The heading (dayHeading) can read the same for two different days a
+// year apart when neither is this year, so the grouping key is its own
+// Manila year+month+day, not the label itself.
+const DAY_KEY = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', year: 'numeric', month: 'numeric', day: 'numeric' })
 
 const WARNINGS = new Set(['admin.sign_in_failed', 'admin.switched_off'])
 
@@ -16,8 +14,8 @@ const WARNINGS = new Set(['admin.sign_in_failed', 'admin.switched_off'])
 function byDay(entries) {
   const days = []
   for (const entry of entries) {
-    const day = dayOf(entry.createdAt)
-    if (days.at(-1)?.day !== day) days.push({ day, entries: [] })
+    const key = DAY_KEY.format(new Date(entry.createdAt))
+    if (days.at(-1)?.key !== key) days.push({ key, day: dayHeading(entry.createdAt), entries: [] })
     days.at(-1).entries.push(entry)
   }
   return days
@@ -107,14 +105,14 @@ export default function Activity() {
                 <tr><th className="col-when">Time</th><th>Who</th><th>What</th><th>Details</th></tr>
               </thead>
               <tbody>
-                {byDay(entries).map(({ day, entries: dayEntries }) => (
-                  <Fragment key={day}>
+                {byDay(entries).map(({ key, day, entries: dayEntries }) => (
+                  <Fragment key={key}>
                     <tr className="day-row">
                       <th colSpan={4} scope="colgroup">{day}</th>
                     </tr>
                     {dayEntries.map((entry) => (
                       <tr key={entry.id}>
-                        <td className="col-when">{timeOf(entry.createdAt)}</td>
+                        <td className="col-when">{timeOfDay(entry.createdAt)}</td>
                         <td>{entry.adminName ?? 'Setup command'}</td>
                         <td><span className={`what${WARNINGS.has(entry.action) ? ' is-warning' : ''}`}>{actionLabel(entry.action)}</span></td>
                         <td><span className="cell-main">{entry.summary}</span></td>
