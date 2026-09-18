@@ -3,7 +3,7 @@ import { query, withTransaction } from '../db.js'
 import { requireAdminAccount, requireOwner } from '../auth.js'
 import { ADMIN_COLUMNS, createAdmin, createSetupLink, resetSessions } from '../admin-accounts.js'
 import { recordActivity } from '../admin-activity.js'
-import { adminPayload, normalizeEmail } from '../admin-rules.js'
+import { adminPayload, isAdminEmail, normalizeEmail } from '../admin-rules.js'
 import { isUuid } from '../validate.js'
 
 // Adding, switching off and re-linking admins is the owner's alone, so
@@ -38,7 +38,7 @@ router.post('/', async (req, res) => {
   if (!name || name.length > NAME_MAX) {
     return res.status(400).json({ error: `Name must be 1 to ${NAME_MAX} characters` })
   }
-  if (!email.includes('@')) return res.status(400).json({ error: 'Email looks invalid' })
+  if (!isAdminEmail(email)) return res.status(400).json({ error: 'Email looks invalid' })
 
   try {
     const { admin, setupLink } = await withTransaction(async (client) => {

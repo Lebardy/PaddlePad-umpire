@@ -5,6 +5,10 @@
 //   railway ssh --service api --environment staging -- \
 //     node scripts/create-owner.mjs --name "Your Name" --email you@example.com
 //
+// Locally, against a Postgres running on this machine:
+//
+//   node scripts/create-owner.mjs --name "Your Name" --email you@example.com --local
+//
 // Runs inside the Railway container, because the database is not
 // reachable from outside it. Prints a one-time setup link to open in a
 // browser, where the owner chooses a password or connects Google.
@@ -46,11 +50,11 @@ if (!process.env.ADMIN_ORIGIN && !values.local) {
 const { pool, withTransaction } = await import('../src/db.js')
 const { createAdmin, createSetupLink } = await import('../src/admin-accounts.js')
 const { recordActivity } = await import('../src/admin-activity.js')
-const { normalizeEmail } = await import('../src/admin-rules.js')
+const { normalizeEmail, isAdminEmail } = await import('../src/admin-rules.js')
 
 const email = normalizeEmail(values.email)
 
-if (!name || !email.includes('@')) {
+if (!name || !isAdminEmail(email)) {
   console.error('usage: node scripts/create-owner.mjs --name "Your Name" --email you@example.com [--local]')
   process.exit(2)
 }

@@ -19,13 +19,15 @@ const IGNORED = new Set(['/health'])
 // need to reconstruct.
 const MUTATIONS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
-// A setup link's secret lives in the path, not the body, so the usual
-// "no bodies" guard above doesn't cover it -- logging the path whole
-// would put a still-usable secret in Railway's logs for anyone who can
-// read them. Real secrets are base64url, so this only ever redacts the
-// thing it means to.
+// A setup link's secret and an invite code both live in the path, not
+// the body, so the usual "no bodies" guard above doesn't cover them --
+// logging either whole would put a still-usable secret in Railway's
+// logs for anyone who can read them. Each pattern only ever matches the
+// one segment it means to redact, so nothing else in the path is touched.
 function redactPath(path) {
-  return path.replace(/\/admin\/auth\/setup\/[^/]+/, '/admin/auth/setup/…')
+  return path
+    .replace(/\/admin\/auth\/setup\/[^/]+/, '/admin/auth/setup/…')
+    .replace(/\/admin\/invites\/[^/]+/, '/admin/invites/…')
 }
 
 export function requestLog(req, res, next) {
@@ -41,14 +43,19 @@ export function requestLog(req, res, next) {
     const isMutation = MUTATIONS.has(req.method)
     if (!isMutation && res.statusCode < 400) return
 
-    // requireAuth / requirePlayer attach these; an unauthenticated
-    // request logs as anonymous rather than being dropped, since failed
-    // sign-in attempts are worth seeing.
-    const actor = req.umpire
-      ? `umpire:${req.umpire.id}`
-      : req.player
-        ? `player:${req.player.id}`
-        : 'anon'
+    // requireAuth / requirePlayer / requireAdminAccount attach these; an
+    // unauthenticated request logs as anonymous rather than being
+    // dropped, since failed sign-in attempts are worth seeing. Checked
+    // in this order because an admin token never satisfies the other
+    // two guards, but the reverse isn't tested elsewhere -- admin is
+    // asked first so an admin request is never misreported as anon.
+    const actor = req.admin
+      ? `admin:${req.admin.id}`
+      : req.umpire
+        ? `umpire:${req.umpire.id}`
+        : req.player
+          ? `player:${req.player.id}`
+          : 'anon'
 
     // The first X-Forwarded-For entry, for the reason set out at length
     // in ratelimit.js: on Railway that is the real client, while req.ip

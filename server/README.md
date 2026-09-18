@@ -152,13 +152,13 @@ reachable, so it's suitable as Railway's health check path.
 
 ### The staging environment
 
-The Railway project has two environments. `production` is what the club
-uses; `staging` is an identical copy to deploy to first.
+The Railway project has two environments. `production` is what everyone
+actually uses; `staging` is an identical copy to deploy to first.
 
 | | production | staging |
 |---|---|---|
 | api | `api.paddlepad.app` | `api-staging-8ac6.up.railway.app` |
-| web (umpire) | `umpire.paddlepad.app` | `web-staging-e8e9.up.railway.app` |
+| umpire | `umpire.paddlepad.app` | `web-staging-e8e9.up.railway.app` |
 | admin | not deployed yet — see below | `admin-staging-7af8.up.railway.app` |
 | play (player) | `paddlepad.app` | `play-staging-7f59.up.railway.app` |
 | ml (pipeline) | no public address | `ml-staging-12f5.up.railway.app` |
@@ -174,9 +174,9 @@ A new app address needs adding in three places: the api's
 Authorized JavaScript origins.
 
 ```bash
-railway up --service api  --environment staging
-railway up --service web  --environment staging
-railway up --service play --environment staging
+railway up --service api    --environment staging
+railway up --service umpire --environment staging
+railway up --service play   --environment staging
 railway up ./admin --path-as-root --service admin --environment staging
 ```
 
@@ -258,6 +258,23 @@ give it a few seconds if it's been asleep. The command prints a
 one-time setup link, good for 24 hours, that opens the admin site so
 the owner can choose a password or connect Google.
 
+Once the owner has finished setup, the Account page should be used
+straight away to make a set of backup codes — ten one-time codes,
+shown once and never again, that sign in when neither a password nor
+Google is available. Making a fresh set replaces any still-unused ones
+outright, and the site warns once only three or fewer are left.
+
+**Proving it's really you.** Changing the password, connecting or
+disconnecting Google, or making a fresh set of backup codes all ask for
+proof again first — the current password, or, for a Google-only admin,
+signing in with Google a second time on the spot. A token alone is not
+enough for any of those, because it's exactly what a stolen token would
+have. Each of them also signs out every other session immediately
+afterwards, so a stolen token stops working the moment the real admin
+changes anything. "Sign out everywhere else" on the Account page does
+the same thing on its own, for an admin who just wants to end a session
+left open on another device without changing anything else.
+
 **Rolling this out to production, in order.** The umpire app's own admin
 switch is gone as of the commit that retires it, so production must
 already have a working admin site — with an owner who has signed in —
@@ -295,7 +312,7 @@ an invite code at all.
 | `POST` | `/auth/player/google` | — | Sign in a player with Google; a first-time account has to say who it is |
 | `POST` | `/auth/player/google/link` | Bearer (player) | Connect Google to the account you already have |
 | `POST` | `/auth/player/google/unlink` | Bearer (player) | Disconnect it, unless that would leave no way back in |
-| `GET` | `/export/match-logs.csv` | Bearer (umpire) | The club-wide ML export |
+| `GET` | `/export/match-logs.csv` | Bearer (umpire) | The ML export of everyone's matches |
 | `GET` | `/player/me` | Bearer (player) | A player's own summary, plus their rating or its gate state |
 | `PATCH` | `/player/me` | Bearer (player) | Rename yourself |
 | `DELETE` | `/player/me` | Bearer (player) | Delete your profile — see below |
@@ -305,11 +322,14 @@ an invite code at all.
 | `GET`/`POST` | `/admin/auth/setup/:secret` | — | Check a setup link, then use it to choose a password, connect Google, or both |
 | `POST` | `/admin/auth/login` | — | Sign in as an admin, returns an admin token |
 | `POST` | `/admin/auth/google` | — | Sign in an admin with Google |
-| `GET` | `/admin/auth/me` | Bearer (admin) | The signed-in admin's own account |
+| `POST` | `/admin/auth/backup-code` | — | Sign in as the owner with a backup code, when a password or Google isn't available |
+| `GET` | `/admin/auth/me` | Bearer (admin) | The signed-in admin's own account, including how many backup codes are left |
 | `PATCH` | `/admin/auth/me` | Bearer (admin) | Rename yourself |
 | `POST` | `/admin/auth/me/password` | Bearer (admin) | Change the password, or set the first one |
 | `POST` | `/admin/auth/me/google/connect` | Bearer (admin) | Connect Google to the account already signed in |
 | `POST` | `/admin/auth/me/google/disconnect` | Bearer (admin) | Disconnect it, unless that would leave no way back in |
+| `POST` | `/admin/auth/me/sign-out-others` | Bearer (admin) | End every other session for this admin right now |
+| `POST` | `/admin/auth/me/backup-codes` | Bearer (owner) | Make a fresh set of ten backup codes, replacing any still unused |
 | `GET` | `/admin/admins` | Bearer (owner) | List every admin |
 | `POST` | `/admin/admins` | Bearer (owner) | Add a new admin and its first setup link |
 | `POST` | `/admin/admins/:id/setup-link` | Bearer (owner) | Make a fresh setup link, cancelling any unused one |
@@ -425,7 +445,7 @@ up with and a matching address is decent evidence of the same person.
 Players have no such column and never did — there is nothing to send
 them, so an address collected at signup would be a username in disguise.
 Google hands back a display name and an address, and neither is evidence
-about *which row on a club roster* this human is.
+about *which row on the roster* this human is.
 
 So `/auth/player/google` resolves identity the way `/auth/player/register`
 already does, and shares `assertMayLinkTo` with it. A Google account it
@@ -592,9 +612,9 @@ Two refusals are worth knowing:
 Ratings computed against the absorbed id go with it, by cascade. Those
 snapshots were measured against a pool and an id that no longer exist,
 and the next pipeline run recomputes. A merge is invisible to the umpire
-— two roster entries quietly become one — which a club where the umpire
-knows everyone can absorb, and which a `merged_from` audit column would
-fix if it ever bites.
+— two roster entries quietly become one — which is easy to live with
+where the umpire knows everyone playing, and which a `merged_from` audit
+column would fix if it ever bites.
 
 ### What deleting your profile does
 
