@@ -8,7 +8,7 @@
 import { SETUP_LINK_HOURS, newSetupSecret } from './admin-rules.js'
 
 export const ADMIN_COLUMNS =
-  'id, name, email, role, password_hash, google_sub, google_email, deactivated_at, last_signed_in_at, created_at'
+  'id, name, email, role, password_hash, google_sub, google_email, deactivated_at, last_signed_in_at, created_at, sessions_reset_at'
 
 /** Where a setup link opens: the admin site, not the API. */
 export function setupUrl(secret) {
@@ -45,4 +45,15 @@ export async function createSetupLink(db, { adminId, createdBy }) {
     [adminId, hash, SETUP_LINK_HOURS, createdBy ?? null],
   )
   return { url: setupUrl(secret), expiresAt: rows[0].expires_at }
+}
+
+/**
+ * Ends every session an admin currently holds: any token issued before
+ * this moment stops working the next time it's used (see
+ * requireAdminAccount and admin-rules.js sessionEnded). Called from the
+ * same transaction as whatever earned it -- a password or Google
+ * change, a switch-off, or the admin's own "sign out everywhere else".
+ */
+export async function resetSessions(db, adminId) {
+  await db.query('UPDATE admins SET sessions_reset_at = now() WHERE id = $1', [adminId])
 }

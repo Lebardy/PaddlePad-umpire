@@ -133,6 +133,22 @@ section('which tokens each guard lets through')
   check('the role comes from the database, not the token',
     (await run(auth.requireAdminAccount(fakeQuery([{ ...activeRow, role: 'owner' }])), adminToken)).req.admin.role, 'owner')
 
+  // A token issued before admins.sessions_reset_at must be refused, even
+  // though it is otherwise valid and the admin is still switched on.
+  // The reset moment sits between the two tokens' iat, and everything
+  // is close to "now" so a 1h expiresIn never makes a token expired.
+  const nowSecond = Math.floor(Date.now() / 1000)
+  const resetAt = new Date(nowSecond * 1000).toISOString()
+  const tokenBeforeReset = sign({ sub: 'a1', name: 'Jan', role: 'admin', iat: nowSecond - 5 })
+  const tokenAfterReset = sign({ sub: 'a1', name: 'Jan', role: 'admin', iat: nowSecond + 5 })
+  const resetRow = { ...activeRow, sessions_reset_at: resetAt }
+
+  const beforeResult = await run(auth.requireAdminAccount(fakeQuery([resetRow])), tokenBeforeReset)
+  check('the admin guard refuses a token from before a session reset', beforeResult.status, 401)
+  check('and says the session ended', beforeResult.body, { error: 'Your session has ended. Sign in again.' })
+  check('the admin guard lets a token from after a session reset through',
+    (await run(auth.requireAdminAccount(fakeQuery([resetRow])), tokenAfterReset)).status, 'next')
+
   check('the umpire guard refuses an admin token', (await run(auth.requireAuth, adminToken)).status, 403)
   check('the umpire guard still accepts an old umpire token', (await run(auth.requireAuth, oldUmpireToken)).status, 'next')
   check('the player guard refuses an admin token', (await run(auth.requirePlayer, adminToken)).status, 403)

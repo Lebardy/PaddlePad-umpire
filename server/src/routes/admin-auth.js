@@ -8,7 +8,7 @@ import {
   verifyPassword,
 } from '../auth.js'
 import { googleConfigured, resolveGoogleProfile } from '../google.js'
-import { ADMIN_COLUMNS } from '../admin-accounts.js'
+import { ADMIN_COLUMNS, resetSessions } from '../admin-accounts.js'
 import { recordActivity } from '../admin-activity.js'
 import {
   adminPayload,
@@ -58,6 +58,42 @@ async function googleProfile(req, res) {
     }
     throw error
   }
+}
+
+const REPROOF_REFUSAL = 'Sign in with the Google account connected to your admin account'
+
+/**
+ * Proof that the person making a sign-in change is really the admin,
+ * not just someone holding their token: their current password, or --
+ * for a Google-only admin -- a Google sign-in done again right now.
+ *
+ * Returns true when proven. On failure it sends the 403 itself and
+ * returns false, so callers just `if (!(await requireReproof(...))) return`.
+ * A failed attempt writes no activity record.
+ */
+async function requireReproof(req, res, me) {
+  if (me.password_hash) {
+    const ok = await verifyPassword(String(req.body?.currentPassword ?? ''), me.password_hash)
+    if (ok) return true
+    res.status(403).json({ error: 'Your current password is wrong' })
+    return false
+  }
+
+  let profile
+  try {
+    profile = await resolveGoogleProfile({
+      accessToken: req.body?.reproofAccessToken,
+      credential: req.body?.reproofCredential,
+    })
+  } catch {
+    res.status(403).json({ error: REPROOF_REFUSAL })
+    return false
+  }
+  if (profile.sub !== me.google_sub) {
+    res.status(403).json({ error: REPROOF_REFUSAL })
+    return false
+  }
+  return true
 }
 
 router.post('/login', async (req, res) => {
@@ -236,9 +272,7 @@ router.post('/me/password', async (req, res) => {
   const me = await loadMe(req.admin.id)
   const newPassword = String(req.body?.newPassword ?? '')
 
-  if (me.password_hash && !(await verifyPassword(String(req.body?.currentPassword ?? ''), me.password_hash))) {
-    return res.status(403).json({ error: 'Your current password is wrong' })
-  }
+  if (!(await requireReproof(req, res, me))) return
   if (newPassword.length < MIN_PASSWORD_LENGTH) {
     return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` })
   }
@@ -249,16 +283,19 @@ router.post('/me/password', async (req, res) => {
       `UPDATE admins SET password_hash = $2 WHERE id = $1 RETURNING ${ADMIN_COLUMNS}`,
       [me.id, passwordHash],
     )
+    await resetSessions(client, me.id)
     await recordActivity(client, {
       adminId: me.id, action: 'admin.password_changed', targetType: 'admin', targetId: me.id,
       summary: `${me.name} ${me.password_hash ? 'changed' : 'set'} their password`,
     })
     return rows[0]
   })
-  res.json({ admin: adminPayload(row) })
+  res.json({ token: signAdminToken(row), admin: adminPayload(row) })
 })
 
 router.post('/me/google/connect', async (req, res) => {
+  const me = await loadMe(req.admin.id)
+  if (!(await requireReproof(req, res, me))) return
   const profile = await googleProfile(req, res)
   if (!profile) return
   try {
@@ -267,13 +304,14 @@ router.post('/me/google/connect', async (req, res) => {
         `UPDATE admins SET google_sub = $2, google_email = $3 WHERE id = $1 RETURNING ${ADMIN_COLUMNS}`,
         [req.admin.id, profile.sub, profile.email],
       )
+      await resetSessions(client, req.admin.id)
       await recordActivity(client, {
         adminId: req.admin.id, action: 'admin.google_connected', targetType: 'admin', targetId: req.admin.id,
         summary: `${req.admin.name} connected Google (${profile.email})`,
       })
       return rows[0]
     })
-    res.json({ admin: adminPayload(row) })
+    res.json({ token: signAdminToken(row), admin: adminPayload(row) })
   } catch (error) {
     if (error.code === '23505') {
       return res.status(409).json({ error: 'That Google account is already connected to another admin' })
@@ -288,18 +326,32 @@ router.post('/me/google/disconnect', async (req, res) => {
   if (!canDisconnectGoogle(me)) {
     return res.status(409).json({ error: 'Set a password first. Google is your only way in, and there are no reset emails.' })
   }
+  if (!(await requireReproof(req, res, me))) return
   const row = await withTransaction(async (client) => {
     const { rows } = await client.query(
       `UPDATE admins SET google_sub = NULL, google_email = NULL WHERE id = $1 RETURNING ${ADMIN_COLUMNS}`,
       [me.id],
     )
+    await resetSessions(client, me.id)
     await recordActivity(client, {
       adminId: me.id, action: 'admin.google_disconnected', targetType: 'admin', targetId: me.id,
       summary: `${me.name} disconnected Google`,
     })
     return rows[0]
   })
-  res.json({ admin: adminPayload(row) })
+  res.json({ token: signAdminToken(row), admin: adminPayload(row) })
+})
+
+router.post('/me/sign-out-others', async (req, res) => {
+  await withTransaction(async (client) => {
+    await resetSessions(client, req.admin.id)
+    await recordActivity(client, {
+      adminId: req.admin.id, action: 'admin.signed_out_others', targetType: 'admin', targetId: req.admin.id,
+      summary: `${req.admin.name} signed out everywhere else`,
+    })
+  })
+  const row = await loadMe(req.admin.id)
+  res.json({ token: signAdminToken(row), admin: adminPayload(row) })
 })
 
 export default router

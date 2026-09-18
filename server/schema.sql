@@ -641,3 +641,13 @@ CREATE INDEX IF NOT EXISTS players_created_idx ON players (created_at DESC, id D
 -- fresh claim code for this player (people-rules.js mayMintClaimCode);
 -- a successful claim clears it along with deactivated_at.
 ALTER TABLE players ADD COLUMN IF NOT EXISTS closed_by_admin_at TIMESTAMPTZ;
+
+-- ============================================================
+-- Ending admin sessions
+--
+-- An admin token issued before this moment no longer works. Set when a
+-- password or Google link changes, when an admin is switched off, when
+-- backup codes are made or used, and by "Sign out everywhere else".
+-- NULL means never reset.
+-- ============================================================
+ALTER TABLE admins ADD COLUMN IF NOT EXISTS sessions_reset_at TIMESTAMPTZ;

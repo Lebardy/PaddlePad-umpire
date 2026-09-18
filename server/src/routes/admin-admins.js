@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { query, withTransaction } from '../db.js'
 import { requireAdminAccount, requireOwner } from '../auth.js'
-import { ADMIN_COLUMNS, createAdmin, createSetupLink } from '../admin-accounts.js'
+import { ADMIN_COLUMNS, createAdmin, createSetupLink, resetSessions } from '../admin-accounts.js'
 import { recordActivity } from '../admin-activity.js'
 import { adminPayload, normalizeEmail } from '../admin-rules.js'
 import { isUuid } from '../validate.js'
@@ -96,13 +96,15 @@ function switchRoute(on) {
           [target.id],
         )
         // A switched-off admin must not be able to come back in through
-        // a link handed out earlier.
+        // a link handed out earlier, or through a session token they
+        // already hold.
         if (!on) {
           await client.query(
             `UPDATE admin_setup_links SET cancelled_at = now()
               WHERE admin_id = $1 AND used_at IS NULL AND cancelled_at IS NULL`,
             [target.id],
           )
+          await resetSessions(client, target.id)
         }
         await recordActivity(client, {
           adminId: req.admin.id, action: on ? 'admin.switched_on' : 'admin.switched_off',

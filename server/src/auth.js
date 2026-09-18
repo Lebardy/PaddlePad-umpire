@@ -1,7 +1,7 @@
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
 import jwt from 'jsonwebtoken'
-import { ADMIN_TOKEN_TTL } from './admin-rules.js'
+import { ADMIN_TOKEN_TTL, sessionEnded } from './admin-rules.js'
 import { sessionRefusal } from './people-rules.js'
 
 const scryptAsync = promisify(scrypt)
@@ -223,12 +223,15 @@ export function requireAdminAccount(queryFn) {
     }
     try {
       const { rows } = await queryFn(
-        'SELECT id, name, email, role, deactivated_at FROM admins WHERE id = $1',
+        'SELECT id, name, email, role, deactivated_at, sessions_reset_at FROM admins WHERE id = $1',
         [payload.sub],
       )
       const found = rows[0]
       if (!found || found.deactivated_at) {
         return res.status(401).json({ error: 'Your admin access has ended' })
+      }
+      if (sessionEnded(payload.iat, found.sessions_reset_at)) {
+        return res.status(401).json({ error: 'Your session has ended. Sign in again.' })
       }
       req.admin = { id: found.id, name: found.name, email: found.email, role: found.role }
       next()

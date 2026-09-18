@@ -175,6 +175,8 @@ app.use('/admin/auth/login', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/admin/auth/google', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/admin/auth/setup', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/admin/auth/me/password', rateLimit({ max: 10, windowMs: 60_000 }))
+app.use('/admin/auth/me/google', rateLimit({ max: 10, windowMs: 60_000 }))
+app.use('/admin/auth/me/backup-codes', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/admin', rateLimit({ max: 120, windowMs: 60_000 }))
 
 app.use('/auth', authRoutes)
