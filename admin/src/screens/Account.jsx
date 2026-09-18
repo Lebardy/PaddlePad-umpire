@@ -17,7 +17,7 @@ import { signInMethods } from '../lib/format'
 import { THEMES, getThemeChoice, setThemeChoice } from '../lib/theme'
 
 const USED_BACKUP_CODE_NOTICE =
-  "You signed in with a backup code. Set a new password or reconnect Google, then make new backup codes if you're running low."
+  "You signed in with a backup code. Set a new password or reconnect Google, then make new backup codes if you’re running low."
 
 /** One section's saving state: a message, whether it's an error, and
     whether its request is running right now. */
@@ -67,12 +67,14 @@ function Setting({ title, about, children, as: Tag = 'div', ...rest }) {
 
 /** Proof that whoever is making a sign-in change is really this admin:
     their current password, or -- when they have none -- a fresh Google
-    sign-in done again right now. */
-function useProof(admin) {
+    sign-in done again right now. `bypass` skips both: the session itself
+    already proved it, because it was opened with a backup code (see
+    requireReproof / proofFromSession on the server). */
+function useProof(admin, bypass = false) {
   const [currentPassword, setCurrentPassword] = useState('')
   const [reproofToken, setReproofToken] = useState(null)
-  const ready = admin.hasPassword ? currentPassword.length > 0 : Boolean(reproofToken)
-  const proof = admin.hasPassword ? { currentPassword } : { reproofAccessToken: reproofToken }
+  const ready = bypass || (admin.hasPassword ? currentPassword.length > 0 : Boolean(reproofToken))
+  const proof = bypass ? {} : (admin.hasPassword ? { currentPassword } : { reproofAccessToken: reproofToken })
   function reset() {
     setCurrentPassword('')
     setReproofToken(null)
@@ -80,7 +82,8 @@ function useProof(admin) {
   return { currentPassword, setCurrentPassword, reproofToken, setReproofToken, ready, proof, reset }
 }
 
-function ProofField({ admin, proof, busy }) {
+function ProofField({ admin, proof, busy, bypass }) {
+  if (bypass) return <p className="form-ok" role="status">Confirmed by your backup-code sign-in.</p>
   if (admin.hasPassword) {
     return (
       <label className="field"><span>Current password</span>
@@ -100,14 +103,11 @@ export default function Account({ admin, onAdminChange }) {
   const [newPassword, setNewPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [passwordStatus, setPasswordStatus, passwordBusy, runPassword] = useStatus()
-  const passwordProof = useProof(admin)
 
   const [googleStatus, , googleBusy, runGoogle] = useStatus()
-  const googleProof = useProof(admin)
 
   const [sessionsStatus, , sessionsBusy, runSessions] = useStatus()
 
-  const codesProof = useProof(admin)
   const [codes, setCodes] = useState(null)
   const [backupCodesLeft, setBackupCodesLeft] = useState(null)
   const [backupCodesLoaded, setBackupCodesLoaded] = useState(false)
@@ -115,7 +115,16 @@ export default function Account({ admin, onAdminChange }) {
   const [codesBusy, setCodesBusy] = useState(false)
 
   const [theme, setTheme] = useState(getThemeChoice)
-  const [usedBackupCode] = useState(consumeUsedBackupCodeFlag)
+  // True from a backup-code sign-in until the first sign-in change goes
+  // through: the server's requireReproof accepts that session as proof
+  // for exactly one change (see admin-rules.js proofFromSession), and the
+  // fresh token that change comes back with does not carry the claim
+  // forward, so proof is required normally after that.
+  const [usedBackupCode, setUsedBackupCode] = useState(consumeUsedBackupCodeFlag)
+
+  const passwordProof = useProof(admin, usedBackupCode)
+  const googleProof = useProof(admin, usedBackupCode)
+  const codesProof = useProof(admin, usedBackupCode)
 
   useEffect(() => {
     if (admin.role !== 'owner') return
@@ -147,6 +156,7 @@ export default function Account({ admin, onAdminChange }) {
       setNewPassword('')
       setConfirm('')
       passwordProof.reset()
+      setUsedBackupCode(false)
     } catch {
       // Status already shown by runPassword.
     }
@@ -157,6 +167,7 @@ export default function Account({ admin, onAdminChange }) {
       const updated = await runGoogle(() => connectGoogle(accessToken, googleProof.proof), 'Google connected.')
       onAdminChange(updated)
       googleProof.reset()
+      setUsedBackupCode(false)
     } catch {
       // Status already shown by runGoogle.
     }
@@ -167,6 +178,7 @@ export default function Account({ admin, onAdminChange }) {
       const updated = await runGoogle(() => disconnectGoogle(googleProof.proof), 'Google disconnected.')
       onAdminChange(updated)
       googleProof.reset()
+      setUsedBackupCode(false)
     } catch {
       // Status already shown by runGoogle.
     }
@@ -187,6 +199,7 @@ export default function Account({ admin, onAdminChange }) {
       setCodes(newCodes)
       setBackupCodesLeft(newCodes.length)
       codesProof.reset()
+      setUsedBackupCode(false)
     } finally {
       setCodesBusy(false)
     }
@@ -218,7 +231,7 @@ export default function Account({ admin, onAdminChange }) {
             about="At least 8 characters. There are no reset emails, so keep it somewhere safe."
             onSubmit={savePassword}
           >
-            <ProofField admin={admin} proof={passwordProof} busy={passwordBusy} />
+            <ProofField admin={admin} proof={passwordProof} busy={passwordBusy} bypass={usedBackupCode} />
             <div className="pair">
               <label className="field"><span>New password</span>
                 <input type="password" autoComplete="new-password" minLength={8} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
@@ -238,7 +251,7 @@ export default function Account({ admin, onAdminChange }) {
               <>
                 <p>Connected to <strong>{admin.googleEmail}</strong>.</p>
                 {!admin.hasPassword && <p className="hint">Set a password before disconnecting. Google is your only way in.</p>}
-                {admin.hasPassword && <ProofField admin={admin} proof={googleProof} busy={googleBusy} />}
+                {admin.hasPassword && <ProofField admin={admin} proof={googleProof} busy={googleBusy} bypass={usedBackupCode} />}
                 <Status status={googleStatus} />
                 <button type="button" className="btn-danger" disabled={googleBusy || !admin.hasPassword || !googleProof.ready}
                   onClick={saveDisconnectGoogle}>{googleBusy ? 'Saving…' : 'Disconnect Google'}</button>
@@ -246,7 +259,7 @@ export default function Account({ admin, onAdminChange }) {
             ) : (
               <>
                 <p>No Google account connected.</p>
-                <ProofField admin={admin} proof={googleProof} busy={googleBusy} />
+                <ProofField admin={admin} proof={googleProof} busy={googleBusy} bypass={usedBackupCode} />
                 <Status status={googleStatus} />
                 <GoogleButton label={googleBusy ? 'Saving…' : 'Connect Google'} disabled={googleBusy || !googleProof.ready}
                   onToken={saveConnectGoogle} />
@@ -254,7 +267,7 @@ export default function Account({ admin, onAdminChange }) {
             )}
           </Setting>
 
-          <Setting title="Sessions" about="Signs out every other browser where you're signed in as you. You stay signed in here.">
+          <Setting title="Sessions" about="Signs out every other browser where you’re signed in as you. You stay signed in here.">
             <Status status={sessionsStatus} />
             <button type="button" className="btn-quiet" disabled={sessionsBusy} onClick={signOutEverywhereElse}>
               {sessionsBusy ? 'Saving…' : 'Sign out everywhere else'}
@@ -265,7 +278,7 @@ export default function Account({ admin, onAdminChange }) {
             <Setting title="Backup codes" about="A way back in if you ever lose your password and your Google account both.">
               {backupCodesLoaded && (
                 codesGone
-                  ? <p>You don't have backup codes yet.</p>
+                  ? <p>You don’t have backup codes yet.</p>
                   : (
                     <>
                       <p>You have {backupCodesLeft} backup code{backupCodesLeft === 1 ? '' : 's'} left.</p>
@@ -273,7 +286,7 @@ export default function Account({ admin, onAdminChange }) {
                     </>
                   )
               )}
-              {askingNewCodes && <ProofField admin={admin} proof={codesProof} busy={codesBusy} />}
+              {askingNewCodes && <ProofField admin={admin} proof={codesProof} busy={codesBusy} bypass={usedBackupCode} />}
               <RowConfirm
                 label="Make new backup codes"
                 className="btn-primary"
