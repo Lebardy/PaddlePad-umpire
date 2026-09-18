@@ -168,5 +168,50 @@ section('which tokens each guard lets through')
   check('and says which', (await runPlayerGuard([])).body.status, 'closed')
 }
 
+section('ending sessions')
+{
+  const reset = '2026-09-18T01:00:00.700Z'
+  const second = Math.floor(Date.parse(reset) / 1000)
+  check('no reset never ends a session', rules.sessionEnded(second - 1000, null), false)
+  check('a token from before the reset has ended', rules.sessionEnded(second - 1, reset), true)
+  check('a token from the same second as the reset survives', rules.sessionEnded(second, reset), false)
+  check('a token from after the reset survives', rules.sessionEnded(second + 5, reset), false)
+  check('a token with no issue time has ended once there is a reset', rules.sessionEnded(undefined, reset), true)
+}
+
+section('backup codes')
+{
+  const codes = rules.newBackupCodes()
+  check('a set has 10 codes', codes.length, 10)
+  check('the count is 10', rules.BACKUP_CODE_COUNT, 10)
+  check('low means 3 or fewer', rules.BACKUP_CODE_LOW, 3)
+  check('every code is XXXXX-XXXXX from the invite alphabet',
+    codes.every((c) => /^[ACDEFGHJKMNPQRTUVWXY2346789]{5}-[ACDEFGHJKMNPQRTUVWXY2346789]{5}$/.test(c)), true)
+  check('codes in a set are all different', new Set(codes).size, 10)
+  check('typing ignores case, spaces and dashes', rules.normalizeBackupCode(' acdef - ghjkm '), 'ACDEFGHJKM')
+  check('the shown form normalises to itself without the dash', rules.normalizeBackupCode(codes[0]), codes[0].replace('-', ''))
+  check('too short is nothing', rules.normalizeBackupCode('ACDEF'), '')
+  check('letters outside the alphabet are nothing', rules.normalizeBackupCode('ABCDEFGHIJ'), '')
+  check('nothing is nothing', rules.normalizeBackupCode(undefined), '')
+}
+
+section('admin emails')
+{
+  check('a normal address is fine', rules.isAdminEmail('ana@example.com'), true)
+  check('a subdomain is fine', rules.isAdminEmail('ana.cruz@mail.example.co'), true)
+  check('no dot after the @ is refused', rules.isAdminEmail('ana@example'), false)
+  check('a space is refused', rules.isAdminEmail('ana cruz@example.com'), false)
+  check('two @ are refused', rules.isAdminEmail('a@b@example.com'), false)
+  check('nothing before the @ is refused', rules.isAdminEmail('@example.com'), false)
+  check('empty is refused', rules.isAdminEmail(''), false)
+}
+
+section('new action names')
+{
+  for (const name of ['admin.signed_out_others', 'admin.backup_codes_created', 'admin.backup_code_used']) {
+    check(`${name} is an action`, rules.ACTIONS.includes(name), true)
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
