@@ -122,6 +122,21 @@ export function sessionEnded(iatSeconds, resetAt) {
   return iatSeconds < Math.floor(new Date(resetAt).getTime() / 1000)
 }
 
+/**
+ * The `iat` to sign a fresh token with right after a session reset.
+ *
+ * `resetAt` comes from Postgres's clock; `now` comes from this server's
+ * own. If Postgres runs even slightly ahead, a token signed with a
+ * plain "now" could carry an `iat` before the reset it is meant to
+ * survive, and sessionEnded would refuse it on the very next request.
+ * Using whichever moment is later avoids that.
+ */
+export function adminTokenIat(resetAt, now = Date.now()) {
+  const nowSeconds = Math.floor(now / 1000)
+  if (!resetAt) return nowSeconds
+  return Math.max(nowSeconds, Math.floor(new Date(resetAt).getTime() / 1000))
+}
+
 export const BACKUP_CODE_COUNT = 10
 export const BACKUP_CODE_LOW = 3
 // The invite-code alphabet: no letters or digits that look alike.

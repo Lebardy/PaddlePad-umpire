@@ -195,6 +195,19 @@ section('ending sessions')
   check('a token with no issue time has ended once there is a reset', rules.sessionEnded(undefined, reset), true)
 }
 
+section('signing a token right after a reset')
+{
+  const reset = '2026-09-18T01:00:00.700Z'
+  const resetSecond = Math.floor(Date.parse(reset) / 1000)
+  check('the reset wins when this server is behind Postgres',
+    rules.adminTokenIat(reset, Date.parse(reset) - 5000), resetSecond)
+  check('now wins when this server is ahead of the reset',
+    rules.adminTokenIat(reset, Date.parse(reset) + 5000), resetSecond + 5)
+  check('the same second as the reset counts as now, not before it',
+    rules.adminTokenIat(reset, Date.parse(reset)), resetSecond)
+  check('no reset just means now', rules.adminTokenIat(null, Date.parse(reset)), resetSecond)
+}
+
 section('backup codes')
 {
   const codes = rules.newBackupCodes()

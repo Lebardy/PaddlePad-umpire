@@ -86,7 +86,18 @@ async function requireReproof(req, res, me) {
       accessToken: req.body?.reproofAccessToken,
       credential: req.body?.reproofCredential,
     })
-  } catch {
+  } catch (error) {
+    // A missing or invalid token is a failed re-proof: 403, same as a
+    // mismatched account below. Anything the resolver signals as a
+    // server-side failure (Google not configured, Google unreachable)
+    // is not about who is asking, so it is answered as itself, the way
+    // googleProfile() does above -- and anything with no statusCode at
+    // all is a bug, not a refusal, so it is left to bubble up.
+    if (!error.statusCode) throw error
+    if (error.statusCode >= 500) {
+      res.status(error.statusCode).json({ error: error.message })
+      return false
+    }
     res.status(403).json({ error: REPROOF_REFUSAL })
     return false
   }
@@ -194,7 +205,7 @@ router.post('/setup/:secret', async (req, res) => {
   const passwordHash = password === null ? null : await hashPassword(password)
 
   try {
-    const row = await withTransaction(async (client) => {
+    const { row, resetAt } = await withTransaction(async (client) => {
       // The UPDATE is the real single-use guard: of two requests racing
       // with the same link, only one can match.
       const { rows: used } = await client.query(
@@ -223,6 +234,10 @@ router.post('/setup/:secret', async (req, res) => {
         error.statusCode = 410
         throw error
       }
+      // A setup link is how a locked-out or compromised admin is
+      // re-linked, so any session token issued before this moment --
+      // however that admin got hold of one -- must stop working too.
+      const resetAt = await resetSessions(client, rows[0].id)
       await recordActivity(client, {
         adminId: rows[0].id,
         action: 'admin.setup_completed',
@@ -230,9 +245,9 @@ router.post('/setup/:secret', async (req, res) => {
         targetId: rows[0].id,
         summary: `${rows[0].name} finished setting up with ${profile ? 'Google' : 'a password'}`,
       })
-      return rows[0]
+      return { row: rows[0], resetAt }
     })
-    res.json({ token: signAdminToken(row), admin: adminPayload(row) })
+    res.json({ token: signAdminToken(row, resetAt), admin: adminPayload(row) })
   } catch (error) {
     if (error.statusCode === 410) return res.status(410).json({ error: LINK_GONE })
     if (error.code === '23505') {
@@ -283,19 +298,19 @@ router.post('/me/password', async (req, res) => {
   }
 
   const passwordHash = await hashPassword(newPassword)
-  const row = await withTransaction(async (client) => {
+  const { row, resetAt } = await withTransaction(async (client) => {
     const { rows } = await client.query(
       `UPDATE admins SET password_hash = $2 WHERE id = $1 RETURNING ${ADMIN_COLUMNS}`,
       [me.id, passwordHash],
     )
-    await resetSessions(client, me.id)
+    const resetAt = await resetSessions(client, me.id)
     await recordActivity(client, {
       adminId: me.id, action: 'admin.password_changed', targetType: 'admin', targetId: me.id,
       summary: `${me.name} ${me.password_hash ? 'changed' : 'set'} their password`,
     })
-    return rows[0]
+    return { row: rows[0], resetAt }
   })
-  res.json({ token: signAdminToken(row), admin: adminPayload(row) })
+  res.json({ token: signAdminToken(row, resetAt), admin: adminPayload(row) })
 })
 
 router.post('/me/google/connect', async (req, res) => {
@@ -304,19 +319,19 @@ router.post('/me/google/connect', async (req, res) => {
   const profile = await googleProfile(req, res)
   if (!profile) return
   try {
-    const row = await withTransaction(async (client) => {
+    const { row, resetAt } = await withTransaction(async (client) => {
       const { rows } = await client.query(
         `UPDATE admins SET google_sub = $2, google_email = $3 WHERE id = $1 RETURNING ${ADMIN_COLUMNS}`,
         [req.admin.id, profile.sub, profile.email],
       )
-      await resetSessions(client, req.admin.id)
+      const resetAt = await resetSessions(client, req.admin.id)
       await recordActivity(client, {
         adminId: req.admin.id, action: 'admin.google_connected', targetType: 'admin', targetId: req.admin.id,
         summary: `${req.admin.name} connected Google (${profile.email})`,
       })
-      return rows[0]
+      return { row: rows[0], resetAt }
     })
-    res.json({ token: signAdminToken(row), admin: adminPayload(row) })
+    res.json({ token: signAdminToken(row, resetAt), admin: adminPayload(row) })
   } catch (error) {
     if (error.code === '23505') {
       return res.status(409).json({ error: 'That Google account is already connected to another admin' })
@@ -332,31 +347,32 @@ router.post('/me/google/disconnect', async (req, res) => {
     return res.status(409).json({ error: 'Set a password first. Google is your only way in, and there are no reset emails.' })
   }
   if (!(await requireReproof(req, res, me))) return
-  const row = await withTransaction(async (client) => {
+  const { row, resetAt } = await withTransaction(async (client) => {
     const { rows } = await client.query(
       `UPDATE admins SET google_sub = NULL, google_email = NULL WHERE id = $1 RETURNING ${ADMIN_COLUMNS}`,
       [me.id],
     )
-    await resetSessions(client, me.id)
+    const resetAt = await resetSessions(client, me.id)
     await recordActivity(client, {
       adminId: me.id, action: 'admin.google_disconnected', targetType: 'admin', targetId: me.id,
       summary: `${me.name} disconnected Google`,
     })
-    return rows[0]
+    return { row: rows[0], resetAt }
   })
-  res.json({ token: signAdminToken(row), admin: adminPayload(row) })
+  res.json({ token: signAdminToken(row, resetAt), admin: adminPayload(row) })
 })
 
 router.post('/me/sign-out-others', async (req, res) => {
-  await withTransaction(async (client) => {
-    await resetSessions(client, req.admin.id)
+  const resetAt = await withTransaction(async (client) => {
+    const resetAt = await resetSessions(client, req.admin.id)
     await recordActivity(client, {
       adminId: req.admin.id, action: 'admin.signed_out_others', targetType: 'admin', targetId: req.admin.id,
       summary: `${req.admin.name} signed out everywhere else`,
     })
+    return resetAt
   })
   const row = await loadMe(req.admin.id)
-  res.json({ token: signAdminToken(row), admin: adminPayload(row) })
+  res.json({ token: signAdminToken(row, resetAt), admin: adminPayload(row) })
 })
 
 router.post('/me/backup-codes', async (req, res) => {
@@ -366,16 +382,16 @@ router.post('/me/backup-codes', async (req, res) => {
   }
   if (!(await requireReproof(req, res, me))) return
 
-  const codes = await withTransaction(async (client) => {
+  const { codes, resetAt } = await withTransaction(async (client) => {
     const codes = await replaceBackupCodes(client, me.id)
-    await resetSessions(client, me.id)
+    const resetAt = await resetSessions(client, me.id)
     await recordActivity(client, {
       adminId: me.id, action: 'admin.backup_codes_created', targetType: 'admin', targetId: me.id,
       summary: `${me.name} made a new set of backup codes`,
     })
-    return codes
+    return { codes, resetAt }
   })
-  res.json({ codes, token: signAdminToken(me), admin: adminPayload(me) })
+  res.json({ codes, token: signAdminToken(me, resetAt), admin: adminPayload(me) })
 })
 
 // ------------------------------------------------------------
@@ -391,13 +407,14 @@ router.post('/backup-code', async (req, res) => {
 
   let matched = false
   let row = null
+  let resetAt = null
 
   if (found?.role === 'owner') {
     if (!found.deactivated_at) {
       const result = await withTransaction(async (client) => {
         const used = await useBackupCode(client, found.id, typedCode)
         if (!used) return { used: false }
-        await resetSessions(client, found.id)
+        const reset = await resetSessions(client, found.id)
         const { rows: updated } = await client.query(
           `UPDATE admins SET last_signed_in_at = now() WHERE id = $1 RETURNING ${ADMIN_COLUMNS}`,
           [found.id],
@@ -406,10 +423,13 @@ router.post('/backup-code', async (req, res) => {
           adminId: found.id, action: 'admin.backup_code_used', targetType: 'admin', targetId: found.id,
           summary: `${updated[0].name} signed in with a backup code`,
         })
-        return { used: true, row: updated[0] }
+        return { used: true, resetAt: reset, row: updated[0] }
       })
       matched = result.used
-      if (matched) row = result.row
+      if (matched) {
+        resetAt = result.resetAt
+        row = result.row
+      }
     }
     // The email really is the owner's, so a wrong or reused code (or an
     // attempt while switched off) is a real failed sign-in, logged
@@ -431,7 +451,7 @@ router.post('/backup-code', async (req, res) => {
     return res.status(401).json({ error: "That email and backup code don't match" })
   }
 
-  res.json({ token: signAdminToken(row), admin: adminPayload(row), usedBackupCode: true })
+  res.json({ token: signAdminToken(row, resetAt), admin: adminPayload(row), usedBackupCode: true })
 })
 
 export default router

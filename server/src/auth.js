@@ -1,7 +1,7 @@
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
 import jwt from 'jsonwebtoken'
-import { ADMIN_TOKEN_TTL, sessionEnded } from './admin-rules.js'
+import { ADMIN_TOKEN_TTL, adminTokenIat, sessionEnded } from './admin-rules.js'
 import { sessionRefusal } from './people-rules.js'
 
 const scryptAsync = promisify(scrypt)
@@ -194,13 +194,18 @@ export function requireActivePlayer(queryFn) {
  * A token for an ADMIN. Its own role, so it is never accepted where an
  * umpire or player token is expected, and neither of those is accepted
  * here. Shorter-lived than theirs: an admin can do far more.
+ *
+ * `resetAt` is passed right after a session reset (a password or Google
+ * change, sign-out-others, backup codes made or used, a setup link
+ * completed): it pins the new token's `iat` to whichever is later, this
+ * server's clock or the reset's, so a Postgres clock running slightly
+ * ahead can never make the very token just issued look like it predates
+ * its own reset (see adminTokenIat).
  */
-export function signAdminToken(admin) {
-  return jwt.sign(
-    { sub: admin.id, name: admin.name, role: 'admin' },
-    JWT_SECRET,
-    { expiresIn: ADMIN_TOKEN_TTL },
-  )
+export function signAdminToken(admin, resetAt) {
+  const payload = { sub: admin.id, name: admin.name, role: 'admin' }
+  if (resetAt) payload.iat = adminTokenIat(resetAt)
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: ADMIN_TOKEN_TTL })
 }
 
 /**

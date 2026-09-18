@@ -53,7 +53,15 @@ export async function createSetupLink(db, { adminId, createdBy }) {
  * requireAdminAccount and admin-rules.js sessionEnded). Called from the
  * same transaction as whatever earned it -- a password or Google
  * change, a switch-off, or the admin's own "sign out everywhere else".
+ *
+ * Returns the stored reset moment (Postgres's clock, not this server's)
+ * so a token signed right after can be pinned to it -- see
+ * signAdminToken's `resetAt` argument and admin-rules.js adminTokenIat.
  */
 export async function resetSessions(db, adminId) {
-  await db.query('UPDATE admins SET sessions_reset_at = now() WHERE id = $1', [adminId])
+  const { rows } = await db.query(
+    'UPDATE admins SET sessions_reset_at = now() WHERE id = $1 RETURNING sessions_reset_at',
+    [adminId],
+  )
+  return rows[0].sessions_reset_at
 }
