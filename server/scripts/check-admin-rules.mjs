@@ -64,6 +64,7 @@ section('what the site is told about an admin')
   check('the fields the site uses', payload, {
     id: 'a1', name: 'Jan', email: 'jan@example.com', role: 'owner', hasPassword: true,
     googleEmail: 'jan@gmail.com', active: true, lastSignedInAt: '2026-09-15T01:00:00Z', createdAt: '2026-09-14T01:00:00Z',
+    facilityId: null,
   })
   check('a switched-off admin is not active', rules.adminPayload({ ...row, deactivated_at: '2026-09-15T02:00:00Z' }).active, false)
 }
@@ -121,7 +122,7 @@ section('which tokens each guard lets through')
 
   check('the admin guard lets an admin token through', (await run(guard, adminToken)).status, 'next')
   check('and reads the admin from the database', lookups.at(-1), ['a1'])
-  check('and attaches who it is', (await run(guard, adminToken)).req.admin, { id: 'a1', name: 'Jan', email: 'jan@example.com', role: 'admin' })
+  check('and attaches who it is', (await run(guard, adminToken)).req.admin, { id: 'a1', name: 'Jan', email: 'jan@example.com', role: 'admin', facilityId: null })
   check('the admin guard refuses no token', (await run(guard, null)).status, 401)
   check('the admin guard refuses an umpire token', (await run(guard, umpireToken)).status, 403)
   check('the admin guard refuses an old umpire token with no role', (await run(guard, oldUmpireToken)).status, 403)

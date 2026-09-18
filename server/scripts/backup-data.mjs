@@ -21,6 +21,7 @@ import pg from 'pg'
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
 
 const TABLES = [
+  'facilities',
   'umpires',
   'admins',
   'admin_setup_links',

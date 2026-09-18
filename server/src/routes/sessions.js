@@ -51,8 +51,8 @@ router.post('/', async (req, res) => {
   if (name.length > 120) return res.status(400).json({ error: 'That name is too long' })
 
   await query(
-    `INSERT INTO sessions (id, name, created_by)
-     VALUES ($1, $2, $3)
+    `INSERT INTO sessions (id, name, created_by, facility_id)
+     VALUES ($1, $2, $3, (SELECT facility_id FROM umpires WHERE id = $3))
      ON CONFLICT (id) DO NOTHING`,
     [id, name, req.umpire.id],
   )

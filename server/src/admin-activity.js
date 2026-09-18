@@ -11,8 +11,8 @@ import { ACTIONS } from './admin-rules.js'
 export async function recordActivity(db, { adminId = null, action, targetType = null, targetId = null, summary }) {
   if (!ACTIONS.includes(action)) throw new Error(`Unknown admin action: ${action}`)
   await db.query(
-    `INSERT INTO admin_activity (admin_id, action, target_type, target_id, summary)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO admin_activity (admin_id, action, target_type, target_id, summary, facility_id)
+     VALUES ($1, $2, $3, $4, $5, (SELECT facility_id FROM admins WHERE id = $1))`,
     [adminId, action, targetType, targetId == null ? null : String(targetId), summary],
   )
 }

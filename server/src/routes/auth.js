@@ -84,7 +84,7 @@ const BOOTSTRAP_INVITE_CODE = process.env.BOOTSTRAP_INVITE_CODE
  * UPDATE only matches while `used_by IS NULL`, so the second one
  * matches zero rows and its whole transaction rolls back.
  *
- * @returns {Promise<string|null>} an error message, or null on success
+ * @returns {Promise<{error: string} | {facilityId: string|null}>}
  */
 async function claimInvite(client, rawCode, umpireId) {
   const code = normalizeInviteCode(rawCode)
@@ -95,25 +95,30 @@ async function claimInvite(client, rawCode, umpireId) {
     // before this registration" means exactly one row.
     if (rows[0].n === 1 && code === normalizeInviteCode(BOOTSTRAP_INVITE_CODE)) {
       // Lets the very first umpire in. Admin powers live on the admin
-      // site now, so this makes no one an admin.
-      return null
+      // site now, so this makes no one an admin. There is no invite
+      // code to read a facility from, so the new umpire joins the only
+      // facility if there is exactly one, and otherwise joins none yet.
+      const { rows: facilities } = await client.query('SELECT id FROM facilities')
+      return { facilityId: facilities.length === 1 ? facilities[0].id : null }
     }
   }
 
-  if (!code) return 'An invite code is required'
+  if (!code) return { error: 'An invite code is required' }
 
-  const { rowCount } = await client.query(
+  const { rows } = await client.query(
     `UPDATE invites
         SET used_by = $2, used_at = now()
       WHERE code = $1
         AND used_by IS NULL
-        AND (expires_at IS NULL OR expires_at > now())`,
+        AND (expires_at IS NULL OR expires_at > now())
+      RETURNING facility_id`,
     [code, umpireId],
   )
 
   // One message for "wrong", "already used" and "expired" alike, so
   // the endpoint can't be used to probe which codes exist.
-  return rowCount === 1 ? null : 'That invite code is not valid'
+  if (rows.length !== 1) return { error: 'That invite code is not valid' }
+  return { facilityId: rows[0].facility_id }
 }
 
 router.post('/register', async (req, res) => {
@@ -146,11 +151,12 @@ router.post('/register', async (req, res) => {
       )
       const created = rows[0]
 
-      const inviteError = await claimInvite(client, invite, created.id)
-      if (inviteError) {
+      const claimed = await claimInvite(client, invite, created.id)
+      if (claimed.error) {
         // Rolls back the umpire insert above.
-        throw refusal(403, inviteError)
+        throw refusal(403, claimed.error)
       }
+      await client.query('UPDATE umpires SET facility_id = $2 WHERE id = $1', [created.id, claimed.facilityId])
 
       return created
     })
@@ -268,10 +274,11 @@ router.post('/google', async (req, res) => {
       )
       const created = rows[0]
 
-      const inviteError = await claimInvite(client, req.body?.invite, created.id)
+      const claimed = await claimInvite(client, req.body?.invite, created.id)
       // Rolls back the insert above, so a refused invite leaves no
       // half-made account behind.
-      if (inviteError) throw refusal(403, inviteError)
+      if (claimed.error) throw refusal(403, claimed.error)
+      await client.query('UPDATE umpires SET facility_id = $2 WHERE id = $1', [created.id, claimed.facilityId])
 
       return created
     })

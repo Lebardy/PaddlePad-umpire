@@ -88,6 +88,7 @@ export function adminPayload(row) {
     active: !row.deactivated_at,
     lastSignedInAt: row.last_signed_in_at ?? null,
     createdAt: row.created_at,
+    facilityId: row.facility_id ?? null,
   }
 }
 

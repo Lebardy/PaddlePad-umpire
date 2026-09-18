@@ -8,7 +8,7 @@
 import { SETUP_LINK_HOURS, newSetupSecret } from './admin-rules.js'
 
 export const ADMIN_COLUMNS =
-  'id, name, email, role, password_hash, google_sub, google_email, deactivated_at, last_signed_in_at, created_at, sessions_reset_at'
+  'id, name, email, role, password_hash, google_sub, google_email, deactivated_at, last_signed_in_at, created_at, sessions_reset_at, facility_id'
 
 /** Where a setup link opens: the admin site, not the API. */
 export function setupUrl(secret) {
@@ -17,12 +17,12 @@ export function setupUrl(secret) {
 }
 
 /** Inserts an admin with no way to sign in yet. Throws 23505 on a taken email or a second owner. */
-export async function createAdmin(db, { name, email, role, createdBy }) {
+export async function createAdmin(db, { name, email, role, createdBy, facilityId }) {
   const { rows } = await db.query(
-    `INSERT INTO admins (name, email, role, created_by)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO admins (name, email, role, created_by, facility_id)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING ${ADMIN_COLUMNS}`,
-    [name, email, role, createdBy ?? null],
+    [name, email, role, createdBy ?? null, facilityId ?? null],
   )
   return rows[0]
 }

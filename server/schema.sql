@@ -662,3 +662,57 @@ CREATE TABLE IF NOT EXISTS admin_backup_codes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS admin_backup_codes_admin_idx ON admin_backup_codes (admin_id) WHERE used_at IS NULL;
+
+-- ============================================================
+-- Facilities
+--
+-- A facility is a place with courts where umpires score matches for an
+-- hourly fee the facility sets (shown to players; paid at the
+-- facility). Umpires, admins other than the owner, sessions and invite
+-- codes each belong to one. Players belong to none: they can play
+-- anywhere, and ratings and boards are across everyone on PaddlePad.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS facilities (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name                TEXT NOT NULL,
+    area                TEXT,
+    location_url        TEXT,
+    opening_hours       TEXT,
+    hourly_fee_centavos INTEGER CHECK (hourly_fee_centavos IS NULL OR hourly_fee_centavos >= 0),
+    details             TEXT,
+    created_by          UUID REFERENCES admins (id) ON DELETE SET NULL,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS facilities_name_lower_idx ON facilities (lower(name));
+
+ALTER TABLE umpires        ADD COLUMN IF NOT EXISTS facility_id UUID REFERENCES facilities (id);
+ALTER TABLE admins         ADD COLUMN IF NOT EXISTS facility_id UUID REFERENCES facilities (id);
+ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS facility_id UUID REFERENCES facilities (id);
+ALTER TABLE invites        ADD COLUMN IF NOT EXISTS facility_id UUID REFERENCES facilities (id);
+ALTER TABLE admin_activity ADD COLUMN IF NOT EXISTS facility_id UUID REFERENCES facilities (id);
+CREATE INDEX IF NOT EXISTS umpires_facility_idx  ON umpires (facility_id);
+CREATE INDEX IF NOT EXISTS sessions_facility_idx ON sessions (facility_id);
+CREATE INDEX IF NOT EXISTS invites_facility_idx  ON invites (facility_id);
+CREATE INDEX IF NOT EXISTS admin_activity_facility_idx ON admin_activity (facility_id, id DESC);
+
+-- The switch-over: everything made before facilities existed goes into
+-- one starting facility, created once, which the owner then renames.
+-- Safe on every boot: it only acts while something has no facility.
+DO $$
+DECLARE starting UUID;
+BEGIN
+  IF EXISTS (SELECT 1 FROM umpires WHERE facility_id IS NULL)
+     OR EXISTS (SELECT 1 FROM sessions WHERE facility_id IS NULL)
+     OR EXISTS (SELECT 1 FROM invites WHERE facility_id IS NULL)
+     OR EXISTS (SELECT 1 FROM admins WHERE facility_id IS NULL AND role <> 'owner') THEN
+    SELECT id INTO starting FROM facilities ORDER BY created_at LIMIT 1;
+    IF starting IS NULL THEN
+      INSERT INTO facilities (name) VALUES ('Starting facility') RETURNING id INTO starting;
+    END IF;
+    UPDATE umpires  SET facility_id = starting WHERE facility_id IS NULL;
+    UPDATE sessions SET facility_id = starting WHERE facility_id IS NULL;
+    UPDATE invites  SET facility_id = starting WHERE facility_id IS NULL;
+    UPDATE admins   SET facility_id = starting WHERE facility_id IS NULL AND role <> 'owner';
+  END IF;
+END $$;

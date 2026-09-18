@@ -241,7 +241,7 @@ export function requireAdminAccount(queryFn) {
     }
     try {
       const { rows } = await queryFn(
-        'SELECT id, name, email, role, deactivated_at, sessions_reset_at FROM admins WHERE id = $1',
+        'SELECT id, name, email, role, deactivated_at, sessions_reset_at, facility_id FROM admins WHERE id = $1',
         [payload.sub],
       )
       const found = rows[0]
@@ -251,7 +251,13 @@ export function requireAdminAccount(queryFn) {
       if (sessionEnded(payload.iat, found.sessions_reset_at)) {
         return res.status(401).json({ error: 'Your session has ended. Sign in again.' })
       }
-      req.admin = { id: found.id, name: found.name, email: found.email, role: found.role }
+      req.admin = {
+        id: found.id,
+        name: found.name,
+        email: found.email,
+        role: found.role,
+        facilityId: found.facility_id ?? null,
+      }
       // Carried through from the token, not the row: only a session
       // opened by /admin/auth/backup-code ever sets this (see
       // signAdminToken's `extra` and admin-rules.js proofFromSession).
