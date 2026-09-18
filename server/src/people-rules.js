@@ -47,6 +47,21 @@ export function mayClose(admin) {
   return admin?.role === 'owner'
 }
 
+/**
+ * Who may mint a new claim code for a player.
+ *
+ * Closing is the one action kept for the owner because it is meant to be
+ * final, so reopening an OWNER-closed account needs the owner too --
+ * everyone else, including the umpire route with no admin at all, is
+ * refused while `closed_by_admin_at` is set. A player who closed their
+ * own account (deactivated_at set, closed_by_admin_at not) keeps
+ * today's recovery through any admin or an umpire.
+ */
+export function mayMintClaimCode(row, { isOwner = false } = {}) {
+  if (row?.closed_by_admin_at) return isOwner
+  return true
+}
+
 function refusalFor(row, closedColumn, statusCode) {
   if (!row || row[closedColumn]) return { statusCode, body: { error: CLOSED_MESSAGE, status: 'closed' } }
   if (row.paused_at) return { statusCode, body: { error: PAUSED_MESSAGE, status: 'paused' } }

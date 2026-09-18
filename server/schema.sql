@@ -635,3 +635,9 @@ ALTER TABLE players ADD COLUMN IF NOT EXISTS last_signed_in_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS umpires_created_idx ON umpires (created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS players_created_idx ON players (created_at DESC, id DESC);
+
+-- Set only when the OWNER closes a player from the admin site, never by
+-- a player's own self-deletion. While set, only the owner may mint a
+-- fresh claim code for this player (people-rules.js mayMintClaimCode);
+-- a successful claim clears it along with deactivated_at.
+ALTER TABLE players ADD COLUMN IF NOT EXISTS closed_by_admin_at TIMESTAMPTZ;

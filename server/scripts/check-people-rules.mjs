@@ -55,6 +55,20 @@ section('closing')
     'closed+3f1c2b1e-0000-4000-8000-000000000001@paddlepad.invalid')
 }
 
+section('who may make a claim code')
+{
+  check('anyone may for an active player',
+    rules.mayMintClaimCode({ closed_by_admin_at: null }), true)
+  check('anyone may for a player who closed their own account',
+    rules.mayMintClaimCode({ closed_by_admin_at: null, deactivated_at: '2026-09-16T00:00:00Z' }), true)
+  check('a normal admin is refused for an owner-closed player',
+    rules.mayMintClaimCode({ closed_by_admin_at: '2026-09-16T00:00:00Z' }, { isOwner: false }), false)
+  check('the owner may for an owner-closed player',
+    rules.mayMintClaimCode({ closed_by_admin_at: '2026-09-16T00:00:00Z' }, { isOwner: true }), true)
+  check('with no admin at all (the umpire route), an owner-closed player is refused',
+    rules.mayMintClaimCode({ closed_by_admin_at: '2026-09-16T00:00:00Z' }), false)
+}
+
 section('refusals')
 {
   check('an active umpire session is fine', rules.sessionRefusal({ paused_at: null, closed_at: null }, 'closed_at'), null)

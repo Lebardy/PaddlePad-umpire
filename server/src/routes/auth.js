@@ -232,18 +232,27 @@ router.post('/google', async (req, res) => {
     })
   }
 
-  const byEmail = await query(
-    `UPDATE umpires SET google_sub = $2, google_email = $3
-      WHERE lower(email) = $1 AND google_sub IS NULL
-      RETURNING id, email, name, password_hash, google_email, paused_at, closed_at`,
-    [profile.email, profile.sub, profile.email],
+  // A SELECT first, refusing a paused or closed umpire before anything
+  // is written -- unlike the `linked` branch above, this one would
+  // otherwise attach a brand-new Google link to the account, which is a
+  // new way IN, not just a display refresh. A pause made because an
+  // account looked taken over must not hand it one anyway.
+  const { rows: byEmailFound } = await query(
+    `SELECT id, email, name, password_hash, google_email, paused_at, closed_at
+       FROM umpires WHERE lower(email) = $1 AND google_sub IS NULL`,
+    [profile.email],
   )
-  if (byEmail.rows[0]) {
-    if (refuseSignIn(res, byEmail.rows[0], 'closed_at')) return
-    await noteSignIn(query, 'umpires', byEmail.rows[0].id)
+  if (byEmailFound[0]) {
+    if (refuseSignIn(res, byEmailFound[0], 'closed_at')) return
+    const { rows: byEmail } = await query(
+      `UPDATE umpires SET google_sub = $2, google_email = $3 WHERE id = $1
+        RETURNING id, email, name, password_hash, google_email`,
+      [byEmailFound[0].id, profile.sub, profile.email],
+    )
+    await noteSignIn(query, 'umpires', byEmail[0].id)
     return res.json({
-      token: signToken(byEmail.rows[0]),
-      umpire: umpirePayload(byEmail.rows[0]),
+      token: signToken(byEmail[0]),
+      umpire: umpirePayload(byEmail[0]),
     })
   }
 
@@ -686,10 +695,16 @@ router.post('/player/claim', async (req, res) => {
   // working one means an umpire minted a fresh one and handed it over --
   // the same trusted human in the loop as the forgotten-password case.
   // Without this a closed account would be unreachable forever.
+  //
+  // closed_by_admin_at clears the same way: reaching this row at all
+  // means the umpire route already refused to mint a code for it while
+  // that column was set (see people-rules.js mayMintClaimCode), so a
+  // working code here only ever came from the owner.
   const { rows } = await query(
     `UPDATE players
-        SET claimed_at     = COALESCE(claimed_at, now()),
-            deactivated_at = NULL
+        SET claimed_at         = COALESCE(claimed_at, now()),
+            deactivated_at     = NULL,
+            closed_by_admin_at = NULL
       WHERE claim_code = $1
         AND paused_at IS NULL
       RETURNING id, name, claimed_at, username, google_email`,
@@ -851,17 +866,18 @@ router.post('/player/register', async (req, res) => {
       if (!rows[0]) throw refusal(409, 'That name is taken. Try again.')
       assertMayLinkTo(rows[0], code)
 
-      // deactivated_at is cleared for the same reason /player/claim
-      // clears it: a closed account whose code was re-minted is being
-      // legitimately recovered, and assertMayLinkTo has already checked
-      // that code.
+      // deactivated_at (and closed_by_admin_at with it) is cleared for
+      // the same reason /player/claim clears it: a closed account whose
+      // code was re-minted is being legitimately recovered, and
+      // assertMayLinkTo has already checked that code.
       const updated = await client.query(
         `UPDATE players
-            SET username       = $2,
-                password_hash  = $3,
-                registered_at  = now(),
-                claimed_at     = COALESCE(claimed_at, now()),
-                deactivated_at = NULL
+            SET username           = $2,
+                password_hash       = $3,
+                registered_at       = now(),
+                claimed_at          = COALESCE(claimed_at, now()),
+                deactivated_at      = NULL,
+                closed_by_admin_at  = NULL
           WHERE id = $1
           RETURNING id, name, claimed_at, username, google_email`,
         [rows[0].id, username, password_hash],
@@ -1043,17 +1059,18 @@ router.post('/player/google', async (req, res) => {
 
       assertMayLinkTo(rows[0], code)
 
-      // deactivated_at clears for the same reason it does in
-      // /player/claim and /player/register: assertMayLinkTo has just
-      // checked a working claim code, which only exists because an
-      // umpire minted one and handed it over.
+      // deactivated_at (and closed_by_admin_at with it) clears for the
+      // same reason it does in /player/claim and /player/register:
+      // assertMayLinkTo has just checked a working claim code, which
+      // only exists because an umpire minted one and handed it over.
       const updated = await client.query(
         `UPDATE players
-            SET google_sub     = $2,
-                google_email   = $3,
-                registered_at  = COALESCE(registered_at, now()),
-                claimed_at     = COALESCE(claimed_at, now()),
-                deactivated_at = NULL
+            SET google_sub         = $2,
+                google_email       = $3,
+                registered_at      = COALESCE(registered_at, now()),
+                claimed_at         = COALESCE(claimed_at, now()),
+                deactivated_at     = NULL,
+                closed_by_admin_at = NULL
           WHERE id = $1
           RETURNING id, name, claimed_at, username, google_email`,
         [rows[0].id, profile.sub, profile.email],

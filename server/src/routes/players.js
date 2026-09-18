@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { query } from '../db.js'
 import { requireActiveUmpire, requireAuth } from '../auth.js'
 import { generateInviteCode } from '../invites.js'
+import { mayMintClaimCode } from '../people-rules.js'
 import { normalizePlayerName, playerNameError } from '../validate.js'
 
 const router = Router()
@@ -128,8 +129,24 @@ router.post('/', async (req, res) => {
  * migration. Nothing consumes this yet; it is groundwork for letting a
  * player claim their own record (by QR or by typing it) and inherit the
  * history an umpire already logged for them.
+ *
+ * Refuses a player the OWNER closed from the admin site: that close is
+ * meant to be final, so only the owner may reopen it, from
+ * POST /admin/players/:id/claim-code. A player who closed their own
+ * account is unaffected -- this stays their recovery path.
  */
 router.get('/:id/claim-code', async (req, res) => {
+  const { rows: existing } = await query(
+    'SELECT closed_by_admin_at FROM players WHERE id = $1',
+    [req.params.id],
+  )
+  if (!existing[0]) return res.status(404).json({ error: 'No such player' })
+  if (!mayMintClaimCode(existing[0])) {
+    return res.status(403).json({
+      error: "This player's account was closed by the owner. Only the owner can reopen it.",
+    })
+  }
+
   const { rows } = await query(
     `UPDATE players
         SET claim_code = COALESCE(claim_code, $2)

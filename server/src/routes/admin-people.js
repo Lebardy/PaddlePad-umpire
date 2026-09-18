@@ -5,7 +5,7 @@ import { recordActivity } from '../admin-activity.js'
 import { generateInviteCode } from '../invites.js'
 import { wipePlayerCredentials } from '../player-accounts.js'
 import {
-  closedUmpireEmail, confirmNameMatches, mayClose, readPauseReason, readStatusFilter,
+  closedUmpireEmail, confirmNameMatches, mayClose, mayMintClaimCode, readPauseReason, readStatusFilter,
 } from '../people-rules.js'
 import {
   findPlayerRow, findUmpireRow, listPlayers, listUmpires, playerDetail, umpireDetail,
@@ -114,7 +114,13 @@ function peopleRouter(kind) {
 export const adminPlayersRoutes = peopleRouter({
   noun: 'player', plural: 'players', table: 'players', closedColumn: 'deactivated_at',
   list: listPlayers, find: findPlayerRow, detail: playerDetail,
-  close: (client, row) => wipePlayerCredentials(client, row.id),
+  // Shares the wipe with DELETE /player/me, then stamps that THIS close
+  // came from the admin site -- self-deletion never sets this column,
+  // which is what makes reopening an owner's close the owner's alone.
+  close: async (client, row) => {
+    await wipePlayerCredentials(client, row.id)
+    await client.query('UPDATE players SET closed_by_admin_at = now() WHERE id = $1', [row.id])
+  },
 })
 
 export const adminUmpiresRoutes = peopleRouter({
@@ -137,6 +143,9 @@ adminPlayersRoutes.post('/:id/claim-code', async (req, res) => {
     const claimCode = await withTransaction(async (client) => {
       const row = await findPlayerRow(client.query.bind(client), req.params.id, { lock: true })
       if (!row) throw refusal(404, 'No such player')
+      if (!mayMintClaimCode(row, { isOwner: mayClose(req.admin) })) {
+        throw refusal(403, 'Only the owner can reopen a closed account')
+      }
       if (row.paused_at && !row.deactivated_at) throw refusal(409, 'Switch this player back on before making a new code')
       const code = generateInviteCode()
       await client.query('UPDATE players SET claim_code = $2 WHERE id = $1', [row.id, code])
