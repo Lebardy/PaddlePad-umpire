@@ -159,10 +159,15 @@ actually uses; `staging` is an identical copy to deploy to first.
 |---|---|---|
 | api | `api.paddlepad.app` | `api-staging-8ac6.up.railway.app` |
 | umpire | `umpire.paddlepad.app` | `web-staging-e8e9.up.railway.app` |
-| admin | not deployed yet — see below | `admin-staging-7af8.up.railway.app` |
+| admin | `admin.paddlepad.app` | `admin-staging-7af8.up.railway.app` |
 | play (player) | `paddlepad.app` | `play-staging-7f59.up.railway.app` |
 | ml (pipeline) | no public address | `ml-staging-12f5.up.railway.app` |
 | ml-cron (nightly run) | no public address | none; staging's runs inside `ml` |
+
+The Railway service behind production's admin site is named `Admin`
+(capital A); staging's is the lowercase `admin` used in the commands
+below. Everything else about the two admin services — the variables it
+needs, what it talks to, how it's deployed — is the same either way.
 
 Production's three `paddlepad.app` addresses are custom domains at
 name.com. Its older `railway.app` addresses (`paddlepad-api`,
@@ -323,7 +328,7 @@ an invite code at all.
 | `POST` | `/admin/auth/login` | — | Sign in as an admin, returns an admin token |
 | `POST` | `/admin/auth/google` | — | Sign in an admin with Google |
 | `POST` | `/admin/auth/backup-code` | — | Sign in as the owner with a backup code, when a password or Google isn't available |
-| `GET` | `/admin/auth/me` | Bearer (admin) | The signed-in admin's own account, including how many backup codes are left |
+| `GET` | `/admin/auth/me` | Bearer (admin) | The signed-in admin's own account; `backupCodesLeft` too, but only for the owner — `null` for anyone else |
 | `PATCH` | `/admin/auth/me` | Bearer (admin) | Rename yourself |
 | `POST` | `/admin/auth/me/password` | Bearer (admin) | Change the password, or set the first one |
 | `POST` | `/admin/auth/me/google/connect` | Bearer (admin) | Connect Google to the account already signed in |
