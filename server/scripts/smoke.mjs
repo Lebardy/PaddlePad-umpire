@@ -1925,9 +1925,21 @@ async function main() {
       return (r.body.entries ?? []).filter((e) => Number(e.id) > since).length
     }
 
+    // A failure detail below is a JSON dump of a response body -- never
+    // one that could itself be a credential. A session token or a set
+    // of backup codes is swapped out before it ever reaches JSON.stringify.
+    const redacted = (body) => {
+      const { token, codes, ...rest } = body ?? {}
+      return JSON.stringify({
+        ...rest,
+        ...(token !== undefined ? { token: '[redacted]' } : {}),
+        ...(codes !== undefined ? { codes: `[redacted, ${Array.isArray(codes) ? codes.length : 0} codes]` } : {}),
+      })
+    }
+
     // --- 1: signing out everywhere else ends every OTHER session, not this one ---
     const loginA = await request('/admin/auth/login', { method: 'POST', body: { email: OWNER_EMAIL, password: OWNER_PASSWORD } })
-    check('the owner signs in for token A -> 200', loginA.status === 200, JSON.stringify(loginA.body).slice(0, 80))
+    check('the owner signs in for token A -> 200', loginA.status === 200, redacted(loginA.body).slice(0, 80))
     const tokenA = loginA.body.token
     const ownerId = loginA.body.admin?.id
 
@@ -1938,11 +1950,11 @@ async function main() {
     const signedOutWatermark = await newestActivityId('admin.signed_out_others', ownerId, tokenB)
     const signedOut = await request('/admin/auth/me/sign-out-others', { method: 'POST', bearer: tokenB })
     check('sign-out-others with token B -> 200 with a fresh token',
-      signedOut.status === 200 && typeof signedOut.body.token === 'string', JSON.stringify(signedOut.body).slice(0, 80))
+      signedOut.status === 200 && typeof signedOut.body.token === 'string', redacted(signedOut.body).slice(0, 80))
     let ownerToken = signedOut.body.token
 
     const aEnded = await request('/admin/auth/me', { bearer: tokenA })
-    check('token A has ended -> 401', aEnded.status === 401 && aEnded.body.error === SESSION_ENDED, JSON.stringify(aEnded.body))
+    check('token A has ended -> 401', aEnded.status === 401 && aEnded.body.error === SESSION_ENDED, redacted(aEnded.body))
     const cWorks = await request('/admin/auth/me', { bearer: ownerToken })
     check('token C (the fresh one) still works', cWorks.status === 200, String(cWorks.status))
     const signedOutAdded = await newEntriesSince('admin.signed_out_others', ownerId, ownerToken, signedOutWatermark)
@@ -1955,7 +1967,7 @@ async function main() {
       method: 'POST', bearer: ownerToken, body: { currentPassword: 'definitely-the-wrong-password', newPassword: 'a-temporary-password-1' },
     })
     check('a wrong currentPassword -> 403', wrongCurrent.status === 403 && wrongCurrent.body.error === 'Your current password is wrong',
-      JSON.stringify(wrongCurrent.body))
+      redacted(wrongCurrent.body))
     const noEntryYet = await newEntriesSince('admin.password_changed', ownerId, ownerToken, pwWatermark)
     check('the wrong attempt added no activity entry', noEntryYet === 0, String(noEntryYet))
 
@@ -1967,12 +1979,12 @@ async function main() {
         method: 'POST', bearer: ownerToken, body: { currentPassword: OWNER_PASSWORD, newPassword: TEMP_PASSWORD },
       })
       check('the right currentPassword changes it -> 200 with a fresh token',
-        toTemp.status === 200 && typeof toTemp.body.token === 'string', JSON.stringify(toTemp.body).slice(0, 80))
+        toTemp.status === 200 && typeof toTemp.body.token === 'string', redacted(toTemp.body).slice(0, 80))
       ownerToken = toTemp.body.token
 
       const oldEnded = await request('/admin/auth/me', { bearer: beforeChangeToken })
       check('the token from before the change has ended -> 401',
-        oldEnded.status === 401 && oldEnded.body.error === SESSION_ENDED, JSON.stringify(oldEnded.body))
+        oldEnded.status === 401 && oldEnded.body.error === SESSION_ENDED, redacted(oldEnded.body))
     } finally {
       // Try changing it back with the temporary password first; if that
       // is refused, the change to temporary may itself never have gone
@@ -2009,13 +2021,13 @@ async function main() {
     const hAdminAdded = await request('/admin/admins', {
       method: 'POST', bearer: ownerToken, body: { name: 'Smoke Hardening Admin', email: hAdminEmail },
     })
-    check('the owner adds a throwaway admin -> 201', hAdminAdded.status === 201, JSON.stringify(hAdminAdded.body).slice(0, 80))
+    check('the owner adds a throwaway admin -> 201', hAdminAdded.status === 201, redacted(hAdminAdded.body).slice(0, 80))
     const hAdminId = hAdminAdded.body.admin?.id
     const hSecret = (hAdminAdded.body.setupLink?.url ?? '').split('/setup/')[1]
     const HARDENING_ADMIN_PASSWORD = `smoke-${uuid()}`
     const hSetup = await request(`/admin/auth/setup/${hSecret}`, { method: 'POST', body: { password: HARDENING_ADMIN_PASSWORD } })
     check('it completes setup through the API and signs in -> 200',
-      hSetup.status === 200 && typeof hSetup.body.token === 'string', JSON.stringify(hSetup.body).slice(0, 80))
+      hSetup.status === 200 && typeof hSetup.body.token === 'string', redacted(hSetup.body).slice(0, 80))
     let hAdminToken = hSetup.body.token
 
     // sessionEnded compares whole seconds so a token handed back in the
@@ -2033,7 +2045,7 @@ async function main() {
 
     const hOldTokenAfter = await request('/admin/auth/me', { bearer: hAdminToken })
     check('its token from before the switch-off has ended -> 401',
-      hOldTokenAfter.status === 401 && hOldTokenAfter.body.error === SESSION_ENDED, JSON.stringify(hOldTokenAfter.body))
+      hOldTokenAfter.status === 401 && hOldTokenAfter.body.error === SESSION_ENDED, redacted(hOldTokenAfter.body))
 
     const hSignInAgain = await request('/admin/auth/login', { method: 'POST', body: { email: hAdminEmail, password: HARDENING_ADMIN_PASSWORD } })
     check('it signs in again fine -> 200', hSignInAgain.status === 200, String(hSignInAgain.status))
@@ -2041,10 +2053,10 @@ async function main() {
 
     const hNoCodes = await request('/admin/auth/me/backup-codes', { method: 'POST', bearer: hAdminToken, body: {} })
     check('a non-owner asking for backup codes -> 403',
-      hNoCodes.status === 403 && hNoCodes.body.error === 'Only the owner has backup codes', JSON.stringify(hNoCodes.body))
+      hNoCodes.status === 403 && hNoCodes.body.error === 'Only the owner has backup codes', redacted(hNoCodes.body))
     const hBadBackup = await request('/admin/auth/backup-code', { method: 'POST', body: { email: hAdminEmail, code: 'ACDEF-GHJKM' } })
     check("a non-owner's email and any code -> 401",
-      hBadBackup.status === 401 && hBadBackup.body.error === "That email and backup code don't match", JSON.stringify(hBadBackup.body))
+      hBadBackup.status === 401 && hBadBackup.body.error === "That email and backup code don't match", redacted(hBadBackup.body))
 
     const hOffAgain = await request(`/admin/admins/${hAdminId}/switch-off`, { method: 'POST', bearer: ownerToken })
     check('the throwaway admin is left switched off -> 200',
@@ -2053,16 +2065,20 @@ async function main() {
     // --- 4: the owner's own backup codes ---
     const bcWrong = await request('/admin/auth/me/backup-codes', { method: 'POST', bearer: ownerToken, body: { currentPassword: 'definitely-the-wrong-password' } })
     check('making backup codes with a wrong currentPassword -> 403',
-      bcWrong.status === 403 && bcWrong.body.error === 'Your current password is wrong', JSON.stringify(bcWrong.body))
+      bcWrong.status === 403 && bcWrong.body.error === 'Your current password is wrong', redacted(bcWrong.body))
 
     const bcCreatedWatermark = await newestActivityId('admin.backup_codes_created', ownerId, ownerToken)
     const bcMade = await request('/admin/auth/me/backup-codes', { method: 'POST', bearer: ownerToken, body: { currentPassword: OWNER_PASSWORD } })
     check('the right currentPassword makes 10 codes -> 200',
       bcMade.status === 200 && Array.isArray(bcMade.body.codes) && bcMade.body.codes.length === 10,
-      JSON.stringify(bcMade.body).slice(0, 80))
-    check('every code is XXXXX-XXXXX from the invite alphabet',
-      (bcMade.body.codes ?? []).every((c) => /^[ACDEFGHJKMNPQRTUVWXY2346789]{5}-[ACDEFGHJKMNPQRTUVWXY2346789]{5}$/.test(c)),
-      JSON.stringify(bcMade.body.codes))
+      redacted(bcMade.body).slice(0, 80))
+    const CODE_PATTERN = /^[ACDEFGHJKMNPQRTUVWXY2346789]{5}-[ACDEFGHJKMNPQRTUVWXY2346789]{5}$/
+    const madeCodes = bcMade.body.codes ?? []
+    // Never the codes themselves, or any part of one -- just which
+    // positions (if any) didn't match, and how many there were.
+    const badCodeIndexes = madeCodes.map((c, i) => (CODE_PATTERN.test(c) ? -1 : i)).filter((i) => i !== -1)
+    check('every code is XXXXX-XXXXX from the invite alphabet', badCodeIndexes.length === 0,
+      `${madeCodes.length} codes, bad indexes: ${JSON.stringify(badCodeIndexes)}`)
     check('a fresh token comes with them', typeof bcMade.body.token === 'string')
     ownerToken = bcMade.body.token
     const bcCreatedAdded = await newEntriesSince('admin.backup_codes_created', ownerId, ownerToken, bcCreatedWatermark)
@@ -2077,26 +2093,26 @@ async function main() {
     const tokenBeforeBackupUse = ownerToken
     const bcUse = await request('/admin/auth/backup-code', { method: 'POST', body: { email: OWNER_EMAIL, code: messyCode } })
     check('a lower-cased, dash-less code signs in -> 200, usedBackupCode',
-      bcUse.status === 200 && bcUse.body.usedBackupCode === true, JSON.stringify(bcUse.body).slice(0, 80))
+      bcUse.status === 200 && bcUse.body.usedBackupCode === true, redacted(bcUse.body).slice(0, 80))
     ownerToken = bcUse.body.token
 
     const bcReuse = await request('/admin/auth/backup-code', { method: 'POST', body: { email: OWNER_EMAIL, code: messyCode } })
     check('the same code again -> 401',
-      bcReuse.status === 401 && bcReuse.body.error === "That email and backup code don't match", JSON.stringify(bcReuse.body))
+      bcReuse.status === 401 && bcReuse.body.error === "That email and backup code don't match", redacted(bcReuse.body))
 
     const meAfterUse = await request('/admin/auth/me', { bearer: ownerToken })
     check('backupCodesLeft is now 9', meAfterUse.body.backupCodesLeft === 9, String(meAfterUse.body.backupCodesLeft))
 
     const olderEnded = await request('/admin/auth/me', { bearer: tokenBeforeBackupUse })
     check("the owner's older token has ended -> 401",
-      olderEnded.status === 401 && olderEnded.body.error === SESSION_ENDED, JSON.stringify(olderEnded.body))
+      olderEnded.status === 401 && olderEnded.body.error === SESSION_ENDED, redacted(olderEnded.body))
 
     const bcUsedAdded = await newEntriesSince('admin.backup_code_used', ownerId, ownerToken, bcUsedWatermark)
     check('one admin.backup_code_used entry', bcUsedAdded === 1, String(bcUsedAdded))
 
     // --- 5: a used invite code cannot be cancelled ---
     const hInvite = await request('/admin/invites', { method: 'POST', bearer: ownerToken, body: { note: 'smoke hardening' } })
-    check('an invite code is made -> 201', hInvite.status === 201, JSON.stringify(hInvite.body).slice(0, 80))
+    check('an invite code is made -> 201', hInvite.status === 201, redacted(hInvite.body).slice(0, 80))
     const hInviteCode = hInvite.body.invite?.code
 
     const hUmpEmail = `smoke.hardening.umpire.${hStamp}@example.com`
@@ -2104,18 +2120,18 @@ async function main() {
     const hUmpReg = await request('/auth/register', {
       method: 'POST', body: { email: hUmpEmail, name: hUmpName, password: `smk-${uuid()}`, invite: hInviteCode },
     })
-    check('the throwaway umpire registers with the code -> 201', hUmpReg.status === 201, JSON.stringify(hUmpReg.body).slice(0, 80))
+    check('the throwaway umpire registers with the code -> 201', hUmpReg.status === 201, redacted(hUmpReg.body).slice(0, 80))
     const hUmpireId = hUmpReg.body.umpire?.id
 
     const hCancelUsed = await request(`/admin/invites/${hInviteCode}`, { method: 'DELETE', bearer: ownerToken })
     check('a used invite code cannot be cancelled -> 404',
-      hCancelUsed.status === 404 && hCancelUsed.body.error === 'No unused invite with that code', JSON.stringify(hCancelUsed.body))
+      hCancelUsed.status === 404 && hCancelUsed.body.error === 'No unused invite with that code', redacted(hCancelUsed.body))
 
     const hCloseUmp = await request(`/admin/umpires/${hUmpireId}/close`, {
       method: 'POST', bearer: ownerToken, body: { reason: 'smoke hardening cleanup', confirmName: hUmpName },
     })
     check('the owner closes the throwaway umpire -> 200',
-      hCloseUmp.status === 200 && hCloseUmp.body.umpire?.status === 'closed', JSON.stringify(hCloseUmp.body).slice(0, 80))
+      hCloseUmp.status === 200 && hCloseUmp.body.umpire?.status === 'closed', redacted(hCloseUmp.body).slice(0, 80))
 
     // --- 6: disconnecting Google as the only way in is a pure rule,
     // already pinned offline in check-admin-rules.mjs (canDisconnectGoogle) ---
