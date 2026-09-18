@@ -58,7 +58,8 @@ export function dayHeading(iso, now = Date.now()) {
 }
 
 export function timeOfDay(iso) {
-  return TIME.format(new Date(iso))
+  // Some browsers put a narrow no-break space before AM/PM; see formatWhen.
+  return TIME.format(new Date(iso)).replace(/\s+/g, ' ')
 }
 
 const ACTION_LABELS = {
