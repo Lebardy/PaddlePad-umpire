@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
+import BackupCodes from '../components/BackupCodes'
 import Gate from '../components/Gate'
 import GoogleButton from '../components/GoogleButton'
-import { completeSetup, readSetupLink } from '../lib/api'
+import { completeSetup, makeBackupCodes, readSetupLink } from '../lib/api'
 
 /** Where a setup link lands: choose a password or connect Google. */
 export default function Setup({ secret, onSignedIn }) {
@@ -11,6 +12,9 @@ export default function Setup({ secret, onSignedIn }) {
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  // Set once setup itself is done, for the owner's one chance to save a
+  // set of backup codes before the site shows. Other admins never see it.
+  const [saved, setSaved] = useState(null)
 
   useEffect(() => {
     let live = true
@@ -20,11 +24,23 @@ export default function Setup({ secret, onSignedIn }) {
     return () => { live = false }
   }, [secret])
 
-  async function finish(fields) {
+  async function finish(fields, proof) {
     setBusy(true)
     setError(null)
     try {
-      onSignedIn(await completeSetup(secret, fields))
+      const admin = await completeSetup(secret, fields)
+      if (admin.role !== 'owner') {
+        onSignedIn(admin)
+        return
+      }
+      try {
+        const codes = await makeBackupCodes(proof)
+        setSaved({ admin, codes })
+      } catch {
+        // Setup itself worked; missing backup codes isn't a reason to
+        // keep the owner out. Account shows they don't have any yet.
+        onSignedIn(admin)
+      }
     } catch (err) {
       setError(err.message)
       setBusy(false)
@@ -37,7 +53,19 @@ export default function Setup({ secret, onSignedIn }) {
       setError('The two passwords don’t match.')
       return
     }
-    finish({ password })
+    finish({ password }, { currentPassword: password })
+  }
+
+  if (saved) {
+    return (
+      <Gate>
+        <div className="gate-form">
+          <h1>Save your backup codes</h1>
+          <p>If you’re ever locked out, one of these signs you back in.</p>
+          <BackupCodes codes={saved.codes} onDone={() => onSignedIn(saved.admin)} />
+        </div>
+      </Gate>
+    )
   }
 
   if (loadError || !link) {
@@ -69,7 +97,7 @@ export default function Setup({ secret, onSignedIn }) {
         {error && <p className="form-error" role="alert">{error}</p>}
         <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save password and sign in'}</button>
         {link.googleConfigured && (
-          <GoogleButton withDivider disabled={busy} label="Continue with Google" onToken={(token) => finish({ accessToken: token })} />
+          <GoogleButton withDivider disabled={busy} label="Continue with Google" onToken={(token) => finish({ accessToken: token }, { reproofAccessToken: token })} />
         )}
         <p className="gate-note">You can add the other way to sign in later, on your Account page.</p>
       </form>
