@@ -2105,6 +2105,8 @@ async function main() {
 
     const meAfterUse = await request('/admin/auth/me', { bearer: ownerToken })
     check('backupCodesLeft is now 9', meAfterUse.body.backupCodesLeft === 9, String(meAfterUse.body.backupCodesLeft))
+    check('and this session still answers viaBackupCode true, before it is used to repair anything',
+      meAfterUse.body.viaBackupCode === true, String(meAfterUse.body.viaBackupCode))
 
     const olderEnded = await request('/admin/auth/me', { bearer: tokenBeforeBackupUse })
     check("the owner's older token has ended -> 401",
@@ -2130,7 +2132,15 @@ async function main() {
       check('a backup-code session sets a password with no currentPassword -> 200 with a fresh token',
         setFromBackupCode.status === 200 && typeof setFromBackupCode.body.token === 'string',
         redacted(setFromBackupCode.body).slice(0, 80))
+      check('and the fresh token no longer answers viaBackupCode true, so the shortcut does not carry forward',
+        setFromBackupCode.body.viaBackupCode === false, String(setFromBackupCode.body.viaBackupCode))
       ownerToken = setFromBackupCode.body.token
+
+      const secondChangeNoProof = await request('/admin/auth/me/password', {
+        method: 'POST', bearer: ownerToken, body: { newPassword: `smoke-temp-${uuid()}` },
+      })
+      check('a further change with that token and no currentPassword is refused -> 403',
+        secondChangeNoProof.status === 403, redacted(secondChangeNoProof.body))
     } finally {
       let back = await request('/admin/auth/me/password', {
         method: 'POST', bearer: ownerToken, body: { currentPassword: BACKUP_TEMP_PASSWORD, newPassword: OWNER_PASSWORD },

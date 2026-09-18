@@ -328,7 +328,7 @@ an invite code at all.
 | `POST` | `/admin/auth/login` | — | Sign in as an admin, returns an admin token |
 | `POST` | `/admin/auth/google` | — | Sign in an admin with Google |
 | `POST` | `/admin/auth/backup-code` | — | Sign in as the owner with a backup code, when a password or Google isn't available |
-| `GET` | `/admin/auth/me` | Bearer (admin) | The signed-in admin's own account; `backupCodesLeft` too, but only for the owner — `null` for anyone else |
+| `GET` | `/admin/auth/me` | Bearer (admin) | The signed-in admin's own account; `backupCodesLeft` too, but only for the owner — `null` for anyone else; `viaBackupCode` says whether this session still counts as its own proof |
 | `PATCH` | `/admin/auth/me` | Bearer (admin) | Rename yourself |
 | `POST` | `/admin/auth/me/password` | Bearer (admin) | Change the password, or set the first one |
 | `POST` | `/admin/auth/me/google/connect` | Bearer (admin) | Connect Google to the account already signed in |

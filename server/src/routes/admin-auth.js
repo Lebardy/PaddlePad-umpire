@@ -283,6 +283,11 @@ router.get('/me', async (req, res) => {
   res.json({
     admin: adminPayload(me),
     backupCodesLeft: me.role === 'owner' ? await countBackupCodesLeft(query, me.id) : null,
+    // Straight off the session (see requireAdminAccount / proofFromSession),
+    // not the row: it is true only while this particular token still
+    // counts as its own proof, and the site reads it fresh here rather
+    // than remembering it from the moment someone signed in.
+    viaBackupCode: Boolean(req.admin.viaBackupCode),
   })
 })
 
@@ -320,7 +325,9 @@ router.post('/me/password', async (req, res) => {
     })
     return { row: rows[0], resetAt }
   })
-  res.json({ token: signAdminToken(row, resetAt), admin: adminPayload(row) })
+  // The fresh token carries no extra claim, so a session that got in on
+  // a backup code stops counting as its own proof from here on.
+  res.json({ token: signAdminToken(row, resetAt), admin: adminPayload(row), viaBackupCode: false })
 })
 
 router.post('/me/google/connect', async (req, res) => {
@@ -341,7 +348,7 @@ router.post('/me/google/connect', async (req, res) => {
       })
       return { row: rows[0], resetAt }
     })
-    res.json({ token: signAdminToken(row, resetAt), admin: adminPayload(row) })
+    res.json({ token: signAdminToken(row, resetAt), admin: adminPayload(row), viaBackupCode: false })
   } catch (error) {
     if (error.code === '23505') {
       return res.status(409).json({ error: 'That Google account is already connected to another admin' })
@@ -369,7 +376,7 @@ router.post('/me/google/disconnect', async (req, res) => {
     })
     return { row: rows[0], resetAt }
   })
-  res.json({ token: signAdminToken(row, resetAt), admin: adminPayload(row) })
+  res.json({ token: signAdminToken(row, resetAt), admin: adminPayload(row), viaBackupCode: false })
 })
 
 router.post('/me/sign-out-others', async (req, res) => {
@@ -382,7 +389,10 @@ router.post('/me/sign-out-others', async (req, res) => {
     return resetAt
   })
   const row = await loadMe(req.admin.id)
-  res.json({ token: signAdminToken(row, resetAt), admin: adminPayload(row) })
+  // Even though this route needs no proof itself, the fresh token drops
+  // the backup-code claim, so the site's shortcut for the next change
+  // must drop with it.
+  res.json({ token: signAdminToken(row, resetAt), admin: adminPayload(row), viaBackupCode: false })
 })
 
 router.post('/me/backup-codes', async (req, res) => {
@@ -401,7 +411,7 @@ router.post('/me/backup-codes', async (req, res) => {
     })
     return { codes, resetAt }
   })
-  res.json({ codes, token: signAdminToken(me, resetAt), admin: adminPayload(me) })
+  res.json({ codes, token: signAdminToken(me, resetAt), admin: adminPayload(me), viaBackupCode: false })
 })
 
 // ------------------------------------------------------------
