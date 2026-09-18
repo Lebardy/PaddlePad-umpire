@@ -6,7 +6,6 @@ import RowConfirm from '../components/RowConfirm'
 import {
   changePassword,
   connectGoogle,
-  consumeUsedBackupCodeFlag,
   disconnectGoogle,
   fetchMeWithCodes,
   makeBackupCodes,
@@ -112,28 +111,36 @@ export default function Account({ admin, onAdminChange }) {
   const [backupCodesLeft, setBackupCodesLeft] = useState(null)
   const [backupCodesLoaded, setBackupCodesLoaded] = useState(false)
   const [askingNewCodes, setAskingNewCodes] = useState(false)
-  const [codesBusy, setCodesBusy] = useState(false)
+  const [codesStatus, , codesBusy, runCodes] = useStatus()
 
   const [theme, setTheme] = useState(getThemeChoice)
-  // True from a backup-code sign-in until the first sign-in change goes
-  // through: the server's requireReproof accepts that session as proof
-  // for exactly one change (see admin-rules.js proofFromSession), and the
-  // fresh token that change comes back with does not carry the claim
-  // forward, so proof is required normally after that.
-  const [usedBackupCode, setUsedBackupCode] = useState(consumeUsedBackupCodeFlag)
+  // Whether this session still counts as its own proof (see
+  // requireReproof / proofFromSession on the server): true from a
+  // backup-code sign-in until the first sign-in change goes through, at
+  // which point the fresh token it comes back with drops the claim.
+  // Always read from the server, never guessed from something the
+  // browser remembers -- fetched below on every mount, and kept in step
+  // by every response that mints a fresh token, so it survives a reload
+  // and clears itself the moment "Sign out everywhere else" (or any
+  // other change) takes it away.
+  const [viaBackupCode, setViaBackupCode] = useState(false)
 
-  const passwordProof = useProof(admin, usedBackupCode)
-  const googleProof = useProof(admin, usedBackupCode)
-  const codesProof = useProof(admin, usedBackupCode)
+  const passwordProof = useProof(admin, viaBackupCode)
+  const googleProof = useProof(admin, viaBackupCode)
+  const codesProof = useProof(admin, viaBackupCode)
 
   useEffect(() => {
-    if (admin.role !== 'owner') return
     let live = true
     fetchMeWithCodes()
-      .then((data) => { if (live) { setBackupCodesLeft(data.backupCodesLeft); setBackupCodesLoaded(true) } })
+      .then((data) => {
+        if (!live) return
+        setBackupCodesLeft(data.backupCodesLeft)
+        setBackupCodesLoaded(true)
+        setViaBackupCode(Boolean(data.viaBackupCode))
+      })
       .catch(() => {})
     return () => { live = false }
-  }, [admin.role])
+  }, [])
 
   async function saveName(event) {
     event.preventDefault()
@@ -151,12 +158,13 @@ export default function Account({ admin, onAdminChange }) {
       return
     }
     try {
-      const updated = await runPassword(() => changePassword({ proof: passwordProof.proof, newPassword }), 'Password saved.')
+      const { admin: updated, viaBackupCode: stillVia } = await runPassword(
+        () => changePassword({ proof: passwordProof.proof, newPassword }), 'Password saved.')
       onAdminChange(updated)
       setNewPassword('')
       setConfirm('')
       passwordProof.reset()
-      setUsedBackupCode(false)
+      setViaBackupCode(Boolean(stillVia))
     } catch {
       // Status already shown by runPassword.
     }
@@ -164,10 +172,11 @@ export default function Account({ admin, onAdminChange }) {
 
   async function saveConnectGoogle(accessToken) {
     try {
-      const updated = await runGoogle(() => connectGoogle(accessToken, googleProof.proof), 'Google connected.')
+      const { admin: updated, viaBackupCode: stillVia } = await runGoogle(
+        () => connectGoogle(accessToken, googleProof.proof), 'Google connected.')
       onAdminChange(updated)
       googleProof.reset()
-      setUsedBackupCode(false)
+      setViaBackupCode(Boolean(stillVia))
     } catch {
       // Status already shown by runGoogle.
     }
@@ -175,10 +184,11 @@ export default function Account({ admin, onAdminChange }) {
 
   async function saveDisconnectGoogle() {
     try {
-      const updated = await runGoogle(() => disconnectGoogle(googleProof.proof), 'Google disconnected.')
+      const { admin: updated, viaBackupCode: stillVia } = await runGoogle(
+        () => disconnectGoogle(googleProof.proof), 'Google disconnected.')
       onAdminChange(updated)
       googleProof.reset()
-      setUsedBackupCode(false)
+      setViaBackupCode(Boolean(stillVia))
     } catch {
       // Status already shown by runGoogle.
     }
@@ -186,22 +196,23 @@ export default function Account({ admin, onAdminChange }) {
 
   async function signOutEverywhereElse() {
     try {
-      onAdminChange(await runSessions(() => signOutOthers(), 'Signed out everywhere else.'))
+      const { admin: updated, viaBackupCode: stillVia } = await runSessions(() => signOutOthers(), 'Signed out everywhere else.')
+      onAdminChange(updated)
+      setViaBackupCode(Boolean(stillVia))
     } catch {
       // Status already shown by runSessions.
     }
   }
 
   async function makeNewCodes() {
-    setCodesBusy(true)
     try {
-      const newCodes = await makeBackupCodes(codesProof.proof)
+      const { codes: newCodes, viaBackupCode: stillVia } = await runCodes(() => makeBackupCodes(codesProof.proof))
       setCodes(newCodes)
       setBackupCodesLeft(newCodes.length)
       codesProof.reset()
-      setUsedBackupCode(false)
-    } finally {
-      setCodesBusy(false)
+      setViaBackupCode(Boolean(stillVia))
+    } catch {
+      // Status already shown by runCodes.
     }
   }
 
@@ -209,7 +220,7 @@ export default function Account({ admin, onAdminChange }) {
 
   return (
     <section>
-      {usedBackupCode && <p className="notice" role="status">{USED_BACKUP_CODE_NOTICE}</p>}
+      {viaBackupCode && <p className="notice" role="status">{USED_BACKUP_CODE_NOTICE}</p>}
       <PageBoard title="Account" intro={<><strong>{admin.name}</strong> · {admin.email}</>}>
         <div className="facts">
           <div className="fact"><span className="tally-label">Role</span><strong>{admin.role === 'owner' ? 'Owner' : 'Admin'}</strong></div>
@@ -231,7 +242,7 @@ export default function Account({ admin, onAdminChange }) {
             about="At least 8 characters. There are no reset emails, so keep it somewhere safe."
             onSubmit={savePassword}
           >
-            <ProofField admin={admin} proof={passwordProof} busy={passwordBusy} bypass={usedBackupCode} />
+            <ProofField admin={admin} proof={passwordProof} busy={passwordBusy} bypass={viaBackupCode} />
             <div className="pair">
               <label className="field"><span>New password</span>
                 <input type="password" autoComplete="new-password" minLength={8} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
@@ -251,7 +262,7 @@ export default function Account({ admin, onAdminChange }) {
               <>
                 <p>Connected to <strong>{admin.googleEmail}</strong>.</p>
                 {!admin.hasPassword && <p className="hint">Set a password before disconnecting. Google is your only way in.</p>}
-                {admin.hasPassword && <ProofField admin={admin} proof={googleProof} busy={googleBusy} bypass={usedBackupCode} />}
+                {admin.hasPassword && <ProofField admin={admin} proof={googleProof} busy={googleBusy} bypass={viaBackupCode} />}
                 <Status status={googleStatus} />
                 <button type="button" className="btn-danger" disabled={googleBusy || !admin.hasPassword || !googleProof.ready}
                   onClick={saveDisconnectGoogle}>{googleBusy ? 'Saving…' : 'Disconnect Google'}</button>
@@ -259,7 +270,7 @@ export default function Account({ admin, onAdminChange }) {
             ) : (
               <>
                 <p>No Google account connected.</p>
-                <ProofField admin={admin} proof={googleProof} busy={googleBusy} bypass={usedBackupCode} />
+                <ProofField admin={admin} proof={googleProof} busy={googleBusy} bypass={viaBackupCode} />
                 <Status status={googleStatus} />
                 <GoogleButton label={googleBusy ? 'Saving…' : 'Connect Google'} disabled={googleBusy || !googleProof.ready}
                   onToken={saveConnectGoogle} />
@@ -286,7 +297,8 @@ export default function Account({ admin, onAdminChange }) {
                     </>
                   )
               )}
-              {askingNewCodes && <ProofField admin={admin} proof={codesProof} busy={codesBusy} bypass={usedBackupCode} />}
+              {askingNewCodes && <ProofField admin={admin} proof={codesProof} busy={codesBusy} bypass={viaBackupCode} />}
+              <Status status={codesStatus} />
               <RowConfirm
                 label="Make new backup codes"
                 className="btn-primary"

@@ -34,7 +34,7 @@ export default function Setup({ secret, onSignedIn }) {
         return
       }
       try {
-        const codes = await makeBackupCodes(proof)
+        const { codes } = await makeBackupCodes(proof)
         setSaved({ admin, codes })
       } catch {
         // Setup itself worked; missing backup codes isn't a reason to
