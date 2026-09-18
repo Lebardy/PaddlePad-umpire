@@ -1756,9 +1756,8 @@ async function main() {
       nonOwnerUnpause.status === 200 && nonOwnerUnpause.body.umpire?.status === 'active',
       JSON.stringify(nonOwnerUnpause.body).slice(0, 80))
 
-    const peopleAdminOff = await request(`/admin/admins/${peopleAdminId}/switch-off`, { method: 'POST', bearer: ownerToken })
-    check('the owner switches the throwaway admin off -> 200',
-      peopleAdminOff.status === 200 && peopleAdminOff.body.admin?.active === false, String(peopleAdminOff.status))
+    // Kept switched on a little longer: --- 12 below needs it to try
+    // reopening the player the owner is about to close.
 
     // --- 11: close ---
     const wrongConfirm = await request(`/admin/players/${playerId}/close`, {
@@ -1779,6 +1778,30 @@ async function main() {
       plDetailAfter.body.player?.matchCount === plDetailBefore.body.player?.matchCount,
       `${plDetailBefore.body.player?.matchCount} -> ${plDetailAfter.body.player?.matchCount}`)
 
+    // --- 12: only the owner may reopen a player the owner closed ---
+    const umpClaimAfterClose = await request(`/players/${playerId}/claim-code`, { bearer: umpToken })
+    check('the umpire route refuses a claim code for an owner-closed player -> 403',
+      umpClaimAfterClose.status === 403 &&
+        umpClaimAfterClose.body.error === "This player's account was closed by the owner. Only the owner can reopen it.",
+      JSON.stringify(umpClaimAfterClose.body))
+    const nonOwnerClaimAfterClose = await request(`/admin/players/${playerId}/claim-code`, {
+      method: 'POST', bearer: peopleAdmin,
+    })
+    check('a non-owner admin cannot reopen an owner-closed player -> 403',
+      nonOwnerClaimAfterClose.status === 403 &&
+        nonOwnerClaimAfterClose.body.error === 'Only the owner can reopen a closed account',
+      JSON.stringify(nonOwnerClaimAfterClose.body))
+    const ownerClaimAfterClose = await request(`/admin/players/${playerId}/claim-code`, {
+      method: 'POST', bearer: ownerToken,
+    })
+    check('the owner can still make a new code for the player they closed -> 200',
+      ownerClaimAfterClose.status === 200 && Boolean(ownerClaimAfterClose.body.claimCode),
+      JSON.stringify(ownerClaimAfterClose.body).slice(0, 80))
+
+    const peopleAdminOff = await request(`/admin/admins/${peopleAdminId}/switch-off`, { method: 'POST', bearer: ownerToken })
+    check('the owner switches the throwaway admin off -> 200',
+      peopleAdminOff.status === 200 && peopleAdminOff.body.admin?.active === false, String(peopleAdminOff.status))
+
     const closeUmp = await request(`/admin/umpires/${umpireId}/close`, {
       method: 'POST', bearer: ownerToken, body: { reason: 'smoke test done', confirmName: umpName },
     })
@@ -1793,6 +1816,40 @@ async function main() {
       method: 'POST', bearer: ownerToken, body: { reason: 'again', confirmName: umpName },
     })
     check('closing the umpire again -> 409', closeUmpAgain.status === 409, String(closeUmpAgain.status))
+
+    // --- 13: closing is recorded exactly once, wrong-name and repeat attempts add nothing ---
+    const playerClosedCount = await countByAction('player.closed', playerId, ownerToken)
+    check('exactly one player.closed entry; the wrong-name attempt added none',
+      playerClosedCount === 1, String(playerClosedCount))
+    const umpireClosedCount = await countByAction('umpire.closed', umpireId, ownerToken)
+    check('exactly one umpire.closed entry; closing it again added none',
+      umpireClosedCount === 1, String(umpireClosedCount))
+
+    // --- 14: a closed umpire's existing token ends the session, not just future sign-ins ---
+    const umpTokenAfterClose = await request('/auth/me', { bearer: umpToken })
+    check('the closed umpire\'s existing token -> 401, status closed',
+      umpTokenAfterClose.status === 401 && umpTokenAfterClose.body.status === 'closed',
+      JSON.stringify(umpTokenAfterClose.body))
+
+    // --- 15: the freed email can register again ---
+    const reInvite = await request('/admin/invites', {
+      method: 'POST', bearer: ownerToken, body: { note: 'smoke people reuse' },
+    })
+    check('a new invite code is made for the freed email -> 201', reInvite.status === 201,
+      JSON.stringify(reInvite.body).slice(0, 80))
+    const reUmpName = `Smoke People Umpire ${pStamp} Again`
+    const reRegister = await request('/auth/register', {
+      method: 'POST',
+      body: { email: umpEmail, name: reUmpName, password: `smk-${uuid()}`, invite: reInvite.body.invite?.code },
+    })
+    check('the freed email can register again with a new invite code -> 201', reRegister.status === 201,
+      JSON.stringify(reRegister.body).slice(0, 80))
+    const reUmpireId = reRegister.body.umpire?.id
+    const reClose = await request(`/admin/umpires/${reUmpireId}/close`, {
+      method: 'POST', bearer: ownerToken, body: { reason: 'smoke cleanup', confirmName: reUmpName },
+    })
+    check('and that throwaway is closed too, leaving nothing behind -> 200',
+      reClose.status === 200 && reClose.body.umpire?.status === 'closed', JSON.stringify(reClose.body).slice(0, 80))
   }
 
   if (selfRegistered.length > 0) {
