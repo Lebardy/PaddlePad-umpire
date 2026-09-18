@@ -447,7 +447,9 @@ td.table-foot { display: table-cell; }
 }
 
 .detail-facts {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  /* A fixed count per page that divides its facts evenly, so no row is left
+     with empty cells showing the grey border colour. */
+  display: grid; grid-template-columns: repeat(var(--fact-columns, 4), minmax(0, 1fr));
   gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
 }
 .detail-fact { padding: 0.85rem 1.25rem; background: var(--surface); min-width: 0; }
