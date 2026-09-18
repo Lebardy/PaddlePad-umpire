@@ -209,9 +209,14 @@ export function requireActivePlayer(queryFn) {
  * server's clock or the reset's, so a Postgres clock running slightly
  * ahead can never make the very token just issued look like it predates
  * its own reset (see adminTokenIat).
+ *
+ * `extra` adds claims beyond the usual three -- today just
+ * `viaBackupCode: true`, set only by `/admin/auth/backup-code`, which
+ * requireAdminAccount carries onto `req.admin` and requireReproof reads
+ * back (see admin-rules.js proofFromSession).
  */
-export function signAdminToken(admin, resetAt) {
-  const payload = { sub: admin.id, name: admin.name, role: 'admin' }
+export function signAdminToken(admin, resetAt, extra) {
+  const payload = { sub: admin.id, name: admin.name, role: 'admin', ...extra }
   if (resetAt) payload.iat = adminTokenIat(resetAt)
   return jwt.sign(payload, JWT_SECRET, { expiresIn: ADMIN_TOKEN_TTL })
 }
@@ -247,6 +252,10 @@ export function requireAdminAccount(queryFn) {
         return res.status(401).json({ error: 'Your session has ended. Sign in again.' })
       }
       req.admin = { id: found.id, name: found.name, email: found.email, role: found.role }
+      // Carried through from the token, not the row: only a session
+      // opened by /admin/auth/backup-code ever sets this (see
+      // signAdminToken's `extra` and admin-rules.js proofFromSession).
+      if (payload.viaBackupCode) req.admin.viaBackupCode = true
       next()
     } catch (error) {
       next(error)

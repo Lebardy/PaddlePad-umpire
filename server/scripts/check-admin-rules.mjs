@@ -184,6 +184,38 @@ section('which tokens each guard lets through')
   check('and says which', (await runPlayerGuard([])).body.status, 'closed')
 }
 
+section('a backup-code session counts as proof')
+{
+  check('no viaBackupCode claim is not proof', rules.proofFromSession({ id: 'a1' }), false)
+  check('viaBackupCode true is proof', rules.proofFromSession({ id: 'a1', viaBackupCode: true }), true)
+  check('viaBackupCode false is not proof', rules.proofFromSession({ id: 'a1', viaBackupCode: false }), false)
+  check('nothing at all is not proof', rules.proofFromSession(undefined), false)
+
+  const auth = await import('../src/auth.js')
+  const jwt = (await import('jsonwebtoken')).default
+
+  const withClaim = auth.signAdminToken({ id: 'a1', name: 'Jan' }, null, { viaBackupCode: true })
+  const withoutClaim = auth.signAdminToken({ id: 'a1', name: 'Jan' })
+  check('signAdminToken carries an extra claim when asked', jwt.decode(withClaim).viaBackupCode, true)
+  check('and carries none by default', 'viaBackupCode' in jwt.decode(withoutClaim), false)
+
+  const sign = (payload) => jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' })
+  const activeRow = { id: 'a1', name: 'Jan', email: 'jan@example.com', role: 'admin', deactivated_at: null }
+  const fakeQuery = (rows) => async () => ({ rows })
+  const guard = auth.requireAdminAccount(fakeQuery([activeRow]))
+  async function run(middleware, token) {
+    const req = { get: (h) => (h.toLowerCase() === 'authorization' && token ? `Bearer ${token}` : undefined) }
+    const res = { statusCode: 200, body: null, status(c) { this.statusCode = c; return this }, json(b) { this.body = b; return this } }
+    await middleware(req, res, () => {})
+    return req
+  }
+
+  const tokenWithClaim = sign({ sub: 'a1', name: 'Jan', role: 'admin', viaBackupCode: true })
+  const tokenWithoutClaim = sign({ sub: 'a1', name: 'Jan', role: 'admin' })
+  check('the admin guard carries viaBackupCode onto req.admin', (await run(guard, tokenWithClaim)).admin.viaBackupCode, true)
+  check('and leaves it off an ordinary token', 'viaBackupCode' in (await run(guard, tokenWithoutClaim)).admin, false)
+}
+
 section('ending sessions')
 {
   const reset = '2026-09-18T01:00:00.700Z'

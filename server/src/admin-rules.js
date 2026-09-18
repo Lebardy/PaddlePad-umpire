@@ -137,6 +137,22 @@ export function adminTokenIat(resetAt, now = Date.now()) {
   return Math.max(nowSeconds, Math.floor(new Date(resetAt).getTime() / 1000))
 }
 
+/**
+ * Whether the session itself already proves who is asking, without a
+ * password or a fresh Google check.
+ *
+ * True only right after a backup-code sign-in (the token's
+ * `viaBackupCode` claim, carried onto `req.admin` by requireAdminAccount).
+ * That is safe to treat as proof: the code that opened the session is
+ * single-use, the sign-in reset every other session on the account, and
+ * for an owner who has already lost both their password and Google it
+ * is the only way back in at all -- refusing to let that session repair
+ * the account would turn ten one-time sign-ins into ten dead ends.
+ */
+export function proofFromSession(admin) {
+  return Boolean(admin?.viaBackupCode)
+}
+
 export const BACKUP_CODE_COUNT = 10
 export const BACKUP_CODE_LOW = 3
 // The invite-code alphabet: no letters or digits that look alike.

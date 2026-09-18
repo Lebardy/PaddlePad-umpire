@@ -17,6 +17,7 @@ import {
   canDisconnectGoogle,
   hashSetupSecret,
   normalizeEmail,
+  proofFromSession,
   setupLinkState,
 } from '../admin-rules.js'
 
@@ -41,7 +42,12 @@ async function completeSignIn(adminId) {
     })
     return rows[0]
   })
-  return { token: signAdminToken(row), admin: adminPayload(row) }
+  // Pinned to the row's own sessions_reset_at, exactly as every other
+  // mint point is: without it, a sign-in in the seconds right after a
+  // reset could be signed with an iat that a Postgres clock running
+  // ahead makes look like it predates that same reset, and the very
+  // next request would refuse the token this response just handed back.
+  return { token: signAdminToken(row, row.sessions_reset_at), admin: adminPayload(row) }
 }
 
 /** A Google profile from the request, or a response already sent. */
@@ -67,8 +73,16 @@ const REPROOF_REFUSAL = 'Sign in with the Google account connected to your admin
  * Returns true when proven. On failure it sends the 403 itself and
  * returns false, so callers just `if (!(await requireReproof(...))) return`.
  * A failed attempt writes no activity record.
+ *
+ * A session opened with a backup code counts as proof on its own (see
+ * proofFromSession): that code is exactly how an owner who has lost
+ * their password proves who they are, so demanding the password they
+ * no longer have here would turn every one of their ten sign-ins into
+ * a dead end instead of a way to repair the account.
  */
 async function requireReproof(req, res, me) {
+  if (proofFromSession(req.admin)) return true
+
   if (me.password_hash) {
     const ok = await verifyPassword(String(req.body?.currentPassword ?? ''), me.password_hash)
     if (ok) return true
@@ -455,7 +469,7 @@ router.post('/backup-code', async (req, res) => {
     return res.status(401).json({ error: "That email and backup code don't match" })
   }
 
-  res.json({ token: signAdminToken(row, resetAt), admin: adminPayload(row), usedBackupCode: true })
+  res.json({ token: signAdminToken(row, resetAt, { viaBackupCode: true }), admin: adminPayload(row), usedBackupCode: true })
 })
 
 export default router
