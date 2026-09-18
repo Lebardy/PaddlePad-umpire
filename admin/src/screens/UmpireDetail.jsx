@@ -92,7 +92,7 @@ export default function UmpireDetail({ id, me }) {
     <section>
       <PageBoard title={umpire.name} intro={<StatusTag status={umpire.status} />}>
         <div className="tally">
-          <TallyCell figure={umpire.matches.length === 20 ? '20+' : umpire.matches.length} label="Matches scored" />
+          <TallyCell figure={umpire.matchCount} label="Matches scored" />
           <TallyCell figure={umpire.matchesInProgress} label="Live now" />
         </div>
       </PageBoard>
@@ -102,6 +102,9 @@ export default function UmpireDetail({ id, me }) {
 
         {umpire.status === 'paused' && (
           <p className="notice">Paused on {formatWhen(umpire.pausedAt)}: {umpire.pausedReason}</p>
+        )}
+        {umpire.status === 'closed' && (
+          <p className="notice">Closed on {formatWhen(umpire.closedAt)}</p>
         )}
 
         <div>
@@ -119,7 +122,7 @@ export default function UmpireDetail({ id, me }) {
         <div>
           <h2 className="section-title">Recent matches scored</h2>
           {umpire.matches.length === 0 ? (
-            <p className="empty">No finished matches yet.</p>
+            <p className="empty">No matches scored yet.</p>
           ) : (
             <div className="table-wrap">
               <table className="table">

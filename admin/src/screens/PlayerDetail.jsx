@@ -44,6 +44,9 @@ export default function PlayerDetail({ id, me }) {
     const { player: fresh } = await pausePerson('players', id, trimmed)
     setResult({ id, player: fresh })
     setReason('')
+    // A code revealed earlier would not work again until they are
+    // switched back on, so it must not keep looking usable on screen.
+    setClaimCode(null)
   }
 
   async function handleUnpause() {
@@ -52,7 +55,12 @@ export default function PlayerDetail({ id, me }) {
   }
 
   async function handleClaimCode() {
-    setClaimCode(await newClaimCode(id))
+    const code = await newClaimCode(id)
+    // "Ways in" changes the moment a code exists, so the page must not
+    // keep showing the stale answer until the next reload.
+    const fresh = await fetchPlayer(id)
+    setResult({ id, player: fresh })
+    setClaimCode(code)
   }
 
   async function handleClose() {
@@ -64,6 +72,9 @@ export default function PlayerDetail({ id, me }) {
       setClosing(false)
       setCloseReason('')
       setCloseName('')
+      // Closing wipes the claim code, so a previously revealed one is
+      // stale the moment this succeeds.
+      setClaimCode(null)
     } catch (err) {
       setCloseError(err.message)
     } finally {
@@ -107,6 +118,9 @@ export default function PlayerDetail({ id, me }) {
         {player.status === 'paused' && (
           <p className="notice">Paused on {formatWhen(player.pausedAt)}: {player.pausedReason}</p>
         )}
+        {player.status === 'closed' && (
+          <p className="notice">Closed on {formatWhen(player.closedAt)}</p>
+        )}
 
         <div>
           <h2 className="section-title">Details</h2>
@@ -137,6 +151,7 @@ export default function PlayerDetail({ id, me }) {
                     <th>Against</th>
                     <th>Score</th>
                     <th>Result</th>
+                    <th>Scored by</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -148,6 +163,7 @@ export default function PlayerDetail({ id, me }) {
                       <td>{m.opponents.join(' & ')}</td>
                       <td className="nowrap">{m.yourScore}–{m.theirScore}</td>
                       <td>{m.won === null ? '—' : (m.won ? 'Won' : 'Lost')}</td>
+                      <td>{m.scoredBy}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -197,7 +213,7 @@ export default function PlayerDetail({ id, me }) {
               />
             )}
 
-            {player.status !== 'paused' && (
+            {player.status !== 'paused' && (!player.closedByAdmin || me.role === 'owner') && (
               <RowConfirm
                 label="New claim code"
                 className="btn-quiet btn-small"
