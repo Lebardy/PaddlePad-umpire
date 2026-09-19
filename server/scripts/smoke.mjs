@@ -131,6 +131,18 @@ const rally = (seq, playerId, outcome = 'winner', zone = 'open') => ({
   zone,
 })
 
+/**
+ * Any one facility to assign a throwaway admin to, for sections that
+ * predate facilities and only need *some* real facility to satisfy
+ * `POST /admin/admins`' now-required `facilityId` -- not testing
+ * facilities themselves, which the dedicated section below does. There
+ * is always at least one once the switch-over has run.
+ */
+async function anyFacilityId(ownerBearer) {
+  const listed = await request('/admin/facilities', { bearer: ownerBearer })
+  return listed.body.facilities?.[0]?.id ?? null
+}
+
 async function main() {
   console.log(`smoke test against ${API}\n`)
 
@@ -1438,15 +1450,22 @@ async function main() {
     const ownerOnPlayer = await request('/player/me', { bearer: owner })
     check('an admin token is refused by the player app -> 403', ownerOnPlayer.status === 403, String(ownerOnPlayer.status))
 
+    const facilityForAdmins = await anyFacilityId(owner)
+    check('a facility exists to assign the throwaway admin to', Boolean(facilityForAdmins), String(facilityForAdmins))
+
     const email = `smoke.admin.${uuid().slice(0, 8)}@example.com`
-    const added = await request('/admin/admins', { method: 'POST', bearer: owner, body: { name: 'Smoke Admin', email } })
+    const added = await request('/admin/admins', {
+      method: 'POST', bearer: owner, body: { name: 'Smoke Admin', email, facilityId: facilityForAdmins },
+    })
     check('the owner adds an admin -> 201', added.status === 201, JSON.stringify(added.body).slice(0, 80))
     const adminId = added.body.admin?.id
     const firstLink = added.body.setupLink?.url ?? ''
     check('and gets a setup link to the admin site', firstLink.includes('/setup/'), firstLink)
     const hoursLeft = (new Date(added.body.setupLink?.expiresAt) - Date.now()) / 3_600_000
     check('the link lasts 24 hours', hoursLeft > 23.9 && hoursLeft < 24.1, String(hoursLeft))
-    const dupe = await request('/admin/admins', { method: 'POST', bearer: owner, body: { name: 'Again', email } })
+    const dupe = await request('/admin/admins', {
+      method: 'POST', bearer: owner, body: { name: 'Again', email, facilityId: facilityForAdmins },
+    })
     check('the same email cannot be added twice -> 409', dupe.status === 409, String(dupe.status))
 
     // A second link cancels the first.
@@ -1561,8 +1580,12 @@ async function main() {
       JSON.stringify(ownerIn2.body).slice(0, 80))
     const ownerToken = ownerIn2.body.token
 
+    // The owner belongs to no facility, so making a code needs one named
+    // explicitly -- any real facility works, since this section is not
+    // testing facilities themselves.
+    const pInviteFacility = await anyFacilityId(ownerToken)
     const pInvite = await request('/admin/invites', {
-      method: 'POST', bearer: ownerToken, body: { note: 'smoke people' },
+      method: 'POST', bearer: ownerToken, body: { note: 'smoke people', facilityId: pInviteFacility },
     })
     check('an invite code is made for the throwaway umpire -> 201', pInvite.status === 201,
       JSON.stringify(pInvite.body).slice(0, 80))
@@ -1724,9 +1747,11 @@ async function main() {
     check('exactly one player.claim_code_created entry', claimCodeCreatedCount === 1, String(claimCodeCreatedCount))
 
     // --- 10: non-owner admin ---
+    const peopleAdminFacility = await anyFacilityId(ownerToken)
     const peopleAdminEmail = `smoke.people.admin.${uuid().slice(0, 8)}@example.com`
     const addedAdmin = await request('/admin/admins', {
-      method: 'POST', bearer: ownerToken, body: { name: 'Smoke People Admin', email: peopleAdminEmail },
+      method: 'POST', bearer: ownerToken,
+      body: { name: 'Smoke People Admin', email: peopleAdminEmail, facilityId: peopleAdminFacility },
     })
     check('the owner adds a throwaway admin -> 201', addedAdmin.status === 201,
       JSON.stringify(addedAdmin.body).slice(0, 80))
@@ -1874,7 +1899,7 @@ async function main() {
 
     // --- 15: the freed email can register again ---
     const reInvite = await request('/admin/invites', {
-      method: 'POST', bearer: ownerToken, body: { note: 'smoke people reuse' },
+      method: 'POST', bearer: ownerToken, body: { note: 'smoke people reuse', facilityId: pInviteFacility },
     })
     check('a new invite code is made for the freed email -> 201', reInvite.status === 201,
       JSON.stringify(reInvite.body).slice(0, 80))
@@ -2020,9 +2045,10 @@ async function main() {
 
     // --- 3: a throwaway admin -- switching off ends its sessions even
     // though switching back on does not bring them back. ---
+    const hAdminFacility = await anyFacilityId(ownerToken)
     const hAdminEmail = `smoke.hardening.${uuid().slice(0, 8)}@example.com`
     const hAdminAdded = await request('/admin/admins', {
-      method: 'POST', bearer: ownerToken, body: { name: 'Smoke Hardening Admin', email: hAdminEmail },
+      method: 'POST', bearer: ownerToken, body: { name: 'Smoke Hardening Admin', email: hAdminEmail, facilityId: hAdminFacility },
     })
     check('the owner adds a throwaway admin -> 201', hAdminAdded.status === 201, redacted(hAdminAdded.body).slice(0, 80))
     const hAdminId = hAdminAdded.body.admin?.id
@@ -2166,7 +2192,10 @@ async function main() {
     }
 
     // --- 5: a used invite code cannot be cancelled ---
-    const hInvite = await request('/admin/invites', { method: 'POST', bearer: ownerToken, body: { note: 'smoke hardening' } })
+    const hInviteFacility = await anyFacilityId(ownerToken)
+    const hInvite = await request('/admin/invites', {
+      method: 'POST', bearer: ownerToken, body: { note: 'smoke hardening', facilityId: hInviteFacility },
+    })
     check('an invite code is made -> 201', hInvite.status === 201, redacted(hInvite.body).slice(0, 80))
     const hInviteCode = hInvite.body.invite?.code
 
@@ -2191,6 +2220,292 @@ async function main() {
     // --- 6: disconnecting Google as the only way in is a pure rule,
     // already pinned offline in check-admin-rules.mjs (canDisconnectGoogle) ---
     console.log('  ...  disconnecting Google when it is the only way in is covered by the offline canDisconnectGoogle checks')
+  }
+
+  section('admin site — facilities')
+  if (!ADMIN_SECTION || !OWNER_EMAIL || !OWNER_PASSWORD) {
+    console.log('  skip (needs a staging or local server, SMOKE_OWNER_EMAIL and SMOKE_OWNER_PASSWORD)')
+  } else {
+    const fStamp = Date.now()
+    const nameFacA = `Smoke Facility A ${fStamp}`
+    const nameFacB = `Smoke Facility B ${fStamp}`
+
+    const countByAction = async (action, targetId, bearer) => {
+      const activity = await request(`/admin/activity?action=${action}`, { bearer })
+      return (activity.body.entries ?? []).filter((e) => e.targetId === targetId).length
+    }
+
+    // Same redaction as the hardening section above (out of scope here,
+    // since it is declared inside that section's own block) -- never let
+    // a token, invite code or setup link reach a failure detail as-is.
+    const redacted = (body) => {
+      const { token, codes, invite, setupLink, ...rest } = body ?? {}
+      return JSON.stringify({
+        ...rest,
+        ...(token !== undefined ? { token: '[redacted]' } : {}),
+        ...(codes !== undefined ? { codes: `[redacted, ${Array.isArray(codes) ? codes.length : 0} codes]` } : {}),
+        ...(invite !== undefined ? { invite: { ...invite, code: '[redacted]' } } : {}),
+        ...(setupLink !== undefined ? { setupLink: '[redacted]' } : {}),
+      })
+    }
+
+    const fOwnerIn = await request('/admin/auth/login', { method: 'POST', body: { email: OWNER_EMAIL, password: OWNER_PASSWORD } })
+    check('the owner signs in for the facilities section -> 200', fOwnerIn.status === 200, redacted(fOwnerIn.body).slice(0, 80))
+    const fOwnerToken = fOwnerIn.body.token
+    const fOwnerId = fOwnerIn.body.admin?.id
+
+    // --- 1: creating facilities ---
+    const facA = await request('/admin/facilities', {
+      method: 'POST', bearer: fOwnerToken, body: { name: nameFacA, hourlyFee: '150' },
+    })
+    check('the owner creates facility A -> 201', facA.status === 201, JSON.stringify(facA.body).slice(0, 120))
+    const facilityAId = facA.body.facility?.id
+    check("facility A's feeText is ₱150 per hour", facA.body.facility?.feeText === '₱150 per hour',
+      String(facA.body.facility?.feeText))
+
+    const facB = await request('/admin/facilities', { method: 'POST', bearer: fOwnerToken, body: { name: nameFacB } })
+    check('the owner creates facility B -> 201', facB.status === 201, JSON.stringify(facB.body).slice(0, 120))
+    const facilityBId = facB.body.facility?.id
+
+    const dupeFacility = await request('/admin/facilities', {
+      method: 'POST', bearer: fOwnerToken, body: { name: nameFacA.toUpperCase() },
+    })
+    check('a duplicate name in any case -> 409', dupeFacility.status === 409, String(dupeFacility.status))
+
+    const badLinkFacility = await request('/admin/facilities', {
+      method: 'POST', bearer: fOwnerToken,
+      body: { name: `Smoke Facility Bad Link ${fStamp}`, locationUrl: 'http://example.com' },
+    })
+    check('a bad map link -> 400', badLinkFacility.status === 400, String(badLinkFacility.status))
+
+    // --- 2: throwaway admins for A and B ---
+    const adminAEmail = `smoke.facility.admin.a.${uuid().slice(0, 8)}@example.com`
+    const addedAdminA = await request('/admin/admins', {
+      method: 'POST', bearer: fOwnerToken,
+      body: { name: `Smoke Facility Admin A ${fStamp}`, email: adminAEmail, facilityId: facilityAId },
+    })
+    check('the owner adds admin A with facility A -> 201', addedAdminA.status === 201, redacted(addedAdminA.body).slice(0, 100))
+    const adminAId = addedAdminA.body.admin?.id
+    check('admin A carries facilityId A', addedAdminA.body.admin?.facilityId === facilityAId,
+      String(addedAdminA.body.admin?.facilityId))
+    const adminASecret = (addedAdminA.body.setupLink?.url ?? '').split('/setup/')[1]
+    const ADMIN_A_PASSWORD = `smoke-${uuid()}`
+    const adminASetup = await request(`/admin/auth/setup/${adminASecret}`, { method: 'POST', body: { password: ADMIN_A_PASSWORD } })
+    check('admin A completes setup through the API -> 200', adminASetup.status === 200, redacted(adminASetup.body).slice(0, 80))
+    const adminAIn = await request('/admin/auth/login', { method: 'POST', body: { email: adminAEmail, password: ADMIN_A_PASSWORD } })
+    check('admin A signs in -> 200', adminAIn.status === 200, String(adminAIn.status))
+    const adminAToken = adminAIn.body.token
+
+    const adminBEmail = `smoke.facility.admin.b.${uuid().slice(0, 8)}@example.com`
+    const addedAdminB = await request('/admin/admins', {
+      method: 'POST', bearer: fOwnerToken,
+      body: { name: `Smoke Facility Admin B ${fStamp}`, email: adminBEmail, facilityId: facilityBId },
+    })
+    check('the owner adds admin B with facility B -> 201', addedAdminB.status === 201, redacted(addedAdminB.body).slice(0, 100))
+    const adminBId = addedAdminB.body.admin?.id
+    const adminBSecret = (addedAdminB.body.setupLink?.url ?? '').split('/setup/')[1]
+    const ADMIN_B_PASSWORD = `smoke-${uuid()}`
+    const adminBSetup = await request(`/admin/auth/setup/${adminBSecret}`, { method: 'POST', body: { password: ADMIN_B_PASSWORD } })
+    check('admin B completes setup through the API -> 200', adminBSetup.status === 200, redacted(adminBSetup.body).slice(0, 80))
+    const adminBIn = await request('/admin/auth/login', { method: 'POST', body: { email: adminBEmail, password: ADMIN_B_PASSWORD } })
+    check('admin B signs in -> 200', adminBIn.status === 200, String(adminBIn.status))
+    const adminBToken = adminBIn.body.token
+
+    // An admin with no facility at all: this API always requires a real
+    // facilityId to add one (POST /admin/admins refuses otherwise), so
+    // there is no way to reach that state here without writing to the
+    // database directly -- which this script never does. The rule for
+    // what such an admin sees (nothing) is pinned offline instead, in
+    // check-facility-rules.mjs (facilityFilterFor's `{ none }` cases).
+    console.log('  ...  an admin with no facility seeing and managing nothing is covered by the offline facilityFilterFor checks; this API has no way to create one to test live')
+
+    // --- 3: invite codes join the right facility ---
+    const inviteA = await request('/admin/invites', {
+      method: 'POST', bearer: adminAToken, body: { note: 'smoke facility a', facilityId: facilityBId },
+    })
+    check('admin A makes an invite code (a sent facilityId is ignored) -> 201', inviteA.status === 201,
+      redacted(inviteA.body).slice(0, 80))
+    check("the code belongs to A, not the B it tried to send", inviteA.body.invite?.facilityId === facilityAId,
+      String(inviteA.body.invite?.facilityId))
+    const inviteACode = inviteA.body.invite?.code
+
+    const umpAEmail = `smoke.facility.umpire.a.${fStamp}@example.com`
+    const umpAName = `Smoke Facility Umpire A ${fStamp}`
+    const umpAReg = await request('/auth/register', {
+      method: 'POST', body: { email: umpAEmail, name: umpAName, password: `smk-${uuid()}`, invite: inviteACode },
+    })
+    check('the throwaway umpire registers into facility A -> 201', umpAReg.status === 201, redacted(umpAReg.body).slice(0, 80))
+    const umpireAId = umpAReg.body.umpire?.id
+    const umpAToken = umpAReg.body.token
+
+    const umpADetail = await request(`/admin/umpires/${umpireAId}`, { bearer: fOwnerToken })
+    check("umpire A's detail shows facility A", umpADetail.body.umpire?.facilityId === facilityAId,
+      String(umpADetail.body.umpire?.facilityId))
+
+    const inviteB = await request('/admin/invites', {
+      method: 'POST', bearer: fOwnerToken, body: { note: 'smoke facility b', facilityId: facilityBId },
+    })
+    check('the owner makes a code for B -> 201', inviteB.status === 201, redacted(inviteB.body).slice(0, 80))
+    const inviteBCode = inviteB.body.invite?.code
+
+    const umpBEmail = `smoke.facility.umpire.b.${fStamp}@example.com`
+    const umpBName = `Smoke Facility Umpire B ${fStamp}`
+    const umpBReg = await request('/auth/register', {
+      method: 'POST', body: { email: umpBEmail, name: umpBName, password: `smk-${uuid()}`, invite: inviteBCode },
+    })
+    check('the throwaway umpire registers into facility B -> 201', umpBReg.status === 201, redacted(umpBReg.body).slice(0, 80))
+    const umpireBId = umpBReg.body.umpire?.id
+
+    // Controller note: GET /admin/invites has crashed before -- check it
+    // plainly works for the owner and for a facility admin.
+    const invitesAsOwner = await request('/admin/invites', { bearer: fOwnerToken })
+    check('GET /admin/invites works for the owner -> 200', invitesAsOwner.status === 200, String(invitesAsOwner.status))
+    const invitesAsAdminA = await request('/admin/invites', { bearer: adminAToken })
+    check('GET /admin/invites works for a facility admin -> 200', invitesAsAdminA.status === 200, String(invitesAsAdminA.status))
+
+    // --- 4: admin A's umpire list and detail are scoped to A ---
+    const umpiresAsA = await request(`/admin/umpires?q=${fStamp}`, { bearer: adminAToken })
+    const idsAsA = (umpiresAsA.body.umpires ?? []).map((u) => u.id)
+    check('admin A lists umpire A, not B', idsAsA.includes(umpireAId) && !idsAsA.includes(umpireBId), JSON.stringify(idsAsA))
+
+    const umpBAsA = await request(`/admin/umpires/${umpireBId}`, { bearer: adminAToken })
+    check("admin A reading umpire B's detail -> 404", umpBAsA.status === 404, String(umpBAsA.status))
+
+    const pauseBAsA = await request(`/admin/umpires/${umpireBId}/pause`, {
+      method: 'POST', bearer: adminAToken, body: { reason: 'smoke test' },
+    })
+    check('admin A pausing umpire B -> 404', pauseBAsA.status === 404, String(pauseBAsA.status))
+
+    const pauseAAsA = await request(`/admin/umpires/${umpireAId}/pause`, {
+      method: 'POST', bearer: adminAToken, body: { reason: 'smoke test' },
+    })
+    check('admin A pausing umpire A works -> 200, status paused',
+      pauseAAsA.status === 200 && pauseAAsA.body.umpire?.status === 'paused', JSON.stringify(pauseAAsA.body).slice(0, 80))
+    const unpauseAAsA = await request(`/admin/umpires/${umpireAId}/unpause`, { method: 'POST', bearer: adminAToken })
+    check('and switching it back on works -> 200, status active',
+      unpauseAAsA.status === 200 && unpauseAAsA.body.umpire?.status === 'active', JSON.stringify(unpauseAAsA.body).slice(0, 80))
+
+    // --- 5: admin A's facility list and edits are scoped to A ---
+    const facilitiesAsA = await request('/admin/facilities', { bearer: adminAToken })
+    const facIdsAsA = (facilitiesAsA.body.facilities ?? []).map((f) => f.id)
+    check('admin A sees only facility A', facIdsAsA.length === 1 && facIdsAsA[0] === facilityAId, JSON.stringify(facIdsAsA))
+
+    const patchBAsA = await request(`/admin/facilities/${facilityBId}`, {
+      method: 'PATCH', bearer: adminAToken, body: { openingHours: 'Mon-Sun 6am-10pm' },
+    })
+    check('admin A patching facility B -> 404', patchBAsA.status === 404, String(patchBAsA.status))
+
+    const beforeFacUpdated = await countByAction('facility.updated', facilityAId, fOwnerToken)
+    const patchAAsA = await request(`/admin/facilities/${facilityAId}`, {
+      method: 'PATCH', bearer: adminAToken, body: { openingHours: 'Mon-Sun 6am-10pm' },
+    })
+    check("admin A patching facility A's openingHours works -> 200",
+      patchAAsA.status === 200 && patchAAsA.body.facility?.openingHours === 'Mon-Sun 6am-10pm',
+      JSON.stringify(patchAAsA.body).slice(0, 100))
+    const afterFacUpdated = await countByAction('facility.updated', facilityAId, fOwnerToken)
+    check('exactly one facility.updated entry was written', afterFacUpdated === beforeFacUpdated + 1,
+      `${beforeFacUpdated} -> ${afterFacUpdated}`)
+
+    // --- 6: pausing players stays the owner's alone ---
+    const plName = `Smoke Facility Player ${fStamp}`
+    const plCreated = await request('/players', { method: 'POST', bearer: umpAToken, body: { name: plName } })
+    check('umpire A creates a throwaway player -> 201', plCreated.status === 201, JSON.stringify(plCreated.body).slice(0, 80))
+    const facPlayerId = plCreated.body.player?.id
+
+    const pauseByAdminA = await request(`/admin/players/${facPlayerId}/pause`, {
+      method: 'POST', bearer: adminAToken, body: { reason: 'smoke test' },
+    })
+    check('admin A pausing a player -> 403, Only the owner can pause players',
+      pauseByAdminA.status === 403 && pauseByAdminA.body.error === 'Only the owner can pause players',
+      JSON.stringify(pauseByAdminA.body))
+
+    const pauseByOwner = await request(`/admin/players/${facPlayerId}/pause`, {
+      method: 'POST', bearer: fOwnerToken, body: { reason: 'smoke test' },
+    })
+    check('the owner can still pause the player -> 200, status paused',
+      pauseByOwner.status === 200 && pauseByOwner.body.player?.status === 'paused', JSON.stringify(pauseByOwner.body).slice(0, 80))
+    const unpauseByOwner = await request(`/admin/players/${facPlayerId}/unpause`, { method: 'POST', bearer: fOwnerToken })
+    check('and switch it back on -> 200, status active',
+      unpauseByOwner.status === 200 && unpauseByOwner.body.player?.status === 'active',
+      JSON.stringify(unpauseByOwner.body).slice(0, 80))
+
+    // --- 7: activity is scoped by facility ---
+    const activityAsA = await request('/admin/activity', { bearer: adminAToken })
+    const namesInA = (activityAsA.body.entries ?? []).map((e) => e.facilityName)
+    check("admin A's activity has none of facility B's entries", !namesInA.includes(nameFacB), JSON.stringify([...new Set(namesInA)]))
+    check("admin A's activity has facility A's entries", namesInA.includes(nameFacA), JSON.stringify([...new Set(namesInA)]))
+
+    const activityFilterB = await request(`/admin/activity?facilityId=${facilityBId}`, { bearer: fOwnerToken })
+    const namesFilterB = (activityFilterB.body.entries ?? []).map((e) => e.facilityName)
+    check("the owner's filter by B shows only B's entries",
+      namesFilterB.length > 0 && namesFilterB.every((n) => n === nameFacB), JSON.stringify([...new Set(namesFilterB)]))
+
+    // --- 9 (done before 8): a session opened while umpire A is still in
+    // facility A is stamped with that facility -- checked before the move
+    // below relocates it. ---
+    const facSessionId = uuid()
+    const facSessionCreate = await request('/sessions', {
+      method: 'POST', bearer: umpAToken, body: { id: facSessionId, name: `Smoke Facility Session ${fStamp}` },
+    })
+    check('umpire A opens a session -> 201', facSessionCreate.status === 201, JSON.stringify(facSessionCreate.body).slice(0, 100))
+    check("the session is stamped with umpire A's facility",
+      facSessionCreate.body.session?.facility_id === facilityAId, String(facSessionCreate.body.session?.facility_id))
+    const facSessionGet = await request(`/sessions/${facSessionId}`, { bearer: umpAToken })
+    check('and GET /sessions/:id carries the same facility_id',
+      facSessionGet.body.session?.facility_id === facilityAId, String(facSessionGet.body.session?.facility_id))
+
+    // --- 8: moving people between facilities ---
+    const moveUmpA = await request(`/admin/umpires/${umpireAId}/move`, {
+      method: 'POST', bearer: fOwnerToken, body: { facilityId: facilityBId },
+    })
+    check('the owner moves umpire A to facility B -> 200', moveUmpA.status === 200 && moveUmpA.body.umpire?.facilityId === facilityBId,
+      JSON.stringify(moveUmpA.body).slice(0, 100))
+
+    const umpAAsAAfterMove = await request(`/admin/umpires/${umpireAId}`, { bearer: adminAToken })
+    check("admin A gets 404 for the umpire that just moved out of their facility",
+      umpAAsAAfterMove.status === 404, String(umpAAsAAfterMove.status))
+
+    const moveOwner = await request(`/admin/admins/${fOwnerId}/move`, {
+      method: 'POST', bearer: fOwnerToken, body: { facilityId: facilityBId },
+    })
+    check('moving the owner -> 409', moveOwner.status === 409, String(moveOwner.status))
+
+    // --- 10: cleanup -- close the throwaways, switch off the throwaway
+    // admins, and rename the facilities (there is no delete) so the list
+    // stays readable. ---
+    const closeUmpA = await request(`/admin/umpires/${umpireAId}/close`, {
+      method: 'POST', bearer: fOwnerToken, body: { reason: 'smoke cleanup', confirmName: umpAName },
+    })
+    check('closing throwaway umpire A -> 200', closeUmpA.status === 200 && closeUmpA.body.umpire?.status === 'closed',
+      JSON.stringify(closeUmpA.body).slice(0, 80))
+
+    const closeUmpB = await request(`/admin/umpires/${umpireBId}/close`, {
+      method: 'POST', bearer: fOwnerToken, body: { reason: 'smoke cleanup', confirmName: umpBName },
+    })
+    check('closing throwaway umpire B -> 200', closeUmpB.status === 200 && closeUmpB.body.umpire?.status === 'closed',
+      JSON.stringify(closeUmpB.body).slice(0, 80))
+
+    const closeFacPlayer = await request(`/admin/players/${facPlayerId}/close`, {
+      method: 'POST', bearer: fOwnerToken, body: { reason: 'smoke cleanup', confirmName: plName },
+    })
+    check('closing the throwaway player -> 200', closeFacPlayer.status === 200 && closeFacPlayer.body.player?.status === 'closed',
+      JSON.stringify(closeFacPlayer.body).slice(0, 80))
+
+    const offAdminA = await request(`/admin/admins/${adminAId}/switch-off`, { method: 'POST', bearer: fOwnerToken })
+    check('switching off throwaway admin A -> 200', offAdminA.status === 200 && offAdminA.body.admin?.active === false,
+      String(offAdminA.status))
+    const offAdminB = await request(`/admin/admins/${adminBId}/switch-off`, { method: 'POST', bearer: fOwnerToken })
+    check('switching off throwaway admin B -> 200', offAdminB.status === 200 && offAdminB.body.admin?.active === false,
+      String(offAdminB.status))
+
+    const renameA = await request(`/admin/facilities/${facilityAId}`, {
+      method: 'PATCH', bearer: fOwnerToken, body: { name: `Smoke Facility (old) A ${fStamp}` },
+    })
+    check('renaming facility A for cleanup -> 200', renameA.status === 200, JSON.stringify(renameA.body).slice(0, 80))
+    const renameB = await request(`/admin/facilities/${facilityBId}`, {
+      method: 'PATCH', bearer: fOwnerToken, body: { name: `Smoke Facility (old) B ${fStamp}` },
+    })
+    check('renaming facility B for cleanup -> 200', renameB.status === 200, JSON.stringify(renameB.body).slice(0, 80))
   }
 
   if (selfRegistered.length > 0) {

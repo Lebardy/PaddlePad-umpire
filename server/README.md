@@ -240,14 +240,36 @@ place the umpire and player addresses already live — or Google sign-in
 on the admin site is refused by the browser before it ever reaches the
 server.
 
-**Pausing, closing and claim codes.** Any admin can pause an umpire or a
-player, with a short reason — it switches off every way in (their current
-token, their password, a player's claim code) while leaving their history
-untouched, and unpausing switches it straight back on. Closing does the
-same for good, so only the owner can do it; closing an umpire also frees
-their email address to sign up again later. A new claim code replaces the
-old one outright — the old one stops working the moment the new one is
-made, which is how a lost or leaked code is dealt with.
+**Pausing, closing and claim codes.** Any admin can pause an umpire, with a
+short reason — it switches off every way in (their current token, their
+password) while leaving their history untouched, and unpausing switches it
+straight back on. Pausing a player does the same for their claim code, but
+stays the owner's alone, since a player belongs to no facility and a pause
+stops them everywhere. Closing does the pause's job for good, so only the
+owner can do it; closing an umpire also frees their email address to sign
+up again later. A new claim code replaces the old one outright — the old
+one stops working the moment the new one is made, which is how a lost or
+leaked code is dealt with.
+
+**Facilities.** A facility is a place with courts where umpires work and
+matches are scored, for an hourly fee the facility sets (shown to players;
+paid at the facility, never through PaddlePad). Every umpire, every admin
+other than the owner, every session and every invite code belongs to
+exactly one; players belong to none, since they can play anywhere and
+ratings and boards stay across everyone on PaddlePad. The owner creates
+facilities, sees and manages every one, and is the only one who can move an
+umpire or an admin between facilities. A facility's own admins see and
+manage only their own — its umpires, invite codes, sessions and activity —
+and can edit its name, area, map link, opening hours, fee and details.
+
+The first time this API boots with the `facilities` table in place, a
+one-time switch-over runs: if anything (an umpire, a session, an invite
+code, or an admin other than the owner) has no facility yet, it is put into
+a single facility named `Starting facility`, created just once. This is
+what makes existing data — everything made before facilities existed — land
+somewhere real rather than in limbo. After deploying this, the owner should
+open the Facilities page, rename `Starting facility` to whatever it
+actually is, and fill in its details.
 
 **Creating the owner.** There's no sign-up form; the first admin account
 is made once, from the command line, inside the api container:
@@ -336,26 +358,39 @@ an invite code at all.
 | `POST` | `/admin/auth/me/sign-out-others` | Bearer (admin) | End every other session for this admin right now |
 | `POST` | `/admin/auth/me/backup-codes` | Bearer (owner) | Make a fresh set of ten backup codes, replacing any still unused |
 | `GET` | `/admin/admins` | Bearer (owner) | List every admin |
-| `POST` | `/admin/admins` | Bearer (owner) | Add a new admin and its first setup link |
+| `POST` | `/admin/admins` | Bearer (owner) | Add a new admin and its first setup link; needs a `facilityId` |
 | `POST` | `/admin/admins/:id/setup-link` | Bearer (owner) | Make a fresh setup link, cancelling any unused one |
 | `POST` | `/admin/admins/:id/switch-off` | Bearer (owner) | Switch an admin off; the owner can't be switched off |
 | `POST` | `/admin/admins/:id/switch-on` | Bearer (owner) | Switch an admin back on |
-| `GET` | `/admin/invites` | Bearer (admin) | List invite codes |
-| `POST` | `/admin/invites` | Bearer (admin) | Make a new invite code |
+| `POST` | `/admin/admins/:id/move` | Bearer (owner) | Move an admin to another facility |
+| `GET` | `/admin/facilities` | Bearer (admin) | List facilities — the owner sees every one, another admin only their own |
+| `POST` | `/admin/facilities` | Bearer (owner) | Create a facility |
+| `GET` | `/admin/facilities/:id` | Bearer (admin) | One facility's detail, plus its admins and umpires |
+| `PATCH` | `/admin/facilities/:id` | Bearer (admin) | Change any subset of a facility's details |
+| `GET` | `/admin/invites` | Bearer (admin) | List invite codes, optionally by `facilityId` (owner only) |
+| `POST` | `/admin/invites` | Bearer (admin) | Make a new invite code, for the owner's chosen `facilityId` or the admin's own |
 | `DELETE` | `/admin/invites/:code` | Bearer (admin) | Cancel a code that hasn't been used |
-| `GET` | `/admin/activity` | Bearer (admin) | The activity record, newest first |
+| `GET` | `/admin/activity` | Bearer (admin) | The activity record, newest first, optionally by `facilityId` (owner only) |
 | `GET` | `/admin/activity/filters` | Bearer (admin) | Who and what to filter the record by |
 | `GET` | `/admin/players` | Bearer (admin) | List players, searchable and filterable by status |
 | `GET` | `/admin/players/:id` | Bearer (admin) | One player's detail: matches, rating, sign-in methods |
-| `POST` | `/admin/players/:id/pause` | Bearer (admin) | Pause a player, with a reason |
-| `POST` | `/admin/players/:id/unpause` | Bearer (admin) | Switch a paused player back on |
+| `POST` | `/admin/players/:id/pause` | Bearer (owner) | Pause a player, with a reason — players belong to no facility, so this stays the owner's alone |
+| `POST` | `/admin/players/:id/unpause` | Bearer (owner) | Switch a paused player back on |
 | `POST` | `/admin/players/:id/close` | Bearer (owner) | Close a player for good |
 | `POST` | `/admin/players/:id/claim-code` | Bearer (admin) | Make a new claim code, replacing the old one |
-| `GET` | `/admin/umpires` | Bearer (admin) | List umpires, searchable and filterable by status |
+| `GET` | `/admin/umpires` | Bearer (admin) | List umpires, searchable and filterable by status, and by `facilityId` (owner only) |
 | `GET` | `/admin/umpires/:id` | Bearer (admin) | One umpire's detail: recent matches, the invite that brought them in |
 | `POST` | `/admin/umpires/:id/pause` | Bearer (admin) | Pause an umpire, with a reason |
 | `POST` | `/admin/umpires/:id/unpause` | Bearer (admin) | Switch a paused umpire back on |
 | `POST` | `/admin/umpires/:id/close` | Bearer (owner) | Close an umpire for good and free their email address |
+| `POST` | `/admin/umpires/:id/move` | Bearer (owner) | Move an umpire to another facility |
+
+An admin who isn't the owner only ever sees and manages their own
+facility's umpires, invite codes, sessions and activity entries — a
+facility that isn't theirs answers 404, the same "not found" a
+made-up id would. Reaching one of the above for another facility's
+umpire, or a facility that isn't the caller's, behaves exactly as if it
+didn't exist.
 
 Tokens are JWTs valid for 30 days, sent as `Authorization: Bearer <token>`.
 An admin token is a JWT too, but lasts 12 hours and carries `role: 'admin'`
