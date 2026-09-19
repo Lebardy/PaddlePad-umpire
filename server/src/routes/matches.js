@@ -423,6 +423,8 @@ router.delete('/:id', async (req, res) => {
  * detect that. But hard-deleting finished play throws away a real
  * record of something that happened, so this is reversible and
  * attributed instead.
+ *
+ * An umpire's void or restore always replaces an admin's (voided_by_admin is cleared), so the umpire keeps the last word.
  */
 router.post('/:id/void', async (req, res) => {
   const voided = req.body?.voided !== false
@@ -432,6 +434,7 @@ router.post('/:id/void', async (req, res) => {
     `UPDATE matches
         SET voided_at = CASE WHEN $2 THEN now() END,
             voided_by = CASE WHEN $2 THEN $3::uuid END,
+            voided_by_admin = NULL,
             void_reason = CASE WHEN $2 THEN $4 END
       WHERE id = $1
       RETURNING id`,
