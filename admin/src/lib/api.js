@@ -223,3 +223,4 @@ export const pausePerson = (kind, id, reason) => post(`/admin/${kind}/${id}/paus
 export const unpausePerson = (kind, id) => post(`/admin/${kind}/${id}/unpause`)
 export const closePerson = (kind, id, { reason, confirmName }) => post(`/admin/${kind}/${id}/close`, { reason, confirmName })
 export const newClaimCode = (id) => post(`/admin/players/${id}/claim-code`).then((d) => d.claimCode)
+export const moveUmpire = (id, facilityId) => post(`/admin/umpires/${id}/move`, { facilityId }).then((d) => d.umpire)
