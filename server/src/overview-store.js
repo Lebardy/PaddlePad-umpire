@@ -7,7 +7,7 @@
 
 import { deriveMatchState, eventFromRow } from './pickleball.js'
 import {
-  WINDOW_DAYS, duplicatePairs, hasSignIn, matchReasons, pairKey, sameDayPairs, sharedMatchPairs,
+  PLAYER_ID_KEYS, WINDOW_DAYS, duplicatePairs, hasSignIn, matchReasons, pairKey, sameDayPairs, sharedMatchPairs,
 } from './overview-rules.js'
 
 const WEEK = "now() - interval '7 days'"
@@ -290,6 +290,44 @@ async function loadDuplicates(queryFn, now) {
   const byId = new Map(players.map((p) => [p.id, p]))
   const describe = (p) => ({ id: p.id, name: p.name, matchCount: p.match_count, firstMatchAt: p.first_match_at, hasSignIn: hasSignIn(p) })
   return pairs.map((pair) => ({ reason: pair.reason, text: pair.text, a: describe(byId.get(pair.a)), b: describe(byId.get(pair.b)) }))
+}
+
+/**
+ * Moves everything of `removeId` onto `keepId` and deletes the removed
+ * record, inside the caller's transaction. The caller has already
+ * checked mergeRefusal. Team lists are plain uuid arrays (no foreign
+ * key), and event payloads name players by id, so both are rewritten
+ * here explicitly.
+ */
+export async function mergePlayers(client, keepId, removeId) {
+  await client.query(
+    `INSERT INTO session_players (session_id, player_id)
+     SELECT session_id, $1 FROM session_players WHERE player_id = $2
+     ON CONFLICT DO NOTHING`,
+    [keepId, removeId],
+  )
+  const { rows: moved } = await client.query(
+    `UPDATE matches
+        SET team_a = array_replace(team_a, $2::uuid, $1::uuid),
+            team_b = array_replace(team_b, $2::uuid, $1::uuid)
+      WHERE $2::uuid = ANY(team_a) OR $2::uuid = ANY(team_b)
+      RETURNING id`,
+    [keepId, removeId],
+  )
+  await client.query('UPDATE matches SET first_server_player = $1 WHERE first_server_player = $2', [keepId, removeId])
+  await client.query('UPDATE matches SET right_start_a = $1 WHERE right_start_a = $2', [keepId, removeId])
+  await client.query('UPDATE matches SET right_start_b = $1 WHERE right_start_b = $2', [keepId, removeId])
+  const movedIds = moved.map((m) => m.id)
+  for (const key of PLAYER_ID_KEYS) {
+    await client.query(
+      `UPDATE match_events SET payload = jsonb_set(payload, ARRAY[$3::text], to_jsonb($1::text))
+        WHERE match_id = ANY($4::uuid[]) AND payload->>$3 = $2::text`,
+      [keepId, removeId, key, movedIds],
+    )
+  }
+  // session_players, player_ratings and dismissed pairs go with the row (ON DELETE CASCADE).
+  await client.query('DELETE FROM players WHERE id = $1', [removeId])
+  return { movedMatches: movedIds.length }
 }
 
 /** Everything the Overview page shows, for one facilityFilterFor() result. */

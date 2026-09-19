@@ -4,9 +4,10 @@ import { requireAdminAccount } from '../auth.js'
 import { facilityFilterFor } from '../facility-rules.js'
 import { recordActivity } from '../admin-activity.js'
 import {
-  NOT_FLAGGED_MESSAGE, NOT_OVERVIEW_VOID_MESSAGE, REASONS, pairKey, readVoidReason,
+  CONFIRM_MERGE_MESSAGE, NOT_FLAGGED_MESSAGE, NOT_OVERVIEW_VOID_MESSAGE, REASONS, hasSignIn, mergeRefusal, pairKey, readVoidReason,
 } from '../overview-rules.js'
-import { loadMatchForAction, loadOverview, matchLabel, matchReasonsNow } from '../overview-store.js'
+import { loadMatchForAction, loadOverview, matchLabel, matchReasonsNow, mergePlayers } from '../overview-store.js'
+import { confirmNameMatches } from '../people-rules.js'
 import { invalidateRallyRatings } from '../rally-rating-store.js'
 import { isUuid } from '../validate.js'
 
@@ -148,6 +149,53 @@ router.post('/not-same-person', async (req, res) => {
     })
   })
   res.json({ ok: true })
+})
+
+router.post('/merge', async (req, res) => {
+  if (req.admin.role !== 'owner') return res.status(403).json({ error: 'Only the owner can do that' })
+  const { keepId, removeId, confirmName } = req.body ?? {}
+  if (!isUuid(keepId) || !isUuid(removeId)) return res.status(400).json({ error: 'Say which two players' })
+  try {
+    const result = await withTransaction(async (client) => {
+      const { rows } = await client.query(
+        `SELECT id, name, username, password_hash, google_sub, claimed_at, registered_at, deactivated_at
+           FROM players WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE`,
+        [[keepId, removeId]],
+      )
+      const keep = rows.find((r) => r.id === keepId)
+      const remove = rows.find((r) => r.id === removeId)
+      if (!keep || !remove) throw refusal(404, 'No such player')
+      if (!confirmNameMatches(confirmName, remove.name)) throw refusal(400, CONFIRM_MERGE_MESSAGE)
+      const { rows: [flags] } = await client.query(
+        `SELECT
+           EXISTS (SELECT 1 FROM matches m
+                    WHERE ($1::uuid = ANY(m.team_a) OR $1::uuid = ANY(m.team_b))
+                      AND ($2::uuid = ANY(m.team_a) OR $2::uuid = ANY(m.team_b))) AS shared_match,
+           EXISTS (SELECT 1 FROM session_players sp JOIN sessions s ON s.id = sp.session_id
+                    WHERE sp.player_id = $2 AND s.ended_at IS NULL AND s.voided_at IS NULL)
+           OR EXISTS (SELECT 1 FROM matches m
+                    WHERE m.status = 'in_progress' AND ($2::uuid = ANY(m.team_a) OR $2::uuid = ANY(m.team_b))) AS in_live_session`,
+        [keepId, removeId],
+      )
+      const why = mergeRefusal({
+        keep: { id: keep.id, hasSignIn: hasSignIn(keep), closed: Boolean(keep.deactivated_at) },
+        remove: { id: remove.id, hasSignIn: hasSignIn(remove), closed: Boolean(remove.deactivated_at) },
+        sharedMatch: flags.shared_match,
+        removeInLiveSession: flags.in_live_session,
+      })
+      if (why) throw refusal(409, why)
+      const merged = await mergePlayers(client, keepId, removeId)
+      await recordActivity(client, {
+        adminId: req.admin.id, action: 'player.merged', targetType: 'player', targetId: keepId,
+        summary: `Merged ${remove.name} into ${keep.name} (${merged.movedMatches} ${merged.movedMatches === 1 ? 'match' : 'matches'} moved)`,
+      })
+      return merged
+    })
+    invalidateRallyRatings()
+    res.json({ ok: true, movedMatches: result.movedMatches })
+  } catch (error) {
+    sendRefusal(res, error)
+  }
 })
 
 export default router

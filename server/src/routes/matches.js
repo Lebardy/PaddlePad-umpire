@@ -158,23 +158,32 @@ router.post('/', async (req, res) => {
 
   const { stacking_a, stacking_b } = stackingToColumns(stacking)
 
-  await query(
-    `INSERT INTO matches (id, session_id, recorded_by, team_a, team_b,
-                          stacking_a, stacking_b,
-                          first_server_team, first_server_player, point_target,
-                          right_start_a, right_start_b,
-                          started_at)
-     VALUES ($1, $2, $3, $4::uuid[], $5::uuid[], $6, $7, $8, $9, $10, $11, $12,
-             COALESCE($13::timestamptz, now()))
-     ON CONFLICT (id) DO NOTHING`,
-    [
-      id, sessionId, req.umpire.id, teamA, teamB,
-      stacking_a, stacking_b,
-      firstServer.team, firstServer.playerId, pointTarget,
-      rightStartA, rightStartB,
-      startedAt ? new Date(startedAt).toISOString() : null,
-    ],
-  )
+  try {
+    await query(
+      `INSERT INTO matches (id, session_id, recorded_by, team_a, team_b,
+                            stacking_a, stacking_b,
+                            first_server_team, first_server_player, point_target,
+                            right_start_a, right_start_b,
+                            started_at)
+       VALUES ($1, $2, $3, $4::uuid[], $5::uuid[], $6, $7, $8, $9, $10, $11, $12,
+               COALESCE($13::timestamptz, now()))
+       ON CONFLICT (id) DO NOTHING`,
+      [
+        id, sessionId, req.umpire.id, teamA, teamB,
+        stacking_a, stacking_b,
+        firstServer.team, firstServer.playerId, pointTarget,
+        rightStartA, rightStartB,
+        startedAt ? new Date(startedAt).toISOString() : null,
+      ],
+    )
+  } catch (error) {
+    // 23503 = foreign_key_violation: a player id that isn't in the
+    // registry any more (merged into another record). A clear 409 is a
+    // permanent refusal to the app's sync, rather than a 500 it would
+    // retry forever.
+    if (error.code === '23503') return res.status(409).json({ error: 'One of those players no longer exists' })
+    throw error
+  }
 
   const { rows } = await query(`${MATCH_SELECT} WHERE m.id = $1`, [id])
   if (!rows[0]) return res.status(404).json({ error: 'Match could not be created' })
