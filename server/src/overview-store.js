@@ -61,7 +61,7 @@ async function namesOf(queryFn, ids) {
 const MATCH_COLUMNS = `m.id, m.session_id, m.team_a, m.team_b, m.first_server_team, m.first_server_player,
   m.right_start_a, m.right_start_b, m.point_target, m.status, m.started_at, m.ended_at, m.ended_early,
   m.voided_at, m.void_reason, m.voided_by_admin, m.recorded_by AS recorded_by_id, u.name AS umpire_name, s.name AS session_name,
-  s.facility_id, f.name AS facility_name, va.name AS voided_by_admin_name`
+  s.facility_id, f.name AS facility_name, va.name AS voided_by_admin_name, s.voided_at AS session_voided_at`
 
 const MATCH_FROM = `FROM matches m
   JOIN sessions s ON s.id = m.session_id
@@ -90,7 +90,9 @@ export async function matchLabel(queryFn, row) {
  * with any reasons already marked "Looks fine" taken off.
  */
 export async function matchReasonsNow(queryFn, row, now = Date.now()) {
-  if (Date.parse(row.started_at) < now - WINDOW_DAYS * 86_400_000) return []
+  if (row.session_voided_at) return []
+  const startedAt = row.started_at instanceof Date ? row.started_at.getTime() : Date.parse(row.started_at)
+  if (startedAt < now - WINDOW_DAYS * 86_400_000) return []
   const events = await eventsFor(queryFn, [row.id])
   const derived = derive(row, events.get(row.id))
   const { rows: dismissed } = await queryFn(
@@ -109,7 +111,7 @@ async function loadRightNow(queryFn, filter) {
   const { rows: sessions } = await queryFn(
     `SELECT s.id, s.name, s.created_at, s.created_by AS opened_by_id, f.name AS facility_name, u.name AS opened_by,
             (SELECT count(*)::int FROM session_players sp WHERE sp.session_id = s.id) AS player_count,
-            (SELECT max(m.ended_at) FROM matches m WHERE m.session_id = s.id AND m.status = 'completed') AS last_match_ended_at
+            (SELECT max(m.ended_at) FROM matches m WHERE m.session_id = s.id AND m.status = 'completed' AND m.voided_at IS NULL) AS last_match_ended_at
        FROM sessions s
        LEFT JOIN facilities f ON f.id = s.facility_id
        LEFT JOIN umpires u ON u.id = s.created_by
@@ -175,14 +177,14 @@ async function loadTotals(queryFn, filter, activeUmpireIds) {
                    FROM matches m
                    JOIN sessions s ON s.id = m.session_id
                    CROSS JOIN LATERAL unnest(m.team_a || m.team_b) AS p(player_id)
-                  WHERE m.voided_at IS NULL AND ${scope}
+                  WHERE m.voided_at IS NULL AND s.voided_at IS NULL AND ${scope}
                   GROUP BY p.player_id) played`,
         params,
       ),
     queryFn(
       `SELECT count(*)::int AS count, count(*) FILTER (WHERE m.started_at > ${WEEK})::int AS new_this_week
          FROM matches m JOIN sessions s ON s.id = m.session_id
-        WHERE m.voided_at IS NULL AND ${scope}`,
+        WHERE m.voided_at IS NULL AND s.voided_at IS NULL AND ${scope}`,
       params,
     ),
     queryFn(

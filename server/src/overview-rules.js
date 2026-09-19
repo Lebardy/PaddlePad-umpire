@@ -26,7 +26,7 @@ export const CONFIRM_MERGE_MESSAGE = 'Type the name of the player being removed 
 export const CLOSED_MERGE_MESSAGE = "Closed accounts can't be merged"
 export const SAME_PLAYER_MESSAGE = 'Pick two different players'
 
-const ms = (value) => (value == null ? null : typeof value === 'number' ? value : Date.parse(value))
+const ms = (value) => (value == null ? null : typeof value === 'number' ? value : value instanceof Date ? value.getTime() : Date.parse(value))
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 /** "under a minute", "2 minutes", "4 hours", "1 h 40 min". */

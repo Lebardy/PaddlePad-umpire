@@ -61,6 +61,10 @@ section('matches worth a look')
   check('exactly 3 minutes is not very short', reasonsOf(done({ startedAt: now - 8 * MIN, endedAt: now - 5 * MIN })), [])
   check('very long: 1 h 40 min', tagsOf(done({ startedAt: now - 105 * MIN, endedAt: now - 5 * MIN })), ['Lasted 1 h 40 min'])
   check('exactly 90 minutes is not very long', reasonsOf(done({ startedAt: now - 95 * MIN, endedAt: now - 5 * MIN })), [])
+  check('very short, to the millisecond: 3 minutes + 500 ms (as Date objects) is not very short',
+    reasonsOf(done({ startedAt: new Date(now - (3 * MIN + 500)), endedAt: new Date(now) })), [])
+  check('very short, to the millisecond: 3 minutes − 1 ms (as Date objects) is very short',
+    tagsOf(done({ startedAt: new Date(now - (3 * MIN - 1)), endedAt: new Date(now) })), ['Lasted 2 minutes'])
   check('several reasons at once, in a fixed order',
     reasonsOf(done({ startedAt: now - 7 * MIN, endedAt: now - 5 * MIN, score: { A: 11, B: 0 } })), ['shutout', 'short'])
   check('a finished match with no end time is judged on score only',
