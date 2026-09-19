@@ -2356,7 +2356,7 @@ async function main() {
     check('the throwaway umpire registers into facility B -> 201', umpBReg.status === 201, redacted(umpBReg.body).slice(0, 80))
     const umpireBId = umpBReg.body.umpire?.id
 
-    // Controller note: GET /admin/invites has crashed before -- check it
+    // GET /admin/invites once crashed on a bad argument -- check it
     // plainly works for the owner and for a facility admin.
     const invitesAsOwner = await request('/admin/invites', { bearer: fOwnerToken })
     check('GET /admin/invites works for the owner -> 200', invitesAsOwner.status === 200, String(invitesAsOwner.status))
