@@ -3,7 +3,7 @@ import { query, withTransaction } from '../db.js'
 import { requireAdminAccount } from '../auth.js'
 import { recordActivity } from '../admin-activity.js'
 import {
-  facilityColumns, facilityPayload, facilityScope, mayCreateFacility, mayManageFacility, readFacility,
+  facilityColumns, facilityFilterFor, facilityPayload, mayCreateFacility, mayManageFacility, readFacility,
 } from '../facility-rules.js'
 import { createFacility, facilityPeople, findFacility, listFacilities, updateFacility } from '../facility-store.js'
 import { isUuid } from '../validate.js'
@@ -38,7 +38,7 @@ const FIELD_LABELS = {
 }
 
 router.get('/', async (req, res) => {
-  const rows = await listFacilities(query, facilityScope(req.admin))
+  const rows = await listFacilities(query, facilityFilterFor(req.admin, null))
   res.json({ facilities: rows.map(facilityPayload) })
 })
 
@@ -90,8 +90,13 @@ router.patch('/:id', async (req, res) => {
       // A rename gets its own wording, naming both the old and new name,
       // rather than "Changed name for <new name>" -- which would read as
       // though the facility already had the new name before the change.
-      const summary = columns.includes('name')
-        ? `Renamed facility ${before.name} to ${updated.name}`
+      // It is only a rename if the name actually changed -- sending the
+      // current name back (alongside other real edits) is not one.
+      const isRename = columns.includes('name') && before.name !== updated.name
+      const otherFields = columns.filter((column) => column !== 'name')
+      const summary = isRename
+        ? `Renamed facility ${before.name} to ${updated.name}` +
+          (otherFields.length ? ` and changed ${otherFields.map((column) => FIELD_LABELS[column]).join(', ')}` : '')
         : `Changed ${columns.map((column) => FIELD_LABELS[column]).join(', ')} for ${updated.name}`
       await recordActivity(client, {
         adminId: req.admin.id, action: 'facility.updated', targetType: 'facility', targetId: updated.id,

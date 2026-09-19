@@ -100,25 +100,12 @@ export function facilityColumns(values = {}) {
   return FACILITY_VALUE_COLUMNS.filter((column) => Object.prototype.hasOwnProperty.call(values, column))
 }
 
-/** The owner sees every facility; every other admin sees their own. */
-export function facilityScope(admin) {
-  return admin?.role === 'owner' ? 'all' : admin?.facilityId ?? null
-}
-
-export function mayManageFacility(admin, facilityId) {
-  const scope = facilityScope(admin)
-  return scope === 'all' || (scope !== null && scope === facilityId)
-}
-
-export function mayManageUmpire(admin, umpire) {
-  return mayManageFacility(admin, umpire?.facility_id ?? null)
-}
-
 /**
- * Which facility(ies) a request is scoped to, for both reading (a list
- * filter) and writing (which facility a new or moved record gets). The
- * single place this decision is made -- every route and store function
- * that needs to scope a query by facility calls this rather than
+ * Which facility(ies) a request is scoped to, for reading (a list
+ * filter), writing (which facility a new or moved record gets), and
+ * authorization (mayManageFacility/mayManageUmpire below). The single
+ * place this decision is made -- every route and store function that
+ * needs to scope or check something by facility calls this rather than
  * working it out itself, so the rule can never drift between them.
  *
  * `requestedFacilityId` is the facility the caller asked for (already
@@ -126,7 +113,9 @@ export function mayManageUmpire(admin, umpire) {
  * and it is only ever honoured for the owner. A facility admin can
  * never pick a different facility than their own, no matter what they
  * send, and an admin who belongs to no facility at all can never be
- * handed one this way either.
+ * handed one this way either. Passing `null` (asking for nothing in
+ * particular) is also how callers read an admin's own overall scope,
+ * for an authorization check rather than a list filter.
  *
  * Returns exactly one of:
  *   `{ all: true }`  -- the owner, nothing requested: every facility.
@@ -143,6 +132,18 @@ export function facilityFilterFor(admin, requestedFacilityId) {
     return requestedFacilityId ? { id: requestedFacilityId } : { all: true }
   }
   return admin?.facilityId ? { id: admin.facilityId } : { none: true }
+}
+
+/** Whether an admin may manage a given facility: the owner any, a facility admin only their own, no one else any. */
+export function mayManageFacility(admin, facilityId) {
+  const scope = facilityFilterFor(admin, null)
+  if (scope.all) return true
+  if (scope.id) return scope.id === facilityId
+  return false // scope.none
+}
+
+export function mayManageUmpire(admin, umpire) {
+  return mayManageFacility(admin, umpire?.facility_id ?? null)
 }
 
 /** A pause stops a player everywhere, so it is the owner's alone. */

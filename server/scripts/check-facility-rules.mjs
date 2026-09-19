@@ -75,15 +75,16 @@ section('who may do what')
 {
   const owner = { role: 'owner', facilityId: null }
   const adminA = { role: 'admin', facilityId: 'fa' }
-  check('the owner sees all', rules.facilityScope(owner), 'all')
-  check('an admin sees their facility', rules.facilityScope(adminA), 'fa')
+  const adminNone = { role: 'admin', facilityId: null }
   check('the owner manages any facility', rules.mayManageFacility(owner, 'fb'), true)
   check('an admin manages their own facility', rules.mayManageFacility(adminA, 'fa'), true)
   check('an admin cannot manage another facility', rules.mayManageFacility(adminA, 'fb'), false)
+  check('a facility-less admin manages no facility', rules.mayManageFacility(adminNone, 'fb'), false)
   check('the owner manages any umpire', rules.mayManageUmpire(owner, { facility_id: 'fb' }), true)
   check('an admin manages their own umpires', rules.mayManageUmpire(adminA, { facility_id: 'fa' }), true)
   check('an admin cannot manage another facility’s umpire', rules.mayManageUmpire(adminA, { facility_id: 'fb' }), false)
   check('an admin cannot manage an umpire with no facility', rules.mayManageUmpire(adminA, { facility_id: null }), false)
+  check('a facility-less admin manages no umpire either', rules.mayManageUmpire(adminNone, { facility_id: 'fb' }), false)
   check('only the owner pauses players', [rules.mayPausePlayers(owner), rules.mayPausePlayers(adminA)], [true, false])
   check('only the owner creates facilities', [rules.mayCreateFacility(owner), rules.mayCreateFacility(adminA)], [true, false])
   check('only the owner moves people', [rules.mayMove(owner), rules.mayMove(adminA)], [true, false])

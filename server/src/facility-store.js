@@ -12,17 +12,21 @@ const FACILITY_COLUMNS =
   'id, name, area, location_url, opening_hours, hourly_fee_centavos, details, created_by, created_at, updated_at'
 
 /**
- * Every facility for `'all'`, ordered by name; the one facility for an
- * id (empty if it doesn't exist); nothing for `null`.
+ * Every facility for a facility-rules.js `facilityFilterFor()` result:
+ * `{ all }` -> every facility, ordered by name; `{ id }` -> that one
+ * facility (empty if it doesn't exist); `{ none }`, missing, or any
+ * unrecognised shape -> `[]`, fail closed rather than open.
  */
-export async function listFacilities(queryFn, scope) {
-  if (scope === 'all') {
+export async function listFacilities(queryFn, filter) {
+  if (filter?.all) {
     const { rows } = await queryFn(`SELECT ${FACILITY_COLUMNS} FROM facilities ORDER BY name`)
     return rows
   }
-  if (!scope) return []
-  const { rows } = await queryFn(`SELECT ${FACILITY_COLUMNS} FROM facilities WHERE id = $1`, [scope])
-  return rows
+  if (filter?.id) {
+    const { rows } = await queryFn(`SELECT ${FACILITY_COLUMNS} FROM facilities WHERE id = $1`, [filter.id])
+    return rows
+  }
+  return []
 }
 
 export async function findFacility(queryFn, id) {

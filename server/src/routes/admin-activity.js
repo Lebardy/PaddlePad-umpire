@@ -23,12 +23,12 @@ router.get('/', async (req, res) => {
   // `{ none }` is its own fixed FALSE condition, never "no filter".
   const filter = facilityFilterFor(req.admin, isUuid(req.query.facilityId) ? req.query.facilityId : null)
   const params = [before, adminId, action]
-  let facilityFilter = 'TRUE'
-  if (filter.id) {
+  let facilityFilter = 'FALSE' // fail closed: filter.none, or anything unrecognised, sees nothing
+  if (filter.all) {
+    facilityFilter = 'TRUE'
+  } else if (filter.id) {
     params.push(filter.id)
     facilityFilter = `e.facility_id = $${params.length}`
-  } else if (filter.none) {
-    facilityFilter = 'FALSE'
   }
   params.push(PAGE + 1)
 
@@ -72,7 +72,7 @@ router.get('/filters', async (req, res) => {
   else if (filter.id) admins = (await query('SELECT id, name FROM admins WHERE facility_id = $1 ORDER BY name', [filter.id])).rows
   // filter.none: an admin who belongs to no facility is offered no admins to filter by either.
 
-  const facilities = await listFacilities(query, filter.all ? 'all' : (filter.id ?? null))
+  const facilities = await listFacilities(query, filter)
   res.json({ admins, actions: ACTIONS, facilities: facilities.map((f) => ({ id: f.id, name: f.name })) })
 })
 

@@ -4,22 +4,29 @@
 
 import { generateInviteCode } from './invites.js'
 
-/** Turns a facility-rules.js facilityFilterFor() result into a fixed SQL condition. */
+/**
+ * Turns a facility-rules.js facilityFilterFor() result into a fixed SQL
+ * condition. Fails closed: only an explicit `{ all }` opens things up;
+ * `{ id }` restricts to that one facility; `{ none }`, a missing
+ * filter, or any other unrecognised shape all mean nothing matches.
+ * Callers must always pass a real filter -- there is no "everything"
+ * default to fall back on by accident.
+ */
 function facilityClause(filter, column, params) {
-  if (filter.id) {
+  if (filter?.all) return 'TRUE'
+  if (filter?.id) {
     params.push(filter.id)
     return `${column} = $${params.length}`
   }
-  if (filter.none) return 'FALSE'
-  return 'TRUE'
+  return 'FALSE'
 }
 
 /**
  * Every code with its status, newest first, scoped by `filter` (a
- * facility-rules.js `facilityFilterFor()` result: `{ all }`, `{ id }`
- * or `{ none }`).
+ * required facility-rules.js `facilityFilterFor()` result: `{ all }`,
+ * `{ id }` or `{ none }`).
  */
-export async function listInvites(db, filter = { all: true }) {
+export async function listInvites(db, filter) {
   const params = []
   const where = facilityClause(filter, 'i.facility_id', params)
   const { rows } = await db.query(
@@ -63,10 +70,11 @@ export async function createInvite(db, { note, days, createdByAdmin, facilityId 
 }
 
 /**
- * Deletes an unused code, scoped by `filter` the same way `listInvites`
- * is. Used codes are kept as the record of who joined with which.
+ * Deletes an unused code, scoped by `filter` (required, same as
+ * `listInvites`). Used codes are kept as the record of who joined with
+ * which.
  */
-export async function cancelInvite(db, code, filter = { all: true }) {
+export async function cancelInvite(db, code, filter) {
   const params = [code]
   const where = facilityClause(filter, 'facility_id', params)
   const { rows } = await db.query(
