@@ -52,6 +52,9 @@ section('reading facility details')
   check('empty optional text becomes nothing', rules.readFacility({ name: 'A', area: '  ', details: '' }).values,
     { name: 'A', area: null, location_url: null, opening_hours: null, hourly_fee_centavos: null, details: null })
   check('a link must be https', rules.readFacility({ name: 'A', locationUrl: 'http://maps.example.com' }), { error: 'The map link must start with https://' })
+  check('an over-long link gets its own message, not the https one',
+    rules.readFacility({ name: 'A', locationUrl: `https://example.com/${'x'.repeat(490)}` }),
+    { error: 'The map link can be up to 500 characters' })
   check('a long area is refused', rules.readFacility({ name: 'A', area: 'x'.repeat(121) }), { error: 'The area can be up to 120 characters' })
   check('long opening hours are refused', rules.readFacility({ name: 'A', openingHours: 'x'.repeat(201) }), { error: 'Opening hours can be up to 200 characters' })
   check('long details are refused', rules.readFacility({ name: 'A', details: 'x'.repeat(1001) }), { error: 'Details can be up to 1000 characters' })

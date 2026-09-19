@@ -61,7 +61,8 @@ export function readFacility(body = {}, { partial = false } = {}) {
   }
   if (has('locationUrl')) {
     const link = optionalText(body.locationUrl)
-    if (link && (!link.startsWith('https://') || link.length > 500)) return { error: 'The map link must start with https://' }
+    if (link && link.length > 500) return { error: 'The map link can be up to 500 characters' }
+    if (link && !link.startsWith('https://')) return { error: 'The map link must start with https://' }
     values.location_url = link
   }
   for (const field of TEXT_FIELDS.slice(1, 2)) {
