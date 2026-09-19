@@ -30,6 +30,7 @@ export const ACTIONS = [
   'admin.signed_out_others',
   'admin.backup_codes_created',
   'admin.backup_code_used',
+  'admin.moved',
   'invite.created',
   'invite.cancelled',
   'player.paused',
@@ -39,6 +40,9 @@ export const ACTIONS = [
   'umpire.paused',
   'umpire.unpaused',
   'umpire.closed',
+  'umpire.moved',
+  'facility.created',
+  'facility.updated',
 ]
 
 export function normalizeEmail(value) {

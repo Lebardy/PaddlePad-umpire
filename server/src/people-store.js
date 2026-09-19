@@ -11,7 +11,9 @@ const PLAYER_COLUMNS = `p.id, p.name, p.username, p.password_hash, p.google_sub,
   p.claim_code, p.claimed_at, p.name_visible, p.created_at, p.last_signed_in_at,
   p.paused_at, p.paused_reason, p.deactivated_at, p.closed_by_admin_at, p.created_by`
 const UMPIRE_COLUMNS = `u.id, u.name, u.email, u.password_hash, u.google_sub, u.google_email,
-  u.created_at, u.last_signed_in_at, u.paused_at, u.paused_reason, u.closed_at`
+  u.created_at, u.last_signed_in_at, u.paused_at, u.paused_reason, u.closed_at,
+  u.facility_id, fac.name AS facility_name`
+const UMPIRE_FACILITY_JOIN = 'LEFT JOIN facilities fac ON fac.id = u.facility_id'
 
 const STATUS_SQL = {
   players: {
@@ -28,14 +30,30 @@ const STATUS_SQL = {
   },
 }
 
-/** One page of a list, newest first, plus the cursor for the next page. */
-async function listPage(queryFn, { table, alias, columns, searchColumns, status, q, after, toItem }) {
+/**
+ * One page of a list, newest first, plus the cursor for the next page.
+ *
+ * `facilityId` filters by the alias's facility_id column when given:
+ * left out entirely means no filter, `null` means "no facility", and
+ * anything else means that exact facility -- the three are distinct, so
+ * a caller scoped to "no facility" can never see another one by leaving
+ * the filter off.
+ */
+async function listPage(queryFn, { table, alias, columns, join = '', searchColumns, status, q, after, facilityId, toItem }) {
   const params = []
   const where = [STATUS_SQL[table][status]]
   const pattern = likePattern(q)
   if (pattern) {
     params.push(pattern)
     where.push(`(${searchColumns.map((c) => `lower(${alias}.${c}) LIKE $${params.length} ESCAPE '\\'`).join(' OR ')})`)
+  }
+  if (facilityId !== undefined) {
+    if (facilityId === null) {
+      where.push(`${alias}.facility_id IS NULL`)
+    } else {
+      params.push(facilityId)
+      where.push(`${alias}.facility_id = $${params.length}`)
+    }
   }
   const cursor = readCursor(after)
   if (cursor) {
@@ -44,7 +62,7 @@ async function listPage(queryFn, { table, alias, columns, searchColumns, status,
   }
   params.push(PEOPLE_PAGE_SIZE + 1)
   const { rows } = await queryFn(
-    `SELECT ${columns} FROM ${table} ${alias}
+    `SELECT ${columns} FROM ${table} ${alias} ${join}
       WHERE ${where.join(' AND ')}
       ORDER BY ${alias}.created_at DESC, ${alias}.id DESC
       LIMIT $${params.length}`,
@@ -61,10 +79,11 @@ export function listPlayers(queryFn, { status, q, after }) {
   })
 }
 
-export function listUmpires(queryFn, { status, q, after }) {
+export function listUmpires(queryFn, { status, q, after, facilityId }) {
   return listPage(queryFn, {
-    table: 'umpires', alias: 'u', columns: UMPIRE_COLUMNS,
-    searchColumns: ['name', 'email', 'google_email'], status, q, after, toItem: umpireListItem,
+    table: 'umpires', alias: 'u', columns: UMPIRE_COLUMNS, join: UMPIRE_FACILITY_JOIN,
+    searchColumns: ['name', 'email', 'google_email'], status, q, after, facilityId,
+    toItem: (row) => ({ ...umpireListItem(row), facilityId: row.facility_id ?? null, facilityName: row.facility_name ?? null }),
   })
 }
 
@@ -80,7 +99,7 @@ export async function findPlayerRow(queryFn, id, { lock = false } = {}) {
 
 export async function findUmpireRow(queryFn, id, { lock = false } = {}) {
   const { rows } = await queryFn(
-    `SELECT ${UMPIRE_COLUMNS} FROM umpires u WHERE u.id = $1${lock ? ' FOR UPDATE' : ''}`,
+    `SELECT ${UMPIRE_COLUMNS} FROM umpires u ${UMPIRE_FACILITY_JOIN} WHERE u.id = $1${lock ? ' FOR UPDATE OF u' : ''}`,
     [id],
   )
   return rows[0] ?? null
@@ -195,6 +214,8 @@ export async function umpireDetail(queryFn, row) {
 
   return {
     ...umpireListItem(row),
+    facilityId: row.facility_id ?? null,
+    facilityName: row.facility_name ?? null,
     googleEmail: row.google_email ?? null,
     pausedAt: row.paused_at ?? null,
     pausedReason: row.paused_reason ?? null,

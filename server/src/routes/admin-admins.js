@@ -4,6 +4,7 @@ import { requireAdminAccount, requireOwner } from '../auth.js'
 import { ADMIN_COLUMNS, createAdmin, createSetupLink, resetSessions } from '../admin-accounts.js'
 import { recordActivity } from '../admin-activity.js'
 import { adminPayload, isAdminEmail, normalizeEmail } from '../admin-rules.js'
+import { findFacility } from '../facility-store.js'
 import { isUuid } from '../validate.js'
 
 // Adding, switching off and re-linking admins is the owner's alone, so
@@ -40,9 +41,14 @@ router.post('/', async (req, res) => {
   }
   if (!isAdminEmail(email)) return res.status(400).json({ error: 'Email looks invalid' })
 
+  const facility = isUuid(req.body?.facilityId) ? await findFacility(query, req.body.facilityId) : null
+  if (!facility) return res.status(400).json({ error: 'Choose a facility' })
+
   try {
     const { admin, setupLink } = await withTransaction(async (client) => {
-      const created = await createAdmin(client, { name, email, role: 'admin', createdBy: req.admin.id })
+      const created = await createAdmin(client, {
+        name, email, role: 'admin', createdBy: req.admin.id, facilityId: facility.id,
+      })
       const link = await createSetupLink(client, { adminId: created.id, createdBy: req.admin.id })
       await recordActivity(client, {
         adminId: req.admin.id, action: 'admin.added', targetType: 'admin', targetId: created.id,
@@ -122,5 +128,34 @@ function switchRoute(on) {
 
 router.post('/:id/switch-off', switchRoute(false))
 router.post('/:id/switch-on', switchRoute(true))
+
+/** Moves an admin to another facility. The owner belongs to no facility, so it can never be moved. */
+router.post('/:id/move', async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such admin' })
+  try {
+    const moved = await withTransaction(async (client) => {
+      const { rows } = await client.query(`SELECT ${ADMIN_COLUMNS} FROM admins WHERE id = $1 FOR UPDATE`, [req.params.id])
+      const target = rows[0]
+      if (!target) throw refusal(404, 'No such admin')
+      if (target.role === 'owner') throw refusal(409, "The owner doesn't belong to a facility")
+
+      const facility = isUuid(req.body?.facilityId) ? await findFacility(client.query.bind(client), req.body.facilityId) : null
+      if (!facility) throw refusal(404, 'No such facility')
+
+      const { rows: updated } = await client.query(
+        `UPDATE admins SET facility_id = $2 WHERE id = $1 RETURNING ${ADMIN_COLUMNS}`,
+        [target.id, facility.id],
+      )
+      await recordActivity(client, {
+        adminId: req.admin.id, action: 'admin.moved', targetType: 'admin', targetId: target.id,
+        summary: `Moved admin ${target.name} to ${facility.name}`,
+      })
+      return updated[0]
+    })
+    res.json({ admin: adminPayload(moved) })
+  } catch (error) {
+    sendRefusal(res, error)
+  }
+})
 
 export default router
