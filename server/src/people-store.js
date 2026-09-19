@@ -33,13 +33,13 @@ const STATUS_SQL = {
 /**
  * One page of a list, newest first, plus the cursor for the next page.
  *
- * `facilityId` filters by the alias's facility_id column when given:
- * left out entirely means no filter, `null` means "no facility", and
- * anything else means that exact facility -- the three are distinct, so
- * a caller scoped to "no facility" can never see another one by leaving
- * the filter off.
+ * `facilityFilter` is a facility-rules.js `facilityFilterFor()` result
+ * (`{ all }`, `{ id }` or `{ none }`), applied to the alias's
+ * facility_id column when given. `{ none }` is its own fixed FALSE
+ * condition -- never treated as "no filter" -- so a caller scoped to no
+ * facility can never see everyone's rows by accident.
  */
-async function listPage(queryFn, { table, alias, columns, join = '', searchColumns, status, q, after, facilityId, toItem }) {
+async function listPage(queryFn, { table, alias, columns, join = '', searchColumns, status, q, after, facilityFilter, toItem }) {
   const params = []
   const where = [STATUS_SQL[table][status]]
   const pattern = likePattern(q)
@@ -47,13 +47,14 @@ async function listPage(queryFn, { table, alias, columns, join = '', searchColum
     params.push(pattern)
     where.push(`(${searchColumns.map((c) => `lower(${alias}.${c}) LIKE $${params.length} ESCAPE '\\'`).join(' OR ')})`)
   }
-  if (facilityId !== undefined) {
-    if (facilityId === null) {
-      where.push(`${alias}.facility_id IS NULL`)
-    } else {
-      params.push(facilityId)
+  if (facilityFilter) {
+    if (facilityFilter.id) {
+      params.push(facilityFilter.id)
       where.push(`${alias}.facility_id = $${params.length}`)
+    } else if (facilityFilter.none) {
+      where.push('FALSE')
     }
+    // facilityFilter.all -> every row for its status/search, no extra condition.
   }
   const cursor = readCursor(after)
   if (cursor) {
@@ -79,10 +80,10 @@ export function listPlayers(queryFn, { status, q, after }) {
   })
 }
 
-export function listUmpires(queryFn, { status, q, after, facilityId }) {
+export function listUmpires(queryFn, { status, q, after, facilityFilter }) {
   return listPage(queryFn, {
     table: 'umpires', alias: 'u', columns: UMPIRE_COLUMNS, join: UMPIRE_FACILITY_JOIN,
-    searchColumns: ['name', 'email', 'google_email'], status, q, after, facilityId,
+    searchColumns: ['name', 'email', 'google_email'], status, q, after, facilityFilter,
     toItem: (row) => ({ ...umpireListItem(row), facilityId: row.facility_id ?? null, facilityName: row.facility_name ?? null }),
   })
 }

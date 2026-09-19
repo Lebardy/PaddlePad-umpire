@@ -10,7 +10,7 @@ import {
 import {
   findPlayerRow, findUmpireRow, listPlayers, listUmpires, playerDetail, umpireDetail,
 } from '../people-store.js'
-import { mayManageUmpire, mayPausePlayers } from '../facility-rules.js'
+import { facilityFilterFor, mayManageUmpire, mayPausePlayers } from '../facility-rules.js'
 import { findFacility } from '../facility-store.js'
 import { isUuid } from '../validate.js'
 
@@ -35,8 +35,15 @@ const noGuard = () => null
  * `kind.readGuard(admin, row)` and `kind.pauseGuard(admin, row)` each
  * return null to allow, or `{ statusCode, message }` to refuse -- used
  * so an umpire outside a facility admin's own facility answers 404
- * ("No such umpire") on every read and pause/unpause, and so pausing a
- * player is the owner's alone.
+ * ("No such umpire") on every read and pause/unpause. Both need the
+ * row (facility scoping), so they run once it has been looked up.
+ *
+ * `kind.pauseRoleGuard(admin)` is a SEPARATE, row-independent check --
+ * used so pausing a player is the owner's alone. It runs before any
+ * database access at all, so a non-owner always gets the same 403
+ * regardless of whether the id they sent even exists: checking a
+ * role-only rule after a row lookup would let the 404-vs-403 split
+ * leak which ids are real.
  */
 function peopleRouter(kind) {
   const router = Router()
@@ -46,10 +53,11 @@ function peopleRouter(kind) {
   const closedColumn = kind.closedColumn
   const readGuard = kind.readGuard ?? noGuard
   const pauseGuard = kind.pauseGuard ?? noGuard
+  const pauseRoleGuard = kind.pauseRoleGuard ?? noGuard
 
   router.get('/', async (req, res) => {
     const options = { status: readStatusFilter(req.query.status), q: req.query.q, after: req.query.after }
-    if (kind.facilityFilter) options.facilityId = kind.facilityFilter(req.admin, req.query.facilityId)
+    if (kind.facilityFilter) options.facilityFilter = kind.facilityFilter(req.admin, req.query.facilityId)
     const page = await kind.list(query, options)
     res.json({ [kind.plural]: page.items, next: page.next })
   })
@@ -87,6 +95,8 @@ function peopleRouter(kind) {
   }
 
   router.post('/:id/pause', async (req, res) => {
+    const early = pauseRoleGuard(req.admin)
+    if (early) return res.status(early.statusCode).json({ error: early.message })
     const { reason, error } = readPauseReason(req.body?.reason)
     if (error) return res.status(400).json({ error })
     await change(req, res, async (client, row) => {
@@ -101,6 +111,8 @@ function peopleRouter(kind) {
   })
 
   router.post('/:id/unpause', async (req, res) => {
+    const early = pauseRoleGuard(req.admin)
+    if (early) return res.status(early.statusCode).json({ error: early.message })
     await change(req, res, async (client, row) => {
       if (row[closedColumn] || !row.paused_at) throw refusal(409, "This account isn't paused")
       await client.query(`UPDATE ${kind.table} SET paused_at = NULL, paused_reason = NULL WHERE id = $1`, [row.id])
@@ -134,7 +146,9 @@ export const adminPlayersRoutes = peopleRouter({
   list: listPlayers, find: findPlayerRow, detail: playerDetail,
   // Players belong to no facility -- pausing one affects them everywhere,
   // so it stays the owner's alone rather than being scoped by facility.
-  pauseGuard: (admin) => (mayPausePlayers(admin) ? null : { statusCode: 403, message: 'Only the owner can pause players' }),
+  // Row-independent, so it is checked before any lookup (see
+  // peopleRouter's doc comment on pauseRoleGuard).
+  pauseRoleGuard: (admin) => (mayPausePlayers(admin) ? null : { statusCode: 403, message: 'Only the owner can pause players' }),
   // Shares the wipe with DELETE /player/me, then stamps that THIS close
   // came from the admin site -- self-deletion never sets this column,
   // which is what makes reopening an owner's close the owner's alone.
@@ -146,8 +160,7 @@ export const adminPlayersRoutes = peopleRouter({
 
 /** The owner may filter the umpire list by a facility; a facility admin is always pinned to their own. */
 function umpireFacilityFilter(admin, queryFacilityId) {
-  if (admin.role === 'owner') return isUuid(queryFacilityId) ? queryFacilityId : undefined
-  return admin.facilityId ?? null
+  return facilityFilterFor(admin, isUuid(queryFacilityId) ? queryFacilityId : null)
 }
 
 const umpireOutsideFacility = { statusCode: 404, message: 'No such umpire' }
@@ -205,6 +218,7 @@ adminUmpiresRoutes.post('/:id/move', requireOwner, async (req, res) => {
 
       const facility = isUuid(req.body?.facilityId) ? await findFacility(client.query.bind(client), req.body.facilityId) : null
       if (!facility) throw refusal(404, 'No such facility')
+      if (row.facility_id === facility.id) throw refusal(409, 'Already in that facility')
 
       await client.query('UPDATE umpires SET facility_id = $2 WHERE id = $1', [row.id, facility.id])
       await recordActivity(client, {

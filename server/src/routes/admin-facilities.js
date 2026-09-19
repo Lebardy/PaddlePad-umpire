@@ -83,13 +83,19 @@ router.patch('/:id', async (req, res) => {
 
   try {
     const facility = await withTransaction(async (client) => {
-      const { rows } = await client.query('SELECT id FROM facilities WHERE id = $1 FOR UPDATE', [req.params.id])
+      const { rows } = await client.query('SELECT id, name FROM facilities WHERE id = $1 FOR UPDATE', [req.params.id])
       if (!rows[0]) throw refusal(404, 'No such facility')
+      const before = rows[0]
       const updated = await updateFacility(client, req.params.id, read.values)
-      const fields = columns.map((column) => FIELD_LABELS[column]).join(', ')
+      // A rename gets its own wording, naming both the old and new name,
+      // rather than "Changed name for <new name>" -- which would read as
+      // though the facility already had the new name before the change.
+      const summary = columns.includes('name')
+        ? `Renamed facility ${before.name} to ${updated.name}`
+        : `Changed ${columns.map((column) => FIELD_LABELS[column]).join(', ')} for ${updated.name}`
       await recordActivity(client, {
         adminId: req.admin.id, action: 'facility.updated', targetType: 'facility', targetId: updated.id,
-        summary: `Changed ${fields} for ${updated.name}`,
+        summary,
       })
       return updated
     })

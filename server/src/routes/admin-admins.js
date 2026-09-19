@@ -141,6 +141,7 @@ router.post('/:id/move', async (req, res) => {
 
       const facility = isUuid(req.body?.facilityId) ? await findFacility(client.query.bind(client), req.body.facilityId) : null
       if (!facility) throw refusal(404, 'No such facility')
+      if (target.facility_id === facility.id) throw refusal(409, 'Already in that facility')
 
       const { rows: updated } = await client.query(
         `UPDATE admins SET facility_id = $2 WHERE id = $1 RETURNING ${ADMIN_COLUMNS}`,

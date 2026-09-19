@@ -4,26 +4,24 @@
 
 import { generateInviteCode } from './invites.js'
 
-/**
- * Every code with its status, newest first.
- *
- * `facilityId` filters which codes come back: leave it out entirely for
- * no filter (the owner browsing everyone), pass a facility's id for
- * that facility only, or pass `null` for codes with no facility at all
- * -- the three are distinct, so a caller scoped to "no facility" can
- * never see another one by leaving the filter off.
- */
-export async function listInvites(db, { facilityId } = {}) {
-  const params = []
-  let filter = 'TRUE'
-  if (facilityId !== undefined) {
-    if (facilityId === null) {
-      filter = 'i.facility_id IS NULL'
-    } else {
-      params.push(facilityId)
-      filter = `i.facility_id = $${params.length}`
-    }
+/** Turns a facility-rules.js facilityFilterFor() result into a fixed SQL condition. */
+function facilityClause(filter, column, params) {
+  if (filter.id) {
+    params.push(filter.id)
+    return `${column} = $${params.length}`
   }
+  if (filter.none) return 'FALSE'
+  return 'TRUE'
+}
+
+/**
+ * Every code with its status, newest first, scoped by `filter` (a
+ * facility-rules.js `facilityFilterFor()` result: `{ all }`, `{ id }`
+ * or `{ none }`).
+ */
+export async function listInvites(db, filter = { all: true }) {
+  const params = []
+  const where = facilityClause(filter, 'i.facility_id', params)
   const { rows } = await db.query(
     `SELECT i.code,
             i.note,
@@ -45,7 +43,7 @@ export async function listInvites(db, { facilityId } = {}) {
        LEFT JOIN admins admin_creator ON admin_creator.id = i.created_by_admin
        LEFT JOIN umpires umpire_creator ON umpire_creator.id = i.created_by
        LEFT JOIN umpires claimer ON claimer.id = i.used_by
-      WHERE ${filter}
+      WHERE ${where}
       ORDER BY i.created_at DESC`,
     params,
   )
@@ -65,27 +63,14 @@ export async function createInvite(db, { note, days, createdByAdmin, facilityId 
 }
 
 /**
- * Deletes an unused code. Used codes are kept as the record of who
- * joined with which.
- *
- * `facilityId` scopes the delete the same way `listInvites` scopes a
- * read: left out for no restriction (the owner), a facility's id to
- * restrict to that facility, or `null` to restrict to codes with no
- * facility at all.
+ * Deletes an unused code, scoped by `filter` the same way `listInvites`
+ * is. Used codes are kept as the record of who joined with which.
  */
-export async function cancelInvite(db, code, { facilityId } = {}) {
+export async function cancelInvite(db, code, filter = { all: true }) {
   const params = [code]
-  let filter = 'TRUE'
-  if (facilityId !== undefined) {
-    if (facilityId === null) {
-      filter = 'facility_id IS NULL'
-    } else {
-      params.push(facilityId)
-      filter = `facility_id = $${params.length}`
-    }
-  }
+  const where = facilityClause(filter, 'facility_id', params)
   const { rows } = await db.query(
-    `DELETE FROM invites WHERE code = $1 AND used_by IS NULL AND (${filter}) RETURNING code, note`,
+    `DELETE FROM invites WHERE code = $1 AND used_by IS NULL AND (${where}) RETURNING code, note`,
     params,
   )
   return rows[0] ?? null

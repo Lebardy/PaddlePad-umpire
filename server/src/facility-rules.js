@@ -114,6 +114,37 @@ export function mayManageUmpire(admin, umpire) {
   return mayManageFacility(admin, umpire?.facility_id ?? null)
 }
 
+/**
+ * Which facility(ies) a request is scoped to, for both reading (a list
+ * filter) and writing (which facility a new or moved record gets). The
+ * single place this decision is made -- every route and store function
+ * that needs to scope a query by facility calls this rather than
+ * working it out itself, so the rule can never drift between them.
+ *
+ * `requestedFacilityId` is the facility the caller asked for (already
+ * checked to be a well-formed id by the caller, or `null`/omitted) --
+ * and it is only ever honoured for the owner. A facility admin can
+ * never pick a different facility than their own, no matter what they
+ * send, and an admin who belongs to no facility at all can never be
+ * handed one this way either.
+ *
+ * Returns exactly one of:
+ *   `{ all: true }`  -- the owner, nothing requested: every facility.
+ *   `{ id }`         -- the owner with a chosen facility, or any
+ *                        facility admin (always their own).
+ *   `{ none: true }` -- an admin who belongs to no facility: sees and
+ *                        manages nothing. This is the case a careless
+ *                        filter can turn into "no restriction" by
+ *                        mistake -- callers must treat it as its own
+ *                        branch, never fall through to `all`.
+ */
+export function facilityFilterFor(admin, requestedFacilityId) {
+  if (admin?.role === 'owner') {
+    return requestedFacilityId ? { id: requestedFacilityId } : { all: true }
+  }
+  return admin?.facilityId ? { id: admin.facilityId } : { none: true }
+}
+
 /** A pause stops a player everywhere, so it is the owner's alone. */
 export function mayPausePlayers(admin) { return admin?.role === 'owner' }
 export function mayCreateFacility(admin) { return admin?.role === 'owner' }

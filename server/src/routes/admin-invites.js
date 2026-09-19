@@ -4,6 +4,7 @@ import { requireAdminAccount } from '../auth.js'
 import { recordActivity } from '../admin-activity.js'
 import { inviteCodeHint, inviteExpiryDays } from '../admin-rules.js'
 import { cancelInvite, createInvite, listInvites } from '../invite-store.js'
+import { facilityFilterFor } from '../facility-rules.js'
 import { findFacility } from '../facility-store.js'
 import { isUuid } from '../validate.js'
 
@@ -19,13 +20,16 @@ function toInvitePayload(row) {
   return { ...rest, facilityId: facilityId ?? null, facilityName: facilityName ?? null }
 }
 
+/** A request body/query's raw facilityId, or null when it isn't a well-formed id. */
+function requestedFacilityId(value) {
+  return isUuid(value) ? value : null
+}
+
 router.get('/', async (req, res) => {
-  // The owner may filter by a facility (or see everyone by leaving it
-  // off); a facility admin is always pinned to their own.
-  const facilityId = req.admin.role === 'owner'
-    ? (isUuid(req.query.facilityId) ? req.query.facilityId : undefined)
-    : (req.admin.facilityId ?? null)
-  const invites = await listInvites(query, { facilityId })
+  // listInvites expects the object shape { query }, not the bare query
+  // function -- it calls db.query(...), not db(...).
+  const filter = facilityFilterFor(req.admin, requestedFacilityId(req.query.facilityId))
+  const invites = await listInvites({ query }, filter)
   res.json({ invites: invites.map(toInvitePayload) })
 })
 
@@ -35,9 +39,11 @@ router.post('/', async (req, res) => {
   if (expiry.error) return res.status(400).json({ error: expiry.error })
 
   // The owner must choose a real facility; a facility admin's code is
-  // always their own -- anything they sent for facilityId is ignored.
-  const requestedFacilityId = req.admin.role === 'owner' ? req.body?.facilityId : req.admin.facilityId
-  const facility = isUuid(requestedFacilityId) ? await findFacility(query, requestedFacilityId) : null
+  // always their own -- anything they sent for facilityId is ignored;
+  // a facility-less admin (facilityFilterFor -> { none }) has none to
+  // fall back to either.
+  const filter = facilityFilterFor(req.admin, requestedFacilityId(req.body?.facilityId))
+  const facility = filter.id ? await findFacility(query, filter.id) : null
   if (!facility) return res.status(400).json({ error: 'Choose a facility' })
 
   const invite = await withTransaction(async (client) => {
@@ -55,10 +61,10 @@ router.post('/', async (req, res) => {
 
 router.delete('/:code', async (req, res) => {
   // A facility admin may only cancel their own facility's codes; the
-  // owner may cancel any.
-  const facilityId = req.admin.role === 'owner' ? undefined : (req.admin.facilityId ?? null)
+  // owner may cancel any; a facility-less admin cancels nothing.
+  const filter = facilityFilterFor(req.admin, null)
   const cancelled = await withTransaction(async (client) => {
-    const row = await cancelInvite(client, req.params.code, { facilityId })
+    const row = await cancelInvite(client, req.params.code, filter)
     if (row) {
       await recordActivity(client, {
         adminId: req.admin.id, action: 'invite.cancelled', targetType: 'invite', targetId: inviteCodeHint(row.code),

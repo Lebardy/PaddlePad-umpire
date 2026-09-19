@@ -89,6 +89,19 @@ section('who may do what')
   check('only the owner moves people', [rules.mayMove(owner), rules.mayMove(adminA)], [true, false])
 }
 
+section('which facility a request is scoped to')
+{
+  const owner = { role: 'owner', facilityId: null }
+  const adminA = { role: 'admin', facilityId: 'fa' }
+  const adminNone = { role: 'admin', facilityId: null }
+  check('the owner with nothing requested sees every facility', rules.facilityFilterFor(owner, null), { all: true })
+  check('the owner requesting a facility is scoped to just it', rules.facilityFilterFor(owner, 'fb'), { id: 'fb' })
+  check('a facility admin is scoped to their own facility', rules.facilityFilterFor(adminA, null), { id: 'fa' })
+  check('a facility admin cannot pick another facility', rules.facilityFilterFor(adminA, 'fb'), { id: 'fa' })
+  check('a facility-less admin sees and manages nothing', rules.facilityFilterFor(adminNone, null), { none: true })
+  check('a facility-less admin cannot pick a facility either', rules.facilityFilterFor(adminNone, 'fb'), { none: true })
+}
+
 section('what the site sees')
 {
   check('a facility as the site sees it', rules.facilityPayload({

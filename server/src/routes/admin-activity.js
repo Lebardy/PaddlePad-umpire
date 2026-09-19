@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { query } from '../db.js'
 import { requireAdminAccount } from '../auth.js'
 import { ACTIONS } from '../admin-rules.js'
-import { facilityScope } from '../facility-rules.js'
+import { facilityFilterFor } from '../facility-rules.js'
 import { listFacilities } from '../facility-store.js'
 import { isUuid } from '../validate.js'
 
@@ -19,21 +19,16 @@ router.get('/', async (req, res) => {
 
   // The owner may filter by a facility, or leave it off to see
   // everyone; a facility admin only ever sees their own facility's
-  // entries -- an admin with no facility (the owner, or the rare
-  // account left unassigned) sees only the entries that also have none.
-  const scope = facilityScope(req.admin)
+  // entries; an admin who belongs to no facility sees none at all --
+  // `{ none }` is its own fixed FALSE condition, never "no filter".
+  const filter = facilityFilterFor(req.admin, isUuid(req.query.facilityId) ? req.query.facilityId : null)
   const params = [before, adminId, action]
   let facilityFilter = 'TRUE'
-  if (scope === 'all') {
-    if (isUuid(req.query.facilityId)) {
-      params.push(req.query.facilityId)
-      facilityFilter = `e.facility_id = $${params.length}`
-    }
-  } else if (scope) {
-    params.push(scope)
+  if (filter.id) {
+    params.push(filter.id)
     facilityFilter = `e.facility_id = $${params.length}`
-  } else {
-    facilityFilter = 'e.facility_id IS NULL'
+  } else if (filter.none) {
+    facilityFilter = 'FALSE'
   }
   params.push(PAGE + 1)
 
@@ -70,15 +65,14 @@ router.get('/', async (req, res) => {
 
 /** What the filters can offer. Names only, so any admin may read it. */
 router.get('/filters', async (req, res) => {
-  const scope = facilityScope(req.admin)
-  const [{ rows: admins }, facilities] = await Promise.all([
-    scope === 'all'
-      ? query('SELECT id, name FROM admins ORDER BY name')
-      : scope
-        ? query('SELECT id, name FROM admins WHERE facility_id = $1 ORDER BY name', [scope])
-        : query('SELECT id, name FROM admins WHERE facility_id IS NULL ORDER BY name'),
-    listFacilities(query, scope),
-  ])
+  const filter = facilityFilterFor(req.admin, null)
+
+  let admins = []
+  if (filter.all) admins = (await query('SELECT id, name FROM admins ORDER BY name')).rows
+  else if (filter.id) admins = (await query('SELECT id, name FROM admins WHERE facility_id = $1 ORDER BY name', [filter.id])).rows
+  // filter.none: an admin who belongs to no facility is offered no admins to filter by either.
+
+  const facilities = await listFacilities(query, filter.all ? 'all' : (filter.id ?? null))
   res.json({ admins, actions: ACTIONS, facilities: facilities.map((f) => ({ id: f.id, name: f.name })) })
 })
 
