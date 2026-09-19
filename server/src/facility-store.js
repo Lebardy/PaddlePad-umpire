@@ -35,6 +35,17 @@ export async function findFacility(queryFn, id) {
 }
 
 /**
+ * The current row for a facility, with its row lock held until the
+ * caller's transaction ends -- for a caller that needs to compare an
+ * incoming edit against the current values before deciding what (if
+ * anything) to write. Returns null when the facility doesn't exist.
+ */
+export async function lockFacility(db, id) {
+  const { rows } = await db.query(`SELECT ${FACILITY_COLUMNS} FROM facilities WHERE id = $1 FOR UPDATE`, [id])
+  return rows[0] ?? null
+}
+
+/**
  * Inserts a facility from `values` (the fixed column set `readFacility`
  * produces -- column names never come from anywhere else: `values` is
  * filtered through `facilityColumns` here regardless of what the

@@ -101,6 +101,19 @@ export function facilityColumns(values = {}) {
 }
 
 /**
+ * Which of `values`' columns actually differ from the facility's current
+ * row -- the fields an edit changed, as opposed to the fields it merely
+ * sent. `before` is the current facility row (as read from the
+ * database); `values` is a `readFacility()` result's `values`. Only the
+ * columns present in `values` are compared, in the same order
+ * `facilityColumns` would return them, so an edit form that always
+ * sends every field still gets credited with only the ones that moved.
+ */
+export function changedFacilityColumns(before, values = {}) {
+  return facilityColumns(values).filter((column) => before?.[column] !== values[column])
+}
+
+/**
  * Which facility(ies) a request is scoped to, for reading (a list
  * filter), writing (which facility a new or moved record gets), and
  * authorization (mayManageFacility/mayManageUmpire below). The single

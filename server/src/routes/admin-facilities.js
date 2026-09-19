@@ -3,9 +3,10 @@ import { query, withTransaction } from '../db.js'
 import { requireAdminAccount } from '../auth.js'
 import { recordActivity } from '../admin-activity.js'
 import {
-  facilityColumns, facilityFilterFor, facilityPayload, mayCreateFacility, mayManageFacility, readFacility,
+  changedFacilityColumns, facilityColumns, facilityFilterFor, facilityPayload, mayCreateFacility, mayManageFacility,
+  readFacility,
 } from '../facility-rules.js'
-import { createFacility, facilityPeople, findFacility, listFacilities, updateFacility } from '../facility-store.js'
+import { createFacility, facilityPeople, findFacility, listFacilities, lockFacility, updateFacility } from '../facility-store.js'
 import { isUuid } from '../validate.js'
 
 // Facilities: where umpires work. The owner sees and manages every one;
@@ -83,21 +84,27 @@ router.patch('/:id', async (req, res) => {
 
   try {
     const facility = await withTransaction(async (client) => {
-      const { rows } = await client.query('SELECT id, name FROM facilities WHERE id = $1 FOR UPDATE', [req.params.id])
-      if (!rows[0]) throw refusal(404, 'No such facility')
-      const before = rows[0]
+      const before = await lockFacility(client, req.params.id)
+      if (!before) throw refusal(404, 'No such facility')
+
+      // Only the fields the edit actually changes get written and
+      // recorded -- the edit form sends every field on every save (so a
+      // cleared field reaches the server), so `columns` alone would
+      // credit a save with changing fields it only resent unchanged,
+      // and a save that changes nothing would still write an entry.
+      const changed = changedFacilityColumns(before, read.values)
+      if (changed.length === 0) return before
+
       const updated = await updateFacility(client, req.params.id, read.values)
       // A rename gets its own wording, naming both the old and new name,
       // rather than "Changed name for <new name>" -- which would read as
       // though the facility already had the new name before the change.
-      // It is only a rename if the name actually changed -- sending the
-      // current name back (alongside other real edits) is not one.
-      const isRename = columns.includes('name') && before.name !== updated.name
-      const otherFields = columns.filter((column) => column !== 'name')
+      const isRename = changed.includes('name')
+      const otherFields = changed.filter((column) => column !== 'name')
       const summary = isRename
         ? `Renamed facility ${before.name} to ${updated.name}` +
           (otherFields.length ? ` and changed ${otherFields.map((column) => FIELD_LABELS[column]).join(', ')}` : '')
-        : `Changed ${columns.map((column) => FIELD_LABELS[column]).join(', ')} for ${updated.name}`
+        : `Changed ${changed.map((column) => FIELD_LABELS[column]).join(', ')} for ${updated.name}`
       await recordActivity(client, {
         adminId: req.admin.id, action: 'facility.updated', targetType: 'facility', targetId: updated.id,
         summary,

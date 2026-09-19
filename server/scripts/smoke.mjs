@@ -2406,6 +2406,15 @@ async function main() {
     check('exactly one facility.updated entry was written', afterFacUpdated === beforeFacUpdated + 1,
       `${beforeFacUpdated} -> ${afterFacUpdated}`)
 
+    const patchAAsANoChange = await request(`/admin/facilities/${facilityAId}`, {
+      method: 'PATCH', bearer: adminAToken, body: { openingHours: 'Mon-Sun 6am-10pm' },
+    })
+    check('saving facility A again with the same value -> 200', patchAAsANoChange.status === 200,
+      String(patchAAsANoChange.status))
+    const afterFacUpdatedNoChange = await countByAction('facility.updated', facilityAId, fOwnerToken)
+    check('a save with no actual change writes no facility.updated entry',
+      afterFacUpdatedNoChange === afterFacUpdated, `${afterFacUpdated} -> ${afterFacUpdatedNoChange}`)
+
     // --- 6: pausing players stays the owner's alone ---
     const plName = `Smoke Facility Player ${fStamp}`
     const plCreated = await request('/players', { method: 'POST', bearer: umpAToken, body: { name: plName } })

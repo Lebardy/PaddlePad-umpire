@@ -71,6 +71,25 @@ section('which columns a write may touch')
   check('no values at all yields nothing', rules.facilityColumns({}), [])
 }
 
+section('which columns an edit actually changed')
+{
+  const before = {
+    name: 'Court Nine', area: 'Dumaguete', location_url: 'https://maps.example.com/a',
+    opening_hours: 'Mon–Sat 6am–10pm', hourly_fee_centavos: 15000, details: 'Four courts.',
+  }
+  check('sending every field but changing only one names only that one',
+    rules.changedFacilityColumns(before, { ...before, hourly_fee_centavos: 20000 }), ['hourly_fee_centavos'])
+  check('sending every field unchanged names nothing',
+    rules.changedFacilityColumns(before, { ...before }), [])
+  check('a field sent but not part of the values object is ignored',
+    rules.changedFacilityColumns(before, { name: 'Court Nine' }), [])
+  check('several real changes are all named, in column order',
+    rules.changedFacilityColumns(before, { ...before, name: 'Court Ten', details: 'Six courts.' }),
+    ['name', 'details'])
+  check('clearing an optional field to null counts as a change',
+    rules.changedFacilityColumns(before, { ...before, area: null }), ['area'])
+}
+
 section('who may do what')
 {
   const owner = { role: 'owner', facilityId: null }
