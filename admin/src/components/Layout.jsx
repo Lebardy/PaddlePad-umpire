@@ -4,12 +4,13 @@ import LampMark from './LampMark'
 const PAGES = [
   { to: '/invites', label: 'Invite codes', current: (path) => path === '/' || path === '/invites' },
   { to: '/people', label: 'People', current: (path) => path === '/people' || path.startsWith('/people/') },
+  { to: '/facilities', label: 'Facilities', current: (path) => path === '/facilities' || path.startsWith('/facilities/') },
   { to: '/admins', label: 'Admins', ownerOnly: true, current: (path) => path === '/admins' },
   { to: '/activity', label: 'Activity', current: (path) => path === '/activity' },
 ]
 
 /** The board across the top of every page, and the page under it. Only pages that exist are listed. */
-export default function Layout({ admin, path, onSignOut, children }) {
+export default function Layout({ admin, facilityLabel, path, onSignOut, children }) {
   const onAccount = path === '/account'
   return (
     <div className="shell">
@@ -27,7 +28,7 @@ export default function Layout({ admin, path, onSignOut, children }) {
         <div className="topbar-who">
           <Link to="/account" className="who-cell" aria-current={onAccount ? 'page' : undefined}>
             <strong>{admin.name}</strong>
-            <span className="who-role">{admin.role === 'owner' ? 'Owner' : 'Admin'} · Account</span>
+            <span className="who-role">{admin.role === 'owner' ? 'Owner' : 'Admin'}{facilityLabel ? ` · ${facilityLabel}` : ''}</span>
           </Link>
           <button type="button" className="signout" onClick={onSignOut}>Sign out</button>
         </div>

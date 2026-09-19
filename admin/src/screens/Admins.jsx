@@ -1,28 +1,42 @@
 import { useEffect, useState } from 'react'
+import FacilityPicker from '../components/FacilityPicker'
 import PageBoard, { TallyCell } from '../components/PageBoard'
 import RowConfirm from '../components/RowConfirm'
-import { addAdmin, listAdmins, newSetupLink, switchAdmin } from '../lib/api'
+import { addAdmin, listAdmins, listFacilities, moveAdmin, newSetupLink, switchAdmin } from '../lib/api'
 import { formatWhen, signInMethods } from '../lib/format'
 
 const notSetUp = (admin) => !admin.hasPassword && !admin.googleEmail
 
-/** Owner only: add admins, hand out setup links, switch admins off and on. */
+/** Owner only: add admins, hand out setup links, switch admins off and on, and move them between facilities. */
 export default function Admins({ me }) {
   const [admins, setAdmins] = useState(null)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [facilityId, setFacilityId] = useState('')
+  const [facilitiesById, setFacilitiesById] = useState({})
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
   const [link, setLink] = useState(null)
   const [copied, setCopied] = useState(false)
   // Which admin's row is asking "are you sure?", and about what.
   const [confirming, setConfirming] = useState(null)
+  const [moveFacilityId, setMoveFacilityId] = useState('')
 
   useEffect(() => {
     let live = true
     listAdmins()
       .then((rows) => { if (live) setAdmins(rows) })
       .catch((err) => { if (live) setError(err.message) })
+    return () => { live = false }
+  }, [])
+
+  // The admin list carries only a facilityId, so the table's own
+  // Facility column resolves it against every facility's name.
+  useEffect(() => {
+    let live = true
+    listFacilities()
+      .then((rows) => { if (live) setFacilitiesById(Object.fromEntries(rows.map((f) => [f.id, f.name]))) })
+      .catch(() => {})
     return () => { live = false }
   }, [])
 
@@ -40,11 +54,12 @@ export default function Admins({ me }) {
     setBusy(true)
     setError(null)
     try {
-      const { admin, setupLink } = await addAdmin({ name: name.trim(), email: email.trim() })
+      const { admin, setupLink } = await addAdmin({ name: name.trim(), email: email.trim(), facilityId })
       setLink({ forName: admin.name, ...setupLink })
       setCopied(false)
       setName('')
       setEmail('')
+      setFacilityId('')
       await refresh()
     } catch (err) {
       setError(err.message)
@@ -61,6 +76,13 @@ export default function Admins({ me }) {
 
   async function handleSwitch(admin) {
     await switchAdmin(admin.id, !admin.active)
+    await refresh()
+  }
+
+  // Errors are thrown back to the row's confirmation, which shows them there.
+  async function handleMove(admin) {
+    await moveAdmin(admin.id, moveFacilityId)
+    setMoveFacilityId('')
     await refresh()
   }
 
@@ -92,12 +114,27 @@ export default function Admins({ me }) {
             confirmClass="btn-primary btn-small"
             keepLabel="Not now"
             open={asking === 'link'}
-            hidden={asking === 'switch'}
+            hidden={asking === 'switch' || asking === 'move'}
             onOpen={() => setConfirming({ id: admin.id, what: 'link' })}
             onClose={close}
             onConfirm={() => handleNewLink(admin)}
           />
         )}
+        <RowConfirm
+          label="Move"
+          className="btn-quiet btn-small"
+          question={<FacilityPicker me={me} value={moveFacilityId} onChange={setMoveFacilityId} label="Move to" />}
+          confirmLabel="Move"
+          busyLabel="Moving…"
+          confirmClass="btn-primary btn-small"
+          keepLabel="Not now"
+          open={asking === 'move'}
+          hidden={asking === 'link' || asking === 'switch'}
+          disabled={asking === 'move' && !moveFacilityId}
+          onOpen={() => { setMoveFacilityId(admin.facilityId ?? ''); setConfirming({ id: admin.id, what: 'move' }) }}
+          onClose={close}
+          onConfirm={() => handleMove(admin)}
+        />
         <RowConfirm
           label={admin.active ? 'Switch off' : 'Switch on'}
           className={`btn-small ${admin.active ? 'btn-danger' : 'btn-quiet'}`}
@@ -107,7 +144,7 @@ export default function Admins({ me }) {
           confirmClass={`btn-small ${admin.active ? 'btn-danger is-solid' : 'btn-primary'}`}
           keepLabel="Not now"
           open={asking === 'switch'}
-          hidden={asking === 'link'}
+          hidden={asking === 'link' || asking === 'move'}
           onOpen={() => setConfirming({ id: admin.id, what: 'switch' })}
           onClose={close}
           onConfirm={() => handleSwitch(admin)}
@@ -135,6 +172,7 @@ export default function Admins({ me }) {
           <h2 className="form-strip-title">Add an admin</h2>
           <label className="field grow"><span>Name</span><input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} required /></label>
           <label className="field grow"><span>Email</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
+          <FacilityPicker me={me} value={facilityId} onChange={setFacilityId} required />
           <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Adding…' : 'Add admin'}</button>
         </form>
 
@@ -163,6 +201,7 @@ export default function Admins({ me }) {
               <thead>
                 <tr>
                   <th>Admin</th>
+                  <th>Facility</th>
                   <th>Signs in with</th>
                   <th className="col-when">Last signed in</th>
                   <th className="col-when">Status</th>
@@ -176,6 +215,7 @@ export default function Admins({ me }) {
                       <span className="cell-main"><strong>{admin.name}</strong>{admin.id === me.id && ' (you)'}</span>
                       <span className="cell-sub">{admin.email} · {admin.role === 'owner' ? 'Owner' : 'Admin'}</span>
                     </td>
+                    <td>{admin.role === 'owner' ? 'All facilities' : (facilitiesById[admin.facilityId] ?? '—')}</td>
                     <td>
                       {notSetUp(admin)
                         ? <span className="tag tag-waiting">{signInMethods(admin)}</span>
@@ -189,7 +229,7 @@ export default function Admins({ me }) {
               </tbody>
               {list.length === 1 && (
                 <tfoot>
-                  <tr><td colSpan={5} className="table-foot">Only you so far. Add an admin above, then send them their setup link.</td></tr>
+                  <tr><td colSpan={6} className="table-foot">Only you so far. Add an admin above, then send them their setup link.</td></tr>
                 </tfoot>
               )}
             </table>

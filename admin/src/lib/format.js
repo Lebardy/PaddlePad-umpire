@@ -82,6 +82,22 @@ export function actionLabel(action) {
   return ACTION_LABELS[action] ?? action
 }
 
+// Facilities
+
+/**
+ * What the header shows under an admin's name: 'All facilities' for the
+ * owner, or the name of the one facility a facility admin belongs to.
+ * `facilities` is whatever GET /admin/facilities has returned so far --
+ * for a facility admin that's a one-row list holding only their own, so
+ * before it has loaded (or if it somehow comes back without a match)
+ * this reads null rather than guessing at a name.
+ */
+export function facilityLabel(admin, facilities = []) {
+  if (admin.role === 'owner') return 'All facilities'
+  const facility = facilities.find((f) => f.id === admin.facilityId)
+  return facility ? facility.name : null
+}
+
 // People
 
 export function lastSignedInText(iso) {

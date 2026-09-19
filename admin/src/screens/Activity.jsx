@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
+import FacilityPicker from '../components/FacilityPicker'
 import PageBoard from '../components/PageBoard'
 import { activityFilters, listActivity } from '../lib/api'
 import { actionLabel, dayHeading, timeOfDay } from '../lib/format'
@@ -21,12 +22,13 @@ function byDay(entries) {
   return days
 }
 
-export default function Activity() {
+export default function Activity({ me }) {
   const [entries, setEntries] = useState(null)
   const [nextBefore, setNextBefore] = useState(null)
   const [filters, setFilters] = useState({ admins: [], actions: [] })
   const [adminId, setAdminId] = useState('')
   const [action, setAction] = useState('')
+  const [facilityId, setFacilityId] = useState('')
   const [error, setError] = useState(null)
   const [loadingMore, setLoadingMore] = useState(false)
 
@@ -42,7 +44,7 @@ export default function Activity() {
   // A new filter starts again from the newest entry.
   useEffect(() => {
     const id = ++requestId.current
-    listActivity({ adminId, action })
+    listActivity({ adminId, action, facilityId })
       .then((data) => {
         if (requestId.current !== id) return
         setEntries(data.entries)
@@ -50,7 +52,7 @@ export default function Activity() {
         setError(null)
       })
       .catch((err) => { if (requestId.current === id) setError(err.message) })
-  }, [adminId, action])
+  }, [adminId, action, facilityId])
 
   function choose(set, value) {
     setEntries(null)
@@ -61,7 +63,7 @@ export default function Activity() {
     const id = requestId.current
     setLoadingMore(true)
     try {
-      const data = await listActivity({ before: nextBefore, adminId, action })
+      const data = await listActivity({ before: nextBefore, adminId, action, facilityId })
       if (requestId.current !== id) return
       setEntries((current) => [...(current ?? []), ...data.entries])
       setNextBefore(data.nextBefore)
@@ -90,6 +92,7 @@ export default function Activity() {
               {filters.actions.map((a) => <option key={a} value={a}>{actionLabel(a)}</option>)}
             </select>
           </label>
+          <FacilityPicker me={me} value={facilityId} onChange={(v) => choose(setFacilityId, v)} includeAll variant="board" />
         </div>
       </PageBoard>
 
@@ -102,19 +105,24 @@ export default function Activity() {
           <div className="table-wrap">
             <table className="table log">
               <thead>
-                <tr><th className="col-when">Time</th><th>Who</th><th>What</th><th>Details</th></tr>
+                <tr>
+                  <th className="col-when">Time</th><th>Who</th><th>What</th>
+                  {me.role === 'owner' && <th>Facility</th>}
+                  <th>Details</th>
+                </tr>
               </thead>
               <tbody>
                 {byDay(entries).map(({ key, day, entries: dayEntries }) => (
                   <Fragment key={key}>
                     <tr className="day-row">
-                      <th colSpan={4} scope="colgroup">{day}</th>
+                      <th colSpan={me.role === 'owner' ? 5 : 4} scope="colgroup">{day}</th>
                     </tr>
                     {dayEntries.map((entry) => (
                       <tr key={entry.id}>
                         <td className="col-when">{timeOfDay(entry.createdAt)}</td>
                         <td>{entry.adminName ?? 'Setup command'}</td>
                         <td><span className={`what${WARNINGS.has(entry.action) ? ' is-warning' : ''}`}>{actionLabel(entry.action)}</span></td>
+                        {me.role === 'owner' && <td>{entry.facilityName ?? '—'}</td>}
                         <td><span className="cell-main">{entry.summary}</span></td>
                       </tr>
                     ))}

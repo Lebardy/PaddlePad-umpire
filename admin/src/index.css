@@ -232,6 +232,8 @@ html { scrollbar-color: var(--border) var(--bg); }
 }
 .page-board-intro { margin: 0.75rem 0 0; color: var(--board-muted); max-width: 40rem; overflow-wrap: anywhere; }
 .page-board-intro strong { color: var(--board-ink); font-weight: 600; }
+.page-board-intro a { color: var(--lamp); font-weight: 600; text-decoration: underline; }
+.page-board-intro a:hover { text-decoration: none; }
 
 /* The page's key numbers: a ruled strip of cells on the board. */
 .tally { display: flex; border: 1px solid var(--board-rule); border-radius: var(--radius-sm); overflow: hidden; }
@@ -256,6 +258,11 @@ button.tally-cell[aria-pressed='true'] { background: var(--lamp); }
 button.tally-cell[aria-pressed='true'] .tally-figure,
 button.tally-cell[aria-pressed='true'] .tally-label { color: #15181d; }
 button.tally-cell:focus-visible { outline: 2px solid var(--lamp); outline-offset: -4px; }
+
+/* Stacks a board filter above the page's tally, as one grid item, so
+   the two sit right-aligned together instead of Grid's implicit rows
+   scattering them across the board's own two columns. */
+.board-head-group { display: grid; gap: 0.85rem; justify-items: end; }
 
 /* Controls that ride on the board take the board's colours. */
 .board-fields { display: flex; gap: 0.75rem; }
@@ -468,6 +475,12 @@ td.table-foot { display: table-cell; }
 }
 .panel p { margin: 0; color: var(--text-secondary); }
 .panel-actions { display: flex; gap: 0.75rem; }
+/* Same shape as .panel, for an ordinary edit form rather than a
+   dangerous action -- a neutral border instead of the critical-red one. */
+.edit-panel {
+  display: grid; gap: 0.85rem; padding: 1.25rem 1.4rem; margin-top: 0.75rem; max-width: 34rem;
+  background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius);
+}
 
 .claim-reveal { grid-template-columns: minmax(0, 1fr) auto; }
 .claim-reveal-side { display: grid; justify-items: center; gap: 0.6rem; }

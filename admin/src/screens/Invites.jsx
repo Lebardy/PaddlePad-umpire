@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import FacilityPicker from '../components/FacilityPicker'
 import PageBoard, { TallyCell } from '../components/PageBoard'
 import RowConfirm from '../components/RowConfirm'
 import { cancelInvite, createInvite, listInvites } from '../lib/api'
@@ -11,11 +12,13 @@ const SHOWING = [
   { key: 'expired', label: 'Expired', empty: 'No code has stopped working yet.' },
 ]
 
-export default function Invites() {
+export default function Invites({ me }) {
   const [invites, setInvites] = useState(null)
   const [loadedAt, setLoadedAt] = useState(0)
   const [note, setNote] = useState('')
   const [expiry, setExpiry] = useState('14')
+  const [facilityId, setFacilityId] = useState('')
+  const [filterFacilityId, setFilterFacilityId] = useState('')
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
   const [newest, setNewest] = useState(null)
@@ -39,18 +42,23 @@ export default function Invites() {
 
   useEffect(() => {
     let live = true
-    listInvites()
+    listInvites({ facilityId: filterFacilityId || undefined })
       .then((rows) => { if (live) loaded(rows) })
       .catch((err) => { if (live) setError(err.message) })
     return () => { live = false }
-  }, [])
+  }, [filterFacilityId])
 
   async function refresh() {
     try {
-      loaded(await listInvites())
+      loaded(await listInvites({ facilityId: filterFacilityId || undefined }))
     } catch (err) {
       setError(err.message)
     }
+  }
+
+  function updateFilterFacility(value) {
+    setInvites(null)
+    setFilterFacilityId(value)
   }
 
   async function handleCreate(event) {
@@ -62,6 +70,7 @@ export default function Invites() {
       const invite = await createInvite({
         note: note.trim() || undefined,
         expiresInDays: expiry === 'never' ? null : Number(expiry),
+        facilityId: facilityId || undefined,
       })
       setNewest(invite.code)
       setNote('')
@@ -110,11 +119,14 @@ export default function Invites() {
         title="Invite codes"
         intro="A new umpire needs a code to create their account. Each code works once. Send it to them yourself."
       >
-        <div className="tally" role="group" aria-label="Show codes">
-          {SHOWING.map((s) => (
-            <TallyCell key={s.key} figure={invites ? counts[s.key] : '–'} label={s.label}
-              pressed={showing === s.key} onClick={() => show(s.key)} />
-          ))}
+        <div className="board-head-group">
+          <FacilityPicker me={me} value={filterFacilityId} onChange={updateFilterFacility} includeAll variant="board" label="Facility" />
+          <div className="tally" role="group" aria-label="Show codes">
+            {SHOWING.map((s) => (
+              <TallyCell key={s.key} figure={invites ? counts[s.key] : '–'} label={s.label}
+                pressed={showing === s.key} onClick={() => show(s.key)} />
+            ))}
+          </div>
         </div>
       </PageBoard>
 
@@ -125,6 +137,7 @@ export default function Invites() {
             <span>Who it’s for (optional)</span>
             <input value={note} maxLength={120} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Coach Ana" />
           </label>
+          <FacilityPicker me={me} value={facilityId} onChange={setFacilityId} required />
           <label className="field">
             <span>Stops working</span>
             <select value={expiry} onChange={(e) => setExpiry(e.target.value)}>
@@ -171,6 +184,7 @@ export default function Invites() {
                   <th className="col-code">Code</th>
                   <th>For</th>
                   <th>Status</th>
+                  {me.role === 'owner' && <th>Facility</th>}
                   <th className="col-when">Made</th>
                   <th className="col-actions"><span className="sr-only">Actions</span></th>
                 </tr>
@@ -187,6 +201,7 @@ export default function Invites() {
                       <span className={`tag tag-${invite.status}`}>{inviteStatusText(invite, loadedAt)}</span>
                       {invite.status === 'used' && invite.used_at && <span className="cell-sub nowrap">{formatWhen(invite.used_at)}</span>}
                     </td>
+                    {me.role === 'owner' && <td>{invite.facilityName ?? '—'}</td>}
                     <td className="col-when">{formatWhen(invite.created_at)}</td>
                     <td className="row-actions">
                       {invite.status === 'open' && (

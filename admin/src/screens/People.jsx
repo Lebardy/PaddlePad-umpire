@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import FacilityPicker from '../components/FacilityPicker'
 import PageBoard from '../components/PageBoard'
 import StatusTag from '../components/StatusTag'
 import { listPlayers, listUmpires } from '../lib/api'
@@ -29,11 +30,12 @@ const KIND = {
 }
 
 /** Everyone using PaddlePad: players and umpires, searched and filtered the same way. */
-export default function People({ kind }) {
+export default function People({ kind, me }) {
   const config = KIND[kind]
   const [typed, setTyped] = useState('')
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('all')
+  const [facilityId, setFacilityId] = useState('')
   const [rows, setRows] = useState(null)
   const [next, setNext] = useState(null)
   const [error, setError] = useState(null)
@@ -49,9 +51,14 @@ export default function People({ kind }) {
     return () => clearTimeout(timer)
   }, [typed])
 
+  // Players belong to no facility, so the filter (and the column it
+  // scopes) exists only for umpires -- sending it for players would
+  // just be ignored server-side, but there is nothing to filter by.
+  const facilityFilter = kind === 'umpires' ? facilityId : undefined
+
   useEffect(() => {
     const id = ++requestId.current
-    config.list({ q, status })
+    config.list({ q, status, facilityId: facilityFilter })
       .then((data) => {
         if (requestId.current !== id) return
         setRows(data[kind])
@@ -59,22 +66,28 @@ export default function People({ kind }) {
         setError(null)
       })
       .catch((err) => { if (requestId.current === id) setError(err.message) })
-  }, [kind, q, status, config])
+  }, [kind, q, status, facilityFilter, config])
 
-  // A new status starts loading again straight away, from the event that
-  // changed it rather than from inside the effect above. A new search
-  // instead keeps the current rows on screen until the debounced request
-  // lands, so the table doesn't blank out on every keystroke.
+  // A new status or facility starts loading again straight away, from
+  // the event that changed it rather than from inside the effect above.
+  // A new search instead keeps the current rows on screen until the
+  // debounced request lands, so the table doesn't blank out on every
+  // keystroke.
   function updateStatus(value) {
     setRows(null)
     setStatus(value)
+  }
+
+  function updateFacility(value) {
+    setRows(null)
+    setFacilityId(value)
   }
 
   async function showMore() {
     const id = requestId.current
     setLoadingMore(true)
     try {
-      const data = await config.list({ q, status, after: next })
+      const data = await config.list({ q, status, after: next, facilityId: facilityFilter })
       if (requestId.current !== id) return
       setRows((current) => [...(current ?? []), ...data[kind]])
       setNext(data.next)
@@ -113,6 +126,7 @@ export default function People({ kind }) {
               </label>
             ))}
           </fieldset>
+          {kind === 'umpires' && <FacilityPicker me={me} value={facilityId} onChange={updateFacility} includeAll />}
         </div>
 
         {error && <p className="form-error" role="alert">{error}</p>}
@@ -126,6 +140,7 @@ export default function People({ kind }) {
                 <tr>
                   <th>Name</th>
                   <th>Ways in</th>
+                  {kind === 'umpires' && me.role === 'owner' && <th>Facility</th>}
                   <th className="col-when">Joined</th>
                   <th className="col-when">Last signed in</th>
                   <th>Status</th>
@@ -145,6 +160,7 @@ export default function People({ kind }) {
                         : <span className="cell-sub">{person.email}</span>}
                     </td>
                     <td>{signInMethodsText(person.signInMethods)}</td>
+                    {kind === 'umpires' && me.role === 'owner' && <td>{person.facilityName ?? '—'}</td>}
                     <td className="col-when">{formatWhen(person.joinedAt)}</td>
                     <td className="col-when">{lastSignedInText(person.lastSignedInAt)}</td>
                     <td><StatusTag status={person.status} /></td>

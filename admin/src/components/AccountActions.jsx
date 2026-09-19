@@ -21,6 +21,10 @@ const CLOSE_EXPLANATION = {
  */
 export default function AccountActions({ kind, person, me, onChanged, extraActions }) {
   const singular = kind === 'players' ? 'player' : 'umpire'
+  // Pausing a player stops them everywhere, since they belong to no
+  // facility -- it stays the owner's alone. An umpire belongs to one
+  // facility, so any admin who can see them may pause them.
+  const canPause = kind === 'umpires' || me.role === 'owner'
 
   const [confirming, setConfirming] = useState(null)
   const [reason, setReason] = useState('')
@@ -70,7 +74,7 @@ export default function AccountActions({ kind, person, me, onChanged, extraActio
     <div>
       <h2 className="section-title">Actions</h2>
       <div className="actions-row">
-        {person.status !== 'closed' && person.status !== 'paused' && (
+        {canPause && person.status !== 'closed' && person.status !== 'paused' && (
           <RowConfirm
             label="Pause account"
             className="btn-danger btn-small"
@@ -93,7 +97,7 @@ export default function AccountActions({ kind, person, me, onChanged, extraActio
           />
         )}
 
-        {person.status === 'paused' && (
+        {canPause && person.status === 'paused' && (
           <RowConfirm
             label="Switch back on"
             className="btn-quiet btn-small"

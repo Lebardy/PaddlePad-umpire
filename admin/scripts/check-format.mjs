@@ -6,8 +6,8 @@
 // ============================================================
 
 import {
-  EXPIRY_CHOICES, actionLabel, confirmNameMatches, dayHeading, formatWhen, inviteStatusText, lastSignedInText,
-  madeByText, ratingText, signInMethods, signInMethodsText, statusLabel, timeOfDay,
+  EXPIRY_CHOICES, actionLabel, confirmNameMatches, dayHeading, facilityLabel, formatWhen, inviteStatusText,
+  lastSignedInText, madeByText, ratingText, signInMethods, signInMethodsText, statusLabel, timeOfDay,
 } from '../src/lib/format.js'
 
 let pass = 0
@@ -66,6 +66,12 @@ check('an exact typed name matches', confirmNameMatches('Ana Reyes', 'Ana Reyes'
 check('matching ignores case and outer spaces', confirmNameMatches('  ana reyes  ', 'Ana Reyes'), true)
 check('a different name does not match', confirmNameMatches('Ana', 'Ana Reyes'), false)
 check('an empty or blank typed name never matches', confirmNameMatches('   ', 'Ana Reyes'), false)
+
+check('the owner sees every facility', facilityLabel({ role: 'owner', facilityId: null }, []), 'All facilities')
+check('a facility admin sees their own facility’s name',
+  facilityLabel({ role: 'admin', facilityId: 'f1' }, [{ id: 'f1', name: 'Cebu IT Park' }]), 'Cebu IT Park')
+check('a facility admin whose facility hasn’t loaded yet shows nothing',
+  facilityLabel({ role: 'admin', facilityId: 'f1' }, []), null)
 
 check('a day heading this year has no year', dayHeading('2026-09-18T01:00:00Z', Date.parse('2026-09-18T12:00:00Z')), 'Friday, Sep 18')
 check('a day heading from a past year gets one', dayHeading('2025-12-31T15:00:00Z', Date.parse('2026-09-18T12:00:00Z')), 'Wednesday, Dec 31, 2025')

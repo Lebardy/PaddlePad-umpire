@@ -164,24 +164,39 @@ export async function signInWithBackupCode({ email, code }) {
 
 // Invite codes
 
-export const listInvites = () => apiFetch('/admin/invites').then((d) => d.invites)
-export const createInvite = ({ note, expiresInDays }) => post('/admin/invites', { note, expiresInDays }).then((d) => d.invite)
+export function listInvites({ facilityId } = {}) {
+  const params = new URLSearchParams()
+  if (facilityId) params.set('facilityId', facilityId)
+  const qs = params.toString()
+  return apiFetch(`/admin/invites${qs ? `?${qs}` : ''}`).then((d) => d.invites)
+}
+export const createInvite = ({ note, expiresInDays, facilityId }) =>
+  post('/admin/invites', { note, expiresInDays, facilityId }).then((d) => d.invite)
 export const cancelInvite = (code) => apiFetch(`/admin/invites/${encodeURIComponent(code)}`, { method: 'DELETE' })
 
 // Admins (owner only)
 
 export const listAdmins = () => apiFetch('/admin/admins').then((d) => d.admins)
-export const addAdmin = ({ name, email }) => post('/admin/admins', { name, email })
+export const addAdmin = ({ name, email, facilityId }) => post('/admin/admins', { name, email, facilityId })
 export const newSetupLink = (id) => post(`/admin/admins/${id}/setup-link`).then((d) => d.setupLink)
 export const switchAdmin = (id, on) => post(`/admin/admins/${id}/switch-${on ? 'on' : 'off'}`).then((d) => d.admin)
+export const moveAdmin = (id, facilityId) => post(`/admin/admins/${id}/move`, { facilityId }).then((d) => d.admin)
+
+// Facilities
+
+export const listFacilities = () => apiFetch('/admin/facilities').then((d) => d.facilities)
+export const fetchFacility = (id) => apiFetch(`/admin/facilities/${id}`)
+export const createFacility = (fields) => post('/admin/facilities', fields).then((d) => d.facility)
+export const updateFacility = (id, fields) => apiFetch(`/admin/facilities/${id}`, { method: 'PATCH', body: fields }).then((d) => d.facility)
 
 // Activity
 
-export function listActivity({ before, adminId, action } = {}) {
+export function listActivity({ before, adminId, action, facilityId } = {}) {
   const params = new URLSearchParams()
   if (before) params.set('before', before)
   if (adminId) params.set('adminId', adminId)
   if (action) params.set('action', action)
+  if (facilityId) params.set('facilityId', facilityId)
   const qs = params.toString()
   return apiFetch(`/admin/activity${qs ? `?${qs}` : ''}`)
 }
@@ -190,11 +205,12 @@ export const activityFilters = () => apiFetch('/admin/activity/filters')
 
 // People
 
-function peopleQuery({ q, status, after } = {}) {
+function peopleQuery({ q, status, after, facilityId } = {}) {
   const params = new URLSearchParams()
   if (q) params.set('q', q)
   if (status && status !== 'all') params.set('status', status)
   if (after) params.set('after', after)
+  if (facilityId) params.set('facilityId', facilityId)
   const qs = params.toString()
   return qs ? `?${qs}` : ''
 }
@@ -207,3 +223,4 @@ export const pausePerson = (kind, id, reason) => post(`/admin/${kind}/${id}/paus
 export const unpausePerson = (kind, id) => post(`/admin/${kind}/${id}/unpause`)
 export const closePerson = (kind, id, { reason, confirmName }) => post(`/admin/${kind}/${id}/close`, { reason, confirmName })
 export const newClaimCode = (id) => post(`/admin/players/${id}/claim-code`).then((d) => d.claimCode)
+export const moveUmpire = (id, facilityId) => post(`/admin/umpires/${id}/move`, { facilityId }).then((d) => d.umpire)
