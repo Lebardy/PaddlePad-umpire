@@ -131,7 +131,7 @@ export default function Admins({ me }) {
           open={asking === 'move'}
           hidden={asking === 'link' || asking === 'switch'}
           disabled={asking === 'move' && !moveFacilityId}
-          onOpen={() => { setMoveFacilityId(admin.facilityId ?? ''); setConfirming({ id: admin.id, what: 'move' }) }}
+          onOpen={() => { setMoveFacilityId(''); setConfirming({ id: admin.id, what: 'move' }) }}
           onClose={close}
           onConfirm={() => handleMove(admin)}
         />

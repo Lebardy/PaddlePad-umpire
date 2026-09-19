@@ -11,7 +11,10 @@ export default function Facilities({ me }) {
   const [error, setError] = useState(null)
   const [name, setName] = useState('')
   const [area, setArea] = useState('')
+  const [locationUrl, setLocationUrl] = useState('')
+  const [openingHours, setOpeningHours] = useState('')
   const [hourlyFee, setHourlyFee] = useState('')
+  const [details, setDetails] = useState('')
   const [busy, setBusy] = useState(false)
   const [formError, setFormError] = useState(null)
 
@@ -46,7 +49,14 @@ export default function Facilities({ me }) {
     setBusy(true)
     setFormError(null)
     try {
-      const facility = await createFacility({ name: name.trim(), area: area.trim() || undefined, hourlyFee: hourlyFee.trim() || undefined })
+      const facility = await createFacility({
+        name: name.trim(),
+        area: area.trim() || undefined,
+        locationUrl: locationUrl.trim() || undefined,
+        openingHours: openingHours.trim() || undefined,
+        hourlyFee: hourlyFee.trim() || undefined,
+        details: details.trim() || undefined,
+      })
       navigate(`/facilities/${facility.id}`)
     } catch (err) {
       setFormError(err.message)
@@ -85,9 +95,21 @@ export default function Facilities({ me }) {
             <span>Area (optional)</span>
             <input value={area} maxLength={120} onChange={(e) => setArea(e.target.value)} placeholder="e.g. Cebu IT Park" />
           </label>
+          <label className="field grow">
+            <span>Map link (optional)</span>
+            <input value={locationUrl} maxLength={500} placeholder="https://maps.google.com/…" onChange={(e) => setLocationUrl(e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Opening hours (optional)</span>
+            <input value={openingHours} maxLength={200} placeholder="e.g. 6 AM – 10 PM" onChange={(e) => setOpeningHours(e.target.value)} />
+          </label>
           <label className="field">
             <span>Fee per hour, in pesos (optional)</span>
             <input inputMode="decimal" value={hourlyFee} onChange={(e) => setHourlyFee(e.target.value)} placeholder="e.g. 150" />
+          </label>
+          <label className="field grow">
+            <span>Details (optional)</span>
+            <textarea maxLength={1000} value={details} onChange={(e) => setDetails(e.target.value)} />
           </label>
           <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Making…' : 'Make facility'}</button>
         </form>

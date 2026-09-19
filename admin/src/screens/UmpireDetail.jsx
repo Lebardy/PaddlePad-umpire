@@ -147,7 +147,7 @@ export default function UmpireDetail({ id, me }) {
                 keepLabel="Not now"
                 open={confirming === 'move'}
                 disabled={confirming === 'move' && !moveFacilityId}
-                onOpen={() => { setMoveFacilityId(umpire.facilityId ?? ''); setConfirming('move') }}
+                onOpen={() => { setMoveFacilityId(''); setConfirming('move') }}
                 onClose={() => setConfirming(null)}
                 onConfirm={handleMove}
               />
