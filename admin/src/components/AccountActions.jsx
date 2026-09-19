@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import RowConfirm from './RowConfirm'
 import { closePerson, pausePerson, unpausePerson } from '../lib/api'
 import { confirmNameMatches } from '../lib/format'
@@ -6,14 +6,14 @@ import { confirmNameMatches } from '../lib/format'
 const CLOSE_EXPLANATION = {
   players:
     'Closing wipes their username, password, Google link and claim code. Their matches and rating history ' +
-    'stay. This can’t be undone, but a new claim code can reopen the account.',
+    'stay. A new claim code can reopen the account later.',
   umpires:
     'Closing wipes their password and Google link and frees their email so they can sign up again with a ' +
-    'new invite code. The matches they scored stay. This can’t be undone.',
+    'new invite code. The matches they scored stay.',
 }
 
 /**
- * Pause, switch back on and close-for-good: the actions shared by a
+ * Pause, switch back on and close: the actions shared by a
  * player's and an umpire's page. `extraActions`, given the same shared
  * `confirming` state this uses for Pause / Switch back on, can add
  * another row confirmation (the player's claim code) that takes part
@@ -33,6 +33,16 @@ export default function AccountActions({ kind, person, me, onChanged, extraActio
   const [closeName, setCloseName] = useState('')
   const [closeError, setCloseError] = useState(null)
   const [closeBusy, setCloseBusy] = useState(false)
+  const closeDialog = useRef(null)
+
+  // Closing can't be undone, so it asks in a pop-up over the page
+  // rather than inline, where it is easy to click through.
+  useEffect(() => {
+    const dialog = closeDialog.current
+    if (!dialog) return
+    if (closing && !dialog.open) dialog.showModal()
+    if (!closing && dialog.open) dialog.close()
+  }, [closing])
 
   async function handlePause() {
     const trimmed = reason.trim()
@@ -115,12 +125,19 @@ export default function AccountActions({ kind, person, me, onChanged, extraActio
         {extraActions?.(confirming, setConfirming)}
 
         {me.role === 'owner' && person.status !== 'closed' && !closing && (
-          <button type="button" className="btn-danger btn-small" onClick={() => setClosing(true)}>Close for good</button>
+          <button type="button" className="btn-danger btn-small" onClick={() => setClosing(true)}>Close</button>
         )}
       </div>
 
-      {me.role === 'owner' && person.status !== 'closed' && closing && (
-        <div className="panel">
+      {me.role === 'owner' && person.status !== 'closed' && (
+        <dialog
+          ref={closeDialog}
+          className="warning-dialog"
+          aria-labelledby="close-dialog-title"
+          onCancel={(e) => { e.preventDefault(); if (!closeBusy) cancelClose() }}
+        >
+          <h2 id="close-dialog-title" className="section-title">Close {person.name}?</h2>
+          <p className="warning-line">This can’t be undone.</p>
           <p>{CLOSE_EXPLANATION[kind]}</p>
           <label className="field"><span>Reason</span>
             <textarea value={closeReason} maxLength={300} onChange={(e) => setCloseReason(e.target.value)} />
@@ -138,9 +155,9 @@ export default function AccountActions({ kind, person, me, onChanged, extraActio
             >
               {closeBusy ? 'Closing…' : 'Close account'}
             </button>
-            <button type="button" className="btn-quiet" onClick={cancelClose}>Cancel</button>
+            <button type="button" className="btn-quiet" disabled={closeBusy} onClick={cancelClose}>Cancel</button>
           </div>
-        </div>
+        </dialog>
       )}
     </div>
   )

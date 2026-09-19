@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
 import AccountActions from '../components/AccountActions'
-import FacilityPicker from '../components/FacilityPicker'
 import PageBoard, { TallyCell } from '../components/PageBoard'
-import RowConfirm from '../components/RowConfirm'
 import StatusTag from '../components/StatusTag'
-import { fetchUmpire, moveUmpire } from '../lib/api'
+import { fetchUmpire } from '../lib/api'
 import { formatWhen, lastSignedInText, signInMethodsText } from '../lib/format'
 import { Link } from '../lib/router'
 
@@ -18,7 +16,6 @@ export default function UmpireDetail({ id, me }) {
   // inside the effect) is what tells a still-loading id apart from one
   // already answered.
   const [result, setResult] = useState(null)
-  const [moveFacilityId, setMoveFacilityId] = useState('')
 
   useEffect(() => {
     let live = true
@@ -37,12 +34,6 @@ export default function UmpireDetail({ id, me }) {
 
   function handleChanged(fresh) {
     setResult({ id, umpire: fresh })
-  }
-
-  // Errors are thrown back to the row's confirmation, which shows them there.
-  async function handleMove() {
-    handleChanged(await moveUmpire(umpire.id, moveFacilityId))
-    setMoveFacilityId('')
   }
 
   if (loading) return <section className="sheet"><p className="empty">Loading…</p></section>
@@ -143,24 +134,6 @@ export default function UmpireDetail({ id, me }) {
           person={umpire}
           me={me}
           onChanged={handleChanged}
-          extraActions={(confirming, setConfirming) => (
-            me.role === 'owner' && (
-              <RowConfirm
-                label="Move"
-                className="btn-quiet btn-small"
-                question={<FacilityPicker me={me} value={moveFacilityId} onChange={setMoveFacilityId} label="Move to" />}
-                confirmLabel="Move"
-                busyLabel="Moving…"
-                confirmClass="btn-primary btn-small"
-                keepLabel="Not now"
-                open={confirming === 'move'}
-                disabled={confirming === 'move' && !moveFacilityId}
-                onOpen={() => { setMoveFacilityId(''); setConfirming('move') }}
-                onClose={() => setConfirming(null)}
-                onConfirm={handleMove}
-              />
-            )
-          )}
         />
       </div>
     </section>
