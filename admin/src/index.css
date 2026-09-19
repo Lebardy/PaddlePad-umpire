@@ -185,7 +185,8 @@ html { scrollbar-color: var(--border) var(--bg); }
 }
 
 .topbar {
-  display: grid; grid-template-columns: auto 1fr auto; align-items: stretch;
+  /* The menu keeps its width; the name and facility give way when space is short. */
+  display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: stretch;
   min-height: 3.75rem; padding-inline: 1.5rem 0; border-bottom: 1px solid var(--board-rule);
 }
 .topbar .brand-mark { font-size: 1.35rem; padding-right: 1.5rem; }
@@ -194,7 +195,7 @@ html { scrollbar-color: var(--border) var(--bg); }
 .tabs li { display: flex; border-right: 1px solid var(--board-rule); }
 .tabs a {
   display: flex; align-items: center; padding: 0 1.4rem; font-size: 1.05rem;
-  color: var(--board-muted); text-decoration: none; position: relative;
+  color: var(--board-muted); text-decoration: none; position: relative; white-space: nowrap;
 }
 .tabs a:hover { color: var(--board-ink); background: var(--board-raised); }
 .tabs a[aria-current='page'] { color: var(--lamp); background: var(--board-raised); }
@@ -203,13 +204,13 @@ html { scrollbar-color: var(--border) var(--bg); }
   content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 4px; background: var(--lamp);
 }
 
-.topbar-who { display: flex; align-items: stretch; border-left: 1px solid var(--board-rule); }
+.topbar-who { display: flex; align-items: stretch; justify-self: end; min-width: 0; border-left: 1px solid var(--board-rule); }
 .who-cell {
   display: grid; align-content: center; padding: 0 1.25rem; min-width: 0; max-width: 17rem;
   color: var(--board-ink); text-decoration: none; position: relative;
 }
 .who-cell strong { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.who-role { font-size: 0.8rem; color: var(--board-muted); }
+.who-role { font-size: 0.8rem; color: var(--board-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .who-cell:hover, .who-cell[aria-current='page'] { background: var(--board-raised); }
 .who-cell:hover strong, .who-cell[aria-current='page'] strong { color: var(--lamp); }
 .who-cell[aria-current='page']::after {
@@ -217,7 +218,7 @@ html { scrollbar-color: var(--border) var(--bg); }
 }
 .signout {
   border: 0; border-left: 1px solid var(--board-rule); background: none; color: var(--board-muted);
-  padding: 0 1.25rem; cursor: pointer; font-size: 0.95rem;
+  padding: 0 1.25rem; cursor: pointer; font-size: 0.95rem; white-space: nowrap;
 }
 .signout:hover { color: var(--board-ink); background: var(--board-raised); }
 
@@ -562,6 +563,10 @@ td.table-foot { display: table-cell; }
   .page-board { grid-template-columns: minmax(0, 1fr); align-items: start; }
   .page-board > .tally, .page-board > .facts { justify-self: start; }
   .setting { grid-template-columns: 13rem minmax(0, 1fr); gap: 1.25rem 2rem; }
+  /* Tighter menu cells so the name and facility still fit at tablet width. */
+  .topbar .brand-mark { padding-right: 1rem; }
+  .tabs a { padding: 0 0.9rem; }
+  .who-cell, .signout { padding: 0 1rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

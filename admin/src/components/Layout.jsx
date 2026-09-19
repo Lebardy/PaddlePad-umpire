@@ -4,7 +4,7 @@ import LampMark from './LampMark'
 const PAGES = [
   { to: '/invites', label: 'Invite codes', current: (path) => path === '/' || path === '/invites' },
   { to: '/people', label: 'People', current: (path) => path === '/people' || path.startsWith('/people/') },
-  { to: '/facilities', label: 'Facilities', current: (path) => path === '/facilities' || path.startsWith('/facilities/') },
+  { to: '/facilities', label: 'Facilities', facilityAdminLabel: 'Facility', current: (path) => path === '/facilities' || path.startsWith('/facilities/') },
   { to: '/admins', label: 'Admins', ownerOnly: true, current: (path) => path === '/admins' },
   { to: '/activity', label: 'Activity', current: (path) => path === '/activity' },
 ]
@@ -20,13 +20,20 @@ export default function Layout({ admin, facilityLabel, path, onSignOut, children
           <ul className="tabs">
             {PAGES.filter((page) => !page.ownerOnly || admin.role === 'owner').map((page) => (
               <li key={page.to}>
-                <Link to={page.to} aria-current={page.current(path) ? 'page' : undefined}>{page.label}</Link>
+                <Link to={page.to} aria-current={page.current(path) ? 'page' : undefined}>
+                  {admin.role !== 'owner' && page.facilityAdminLabel ? page.facilityAdminLabel : page.label}
+                </Link>
               </li>
             ))}
           </ul>
         </nav>
         <div className="topbar-who">
-          <Link to="/account" className="who-cell" aria-current={onAccount ? 'page' : undefined}>
+          <Link
+            to="/account"
+            className="who-cell"
+            aria-current={onAccount ? 'page' : undefined}
+            title={facilityLabel ? `${admin.name} · ${facilityLabel}` : admin.name}
+          >
             <strong>{admin.name}</strong>
             <span className="who-role">{admin.role === 'owner' ? 'Owner' : 'Admin'}{facilityLabel ? ` · ${facilityLabel}` : ''}</span>
           </Link>
