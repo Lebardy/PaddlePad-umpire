@@ -18,6 +18,10 @@ const SESSION_SELECT = `
          -- umpires can share a display name, and shows the name.
          s.created_by,
          u.name AS created_by_name,
+         -- Which facility this session was opened at (part 2 of facilities
+         -- is what shows this in the umpire app; stamped here already so
+         -- nothing has to be backfilled once it does).
+         s.facility_id,
          (SELECT count(*)::int FROM session_players sp WHERE sp.session_id = s.id) AS player_count,
          (SELECT count(*)::int FROM matches m WHERE m.session_id = s.id)           AS match_count
     FROM sessions s
