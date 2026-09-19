@@ -698,18 +698,22 @@ CREATE INDEX IF NOT EXISTS admin_activity_facility_idx ON admin_activity (facili
 
 -- The switch-over: everything made before facilities existed goes into
 -- one starting facility, created once, which the owner then renames.
--- Safe on every boot: it only acts while something has no facility.
+-- One-time only: it can act only while no facility exists yet at all.
+-- Once the first facility exists (however it got there), this never
+-- runs again, and any row left with a NULL facility_id after that
+-- stays visibly unassigned instead of being swept in silently. Safe to
+-- re-run: an advisory lock (held only for this transaction) keeps two
+-- servers booting at once from both inserting a "Starting facility".
 DO $$
 DECLARE starting UUID;
 BEGIN
-  IF EXISTS (SELECT 1 FROM umpires WHERE facility_id IS NULL)
-     OR EXISTS (SELECT 1 FROM sessions WHERE facility_id IS NULL)
-     OR EXISTS (SELECT 1 FROM invites WHERE facility_id IS NULL)
-     OR EXISTS (SELECT 1 FROM admins WHERE facility_id IS NULL AND role <> 'owner') THEN
-    SELECT id INTO starting FROM facilities ORDER BY created_at LIMIT 1;
-    IF starting IS NULL THEN
-      INSERT INTO facilities (name) VALUES ('Starting facility') RETURNING id INTO starting;
-    END IF;
+  PERFORM pg_advisory_xact_lock(729016455);
+  IF NOT EXISTS (SELECT 1 FROM facilities)
+     AND (EXISTS (SELECT 1 FROM umpires WHERE facility_id IS NULL)
+          OR EXISTS (SELECT 1 FROM sessions WHERE facility_id IS NULL)
+          OR EXISTS (SELECT 1 FROM invites WHERE facility_id IS NULL)
+          OR EXISTS (SELECT 1 FROM admins WHERE facility_id IS NULL AND role <> 'owner')) THEN
+    INSERT INTO facilities (name) VALUES ('Starting facility') RETURNING id INTO starting;
     UPDATE umpires  SET facility_id = starting WHERE facility_id IS NULL;
     UPDATE sessions SET facility_id = starting WHERE facility_id IS NULL;
     UPDATE invites  SET facility_id = starting WHERE facility_id IS NULL;

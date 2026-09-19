@@ -6,6 +6,7 @@
 // ============================================================
 
 import { personStatus } from './people-rules.js'
+import { facilityColumns } from './facility-rules.js'
 
 const FACILITY_COLUMNS =
   'id, name, area, location_url, opening_hours, hourly_fee_centavos, details, created_by, created_at, updated_at'
@@ -31,12 +32,15 @@ export async function findFacility(queryFn, id) {
 
 /**
  * Inserts a facility from `values` (the fixed column set `readFacility`
- * produces -- column names never come from anywhere else). Throws
- * 23505 on `facilities_name_lower_idx` for a name clash, left for the
- * route to turn into its own message.
+ * produces -- column names never come from anywhere else: `values` is
+ * filtered through `facilityColumns` here regardless of what the
+ * caller passed). Throws 23505 on `facilities_name_lower_idx` for a
+ * name clash, left for the route to turn into its own message. Throws
+ * when `values` has no allowed column.
  */
 export async function createFacility(db, values, createdBy) {
-  const columns = Object.keys(values)
+  const columns = facilityColumns(values)
+  if (columns.length === 0) throw new Error('createFacility: no allowed facility columns in values')
   const placeholders = columns.map((_, i) => `$${i + 1}`)
   const { rows } = await db.query(
     `INSERT INTO facilities (${columns.join(', ')}, created_by)
@@ -48,12 +52,14 @@ export async function createFacility(db, values, createdBy) {
 }
 
 /**
- * Updates a facility from `values` (again, only `readFacility`'s fixed
- * columns) and stamps `updated_at`. Returns the row, or null when the
- * facility doesn't exist. Throws 23505 the same way createFacility does.
+ * Updates a facility from `values` (again, filtered through
+ * `facilityColumns`) and stamps `updated_at`. Returns the row, or null
+ * when the facility doesn't exist. Throws 23505 the same way
+ * createFacility does, and throws when `values` has no allowed column.
  */
 export async function updateFacility(db, id, values) {
-  const columns = Object.keys(values)
+  const columns = facilityColumns(values)
+  if (columns.length === 0) throw new Error('updateFacility: no allowed facility columns in values')
   const sets = columns.map((column, i) => `${column} = $${i + 2}`)
   sets.push('updated_at = now()')
   const { rows } = await db.query(

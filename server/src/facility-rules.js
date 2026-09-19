@@ -86,6 +86,20 @@ export function readFacility(body = {}, { partial = false } = {}) {
   return { values }
 }
 
+/** The only columns a facility create/update may ever set from caller-supplied values. */
+const FACILITY_VALUE_COLUMNS = ['name', 'area', 'location_url', 'opening_hours', 'hourly_fee_centavos', 'details']
+
+/**
+ * Keeps only the fixed, known facility columns present in `values`,
+ * dropping everything else -- so a caller that ever passes a raw
+ * request body straight through can't smuggle in an arbitrary column
+ * name. Used by facility-store.js to build its INSERT/UPDATE column
+ * lists.
+ */
+export function facilityColumns(values = {}) {
+  return FACILITY_VALUE_COLUMNS.filter((column) => Object.prototype.hasOwnProperty.call(values, column))
+}
+
 /** The owner sees every facility; every other admin sees their own. */
 export function facilityScope(admin) {
   return admin?.role === 'owner' ? 'all' : admin?.facilityId ?? null

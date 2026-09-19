@@ -61,6 +61,16 @@ section('reading facility details')
   check('a partial change still checks the name', rules.readFacility({ name: '' }, { partial: true }), { error: 'A facility needs a name (up to 80 characters)' })
 }
 
+section('which columns a write may touch')
+{
+  check('every allowed column passes through', rules.facilityColumns({
+    name: 'A', area: 'B', location_url: 'C', opening_hours: 'D', hourly_fee_centavos: 100, details: 'E',
+  }), ['name', 'area', 'location_url', 'opening_hours', 'hourly_fee_centavos', 'details'])
+  check('an unknown column is dropped', rules.facilityColumns({ name: 'A', created_by: 'x', id: 'y' }), ['name'])
+  check('a raw body with only unknown keys yields nothing', rules.facilityColumns({ role: 'owner', facility_id: 'f1' }), [])
+  check('no values at all yields nothing', rules.facilityColumns({}), [])
+}
+
 section('who may do what')
 {
   const owner = { role: 'owner', facilityId: null }
