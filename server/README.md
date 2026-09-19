@@ -384,6 +384,17 @@ an invite code at all.
 | `POST` | `/admin/umpires/:id/unpause` | Bearer (admin) | Switch a paused umpire back on |
 | `POST` | `/admin/umpires/:id/close` | Bearer (owner) | Close an umpire for good and free their email address |
 | `POST` | `/admin/umpires/:id/move` | Bearer (owner) | Move an umpire to another facility |
+| `GET` | `/admin/overview` | Bearer (admin) | What's going on right now, totals, matches worth a look, and (owner only) possible duplicate players; the owner can narrow it with `?facilityId` |
+| `POST` | `/admin/overview/looks-fine` | Bearer (admin) | Dismiss one warning reason on a flagged match |
+| `POST` | `/admin/overview/void` | Bearer (admin) | Void a match the Overview has flagged, with a reason |
+| `POST` | `/admin/overview/unvoid` | Bearer (admin) | Undo a void that was made from the Overview |
+| `POST` | `/admin/overview/not-same-person` | Bearer (owner) | Dismiss a possible duplicate pair for good — they're two different people |
+| `POST` | `/admin/overview/merge` | Bearer (owner) | Merge one player into another: their matches move over and the duplicate is removed |
+
+`node server/scripts/check-overview-rules.mjs` checks the Overview's
+rules — which matches are worth a look, which players might be the same
+person entered twice, and when a void or a merge is allowed — offline,
+with no database.
 
 An admin who isn't the owner only ever sees and manages their own
 facility's umpires, invite codes and activity entries — a

@@ -2517,6 +2517,331 @@ async function main() {
     check('renaming facility B for cleanup -> 200', renameB.status === 200, JSON.stringify(renameB.body).slice(0, 80))
   }
 
+  section('admin site — overview')
+  if (!ADMIN_SECTION || !OWNER_EMAIL || !OWNER_PASSWORD) {
+    console.log('  skip (needs a staging or local server, SMOKE_OWNER_EMAIL and SMOKE_OWNER_PASSWORD)')
+  } else {
+    const stamp = Date.now()
+    const nameFacA = `Smoke Overview A ${stamp}`
+    const nameFacB = `Smoke Overview B ${stamp}`
+
+    // Same redaction as the other admin sections -- never let a token,
+    // invite code or setup link reach a failure detail as-is.
+    const redacted = (body) => {
+      const { token, codes, invite, setupLink, ...rest } = body ?? {}
+      return JSON.stringify({
+        ...rest,
+        ...(token !== undefined ? { token: '[redacted]' } : {}),
+        ...(codes !== undefined ? { codes: `[redacted, ${Array.isArray(codes) ? codes.length : 0} codes]` } : {}),
+        ...(invite !== undefined ? { invite: { ...invite, code: '[redacted]' } } : {}),
+        ...(setupLink !== undefined ? { setupLink: '[redacted]' } : {}),
+      })
+    }
+
+    // --- Step 1: two throwaway facilities, one admin and one umpire each ---
+    const fOwnerIn = await request('/admin/auth/login', { method: 'POST', body: { email: OWNER_EMAIL, password: OWNER_PASSWORD } })
+    check('the owner signs in for the overview section -> 200', fOwnerIn.status === 200, redacted(fOwnerIn.body).slice(0, 80))
+    const fOwnerToken = fOwnerIn.body.token
+
+    const facA = await request('/admin/facilities', { method: 'POST', bearer: fOwnerToken, body: { name: nameFacA } })
+    check('the owner creates facility A -> 201', facA.status === 201, redacted(facA.body).slice(0, 120))
+    const facilityAId = facA.body.facility?.id
+    const facB = await request('/admin/facilities', { method: 'POST', bearer: fOwnerToken, body: { name: nameFacB } })
+    check('the owner creates facility B -> 201', facB.status === 201, redacted(facB.body).slice(0, 120))
+    const facilityBId = facB.body.facility?.id
+
+    const adminAEmail = `smoke.overview.admin.a.${uuid().slice(0, 8)}@example.com`
+    const addedAdminA = await request('/admin/admins', {
+      method: 'POST', bearer: fOwnerToken,
+      body: { name: `Smoke Overview Admin A ${stamp}`, email: adminAEmail, facilityId: facilityAId },
+    })
+    check('the owner adds admin A -> 201', addedAdminA.status === 201, redacted(addedAdminA.body).slice(0, 100))
+    const adminAId = addedAdminA.body.admin?.id
+    const adminASecret = (addedAdminA.body.setupLink?.url ?? '').split('/setup/')[1]
+    const ADMIN_A_PASSWORD = `smoke-${uuid()}`
+    await request(`/admin/auth/setup/${adminASecret}`, { method: 'POST', body: { password: ADMIN_A_PASSWORD } })
+    const adminAIn = await request('/admin/auth/login', { method: 'POST', body: { email: adminAEmail, password: ADMIN_A_PASSWORD } })
+    check('admin A signs in -> 200', adminAIn.status === 200, String(adminAIn.status))
+    const adminAToken = adminAIn.body.token
+
+    const adminBEmail = `smoke.overview.admin.b.${uuid().slice(0, 8)}@example.com`
+    const addedAdminB = await request('/admin/admins', {
+      method: 'POST', bearer: fOwnerToken,
+      body: { name: `Smoke Overview Admin B ${stamp}`, email: adminBEmail, facilityId: facilityBId },
+    })
+    check('the owner adds admin B -> 201', addedAdminB.status === 201, redacted(addedAdminB.body).slice(0, 100))
+    const adminBId = addedAdminB.body.admin?.id
+    const adminBSecret = (addedAdminB.body.setupLink?.url ?? '').split('/setup/')[1]
+    const ADMIN_B_PASSWORD = `smoke-${uuid()}`
+    await request(`/admin/auth/setup/${adminBSecret}`, { method: 'POST', body: { password: ADMIN_B_PASSWORD } })
+    const adminBIn = await request('/admin/auth/login', { method: 'POST', body: { email: adminBEmail, password: ADMIN_B_PASSWORD } })
+    check('admin B signs in -> 200', adminBIn.status === 200, String(adminBIn.status))
+    const adminBToken = adminBIn.body.token
+
+    const inviteA = await request('/admin/invites', { method: 'POST', bearer: adminAToken, body: { note: 'smoke overview a', facilityId: facilityAId } })
+    check('an invite code is made for A -> 201', inviteA.status === 201, redacted(inviteA.body).slice(0, 80))
+    const inviteACode = inviteA.body.invite?.code
+
+    const umpAName = `Smoke Overview Umpire A ${stamp}`
+    const umpAEmail = `smoke.overview.umpire.a.${stamp}@example.com`
+    const umpAReg = await request('/auth/register', {
+      method: 'POST', body: { email: umpAEmail, name: umpAName, password: `smk-${uuid()}`, invite: inviteACode },
+    })
+    check('the throwaway umpire A registers -> 201', umpAReg.status === 201, redacted(umpAReg.body).slice(0, 80))
+    const umpireAId = umpAReg.body.umpire?.id
+    const umpAToken = umpAReg.body.token
+
+    const inviteB = await request('/admin/invites', { method: 'POST', bearer: adminBToken, body: { note: 'smoke overview b', facilityId: facilityBId } })
+    check('an invite code is made for B -> 201', inviteB.status === 201, redacted(inviteB.body).slice(0, 80))
+    const inviteBCode = inviteB.body.invite?.code
+
+    const umpBName = `Smoke Overview Umpire B ${stamp}`
+    const umpBEmail = `smoke.overview.umpire.b.${stamp}@example.com`
+    const umpBReg = await request('/auth/register', {
+      method: 'POST', body: { email: umpBEmail, name: umpBName, password: `smk-${uuid()}`, invite: inviteBCode },
+    })
+    check('the throwaway umpire B registers -> 201', umpBReg.status === 201, redacted(umpBReg.body).slice(0, 80))
+    const umpireBId = umpBReg.body.umpire?.id
+    const umpBToken = umpBReg.body.token
+
+    // --- Umpire A's players and session: Jon and John are one letter
+    // apart on purpose -- they must never share a match, or they stop
+    // being a possible duplicate. ---
+    const jonName = `Smoke Ov Jon ${stamp}`
+    const johnName = `Smoke Ov John ${stamp}`
+    const miaName = `Smoke Ov Mia ${stamp}`
+    const reyName = `Smoke Ov Rey ${stamp}`
+    const jonId = (await request('/players', { method: 'POST', bearer: umpAToken, body: { name: jonName } })).body.player?.id
+    const johnId = (await request('/players', { method: 'POST', bearer: umpAToken, body: { name: johnName } })).body.player?.id
+    const miaId = (await request('/players', { method: 'POST', bearer: umpAToken, body: { name: miaName } })).body.player?.id
+    const reyId = (await request('/players', { method: 'POST', bearer: umpAToken, body: { name: reyName } })).body.player?.id
+    check('four throwaway players are created for umpire A', [jonId, johnId, miaId, reyId].every(Boolean))
+
+    const sessionAId = uuid()
+    const sessionACreate = await request('/sessions', { method: 'POST', bearer: umpAToken, body: { id: sessionAId, name: `Smoke Overview Session A ${stamp}` } })
+    check('umpire A opens a session -> 201', sessionACreate.status === 201, JSON.stringify(sessionACreate.body).slice(0, 100))
+    const rosterA1 = await request(`/sessions/${sessionAId}/players`, { method: 'PUT', bearer: umpAToken, body: { playerIds: [jonId, johnId, miaId, reyId] } })
+    check('umpire A puts all four on the session -> 200', rosterA1.status === 200 && rosterA1.body.playerIds?.length === 4, JSON.stringify(rosterA1.body))
+
+    // --- Umpire B's own session, with two of its own new players ---
+    const plB1Name = `Smoke Ov Umpire B Player One ${stamp}`
+    const plB2Name = `Smoke Ov Umpire B Player Two ${stamp}`
+    const plB1Id = (await request('/players', { method: 'POST', bearer: umpBToken, body: { name: plB1Name } })).body.player?.id
+    const plB2Id = (await request('/players', { method: 'POST', bearer: umpBToken, body: { name: plB2Name } })).body.player?.id
+    const sessionBId = uuid()
+    const sessionBCreate = await request('/sessions', { method: 'POST', bearer: umpBToken, body: { id: sessionBId, name: `Smoke Overview Session B ${stamp}` } })
+    check('umpire B opens a session -> 201', sessionBCreate.status === 201, JSON.stringify(sessionBCreate.body).slice(0, 100))
+    const rosterB1 = await request(`/sessions/${sessionBId}/players`, { method: 'PUT', bearer: umpBToken, body: { playerIds: [plB1Id, plB2Id] } })
+    check('umpire B puts both players on their own session -> 200', rosterB1.status === 200 && rosterB1.body.playerIds?.length === 2, JSON.stringify(rosterB1.body))
+
+    // --- Step 2: flagged matches ---
+    const kaiName = `Smoke Ov Kai ${stamp}`
+    const kaiId = (await request('/players', { method: 'POST', bearer: umpAToken, body: { name: kaiName } })).body.player?.id
+    const rosterA2 = await request(`/sessions/${sessionAId}/players`, { method: 'PUT', bearer: umpAToken, body: { playerIds: [jonId, johnId, miaId, reyId, kaiId] } })
+    check('Kai joins the session roster -> 200', rosterA2.status === 200 && rosterA2.body.playerIds?.length === 5, JSON.stringify(rosterA2.body))
+
+    const m1Id = uuid()
+    const m1Create = await request('/matches', {
+      method: 'POST', bearer: umpAToken,
+      body: {
+        id: m1Id, sessionId: sessionAId, teamA: [jonId, miaId], teamB: [reyId, kaiId],
+        stacking: { A: false, B: false }, firstServer: { team: 'A', playerId: jonId },
+        startedAt: Date.now() - 20 * 60_000,
+      },
+    })
+    check('M1 is created -> 201', m1Create.status === 201, JSON.stringify(m1Create.body).slice(0, 120))
+    const m1Log = await request(`/matches/${m1Id}/log`, {
+      method: 'PUT', bearer: umpAToken,
+      body: { deviceId: DEVICE, events: Array.from({ length: 11 }, (_, i) => rally(i, jonId)) },
+    })
+    check('M1 is Ended 11-0, completed', m1Log.body.match?.status === 'completed' && m1Log.body.match?.winner === 'A',
+      JSON.stringify(m1Log.body).slice(0, 120))
+
+    const m2Id = uuid()
+    const m2Create = await request('/matches', {
+      method: 'POST', bearer: umpBToken,
+      body: {
+        id: m2Id, sessionId: sessionBId, teamA: [plB1Id], teamB: [plB2Id],
+        firstServer: { team: 'A', playerId: plB1Id },
+        startedAt: Date.now() - 20 * 60_000,
+      },
+    })
+    check('M2 is created -> 201', m2Create.status === 201, JSON.stringify(m2Create.body).slice(0, 120))
+    const m2Log = await request(`/matches/${m2Id}/log`, {
+      method: 'PUT', bearer: umpBToken,
+      body: { deviceId: DEVICE, events: Array.from({ length: 11 }, (_, i) => rally(i, plB1Id)) },
+    })
+    check('M2 is Ended 11-0, completed', m2Log.body.match?.status === 'completed' && m2Log.body.match?.winner === 'A',
+      JSON.stringify(m2Log.body).slice(0, 120))
+
+    const ovAsA = await request('/admin/overview', { bearer: adminAToken })
+    check('admin A reads the Overview -> 200', ovAsA.status === 200, String(ovAsA.status))
+    const m1Warning = ovAsA.body.warnings?.find((w) => w.matchId === m1Id)
+    check('M1 is worth a look as a shutout', m1Warning?.reasons?.some((r) => r.reason === 'shutout' && r.tag === 'Ended 11–0'),
+      JSON.stringify(m1Warning?.reasons))
+    check("admin A never sees facility B's match", !ovAsA.body.warnings?.some((w) => w.matchId === m2Id))
+    check('admin A gets no duplicate list', ovAsA.body.duplicates === null, JSON.stringify(ovAsA.body.duplicates)?.slice(0, 80))
+    check('the live board counts the open session', ovAsA.body.live?.sessions >= 1, JSON.stringify(ovAsA.body.live))
+    check('umpire A counts as active (their session is going on)', ovAsA.body.totals?.umpires?.active >= 1,
+      JSON.stringify(ovAsA.body.totals?.umpires))
+    const ovAsOwnerB = await request(`/admin/overview?facilityId=${facilityBId}`, { bearer: fOwnerToken })
+    check('the owner narrowed to B sees M2 and not M1',
+      ovAsOwnerB.body.warnings?.some((w) => w.matchId === m2Id) && !ovAsOwnerB.body.warnings?.some((w) => w.matchId === m1Id))
+
+    // --- Step 3: buttons, with refusals ---
+    const fineOther = await request('/admin/overview/looks-fine', { method: 'POST', bearer: adminAToken, body: { matchId: m2Id, reason: 'shutout' } })
+    check("admin A can't mark B's match fine -> 404", fineOther.status === 404, String(fineOther.status))
+    const noReason = await request('/admin/overview/void', { method: 'POST', bearer: adminAToken, body: { matchId: m1Id, reason: ' ' } })
+    check('void with no reason -> 400', noReason.status === 400, String(noReason.status))
+    const voided = await request('/admin/overview/void', { method: 'POST', bearer: adminAToken, body: { matchId: m1Id, reason: 'smoke test void' } })
+    check('admin A voids M1 -> 200', voided.status === 200, JSON.stringify(voided.body))
+    const m1AsUmpire = await request(`/matches/${m1Id}`, { bearer: umpAToken })
+    check('the umpire sees M1 voided with the reason', Boolean(m1AsUmpire.body.match?.voidedAt) && m1AsUmpire.body.match?.voidReason === 'smoke test void')
+    const afterVoid = await request('/admin/overview', { bearer: adminAToken })
+    check('M1 stays listed as voided, by me', afterVoid.body.warnings?.find((w) => w.matchId === m1Id)?.voided?.byMe === true)
+    const undone = await request('/admin/overview/unvoid', { method: 'POST', bearer: adminAToken, body: { matchId: m1Id } })
+    check('Undo -> 200', undone.status === 200, JSON.stringify(undone.body))
+    const fine = await request('/admin/overview/looks-fine', { method: 'POST', bearer: adminAToken, body: { matchId: m1Id, reason: 'shutout' } })
+    check('Looks fine -> 200', fine.status === 200, JSON.stringify(fine.body))
+    const afterFine = await request('/admin/overview', { bearer: adminAToken })
+    check('M1 is gone from Worth a look', !afterFine.body.warnings?.some((w) => w.matchId === m1Id))
+    const voidUnflagged = await request('/admin/overview/void', { method: 'POST', bearer: adminAToken, body: { matchId: m1Id, reason: 'x' } })
+    check("an unflagged match can't be voided here -> 409", voidUnflagged.status === 409, JSON.stringify(voidUnflagged.body))
+    // Each of the four wrote an entry filed under facility A.
+    const actA = await request('/admin/activity', { bearer: adminAToken })
+    const mine = (actA.body.entries ?? []).filter((e) => e.targetId === m1Id).map((e) => e.action)
+    check('Activity has voided, restored and looks-fine for M1',
+      ['match.voided', 'match.restored', 'match.looks_fine'].every((a) => mine.includes(a)), JSON.stringify(mine))
+    const ownerRoute = await request('/admin/overview/not-same-person', { method: 'POST', bearer: adminAToken, body: { playerIds: [jonId, johnId] } })
+    check('a facility admin calling an owner route -> 403', ownerRoute.status === 403, String(ownerRoute.status))
+
+    // --- Step 4: duplicates and merge ---
+    const ovOwnerStart = Date.now()
+    const ovOwner = await request('/admin/overview', { bearer: fOwnerToken })
+    console.log(`  ...  GET /admin/overview as the owner took ${Date.now() - ovOwnerStart}ms`)
+    const pair = ovOwner.body.duplicates?.find((p) => [p.a.id, p.b.id].includes(jonId) && [p.a.id, p.b.id].includes(johnId))
+    check('Jon / John are listed as possible duplicates', pair?.reason === 'typo', JSON.stringify(pair)?.slice(0, 120))
+    const whileLive = await request('/admin/overview/merge', {
+      method: 'POST', bearer: fOwnerToken, body: { keepId: jonId, removeId: johnId, confirmName: johnName },
+    })
+    check('merge refused while John is on a session going on -> 409', whileLive.status === 409 && whileLive.body.error === 'Try again once their session has ended',
+      JSON.stringify(whileLive.body))
+
+    // End umpire A's session, then give John one finished DOUBLES match of
+    // his own -- with a right-start pick on his team and both non-rally
+    // payload shapes naming him -- so there's something for the merge to
+    // move and rewrite.
+    const sessionAEnd = await request(`/sessions/${sessionAId}/end`, { method: 'POST', bearer: umpAToken, body: {} })
+    check("umpire A ends their session -> 200", sessionAEnd.status === 200, String(sessionAEnd.status))
+
+    const session2Id = uuid()
+    const session2Create = await request('/sessions', { method: 'POST', bearer: umpAToken, body: { id: session2Id, name: `Smoke Overview Session A2 ${stamp}` } })
+    check('umpire A opens a second session -> 201', session2Create.status === 201, JSON.stringify(session2Create.body).slice(0, 100))
+    const sixthName = `Smoke Ov Sixth ${stamp}`
+    const sixthId = (await request('/players', { method: 'POST', bearer: umpAToken, body: { name: sixthName } })).body.player?.id
+    const roster2 = await request(`/sessions/${session2Id}/players`, { method: 'PUT', bearer: umpAToken, body: { playerIds: [johnId, reyId, kaiId, sixthId] } })
+    check('John, Rey, Kai and a sixth player join the second session -> 200',
+      roster2.status === 200 && roster2.body.playerIds?.length === 4, JSON.stringify(roster2.body))
+
+    const m3Id = uuid()
+    const m3Create = await request('/matches', {
+      method: 'POST', bearer: umpAToken,
+      body: {
+        id: m3Id, sessionId: session2Id, teamA: [johnId, reyId], teamB: [kaiId, sixthId],
+        stacking: { A: false, B: false }, firstServer: { team: 'A', playerId: johnId },
+        rightStart: { A: johnId, B: kaiId },
+        startedAt: Date.now() - 15 * 60_000,
+      },
+    })
+    check('M3 is a doubles match with rightStart naming the player about to be removed -> 201',
+      m3Create.status === 201 && m3Create.body.match?.rightStart?.A === johnId, JSON.stringify(m3Create.body).slice(0, 150))
+
+    const m3Events = [
+      ...Array.from({ length: 11 }, (_, i) => rally(i, johnId)),
+      { id: uuid(), seq: 11, type: 'thirdShot', at: Date.now(), playerId: johnId, shotType: 'drive', success: true },
+      rally(12, kaiId),
+    ]
+    const m3Log = await request(`/matches/${m3Id}/log`, { method: 'PUT', bearer: umpAToken, body: { deviceId: DEVICE, events: m3Events } })
+    check('M3 finishes, with a thirdShot event also naming John',
+      m3Log.body.match?.status === 'completed' && (m3Log.body.match?.events ?? []).some((e) => e.type === 'thirdShot' && e.playerId === johnId),
+      JSON.stringify(m3Log.body).slice(0, 150))
+
+    const session2End = await request(`/sessions/${session2Id}/end`, { method: 'POST', bearer: umpAToken, body: {} })
+    check('umpire A ends the second session too -> 200', session2End.status === 200, String(session2End.status))
+
+    const wrongName = await request('/admin/overview/merge', {
+      method: 'POST', bearer: fOwnerToken, body: { keepId: jonId, removeId: johnId, confirmName: 'nope' },
+    })
+    check('merge needs the removed name typed -> 400', wrongName.status === 400, JSON.stringify(wrongName.body))
+    const merged = await request('/admin/overview/merge', {
+      method: 'POST', bearer: fOwnerToken, body: { keepId: jonId, removeId: johnId, confirmName: johnName },
+    })
+    check('merge -> 200 with one match moved', merged.status === 200 && merged.body.movedMatches === 1, JSON.stringify(merged.body))
+
+    const m3 = await request(`/matches/${m3Id}`, { bearer: umpAToken })
+    check('M3 now names Jon, not John', m3.body.match?.teamA?.includes(jonId) && !m3.body.match?.teamA?.includes(johnId),
+      JSON.stringify(m3.body.match?.teamA))
+    check("M3's rightStart now names Jon, not John",
+      m3.body.match?.rightStart?.A === jonId, JSON.stringify(m3.body.match?.rightStart))
+    const m3StillNamingJohn = (m3.body.match?.events ?? []).flatMap((e) => [e.actingPlayerId, e.playerId]).filter((id) => id === johnId)
+    check("none of M3's events -- rally or thirdShot -- still name John, on either payload key",
+      m3StillNamingJohn.length === 0, JSON.stringify(m3StillNamingJohn))
+    check("M3's rallies now name Jon", (m3.body.match?.events ?? []).filter((e) => e.actingPlayerId === jonId).length > 0)
+
+    const newMatchNamingRemoved = await request('/matches', {
+      method: 'POST', bearer: umpAToken,
+      body: {
+        id: uuid(), sessionId: session2Id, teamA: [johnId, reyId], teamB: [kaiId, sixthId],
+        stacking: { A: false, B: false }, firstServer: { team: 'A', playerId: reyId },
+        startedAt: Date.now(),
+      },
+    })
+    check('a NEW match naming the merged-away player -> 409',
+      newMatchNamingRemoved.status === 409 && newMatchNamingRemoved.body.error === 'One of those players no longer exists',
+      JSON.stringify(newMatchNamingRemoved.body))
+
+    const sharedRefusal = await request('/admin/overview/merge', {
+      method: 'POST', bearer: fOwnerToken, body: { keepId: jonId, removeId: reyId, confirmName: reyName },
+    })
+    check('players who shared a match are refused -> 409', sharedRefusal.status === 409, JSON.stringify(sharedRefusal.body))
+    const notSame = await request('/admin/overview/not-same-person', { method: 'POST', bearer: fOwnerToken, body: { playerIds: [jonId, miaId] } })
+    check('not the same person -> 200', notSame.status === 200, JSON.stringify(notSame.body))
+
+    // --- Step 5: cleanup -- close the throwaway players and umpires,
+    // switch off the throwaway admins, and rename the facilities so the
+    // list stays readable. Never touch the shared smoke umpire or the
+    // owner. ---
+    const closeJon = await request(`/admin/players/${jonId}/close`, { method: 'POST', bearer: fOwnerToken, body: { reason: 'smoke cleanup', confirmName: jonName } })
+    check('closing Jon (the merge survivor) -> 200', closeJon.status === 200 && closeJon.body.player?.status === 'closed', JSON.stringify(closeJon.body).slice(0, 80))
+    const closeMia = await request(`/admin/players/${miaId}/close`, { method: 'POST', bearer: fOwnerToken, body: { reason: 'smoke cleanup', confirmName: miaName } })
+    check('closing Mia -> 200', closeMia.status === 200 && closeMia.body.player?.status === 'closed', JSON.stringify(closeMia.body).slice(0, 80))
+    const closeRey = await request(`/admin/players/${reyId}/close`, { method: 'POST', bearer: fOwnerToken, body: { reason: 'smoke cleanup', confirmName: reyName } })
+    check('closing Rey -> 200', closeRey.status === 200 && closeRey.body.player?.status === 'closed', JSON.stringify(closeRey.body).slice(0, 80))
+    const closeKai = await request(`/admin/players/${kaiId}/close`, { method: 'POST', bearer: fOwnerToken, body: { reason: 'smoke cleanup', confirmName: kaiName } })
+    check('closing Kai -> 200', closeKai.status === 200 && closeKai.body.player?.status === 'closed', JSON.stringify(closeKai.body).slice(0, 80))
+    const closeSixth = await request(`/admin/players/${sixthId}/close`, { method: 'POST', bearer: fOwnerToken, body: { reason: 'smoke cleanup', confirmName: sixthName } })
+    check('closing the sixth player -> 200', closeSixth.status === 200 && closeSixth.body.player?.status === 'closed', JSON.stringify(closeSixth.body).slice(0, 80))
+    const closePlB1 = await request(`/admin/players/${plB1Id}/close`, { method: 'POST', bearer: fOwnerToken, body: { reason: 'smoke cleanup', confirmName: plB1Name } })
+    check("closing umpire B's first player -> 200", closePlB1.status === 200 && closePlB1.body.player?.status === 'closed', JSON.stringify(closePlB1.body).slice(0, 80))
+    const closePlB2 = await request(`/admin/players/${plB2Id}/close`, { method: 'POST', bearer: fOwnerToken, body: { reason: 'smoke cleanup', confirmName: plB2Name } })
+    check("closing umpire B's second player -> 200", closePlB2.status === 200 && closePlB2.body.player?.status === 'closed', JSON.stringify(closePlB2.body).slice(0, 80))
+
+    const closeUmpA = await request(`/admin/umpires/${umpireAId}/close`, { method: 'POST', bearer: fOwnerToken, body: { reason: 'smoke cleanup', confirmName: umpAName } })
+    check('closing throwaway umpire A -> 200', closeUmpA.status === 200 && closeUmpA.body.umpire?.status === 'closed', JSON.stringify(closeUmpA.body).slice(0, 80))
+    const closeUmpB = await request(`/admin/umpires/${umpireBId}/close`, { method: 'POST', bearer: fOwnerToken, body: { reason: 'smoke cleanup', confirmName: umpBName } })
+    check('closing throwaway umpire B -> 200', closeUmpB.status === 200 && closeUmpB.body.umpire?.status === 'closed', JSON.stringify(closeUmpB.body).slice(0, 80))
+
+    const offAdminA = await request(`/admin/admins/${adminAId}/switch-off`, { method: 'POST', bearer: fOwnerToken })
+    check('switching off throwaway admin A -> 200', offAdminA.status === 200 && offAdminA.body.admin?.active === false, String(offAdminA.status))
+    const offAdminB = await request(`/admin/admins/${adminBId}/switch-off`, { method: 'POST', bearer: fOwnerToken })
+    check('switching off throwaway admin B -> 200', offAdminB.status === 200 && offAdminB.body.admin?.active === false, String(offAdminB.status))
+
+    const renameA = await request(`/admin/facilities/${facilityAId}`, { method: 'PATCH', bearer: fOwnerToken, body: { name: `Smoke Overview (done) A ${stamp}` } })
+    check('renaming facility A for cleanup -> 200', renameA.status === 200, JSON.stringify(renameA.body).slice(0, 80))
+    const renameB = await request(`/admin/facilities/${facilityBId}`, { method: 'PATCH', bearer: fOwnerToken, body: { name: `Smoke Overview (done) B ${stamp}` } })
+    check('renaming facility B for cleanup -> 200', renameB.status === 200, JSON.stringify(renameB.body).slice(0, 80))
+  }
+
   if (selfRegistered.length > 0) {
     console.log(
       `\nself-registered players left behind (no umpire owns them):\n` +
