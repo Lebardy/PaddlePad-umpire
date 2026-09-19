@@ -20,6 +20,7 @@ import adminAdminsRoutes from './routes/admin-admins.js'
 import adminInviteRoutes from './routes/admin-invites.js'
 import adminActivityRoutes from './routes/admin-activity.js'
 import adminFacilitiesRoutes from './routes/admin-facilities.js'
+import adminOverviewRoutes from './routes/admin-overview.js'
 import { adminPlayersRoutes, adminUmpiresRoutes } from './routes/admin-people.js'
 
 const app = express()
@@ -193,6 +194,7 @@ app.use('/admin/admins', adminAdminsRoutes)
 app.use('/admin/invites', adminInviteRoutes)
 app.use('/admin/activity', adminActivityRoutes)
 app.use('/admin/facilities', adminFacilitiesRoutes)
+app.use('/admin/overview', adminOverviewRoutes)
 app.use('/admin/players', adminPlayersRoutes)
 app.use('/admin/umpires', adminUmpiresRoutes)
 

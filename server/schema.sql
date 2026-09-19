@@ -720,3 +720,39 @@ BEGIN
     UPDATE admins   SET facility_id = starting WHERE facility_id IS NULL AND role <> 'owner';
   END IF;
 END $$;
+
+-- ============================================================
+-- The Overview (admin site's landing page)
+--
+-- Warnings are worked out when the page is opened; the only thing
+-- stored is what an admin chose to hide: one reason on one match
+-- ("Looks fine"), or a pair of players the owner says are two
+-- different people. Hiding a warning never changes a match or player.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS dismissed_warnings (
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    kind        TEXT NOT NULL CHECK (kind IN ('match', 'players')),
+    match_id    UUID REFERENCES matches (id) ON DELETE CASCADE,
+    reason      TEXT,
+    player_a    UUID REFERENCES players (id) ON DELETE CASCADE,
+    player_b    UUID REFERENCES players (id) ON DELETE CASCADE,
+    facility_id UUID REFERENCES facilities (id),
+    admin_id    UUID REFERENCES admins (id) ON DELETE SET NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT dismissed_warnings_shape CHECK (
+        (kind = 'match' AND match_id IS NOT NULL AND reason IS NOT NULL AND player_a IS NULL AND player_b IS NULL)
+        OR (kind = 'players' AND match_id IS NULL AND reason IS NULL
+            AND player_a IS NOT NULL AND player_b IS NOT NULL AND player_a < player_b)
+    )
+);
+CREATE UNIQUE INDEX IF NOT EXISTS dismissed_warnings_match_idx
+    ON dismissed_warnings (match_id, reason) WHERE kind = 'match';
+CREATE UNIQUE INDEX IF NOT EXISTS dismissed_warnings_players_idx
+    ON dismissed_warnings (player_a, player_b) WHERE kind = 'players';
+
+-- The one match change an admin can make: voiding a match the Overview
+-- flagged (and undoing that). Set only by the Overview; the umpire
+-- app's own void route clears it, so an umpire's later decision always
+-- reads as the umpire's.
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS voided_by_admin UUID REFERENCES admins (id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS matches_started_idx ON matches (started_at DESC);

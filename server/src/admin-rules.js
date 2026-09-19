@@ -43,6 +43,11 @@ export const ACTIONS = [
   'umpire.moved',
   'facility.created',
   'facility.updated',
+  'match.looks_fine',
+  'match.voided',
+  'match.restored',
+  'player.not_duplicate',
+  'player.merged',
 ]
 
 export function normalizeEmail(value) {
