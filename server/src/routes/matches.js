@@ -158,6 +158,22 @@ router.post('/', async (req, res) => {
 
   const { stacking_a, stacking_b } = stackingToColumns(stacking)
 
+  // team_a/team_b are plain uuid[] columns with no foreign key, so an
+  // offline tablet replaying a queued create could otherwise name a
+  // player merged away since it last synced with nothing to catch it.
+  // Skipped for a match that already exists: that is a pure idempotent
+  // replay (ON CONFLICT DO NOTHING below leaves the stored row, already
+  // fixed up by any merge, untouched regardless of what this stale body
+  // says), not a new row for Postgres to check.
+  const { rows: already } = await query('SELECT 1 FROM matches WHERE id = $1', [id])
+  if (already.length === 0) {
+    const allPlayerIds = [...new Set([...teamA, ...teamB])]
+    const { rows: found } = await query('SELECT count(*)::int AS n FROM players WHERE id = ANY($1::uuid[])', [allPlayerIds])
+    if (found[0].n !== allPlayerIds.length) {
+      return res.status(409).json({ error: 'One of those players no longer exists' })
+    }
+  }
+
   try {
     await query(
       `INSERT INTO matches (id, session_id, recorded_by, team_a, team_b,
@@ -178,9 +194,11 @@ router.post('/', async (req, res) => {
     )
   } catch (error) {
     // 23503 = foreign_key_violation: a player id that isn't in the
-    // registry any more (merged into another record). A clear 409 is a
-    // permanent refusal to the app's sync, rather than a 500 it would
-    // retry forever.
+    // registry any more (merged into another record). first_server_player
+    // and right_start_a/b are real foreign keys, so this is the backstop
+    // for those; team_a/team_b have no foreign key at all, which is what
+    // the check above exists to cover. A clear 409 is a permanent refusal
+    // to the app's sync, rather than a 500 it would retry forever.
     if (error.code === '23503') return res.status(409).json({ error: 'One of those players no longer exists' })
     throw error
   }

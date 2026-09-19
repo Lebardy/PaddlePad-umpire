@@ -165,14 +165,13 @@ router.post('/merge', async (req, res) => {
       const keep = rows.find((r) => r.id === keepId)
       const remove = rows.find((r) => r.id === removeId)
       if (!keep || !remove) throw refusal(404, 'No such player')
-      if (!confirmNameMatches(confirmName, remove.name)) throw refusal(400, CONFIRM_MERGE_MESSAGE)
       const { rows: [flags] } = await client.query(
         `SELECT
            EXISTS (SELECT 1 FROM matches m
                     WHERE ($1::uuid = ANY(m.team_a) OR $1::uuid = ANY(m.team_b))
                       AND ($2::uuid = ANY(m.team_a) OR $2::uuid = ANY(m.team_b))) AS shared_match,
            EXISTS (SELECT 1 FROM session_players sp JOIN sessions s ON s.id = sp.session_id
-                    WHERE sp.player_id = $2 AND s.ended_at IS NULL AND s.voided_at IS NULL)
+                    WHERE sp.player_id = $2 AND s.ended_at IS NULL)
            OR EXISTS (SELECT 1 FROM matches m
                     WHERE m.status = 'in_progress' AND ($2::uuid = ANY(m.team_a) OR $2::uuid = ANY(m.team_b))) AS in_live_session`,
         [keepId, removeId],
@@ -184,6 +183,7 @@ router.post('/merge', async (req, res) => {
         removeInLiveSession: flags.in_live_session,
       })
       if (why) throw refusal(409, why)
+      if (!confirmNameMatches(confirmName, remove.name)) throw refusal(400, CONFIRM_MERGE_MESSAGE)
       const merged = await mergePlayers(client, keepId, removeId)
       await recordActivity(client, {
         adminId: req.admin.id, action: 'player.merged', targetType: 'player', targetId: keepId,
