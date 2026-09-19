@@ -76,6 +76,10 @@ const ACTION_LABELS = {
   'admin.google_disconnected': 'Disconnected Google',
   'invite.created': 'Made an invite code',
   'invite.cancelled': 'Cancelled an invite code',
+  'admin.moved': 'Moved an admin',
+  'umpire.moved': 'Moved an umpire',
+  'facility.created': 'Made a facility',
+  'facility.updated': 'Updated a facility',
 }
 
 export function actionLabel(action) {

@@ -87,6 +87,7 @@ export default function UmpireDetail({ id, me }) {
         <div>
           <h2 className="section-title">Details</h2>
           <div className="detail-facts" style={{ '--fact-columns': 3 }}>
+            <div className="detail-fact"><span>Facility</span><strong>{umpire.facilityName ?? '—'}</strong></div>
             <div className="detail-fact"><span>Email</span><strong>{umpire.email}</strong></div>
             <div className="detail-fact"><span>Google</span><strong>{umpire.googleEmail ?? 'Not connected'}</strong></div>
             <div className="detail-fact"><span>Ways in</span><strong>{signInMethodsText(umpire.signInMethods)}</strong></div>

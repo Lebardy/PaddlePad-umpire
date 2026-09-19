@@ -40,6 +40,10 @@ check('no time is a dash', formatWhen(null), '—')
 
 check('actions read as words', actionLabel('invite.created'), 'Made an invite code')
 check('an unknown action falls back to its name', actionLabel('something.new'), 'something.new')
+check('an admin move reads as words', actionLabel('admin.moved'), 'Moved an admin')
+check('an umpire move reads as words', actionLabel('umpire.moved'), 'Moved an umpire')
+check('a facility being made reads as words', actionLabel('facility.created'), 'Made a facility')
+check('a facility being edited reads as words', actionLabel('facility.updated'), 'Updated a facility')
 
 check('expiry choices default to 14 days and include never',
   [EXPIRY_CHOICES.find((c) => c.value === '14')?.label, EXPIRY_CHOICES.at(-1)?.value], ['In 14 days', 'never'])
