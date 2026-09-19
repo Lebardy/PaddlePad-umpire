@@ -259,7 +259,7 @@ exactly one; players belong to none, since they can play anywhere and
 ratings and boards stay across everyone on PaddlePad. The owner creates
 facilities, sees and manages every one, and is the only one who can move an
 umpire or an admin between facilities. A facility's own admins see and
-manage only their own — its umpires, invite codes, sessions and activity —
+manage only their own — its umpires, invite codes and activity —
 and can edit its name, area, map link, opening hours, fee and details.
 
 The first time this API boots with the `facilities` table in place, a
@@ -386,7 +386,7 @@ an invite code at all.
 | `POST` | `/admin/umpires/:id/move` | Bearer (owner) | Move an umpire to another facility |
 
 An admin who isn't the owner only ever sees and manages their own
-facility's umpires, invite codes, sessions and activity entries — a
+facility's umpires, invite codes and activity entries — a
 facility that isn't theirs answers 404, the same "not found" a
 made-up id would. Reaching one of the above for another facility's
 umpire, or a facility that isn't the caller's, behaves exactly as if it
