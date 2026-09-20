@@ -183,12 +183,15 @@ router.post('/', async (req, res) => {
       // takes FOR SHARE on the player rows it reads, so a merge landing
       // between the two (which takes FOR UPDATE on the same rows) blocks
       // until this commits rather than deleting a player this insert is
-      // about to name.
+      // about to name. ORDER BY id matches the merge's own ordering: two
+      // statements that lock the same rows in the same order can only ever
+      // queue behind each other, never deadlock holding half of what the
+      // other wants.
       const { rows: already } = await client.query('SELECT 1 FROM matches WHERE id = $1', [id])
       if (already.length === 0) {
         const allPlayerIds = [...new Set([...teamA, ...teamB])]
         const { rows: found } = await client.query(
-          'SELECT id FROM players WHERE id = ANY($1::uuid[]) FOR SHARE',
+          'SELECT id FROM players WHERE id = ANY($1::uuid[]) ORDER BY id FOR SHARE',
           [allPlayerIds],
         )
         if (found.length !== allPlayerIds.length) throw refusal(409, 'One of those players no longer exists')
