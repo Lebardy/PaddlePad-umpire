@@ -77,7 +77,11 @@ function WarningRow({ warning, isOwner, now, actions }) {
   )
 }
 
-/** The facility's odd matches and left-open sessions, in one table, newest concern last. */
+/**
+ * The facility's odd matches and left-open sessions, in one table. Flagged
+ * matches first -- they're what the table exists for -- then left-open
+ * sessions, which on a real platform vastly outnumber them.
+ */
 export default function WorthALook({ warnings, leftOpen, isOwner, now, actions }) {
   const activeCount = leftOpen.length + warnings.filter((w) => !w.voided).length
   const isEmpty = leftOpen.length === 0 && warnings.length === 0
@@ -107,10 +111,10 @@ export default function WorthALook({ warnings, leftOpen, isOwner, now, actions }
               </tr>
             </thead>
             <tbody>
-              {leftOpen.map((session) => <LeftOpenRow key={session.sessionId} session={session} isOwner={isOwner} actions={actions} />)}
               {warnings.map((warning) => (
                 <WarningRow key={warning.matchId} warning={warning} isOwner={isOwner} now={now} actions={actions} />
               ))}
+              {leftOpen.map((session) => <LeftOpenRow key={session.sessionId} session={session} isOwner={isOwner} actions={actions} />)}
             </tbody>
           </table>
         </div>

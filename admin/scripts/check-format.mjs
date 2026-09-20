@@ -50,6 +50,7 @@ check('voided label', actionLabel('match.voided'), 'Voided a match')
 check('a void undone reads as words', actionLabel('match.restored'), 'Undid a void')
 check('marking different people reads as words', actionLabel('player.not_duplicate'), 'Marked players as different people')
 check('a merge reads as words', actionLabel('player.merged'), 'Merged two players')
+check('closing a session reads as words', actionLabel('session.closed'), 'Closed a session')
 
 check('expiry choices default to 14 days and include never',
   [EXPIRY_CHOICES.find((c) => c.value === '14')?.label, EXPIRY_CHOICES.at(-1)?.value], ['In 14 days', 'never'])

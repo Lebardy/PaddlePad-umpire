@@ -162,7 +162,10 @@ router.post('/not-same-person', async (req, res) => {
   if (!Array.isArray(ids) || ids.length !== 2 || !ids.every(isUuid) || ids[0] === ids[1]) {
     return res.status(400).json({ error: 'Say which two players' })
   }
-  const [a, b] = pairKey(ids[0], ids[1]).split(':')
+  // Postgres orders uuids in lowercase; lowercase before pairKey (a plain
+  // string comparison) so the pair always lands the same way `player_a <
+  // player_b` will see it, even from a hand-made request with uppercase hex.
+  const [a, b] = pairKey(ids[0].toLowerCase(), ids[1].toLowerCase()).split(':')
   const { rows } = await query('SELECT id, name FROM players WHERE id = ANY($1::uuid[])', [[a, b]])
   if (rows.length !== 2) return res.status(404).json({ error: 'No such player' })
   const nameOf = new Map(rows.map((r) => [r.id, r.name]))

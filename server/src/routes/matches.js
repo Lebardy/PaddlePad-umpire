@@ -14,6 +14,18 @@ import { invalidateRallyRatings } from '../rally-rating-store.js'
 const router = Router()
 router.use(requireAuth, requireActiveUmpire(query))
 
+function refusal(statusCode, message) {
+  const error = new Error(message)
+  error.statusCode = statusCode
+  return error
+}
+
+/** Sends a refusal thrown inside a transaction, or rethrows anything else. */
+function sendRefusal(res, error) {
+  if (error.statusCode) return res.status(error.statusCode).json({ error: error.message })
+  throw error
+}
+
 // A game to 11 win-by-2 is 20-60 events, and one to 21 perhaps double
 // that; 500 would be a marathon. The cap is a sanity bound on a single
 // request, not a real gameplay limit.
@@ -158,40 +170,52 @@ router.post('/', async (req, res) => {
 
   const { stacking_a, stacking_b } = stackingToColumns(stacking)
 
-  // team_a/team_b are plain uuid[] columns with no foreign key, so an
-  // offline tablet replaying a queued create could otherwise name a
-  // player merged away since it last synced with nothing to catch it.
-  // Skipped for a match that already exists: that is a pure idempotent
-  // replay (ON CONFLICT DO NOTHING below leaves the stored row, already
-  // fixed up by any merge, untouched regardless of what this stale body
-  // says), not a new row for Postgres to check.
-  const { rows: already } = await query('SELECT 1 FROM matches WHERE id = $1', [id])
-  if (already.length === 0) {
-    const allPlayerIds = [...new Set([...teamA, ...teamB])]
-    const { rows: found } = await query('SELECT count(*)::int AS n FROM players WHERE id = ANY($1::uuid[])', [allPlayerIds])
-    if (found[0].n !== allPlayerIds.length) {
-      return res.status(409).json({ error: 'One of those players no longer exists' })
-    }
-  }
-
   try {
-    await query(
-      `INSERT INTO matches (id, session_id, recorded_by, team_a, team_b,
-                            stacking_a, stacking_b,
-                            first_server_team, first_server_player, point_target,
-                            right_start_a, right_start_b,
-                            started_at)
-       VALUES ($1, $2, $3, $4::uuid[], $5::uuid[], $6, $7, $8, $9, $10, $11, $12,
-               COALESCE($13::timestamptz, now()))
-       ON CONFLICT (id) DO NOTHING`,
-      [
-        id, sessionId, req.umpire.id, teamA, teamB,
-        stacking_a, stacking_b,
-        firstServer.team, firstServer.playerId, pointTarget,
-        rightStartA, rightStartB,
-        startedAt ? new Date(startedAt).toISOString() : null,
-      ],
-    )
+    await withTransaction(async (client) => {
+      // team_a/team_b are plain uuid[] columns with no foreign key, so an
+      // offline tablet replaying a queued create could otherwise name a
+      // player merged away since it last synced with nothing to catch it.
+      // Skipped for a match that already exists: that is a pure idempotent
+      // replay (ON CONFLICT DO NOTHING below leaves the stored row, already
+      // fixed up by any merge, untouched regardless of what this stale body
+      // says), not a new row for Postgres to check.
+      // The check and the insert share one transaction, and the check
+      // takes FOR SHARE on the player rows it reads, so a merge landing
+      // between the two (which takes FOR UPDATE on the same rows) blocks
+      // until this commits rather than deleting a player this insert is
+      // about to name.
+      const { rows: already } = await client.query('SELECT 1 FROM matches WHERE id = $1', [id])
+      if (already.length === 0) {
+        const allPlayerIds = [...new Set([...teamA, ...teamB])]
+        const { rows: found } = await client.query(
+          'SELECT id FROM players WHERE id = ANY($1::uuid[]) FOR SHARE',
+          [allPlayerIds],
+        )
+        if (found.length !== allPlayerIds.length) throw refusal(409, 'One of those players no longer exists')
+      }
+
+      await client.query(
+        `INSERT INTO matches (id, session_id, recorded_by, team_a, team_b,
+                              stacking_a, stacking_b,
+                              first_server_team, first_server_player, point_target,
+                              right_start_a, right_start_b,
+                              started_at)
+         VALUES ($1, $2, $3, $4::uuid[], $5::uuid[], $6, $7, $8, $9, $10, $11, $12,
+                 COALESCE($13::timestamptz, now()))
+         ON CONFLICT (id) DO NOTHING`,
+        [
+          id, sessionId, req.umpire.id, teamA, teamB,
+          stacking_a, stacking_b,
+          firstServer.team, firstServer.playerId, pointTarget,
+          rightStartA, rightStartB,
+          startedAt ? new Date(startedAt).toISOString() : null,
+        ],
+      )
+    })
+
+    const { rows } = await query(`${MATCH_SELECT} WHERE m.id = $1`, [id])
+    if (!rows[0]) return res.status(404).json({ error: 'Match could not be created' })
+    res.status(201).json({ match: toClientMatch(rows[0]) })
   } catch (error) {
     // 23503 = foreign_key_violation: a player id that isn't in the
     // registry any more (merged into another record). first_server_player
@@ -200,12 +224,8 @@ router.post('/', async (req, res) => {
     // the check above exists to cover. A clear 409 is a permanent refusal
     // to the app's sync, rather than a 500 it would retry forever.
     if (error.code === '23503') return res.status(409).json({ error: 'One of those players no longer exists' })
-    throw error
+    sendRefusal(res, error)
   }
-
-  const { rows } = await query(`${MATCH_SELECT} WHERE m.id = $1`, [id])
-  if (!rows[0]) return res.status(404).json({ error: 'Match could not be created' })
-  res.status(201).json({ match: toClientMatch(rows[0]) })
 })
 
 /**

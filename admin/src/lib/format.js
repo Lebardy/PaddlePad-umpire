@@ -85,6 +85,7 @@ const ACTION_LABELS = {
   'match.restored': 'Undid a void',
   'player.not_duplicate': 'Marked players as different people',
   'player.merged': 'Merged two players',
+  'session.closed': 'Closed a session',
 }
 
 export function actionLabel(action) {

@@ -39,8 +39,25 @@ export default function Overview({ me, facilityLabel }) {
 
   useEffect(() => {
     load()
-    const timer = setInterval(load, REFRESH_MS)
-    return () => clearInterval(timer)
+    // A hidden tab skips its tick rather than re-running the owner's
+    // expensive duplicate-player scan for nobody to see; once the tab is
+    // looked at again, we catch up with a single reload if one was missed.
+    let missedWhileHidden = false
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') load()
+      else missedWhileHidden = true
+    }, REFRESH_MS)
+    function onVisible() {
+      if (document.visibilityState === 'visible' && missedWhileHidden) {
+        missedWhileHidden = false
+        load()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [load])
 
   function clearRowError(key) {
