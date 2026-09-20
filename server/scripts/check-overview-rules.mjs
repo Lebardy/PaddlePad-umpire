@@ -24,6 +24,7 @@ const section = (title) => console.log(`\n${title}`)
 
 const MIN = 60_000
 const HOUR = 60 * MIN
+const DAY = 24 * HOUR
 const now = Date.parse('2026-09-20T12:00:00Z')
 const done = (overrides = {}) => ({
   status: 'completed', startedAt: now - 20 * MIN, endedAt: now - 5 * MIN, endedEarly: false, score: { A: 11, B: 7 }, ...overrides,
@@ -39,6 +40,10 @@ section('how long something took, in words')
   check('a whole hour', rules.durationText(HOUR), '1 hour')
   check('whole hours', rules.durationText(4 * HOUR), '4 hours')
   check('hours and minutes', rules.durationText(HOUR + 40 * MIN), '1 h 40 min')
+  check('open for text: under an hour', rules.openForText(40 * MIN), '40 minutes')
+  check('open for text: a few hours', rules.openForText(4 * HOUR), '4 hours')
+  check('open for text: exactly 24 hours is 1 day', rules.openForText(DAY), '1 day')
+  check('open for text: 17 days', rules.openForText(17 * DAY), '17 days')
 }
 
 section('matches worth a look')
@@ -74,6 +79,18 @@ section('matches worth a look')
     ['stuck'])
 }
 
+section('going on vs. left open')
+{
+  const openedAt = now - 5 * DAY
+  check('active just inside 3 hours is going on', rules.leftOpenReason({ openedAt, lastActivityAt: now - (rules.ACTIVE_MS - MIN) }, now), null)
+  check('active at exactly 3 hours is still going on', rules.leftOpenReason({ openedAt, lastActivityAt: now - rules.ACTIVE_MS }, now), null)
+  check('active just outside 3 hours is left open',
+    rules.leftOpenReason({ openedAt, lastActivityAt: now - (rules.ACTIVE_MS + MIN) }, now),
+    { reason: 'left_open', tag: 'Left open for 5 days' })
+  check('left open, measured from when it was opened, not the last activity',
+    rules.leftOpenReason({ openedAt: now - 17 * DAY, lastActivityAt: now - 4 * HOUR }, now)?.tag, 'Left open for 17 days')
+}
+
 section('names')
 {
   check('capitals and extra spaces are ignored', rules.normalizeName('  Jon   CRUZ '), 'jon cruz')
@@ -91,6 +108,33 @@ section('names')
   check('Mia / Miala Santos is not a short name (not a whole word)', rules.nameReason('Mia', 'Miala Santos'), null)
   check('names equal apart from spacing are a typo', rules.nameReason('Mia  Santos', 'mia santos'), { reason: 'typo', text: 'Names differ only in capitals or spaces' })
   check('completely different names are not flagged', rules.nameReason('Bea Tan', 'Luis Ocampo'), null)
+}
+
+section('typos, word by word (the staging dry-run truth table)')
+{
+  const typo = (text) => ({ reason: 'typo', text })
+  const oneLetter = typo('Names differ by one letter')
+  const twoLetters = typo('Names differ by two letters')
+  const flagged = [
+    ['Jon Cruz', 'John Cruz', oneLetter], ['Joy Tan', 'Joey Tan', oneLetter], ['Ana Cruz', 'Anna Cruz', oneLetter],
+    ['Carlo Reyes', 'Karlo Reyes', oneLetter], ['Maria Santos', 'Mara Santos', oneLetter],
+    ['Bea Dela Cruz', 'Bea De La Cruz', oneLetter], ['Cathy', 'Kathy', oneLetter], ['Nica', 'Nika', oneLetter],
+    ['Sam', 'San', oneLetter], ['Jomar', 'Jaymar', twoLetters], ['Trisha', 'Tricia', twoLetters],
+    ['Paolo', 'Paulo', oneLetter], ['Mico', 'Nico', oneLetter], ['Aki', 'Aka', oneLetter],
+    ['Ella', 'Elle', oneLetter], ['Vin', 'Van', oneLetter], ['Jon', 'Jan', oneLetter],
+  ]
+  for (const [a, b, expected] of flagged) check(`${a} / ${b} is flagged`, rules.nameReason(a, b), expected)
+
+  const leftAlone = [
+    ['Ana Cruz', 'Uma Cruz'], ['Demo 01', 'Demo 05'], ['Jan', 'Jana'], ['Kat', 'Katrina'],
+    ['Jun', 'June'], ['Kim', 'Kimberly'], ['Ron', 'Ronald'], ['Liz', 'Liza'], ['Reg', 'Reggie'],
+    ['Miggy', 'Mikki'], ['Kyla', 'Kayla'], ['Gab', 'Gabe'],
+  ]
+  for (const [a, b] of leftAlone) check(`${a} / ${b} is left alone`, rules.nameReason(a, b), null)
+
+  check('a digit in a differing word is never a typo, same word count', rules.nameReason('Demo 01', 'Demo 05'), null)
+  check('a digit rules out a typo even at one letter apart', rules.nameReason('Court 1', 'Court 4'), null)
+  check('a digit in a differing-word-count pair is never a typo', rules.nameReason('Ana9 Cruz', 'Ana Cruz Jr'), null)
 }
 
 section('pairs')

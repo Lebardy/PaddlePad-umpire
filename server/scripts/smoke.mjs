@@ -2679,14 +2679,16 @@ async function main() {
     const m1Warning = ovAsA.body.warnings?.find((w) => w.matchId === m1Id)
     check('M1 is worth a look as a shutout', m1Warning?.reasons?.some((r) => r.reason === 'shutout' && r.tag === 'Ended 11–0'),
       JSON.stringify(m1Warning?.reasons))
-    check("admin A never sees facility B's match", !ovAsA.body.warnings?.some((w) => w.matchId === m2Id))
+    check("admin A never sees facility B's match",
+      Array.isArray(ovAsA.body.warnings) && !ovAsA.body.warnings.some((w) => w.matchId === m2Id))
     check('admin A gets no duplicate list', ovAsA.body.duplicates === null, JSON.stringify(ovAsA.body.duplicates)?.slice(0, 80))
     check('the live board counts the open session', ovAsA.body.live?.sessions >= 1, JSON.stringify(ovAsA.body.live))
     check('umpire A counts as active (their session is going on)', ovAsA.body.totals?.umpires?.active >= 1,
       JSON.stringify(ovAsA.body.totals?.umpires))
     const ovAsOwnerB = await request(`/admin/overview?facilityId=${facilityBId}`, { bearer: fOwnerToken })
     check('the owner narrowed to B sees M2 and not M1',
-      ovAsOwnerB.body.warnings?.some((w) => w.matchId === m2Id) && !ovAsOwnerB.body.warnings?.some((w) => w.matchId === m1Id))
+      Array.isArray(ovAsOwnerB.body.warnings) &&
+      ovAsOwnerB.body.warnings.some((w) => w.matchId === m2Id) && !ovAsOwnerB.body.warnings.some((w) => w.matchId === m1Id))
 
     // --- Step 3: buttons, with refusals ---
     const fineOther = await request('/admin/overview/looks-fine', { method: 'POST', bearer: adminAToken, body: { matchId: m2Id, reason: 'shutout' } })
@@ -2704,7 +2706,8 @@ async function main() {
     const fine = await request('/admin/overview/looks-fine', { method: 'POST', bearer: adminAToken, body: { matchId: m1Id, reason: 'shutout' } })
     check('Looks fine -> 200', fine.status === 200, JSON.stringify(fine.body))
     const afterFine = await request('/admin/overview', { bearer: adminAToken })
-    check('M1 is gone from Worth a look', !afterFine.body.warnings?.some((w) => w.matchId === m1Id))
+    check('M1 is gone from Worth a look',
+      Array.isArray(afterFine.body.warnings) && !afterFine.body.warnings.some((w) => w.matchId === m1Id))
     const voidUnflagged = await request('/admin/overview/void', { method: 'POST', bearer: adminAToken, body: { matchId: m1Id, reason: 'x' } })
     check("an unflagged match can't be voided here -> 409", voidUnflagged.status === 409, JSON.stringify(voidUnflagged.body))
     // Each of the four wrote an entry filed under facility A.
@@ -2713,7 +2716,8 @@ async function main() {
     check('Activity has voided, restored and looks-fine for M1',
       ['match.voided', 'match.restored', 'match.looks_fine'].every((a) => mine.includes(a)), JSON.stringify(mine))
     const ownerRoute = await request('/admin/overview/not-same-person', { method: 'POST', bearer: adminAToken, body: { playerIds: [jonId, johnId] } })
-    check('a facility admin calling an owner route -> 403', ownerRoute.status === 403, String(ownerRoute.status))
+    check('a facility admin calling an owner route -> 403',
+      ownerRoute.status === 403 && ownerRoute.body.error === 'Only the owner can do that', JSON.stringify(ownerRoute.body))
 
     // --- Step 4: duplicates and merge ---
     const ovOwnerStart = Date.now()
@@ -2787,6 +2791,9 @@ async function main() {
     check("none of M3's events -- rally or thirdShot -- still name John, on either payload key",
       m3StillNamingJohn.length === 0, JSON.stringify(m3StillNamingJohn))
     check("M3's rallies now name Jon", (m3.body.match?.events ?? []).filter((e) => e.actingPlayerId === jonId).length > 0)
+    check("M3's thirdShot event now names Jon, not John",
+      (m3.body.match?.events ?? []).some((e) => e.type === 'thirdShot' && e.playerId === jonId),
+      JSON.stringify((m3.body.match?.events ?? []).filter((e) => e.type === 'thirdShot')))
 
     const newMatchNamingRemoved = await request('/matches', {
       method: 'POST', bearer: umpAToken,

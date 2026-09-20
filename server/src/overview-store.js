@@ -7,10 +7,12 @@
 
 import { deriveMatchState, eventFromRow } from './pickleball.js'
 import {
-  PLAYER_ID_KEYS, WINDOW_DAYS, duplicatePairs, hasSignIn, matchReasons, pairKey, sameDayPairs, sharedMatchPairs,
+  PLAYER_ID_KEYS, WINDOW_DAYS, duplicatePairs, hasSignIn, leftOpenReason, matchReasons, pairKey, sameDayPairs, sharedMatchPairs,
 } from './overview-rules.js'
 
 const WEEK = "now() - interval '7 days'"
+
+const toMs = (value) => (value == null ? null : value instanceof Date ? value.getTime() : Date.parse(value))
 
 /**
  * The SQL condition limiting `column` (a sessions.facility_id or
@@ -105,13 +107,14 @@ export async function matchReasonsNow(queryFn, row, now = Date.now()) {
   }, now).filter((r) => !hidden.has(r.reason))
 }
 
-async function loadRightNow(queryFn, filter) {
+async function loadRightNow(queryFn, filter, now) {
   const params = []
   const scope = scopeCondition(filter, params, 's.facility_id')
-  const { rows: sessions } = await queryFn(
+  const { rows: openSessions } = await queryFn(
     `SELECT s.id, s.name, s.created_at, s.created_by AS opened_by_id, f.name AS facility_name, u.name AS opened_by,
             (SELECT count(*)::int FROM session_players sp WHERE sp.session_id = s.id) AS player_count,
-            (SELECT max(m.ended_at) FROM matches m WHERE m.session_id = s.id AND m.status = 'completed' AND m.voided_at IS NULL) AS last_match_ended_at
+            (SELECT max(m.ended_at) FROM matches m WHERE m.session_id = s.id AND m.status = 'completed' AND m.voided_at IS NULL) AS last_match_ended_at,
+            (SELECT max(m.started_at) FROM matches m WHERE m.session_id = s.id AND m.voided_at IS NULL) AS last_match_started_at
        FROM sessions s
        LEFT JOIN facilities f ON f.id = s.facility_id
        LEFT JOIN umpires u ON u.id = s.created_by
@@ -119,6 +122,16 @@ async function loadRightNow(queryFn, filter) {
       ORDER BY s.created_at DESC`,
     params,
   )
+  // Last activity is the latest of opened, a non-voided match starting,
+  // or one ending; going-on-or-left-open is decided from that, but the
+  // "left open for" wording is measured from when it was opened.
+  const withActivity = openSessions.map((s) => {
+    const lastActivityAt = Math.max(...[s.created_at, s.last_match_started_at, s.last_match_ended_at].map(toMs).filter((v) => v != null))
+    return { ...s, openReason: leftOpenReason({ openedAt: s.created_at, lastActivityAt }, now) }
+  })
+  const sessions = withActivity.filter((s) => !s.openReason)
+  const leftOpen = withActivity.filter((s) => s.openReason).sort((a, b) => toMs(a.created_at) - toMs(b.created_at))
+
   const sessionIds = sessions.map((s) => s.id)
   const { rows: matches } = sessionIds.length === 0 ? { rows: [] } : await queryFn(
     `SELECT ${MATCH_COLUMNS} ${MATCH_FROM}
@@ -157,6 +170,15 @@ async function loadRightNow(queryFn, filter) {
         }),
       }
     }),
+    leftOpen: leftOpen.map((s) => ({
+      sessionId: s.id,
+      name: s.name,
+      facilityName: s.facility_name,
+      openedBy: s.opened_by,
+      openedAt: s.created_at,
+      playerCount: s.player_count,
+      tag: s.openReason.tag,
+    })),
     activeUmpires: [...new Set([...matches.map((m) => m.recorded_by_id), ...sessions.map((s) => s.opened_by_id)].filter(Boolean))],
   }
 }
@@ -332,7 +354,7 @@ export async function mergePlayers(client, keepId, removeId) {
 
 /** Everything the Overview page shows, for one facilityFilterFor() result. */
 export async function loadOverview(queryFn, filter, { isOwner, adminId, now = Date.now() }) {
-  const rightNow = await loadRightNow(queryFn, filter)
+  const rightNow = await loadRightNow(queryFn, filter, now)
   const [totals, warnings, duplicates] = await Promise.all([
     loadTotals(queryFn, filter, rightNow.activeUmpires),
     loadWarnings(queryFn, filter, { now, adminId }),
@@ -346,6 +368,7 @@ export async function loadOverview(queryFn, filter, { isOwner, adminId, now = Da
     facilityName,
     live: rightNow.live,
     sessions: rightNow.sessions,
+    leftOpen: rightNow.leftOpen,
     totals,
     warnings,
     duplicates,

@@ -9,6 +9,10 @@ export const WINDOW_DAYS = 30
 export const STUCK_MS = 3 * 60 * 60_000
 export const SHORT_MS = 3 * 60_000
 export const LONG_MS = 90 * 60_000
+// A session is "going on" when its last activity was within this long.
+// Older than that, it's left open and belongs under Worth a look, not
+// the live board.
+export const ACTIVE_MS = 3 * 60 * 60_000
 export const REASONS = ['stuck', 'ended_early', 'shutout', 'short', 'long']
 // Where an event names a player: a rally's acting player, and the
 // player of a third shot or a serve correction (see pickleball.js).
@@ -39,6 +43,13 @@ export function durationText(duration) {
   return rest === 0 ? plural(hours, 'hour') : `${hours} h ${rest} min`
 }
 
+/** "under a minute" .. "23 hours", then whole days: "1 day", "17 days". */
+export function openForText(duration) {
+  const DAY = 24 * 60 * 60_000
+  if (duration < DAY) return durationText(duration)
+  return plural(Math.floor(duration / DAY), 'day')
+}
+
 /**
  * Why a match is worth a look, in a fixed order, each with the words
  * shown on its tag. An empty list means nothing is odd about it.
@@ -66,6 +77,20 @@ export function matchReasons(match, now) {
   return reasons
 }
 
+/**
+ * Null while a session counts as going on -- its last activity (open,
+ * or a non-voided match starting or ending) was within ACTIVE_MS.
+ * Otherwise the reason it belongs under Worth a look instead, with how
+ * long it's been open, measured from when it was opened (not from the
+ * last activity). `session` is `{ openedAt, lastActivityAt }`.
+ */
+export function leftOpenReason(session, now) {
+  const lastActivity = ms(session.lastActivityAt)
+  if (lastActivity != null && now - lastActivity <= ACTIVE_MS) return null
+  const openedAt = ms(session.openedAt)
+  return { reason: 'left_open', tag: `Left open for ${openForText(now - openedAt)}` }
+}
+
 export function normalizeName(name) {
   return String(name ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
 }
@@ -87,11 +112,49 @@ export function letterDistance(a, b) {
   return previous[b.length]
 }
 
+const hasDigit = (text) => /\d/.test(text)
+const typoText = (distance) => (distance === 1 ? 'Names differ by one letter' : distance === 2 ? 'Names differ by two letters' : null)
+
 /**
- * Why two names might be one person, or null. Short names (the
- * shorter one 4 letters or fewer) only count when one letter is
- * swapped and the length is the same, so "Jan" and "Jana" -- easily
- * two people -- are left alone.
+ * Same word count: compare word against word by position and add up
+ * the letter distance over only the words that differ. A digit in
+ * either side of a differing word rules it out ("Demo 01" / "Demo
+ * 05"). A short differing word (its shorter side 4 letters or fewer)
+ * only counts at exactly 1 letter, and when the whole name is a
+ * single word, that one letter must also keep the same length ("Jan"
+ * / "Jana" left alone, "Jon" / "Jan" flagged).
+ */
+function wordByWordDistance(wordsA, wordsB) {
+  let total = 0
+  for (let i = 0; i < wordsA.length; i += 1) {
+    const wa = wordsA[i]
+    const wb = wordsB[i]
+    if (wa === wb) continue
+    if (hasDigit(wa) || hasDigit(wb)) return null
+    const distance = letterDistance(wa, wb)
+    if (Math.min(wa.length, wb.length) <= 4) {
+      if (distance !== 1) return null
+      if (wordsA.length === 1 && wa.length !== wb.length) return null
+    }
+    total += distance
+  }
+  return total
+}
+
+/**
+ * Different word counts: the whole-name letter distance, unchanged
+ * from before -- except a name of 4 letters or fewer is never flagged
+ * this way, and a digit anywhere in either name rules it out.
+ */
+function wholeNameDistance(a, b, shorter, longer) {
+  if (shorter.length <= 4) return null
+  if (longer.length - shorter.length > 2) return null
+  if (hasDigit(a) || hasDigit(b)) return null
+  return letterDistance(a, b)
+}
+
+/**
+ * Why two names might be one person, or null.
  */
 export function nameReason(nameA, nameB) {
   const a = normalizeName(nameA)
@@ -102,13 +165,13 @@ export function nameReason(nameA, nameB) {
   if (longer.startsWith(shorter) && longer[shorter.length] === ' ') {
     return { reason: 'short_name', text: 'One name is the start of the other' }
   }
-  if (longer.length - shorter.length > 2) return null
-  const distance = letterDistance(a, b)
-  const isShort = shorter.length <= 4
-  if (isShort && (distance !== 1 || a.length !== b.length)) return null
-  if (distance === 1) return { reason: 'typo', text: 'Names differ by one letter' }
-  if (distance === 2) return { reason: 'typo', text: 'Names differ by two letters' }
-  return null
+  const wordsA = a.split(' ')
+  const wordsB = b.split(' ')
+  const distance = wordsA.length === wordsB.length
+    ? wordByWordDistance(wordsA, wordsB)
+    : wholeNameDistance(a, b, shorter, longer)
+  const text = distance == null ? null : typoText(distance)
+  return text ? { reason: 'typo', text } : null
 }
 
 export function pairKey(a, b) {
