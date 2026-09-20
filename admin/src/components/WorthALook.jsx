@@ -2,10 +2,13 @@ import { agoText, countWord, formatWhen } from '../lib/format'
 
 const AMBER_REASONS = new Set(['ended_early', 'short', 'long'])
 
-/** One left-open session, sitting above the flagged matches: nobody has ended it, but an admin can close it. */
+/**
+ * One left-open session, sitting above the flagged matches: nobody has
+ * ended it, but an admin can close it. Close is the only action this row
+ * has, and its own dialog owns its busy/error state (the same shape as
+ * Void's), so there's no shared busy id or row error to check here.
+ */
 function LeftOpenRow({ session, isOwner, actions }) {
-  const busy = actions.busyId === session.sessionId
-  const error = actions.errors[session.sessionId]
   return (
     <tr>
       <td>
@@ -18,8 +21,7 @@ function LeftOpenRow({ session, isOwner, actions }) {
       <td className="col-when">{formatWhen(session.openedAt)}</td>
       <td className="col-actions">
         <div className="row-actions">
-          <button type="button" className="btn-danger btn-small" disabled={busy} onClick={() => actions.openClose(session)}>Close</button>
-          {error && <span className="row-error" role="alert">{error}</span>}
+          <button type="button" className="btn-danger btn-small" onClick={() => actions.openClose(session)}>Close</button>
         </div>
       </td>
     </tr>

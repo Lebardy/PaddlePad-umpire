@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { closeSession } from '../lib/api'
+import { countWord } from '../lib/format'
 import { useAutoDialog } from '../lib/useAutoDialog'
 
 /**
@@ -29,7 +30,9 @@ export default function CloseSessionDialog({ session, onCancel, onDone }) {
   return (
     <dialog ref={ref} className="warning-dialog" aria-labelledby="close-session-title" onCancel={handleCancel}>
       <h2 id="close-session-title" className="section-title">Close this session?</h2>
-      <p><strong>{session.name}</strong> · opened by {session.openedBy} · {session.tag}</p>
+      <p>
+        <strong>{session.name}</strong> · opened by {session.openedBy} · {countWord(session.playerCount, 'player', 'players')} on the list · {session.tag}
+      </p>
       <p>
         It’s been left open, so closing it tidies up the list. Matches inside it aren’t touched — a match still in
         progress stays with the umpire who scored it. The umpire can reopen the session from their app.
