@@ -235,3 +235,4 @@ export const voidMatch = (matchId, reason) => post('/admin/overview/void', { mat
 export const unvoidMatch = (matchId) => post('/admin/overview/unvoid', { matchId })
 export const markNotSamePerson = (a, b) => post('/admin/overview/not-same-person', { playerIds: [a, b] })
 export const mergePlayers = ({ keepId, removeId, confirmName }) => post('/admin/overview/merge', { keepId, removeId, confirmName })
+export const closeSession = (sessionId, reason) => post(`/admin/overview/sessions/${sessionId}/close`, { reason })

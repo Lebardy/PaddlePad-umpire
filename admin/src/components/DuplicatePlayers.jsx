@@ -32,20 +32,42 @@ export default function DuplicatePlayers({ pairs, actions }) {
               </tr>
             </thead>
             <tbody>
-              {pairs.map((pair) => (
-                <tr key={`${pair.a.id}:${pair.b.id}`}>
-                  <td>
-                    <div className="pair-names">
-                      <Link to={`/people/players/${pair.a.id}`}>{pair.a.name}</Link>
-                      <span className="vs">and</span>
-                      <Link to={`/people/players/${pair.b.id}`}>{pair.b.name}</Link>
-                    </div>
-                    <span className="cell-sub">{playerLine(pair.a)} · {playerLine(pair.b)}</span>
-                  </td>
-                  <td>{pair.text}</td>
-                  <td className="col-actions"><div className="row-actions">{actions /* buttons land in Task 7 */}</div></td>
-                </tr>
-              ))}
+              {pairs.map((pair) => {
+                const key = `${pair.a.id}:${pair.b.id}`
+                const bothSignedIn = pair.a.hasSignIn && pair.b.hasSignIn
+                const busy = actions.busyKey === key
+                const error = actions.errors[key]
+                return (
+                  <tr key={key}>
+                    <td>
+                      <div className="pair-names">
+                        <Link to={`/people/players/${pair.a.id}`}>{pair.a.name}</Link>
+                        <span className="vs">and</span>
+                        <Link to={`/people/players/${pair.b.id}`}>{pair.b.name}</Link>
+                      </div>
+                      <span className="cell-sub">{playerLine(pair.a)} · {playerLine(pair.b)}</span>
+                    </td>
+                    <td>{pair.text}</td>
+                    <td className="col-actions">
+                      <div className="row-actions">
+                        <button type="button" className="btn-quiet btn-small" disabled={busy} onClick={() => actions.notSame(pair)}>
+                          Not the same person
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-primary btn-small"
+                          disabled={bothSignedIn || busy}
+                          onClick={() => actions.openMerge(pair)}
+                        >
+                          Merge
+                        </button>
+                        {bothSignedIn && <span className="row-note">Can’t merge: both have signed in to the player app</span>}
+                        {error && <span className="row-error" role="alert">{error}</span>}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
