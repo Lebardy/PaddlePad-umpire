@@ -2,7 +2,8 @@ import { Link } from '../lib/router'
 import LampMark from './LampMark'
 
 const PAGES = [
-  { to: '/invites', label: 'Invite codes', current: (path) => path === '/' || path === '/invites' },
+  { to: '/', label: 'Overview', current: (path) => path === '/' },
+  { to: '/invites', label: 'Invite codes', current: (path) => path === '/invites' },
   { to: '/people', label: 'People', current: (path) => path === '/people' || path.startsWith('/people/') },
   { to: '/facilities', label: 'Facilities', facilityAdminLabel: 'Facility', current: (path) => path === '/facilities' || path.startsWith('/facilities/') },
   { to: '/admins', label: 'Admins', ownerOnly: true, current: (path) => path === '/admins' },
@@ -15,7 +16,7 @@ export default function Layout({ admin, facilityLabel, path, onSignOut, children
   return (
     <div className="shell">
       <div className="topbar board-texture">
-        <Link to="/invites" className="brand-mark"><LampMark />PaddlePad<span>Admin</span></Link>
+        <Link to="/" className="brand-mark"><LampMark />PaddlePad<span>Admin</span></Link>
         <nav aria-label="Admin pages">
           <ul className="tabs">
             {PAGES.filter((page) => !page.ownerOnly || admin.role === 'owner').map((page) => (

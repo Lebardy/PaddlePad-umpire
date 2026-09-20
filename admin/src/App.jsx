@@ -12,6 +12,7 @@ import Admins from './screens/Admins'
 import Facilities from './screens/Facilities'
 import FacilityDetail from './screens/FacilityDetail'
 import Invites from './screens/Invites'
+import Overview from './screens/Overview'
 import People from './screens/People'
 import PlayerDetail from './screens/PlayerDetail'
 import UmpireDetail from './screens/UmpireDetail'
@@ -64,7 +65,8 @@ export default function App() {
     content = <SignIn onSignedIn={setAdmin} />
   } else {
     let screen
-    if (path === '/' || path === '/invites') screen = <Invites me={admin} />
+    if (path === '/') screen = <Overview me={admin} facilityLabel={facilityLabel(admin, facilities ?? [])} />
+    else if (path === '/invites') screen = <Invites me={admin} />
     else if (path === '/admins' && admin.role === 'owner') screen = <Admins me={admin} />
     else if (path === '/activity') screen = <Activity me={admin} />
     else if (path === '/account') screen = <Account admin={admin} onAdminChange={updateAdmin} />

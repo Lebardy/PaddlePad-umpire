@@ -224,3 +224,14 @@ export const unpausePerson = (kind, id) => post(`/admin/${kind}/${id}/unpause`)
 export const closePerson = (kind, id, { reason, confirmName }) => post(`/admin/${kind}/${id}/close`, { reason, confirmName })
 export const newClaimCode = (id) => post(`/admin/players/${id}/claim-code`).then((d) => d.claimCode)
 export const moveUmpire = (id, facilityId) => post(`/admin/umpires/${id}/move`, { facilityId }).then((d) => d.umpire)
+
+// --- Overview ---
+export function fetchOverview({ facilityId } = {}) {
+  const query = facilityId ? `?facilityId=${encodeURIComponent(facilityId)}` : ''
+  return apiFetch(`/admin/overview${query}`)
+}
+export const markLooksFine = (matchId, reason) => post('/admin/overview/looks-fine', { matchId, reason })
+export const voidMatch = (matchId, reason) => post('/admin/overview/void', { matchId, reason })
+export const unvoidMatch = (matchId) => post('/admin/overview/unvoid', { matchId })
+export const markNotSamePerson = (a, b) => post('/admin/overview/not-same-person', { playerIds: [a, b] })
+export const mergePlayers = ({ keepId, removeId, confirmName }) => post('/admin/overview/merge', { keepId, removeId, confirmName })

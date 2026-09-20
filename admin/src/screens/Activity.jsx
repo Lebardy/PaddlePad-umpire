@@ -9,7 +9,7 @@ import { actionLabel, dayHeading, timeOfDay } from '../lib/format'
 // Manila year+month+day, not the label itself.
 const DAY_KEY = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', year: 'numeric', month: 'numeric', day: 'numeric' })
 
-const WARNINGS = new Set(['admin.sign_in_failed', 'admin.switched_off'])
+const WARNINGS = new Set(['admin.sign_in_failed', 'admin.switched_off', 'match.voided', 'player.merged'])
 
 /** Entries in order, split into days: [{ day, entries }]. */
 function byDay(entries) {

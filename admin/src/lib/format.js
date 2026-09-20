@@ -80,10 +80,37 @@ const ACTION_LABELS = {
   'umpire.moved': 'Moved an umpire',
   'facility.created': 'Made a facility',
   'facility.updated': 'Updated a facility',
+  'match.looks_fine': 'Marked a match as fine',
+  'match.voided': 'Voided a match',
+  'match.restored': 'Undid a void',
+  'player.not_duplicate': 'Marked players as different people',
+  'player.merged': 'Merged two players',
 }
 
 export function actionLabel(action) {
   return ACTION_LABELS[action] ?? action
+}
+
+// Overview
+
+/** "just now", "14 min ago", "2 h ago", "yesterday", "4 days ago". */
+export function agoText(iso, now = Date.now()) {
+  const minutes = Math.floor((now - Date.parse(iso)) / 60_000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} h ago`
+  const days = Math.floor(hours / 24)
+  return days === 1 ? 'yesterday' : `${days} days ago`
+}
+
+/** "7:42 PM", in the viewer's own time. */
+export function clockText(iso) {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+}
+
+export function countWord(n, one, many) {
+  return `${n} ${n === 1 ? one : many}`
 }
 
 // Facilities

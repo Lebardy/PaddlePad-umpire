@@ -6,8 +6,9 @@
 // ============================================================
 
 import {
-  EXPIRY_CHOICES, actionLabel, confirmNameMatches, dayHeading, facilityLabel, formatWhen, inviteStatusText,
-  lastSignedInText, madeByText, ratingText, signInMethods, signInMethodsText, statusLabel, timeOfDay,
+  EXPIRY_CHOICES, actionLabel, agoText, clockText, confirmNameMatches, countWord, dayHeading, facilityLabel,
+  formatWhen, inviteStatusText, lastSignedInText, madeByText, ratingText, signInMethods, signInMethodsText,
+  statusLabel, timeOfDay,
 } from '../src/lib/format.js'
 
 let pass = 0
@@ -44,6 +45,11 @@ check('an admin move reads as words', actionLabel('admin.moved'), 'Moved an admi
 check('an umpire move reads as words', actionLabel('umpire.moved'), 'Moved an umpire')
 check('a facility being made reads as words', actionLabel('facility.created'), 'Made a facility')
 check('a facility being edited reads as words', actionLabel('facility.updated'), 'Updated a facility')
+check('marking fine reads as words', actionLabel('match.looks_fine'), 'Marked a match as fine')
+check('voided label', actionLabel('match.voided'), 'Voided a match')
+check('a void undone reads as words', actionLabel('match.restored'), 'Undid a void')
+check('marking different people reads as words', actionLabel('player.not_duplicate'), 'Marked players as different people')
+check('a merge reads as words', actionLabel('player.merged'), 'Merged two players')
 
 check('expiry choices default to 14 days and include never',
   [EXPIRY_CHOICES.find((c) => c.value === '14')?.label, EXPIRY_CHOICES.at(-1)?.value], ['In 14 days', 'never'])
@@ -81,6 +87,16 @@ check('a day heading this year has no year', dayHeading('2026-09-18T01:00:00Z', 
 check('a day heading from a past year gets one', dayHeading('2025-12-31T15:00:00Z', Date.parse('2026-09-18T12:00:00Z')), 'Wednesday, Dec 31, 2025')
 check('Manila can already be the next day', dayHeading('2025-12-31T17:00:00Z', Date.parse('2026-09-18T12:00:00Z')), 'Thursday, Jan 1')
 check('a time of day in Manila', timeOfDay('2026-09-18T01:05:00Z'), '9:05 AM')
+
+const at = Date.parse('2026-09-20T11:42:00Z')
+check('seconds ago reads just now', agoText('2026-09-20T11:41:40Z', at), 'just now')
+check('minutes ago', agoText('2026-09-20T11:28:00Z', at), '14 min ago')
+check('hours ago', agoText('2026-09-20T09:30:00Z', at), '2 h ago')
+check('a day ago', agoText('2026-09-19T09:00:00Z', at), 'yesterday')
+check('days ago', agoText('2026-09-16T09:00:00Z', at), '4 days ago')
+check('one player', countWord(1, 'player', 'players'), '1 player')
+check('many players', countWord(3, 'player', 'players'), '3 players')
+check('clock time has AM/PM', /^\d{1,2}:\d{2}\s?(AM|PM)$/i.test(clockText('2026-09-20T11:42:00Z')), true)
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
