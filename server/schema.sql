@@ -756,3 +756,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS dismissed_warnings_players_idx
 -- reads as the umpire's.
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS voided_by_admin UUID REFERENCES admins (id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS matches_started_idx ON matches (started_at DESC);
+
+-- The one session change an admin can make: closing a session an
+-- umpire left open (housekeeping, not a match decision -- see Void
+-- above). Set only by the Overview; the umpire's own end route clears
+-- it on reopening, so the umpire keeps the last word.
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ended_by_admin UUID REFERENCES admins (id) ON DELETE SET NULL;

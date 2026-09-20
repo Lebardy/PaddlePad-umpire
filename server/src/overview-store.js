@@ -87,6 +87,45 @@ export async function matchLabel(queryFn, row) {
   return `${side(row.team_a)} vs ${side(row.team_b)}`
 }
 
+const SESSION_COLUMNS = `s.id, s.name, s.facility_id, s.created_at AS opened_at, s.ended_at, s.ended_by_admin, s.voided_at,
+  (SELECT max(m.ended_at) FROM matches m WHERE m.session_id = s.id AND m.status = 'completed' AND m.voided_at IS NULL) AS last_match_ended_at,
+  (SELECT max(m.started_at) FROM matches m WHERE m.session_id = s.id AND m.voided_at IS NULL) AS last_match_started_at`
+
+/** One session with what the Overview's "Close" button needs to check it. */
+export async function loadSessionForAction(queryFn, sessionId, { lock = false } = {}) {
+  const { rows } = await queryFn(
+    `SELECT ${SESSION_COLUMNS} FROM sessions s WHERE s.id = $1${lock ? ' FOR UPDATE OF s' : ''}`,
+    [sessionId],
+  )
+  return rows[0] ?? null
+}
+
+/** A session in words for an activity entry: the name it was given, e.g. "Friday Night". */
+export function sessionLabel(row) {
+  return row.name
+}
+
+/**
+ * Why this session is, right now, left open -- or null when it's
+ * ended, voided, or still within the quiet mark loadRightNow uses.
+ * Reuses leftOpenReason rather than re-deriving the 3-hour rule.
+ */
+export async function sessionLeftOpenNow(queryFn, row, now = Date.now()) {
+  if (row.ended_at || row.voided_at) return null
+  const lastActivityAt = Math.max(...[row.opened_at, row.last_match_started_at, row.last_match_ended_at].map(toMs).filter((v) => v != null))
+  return leftOpenReason({ openedAt: row.opened_at, lastActivityAt }, now)
+}
+
+/**
+ * Closes a session an umpire left open. Only `ended_at` and
+ * `ended_by_admin` are touched -- never `ended_by` (that column
+ * belongs to the umpire's own end route) and never any match inside
+ * the session.
+ */
+export async function closeSession(client, sessionId, adminId) {
+  await client.query('UPDATE sessions SET ended_at = now(), ended_by_admin = $2 WHERE id = $1', [sessionId, adminId])
+}
+
 /**
  * The reasons this match is worth a look right now: inside the window,
  * with any reasons already marked "Looks fine" taken off.

@@ -388,6 +388,7 @@ an invite code at all.
 | `POST` | `/admin/overview/looks-fine` | Bearer (admin) | Dismiss one warning reason on a flagged match |
 | `POST` | `/admin/overview/void` | Bearer (admin) | Void a match the Overview has flagged, with a reason |
 | `POST` | `/admin/overview/unvoid` | Bearer (admin) | Undo a void that was made from the Overview |
+| `POST` | `/admin/overview/sessions/:id/close` | Bearer (admin) | Close a session an umpire left open, with a reason; the matches inside it are untouched |
 | `POST` | `/admin/overview/not-same-person` | Bearer (owner) | Dismiss a possible duplicate pair for good — they're two different people |
 | `POST` | `/admin/overview/merge` | Bearer (owner) | Merge one player into another: their matches move over and the duplicate is removed |
 

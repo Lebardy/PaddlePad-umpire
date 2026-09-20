@@ -4,9 +4,13 @@ import { requireAdminAccount } from '../auth.js'
 import { facilityFilterFor } from '../facility-rules.js'
 import { recordActivity } from '../admin-activity.js'
 import {
-  CONFIRM_MERGE_MESSAGE, NOT_FLAGGED_MESSAGE, NOT_OVERVIEW_VOID_MESSAGE, REASONS, hasSignIn, mergeRefusal, pairKey, readVoidReason,
+  CONFIRM_MERGE_MESSAGE, NOT_FLAGGED_MESSAGE, NOT_LEFT_OPEN_MESSAGE, NOT_OVERVIEW_VOID_MESSAGE, REASONS, SESSION_REASON_MESSAGE,
+  hasSignIn, mergeRefusal, pairKey, readVoidReason,
 } from '../overview-rules.js'
-import { loadMatchForAction, loadOverview, matchLabel, matchReasonsNow, mergePlayers } from '../overview-store.js'
+import {
+  closeSession, loadMatchForAction, loadOverview, loadSessionForAction, matchLabel, matchReasonsNow, mergePlayers, sessionLabel,
+  sessionLeftOpenNow,
+} from '../overview-store.js'
 import { confirmNameMatches } from '../people-rules.js'
 import { invalidateRallyRatings } from '../rally-rating-store.js'
 import { isUuid } from '../validate.js'
@@ -122,6 +126,30 @@ router.post('/unvoid', async (req, res) => {
       })
     })
     invalidateRallyRatings()
+    res.json({ ok: true })
+  } catch (error) {
+    sendRefusal(res, error)
+  }
+})
+
+router.post('/sessions/:id/close', async (req, res) => {
+  const { id } = req.params
+  if (!isUuid(id)) return res.status(404).json({ error: 'No such session' })
+  const read = readVoidReason(req.body?.reason, SESSION_REASON_MESSAGE)
+  if (read.error) return res.status(400).json({ error: read.error })
+  try {
+    await withTransaction(async (client) => {
+      const q = client.query.bind(client)
+      const row = await loadSessionForAction(q, id, { lock: true })
+      if (!row || !mayActOn(req.admin, row)) throw refusal(404, 'No such session')
+      const leftOpen = await sessionLeftOpenNow(q, row)
+      if (!leftOpen) throw refusal(409, NOT_LEFT_OPEN_MESSAGE)
+      await closeSession(client, id, req.admin.id)
+      await recordActivity(client, {
+        adminId: req.admin.id, action: 'session.closed', targetType: 'session', targetId: id, facilityId: row.facility_id,
+        summary: `Closed ${sessionLabel(row)} (${leftOpen.tag}). Reason: ${read.reason}`,
+      })
+    })
     res.json({ ok: true })
   } catch (error) {
     sendRefusal(res, error)

@@ -22,6 +22,8 @@ export const VOID_REASON_MAX = 300
 export const NOT_FLAGGED_MESSAGE = "That match isn't flagged, so it can't be voided here"
 export const VOID_REASON_MESSAGE = "Say why you're voiding this match (up to 300 characters)"
 export const NOT_OVERVIEW_VOID_MESSAGE = 'Only a match voided from the Overview can be undone here'
+export const NOT_LEFT_OPEN_MESSAGE = "That session isn't left open, so it can't be closed here"
+export const SESSION_REASON_MESSAGE = "Say why you're closing this session (up to 300 characters)"
 export const BOTH_SIGNED_IN_MESSAGE = "Both have signed in to the player app, so they can't be merged"
 export const KEEP_SIGNED_IN_MESSAGE = 'Keep the one who has signed in to the player app'
 export const SHARED_MATCH_MESSAGE = "These two have played in the same match, so they're two different people"
@@ -270,8 +272,12 @@ export function mergeRefusal({ keep, remove, sharedMatch, removeInLiveSession })
   return null
 }
 
-export function readVoidReason(value) {
+/**
+ * A 1-300 character reason, trimmed -- shared by Void and Close a
+ * session, which differ only in what they say when it's missing.
+ */
+export function readVoidReason(value, message = VOID_REASON_MESSAGE) {
   const reason = String(value ?? '').trim()
-  if (!reason || reason.length > VOID_REASON_MAX) return { error: VOID_REASON_MESSAGE }
+  if (!reason || reason.length > VOID_REASON_MAX) return { error: message }
   return { reason }
 }

@@ -228,6 +228,10 @@ router.post('/:id/void', async (req, res) => {
  * editing a match is not (see the security notes in README): courts and
  * phones change hands mid-session, and whoever is still there at the
  * end is often not whoever started it. `ended_by` records who did it.
+ *
+ * An umpire's end or reopen always replaces an admin's (ended_by_admin
+ * is cleared), so the umpire keeps the last word over a session the
+ * Overview closed as left open.
  */
 router.post('/:id/end', async (req, res) => {
   const ended = req.body?.ended !== false
@@ -235,7 +239,8 @@ router.post('/:id/end', async (req, res) => {
   const { rows } = await query(
     `UPDATE sessions
         SET ended_at = CASE WHEN $2 THEN now() END,
-            ended_by = CASE WHEN $2 THEN $3::uuid END
+            ended_by = CASE WHEN $2 THEN $3::uuid END,
+            ended_by_admin = NULL
       WHERE id = $1
       RETURNING id`,
     [req.params.id, ended, req.umpire.id],

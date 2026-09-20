@@ -211,6 +211,10 @@ section('void reasons')
   check('a missing reason is refused', rules.readVoidReason(undefined), { error: rules.VOID_REASON_MESSAGE })
   check('a long reason is refused', rules.readVoidReason('x'.repeat(301)), { error: rules.VOID_REASON_MESSAGE })
   check('300 characters is fine', rules.readVoidReason('x'.repeat(300)).reason?.length, 300)
+  check('closing a session with no reason uses its own message',
+    rules.readVoidReason('  ', rules.SESSION_REASON_MESSAGE), { error: rules.SESSION_REASON_MESSAGE })
+  check('closing a session with a reason still trims it the same way',
+    rules.readVoidReason('  Umpire forgot  ', rules.SESSION_REASON_MESSAGE), { reason: 'Umpire forgot' })
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

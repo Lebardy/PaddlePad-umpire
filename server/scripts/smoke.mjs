@@ -24,6 +24,7 @@
 // ============================================================
 
 import { RALLY_ENDINGS, rallyEndingColumn } from '../src/rally-endings.js'
+import { NOT_LEFT_OPEN_MESSAGE, SESSION_REASON_MESSAGE } from '../src/overview-rules.js'
 
 const API = (process.argv[2] ?? process.env.API_URL ?? 'http://localhost:3000').replace(/\/$/, '')
 
@@ -2718,6 +2719,19 @@ async function main() {
     const ownerRoute = await request('/admin/overview/not-same-person', { method: 'POST', bearer: adminAToken, body: { playerIds: [jonId, johnId] } })
     check('a facility admin calling an owner route -> 403',
       ownerRoute.status === 403 && ownerRoute.body.error === 'Only the owner can do that', JSON.stringify(ownerRoute.body))
+
+    // --- Close a session left open: session A is still fresh and going
+    // on here, so the guard is what's worth proving -- an actually
+    // left-open session can't be manufactured through the API. ---
+    const closeFresh = await request(`/admin/overview/sessions/${sessionAId}/close`, { method: 'POST', bearer: adminAToken, body: { reason: 'smoke test close' } })
+    check("closing a fresh, active session -> 409 with the exact message",
+      closeFresh.status === 409 && closeFresh.body.error === NOT_LEFT_OPEN_MESSAGE, JSON.stringify(closeFresh.body))
+    const closeNoReason = await request(`/admin/overview/sessions/${sessionAId}/close`, { method: 'POST', bearer: adminAToken, body: {} })
+    check('closing a session with no reason -> 400 with the exact message',
+      closeNoReason.status === 400 && closeNoReason.body.error === SESSION_REASON_MESSAGE, JSON.stringify(closeNoReason.body))
+    const closeOtherFacility = await request(`/admin/overview/sessions/${sessionAId}/close`, { method: 'POST', bearer: adminBToken, body: { reason: 'smoke test close' } })
+    check("admin B closing facility A's session -> 404",
+      closeOtherFacility.status === 404 && closeOtherFacility.body.error === 'No such session', JSON.stringify(closeOtherFacility.body))
 
     // --- Step 4: duplicates and merge ---
     const ovOwnerStart = Date.now()
