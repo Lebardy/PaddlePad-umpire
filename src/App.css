@@ -119,6 +119,15 @@
   letter-spacing: 0.03em;
 }
 
+/* The name and the facility stack, so the header stays one row tall on
+   a tablet held either way. */
+.account-who {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+}
+
 .umpire-name {
   font-weight: 600;
   font-size: 0.9rem;
@@ -128,8 +137,17 @@
   white-space: nowrap;
 }
 
+.umpire-facility {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 560px) {
-  .umpire-name { display: none; }
+  .umpire-name, .umpire-facility { display: none; }
 }
 
 .account-btn:hover .umpire-name { color: var(--primary); }

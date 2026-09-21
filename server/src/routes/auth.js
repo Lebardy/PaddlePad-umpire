@@ -50,6 +50,10 @@ function umpirePayload(row) {
     name: row.name,
     googleEmail: row.google_email ?? null,
     hasPassword: Boolean(row.password_hash),
+    // Where this umpire works. The app shows it in the header and on
+    // the account screen; null only on a database old enough to still
+    // allow an umpire without one.
+    facilityName: row.facility_name ?? null,
   }
 }
 
@@ -210,7 +214,8 @@ router.post('/register', async (req, res) => {
       const { rows } = await client.query(
         `INSERT INTO umpires (id, email, name, password_hash, facility_id)
          VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, email, name, password_hash, google_email`,
+         RETURNING id, email, name, password_hash, google_email,
+           (SELECT name FROM facilities f WHERE f.id = umpires.facility_id) AS facility_name`,
         [randomUUID(), email, name, password_hash, joining.facilityId],
       )
       const created = rows[0]
@@ -283,7 +288,8 @@ router.post('/google', async (req, res) => {
   const linked = await query(
     `UPDATE umpires SET google_email = $2
       WHERE google_sub = $1
-      RETURNING id, email, name, password_hash, google_email, paused_at, closed_at`,
+      RETURNING id, email, name, password_hash, google_email, paused_at, closed_at,
+        (SELECT name FROM facilities f WHERE f.id = umpires.facility_id) AS facility_name`,
     [profile.sub, profile.email],
   )
   if (linked.rows[0]) {
@@ -315,7 +321,8 @@ router.post('/google', async (req, res) => {
     const { rows: byEmail } = await query(
       `UPDATE umpires SET google_sub = $2, google_email = $3
         WHERE id = $1 AND google_sub IS NULL
-        RETURNING id, email, name, password_hash, google_email`,
+        RETURNING id, email, name, password_hash, google_email,
+          (SELECT name FROM facilities f WHERE f.id = umpires.facility_id) AS facility_name`,
       [byEmailFound[0].id, profile.sub, profile.email],
     )
     if (byEmail[0]) {
@@ -335,7 +342,8 @@ router.post('/google', async (req, res) => {
       const { rows } = await client.query(
         `INSERT INTO umpires (id, email, name, google_sub, google_email, facility_id)
          VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id, email, name, password_hash, google_email`,
+         RETURNING id, email, name, password_hash, google_email,
+           (SELECT name FROM facilities f WHERE f.id = umpires.facility_id) AS facility_name`,
         [randomUUID(), profile.email, profile.name, profile.sub, profile.email, joining.facilityId],
       )
       const created = rows[0]
@@ -430,7 +438,8 @@ router.post('/google/link', async (req, res) => {
   try {
     ;({ rows: linked } = await query(
       `UPDATE umpires SET google_sub = $2, google_email = $3 WHERE id = $1
-        RETURNING id, email, name, password_hash, google_email`,
+        RETURNING id, email, name, password_hash, google_email,
+          (SELECT name FROM facilities f WHERE f.id = umpires.facility_id) AS facility_name`,
       [found.id, profile.sub, profile.email],
     ))
   } catch (error) {
@@ -454,7 +463,8 @@ router.post('/login', async (req, res) => {
   const password = String(req.body?.password ?? '')
 
   const { rows } = await query(
-    `SELECT id, email, name, password_hash, google_email, paused_at, closed_at
+    `SELECT id, email, name, password_hash, google_email, paused_at, closed_at,
+            (SELECT name FROM facilities f WHERE f.id = umpires.facility_id) AS facility_name
        FROM umpires
       WHERE lower(email) = $1`,
     [email],
@@ -496,8 +506,11 @@ router.post('/login', async (req, res) => {
 // the first real request mid-match.
 router.get('/me', requireAuth, requireActiveUmpire(query), async (req, res) => {
   const { rows } = await query(
-    `SELECT id, email, name, password_hash, google_email
-       FROM umpires WHERE id = $1`,
+    `SELECT u.id, u.email, u.name, u.password_hash, u.google_email,
+            f.name AS facility_name
+       FROM umpires u
+       LEFT JOIN facilities f ON f.id = u.facility_id
+      WHERE u.id = $1`,
     [req.umpire.id],
   )
   if (!rows[0]) return res.status(401).json({ error: 'Account no longer exists' })
@@ -584,7 +597,8 @@ router.patch('/me', requireAuth, requireActiveUmpire(query), async (req, res) =>
   try {
     ;({ rows: updated } = await query(
       `UPDATE umpires SET name = $2, email = $3 WHERE id = $1
-        RETURNING id, email, name, password_hash, google_email`,
+        RETURNING id, email, name, password_hash, google_email,
+          (SELECT name FROM facilities f WHERE f.id = umpires.facility_id) AS facility_name`,
       [found.id, name, email],
     ))
   } catch (error) {
@@ -625,7 +639,8 @@ router.post('/me/password', requireAuth, requireActiveUmpire(query), async (req,
 
   const { rows: updated } = await query(
     `UPDATE umpires SET password_hash = $2 WHERE id = $1
-      RETURNING id, email, name, password_hash, google_email`,
+      RETURNING id, email, name, password_hash, google_email,
+        (SELECT name FROM facilities f WHERE f.id = umpires.facility_id) AS facility_name`,
     [found.id, await hashPassword(password)],
   )
 
@@ -671,7 +686,8 @@ router.post('/google/connect', requireAuth, requireActiveUmpire(query), async (r
   try {
     ;({ rows: updated } = await query(
       `UPDATE umpires SET google_sub = $2, google_email = $3 WHERE id = $1
-        RETURNING id, email, name, password_hash, google_email`,
+        RETURNING id, email, name, password_hash, google_email,
+          (SELECT name FROM facilities f WHERE f.id = umpires.facility_id) AS facility_name`,
       [found.id, profile.sub, profile.email],
     ))
   } catch (error) {
@@ -717,7 +733,8 @@ router.post('/google/disconnect', requireAuth, requireActiveUmpire(query), async
 
   const { rows: updated } = await query(
     `UPDATE umpires SET google_sub = NULL, google_email = NULL WHERE id = $1
-      RETURNING id, email, name, password_hash, google_email`,
+      RETURNING id, email, name, password_hash, google_email,
+        (SELECT name FROM facilities f WHERE f.id = umpires.facility_id) AS facility_name`,
     [found.id],
   )
 
