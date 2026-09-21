@@ -159,5 +159,28 @@ section('an umpire can never be made without a facility')
     authRoute.includes('UPDATE umpires SET facility_id = $2 WHERE id = $1'), false)
 }
 
+section("an umpire's own facility, as SQL")
+{
+  {
+    const params = ['some-session-id']
+    check('a facility becomes a condition on the column',
+      rules.umpireScope('fa', params, 's.facility_id'), 's.facility_id = $2::uuid')
+    check('and the id is appended to the parameters', params, ['some-session-id', 'fa'])
+  }
+  {
+    const params = []
+    check('the first parameter is numbered 1', rules.umpireScope('fa', params, 'x'), 'x = $1::uuid')
+  }
+  {
+    const params = []
+    check('no facility matches nothing', rules.umpireScope(null, params, 's.facility_id'), 'FALSE')
+    check('and adds no parameter', params, [])
+  }
+  {
+    const params = []
+    check('undefined matches nothing too', rules.umpireScope(undefined, params, 's.facility_id'), 'FALSE')
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail === 0 ? 0 : 1)

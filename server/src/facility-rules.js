@@ -165,6 +165,21 @@ export function mayPausePlayers(admin) { return admin?.role === 'owner' }
 export function mayCreateFacility(admin) { return admin?.role === 'owner' }
 export function mayMove(admin) { return admin?.role === 'owner' }
 
+/**
+ * The SQL condition limiting `column` to one umpire's facility.
+ *
+ * The mirror of overview-store.js's scopeCondition, for the umpire side
+ * where there is only ever one facility and never "all". An umpire with
+ * no facility matches NOTHING rather than everything: on a database old
+ * enough to still allow one, the safe reading of "belongs nowhere" is
+ * "sees nothing", not "sees everything".
+ */
+export function umpireScope(facilityId, params, column) {
+  if (!facilityId) return 'FALSE'
+  params.push(facilityId)
+  return `${column} = $${params.length}::uuid`
+}
+
 export function facilityPayload(row) {
   return {
     id: row.id,
