@@ -196,8 +196,22 @@ if len(structure["groupOrder"]) > 1:
           f"{structure['groupOrder']} vs {points_structure['groupOrder']}")
 check("the skill score itself is untouched",
       (both["skill_score_score"] == both["skill_score_points"]).all())
-check("playstyles are clustered exactly as before",
-      (both["playstyle_cluster_score"].fillna(-1) == both["playstyle_cluster_points"].fillna(-1)).all())
+
+# This used to assert that playstyles clustered identically either way,
+# because rally points only named the groups. They now also replace the
+# old score as the thing subtracted from the playstyle features, so the
+# archetypes are EXPECTED to differ -- that is the point of the change,
+# not a regression. What still has to hold is that the two levels stay
+# independent: K-Means never sees either number, so who is grouped with
+# whom cannot move (checked above), and the run has to say which number
+# it corrected against.
+check("without rally points the playstyles are corrected against the old score",
+      structure["residualisedBy"] == "skill_score", structure["residualisedBy"])
+check("rally points correct the playstyles when given",
+      points_structure["residualisedBy"] == "rally_points", points_structure["residualisedBy"])
+check("every player still comes out either way",
+      len(both) == final["player_id"].nunique() == by_points["player_id"].nunique(),
+      f"{len(both)} vs {final['player_id'].nunique()} vs {by_points['player_id'].nunique()}")
 
 missing_one = dict(list(reversed_points.items())[1:])
 try:

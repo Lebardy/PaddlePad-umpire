@@ -393,9 +393,11 @@ def name_skill_groups(skill_clustered, rally_points):
     nobody changed group either way -- see
     scripts/playstyle_truth_check.py.
 
-    Only the naming changes. skill_score stays the old score everywhere
-    else, including the residualising of the playstyle features, so
-    playstyles are clustered exactly as before.
+    skill_score itself is never recomputed or overwritten -- it is
+    published exactly as the model produced it, and still feeds the
+    skill model. What changed is which number the pipeline ASKS when it
+    needs to know who is better: the naming here, and the residualising
+    at Level 2.
 
     Returns the labelled frame, the group names from lowest to highest,
     and which number named them.
@@ -419,8 +421,12 @@ def name_skill_groups(skill_clustered, rally_points):
 
     labels = interpret_skill_clusters(ranked, rank_by=source)
     order = ranked.groupby("skill_cluster")[source].mean().sort_values().index
+    # `ranked` rather than the frame that came in, so the rally points
+    # column travels on to Level 2, which now subtracts them from the
+    # playstyle features. When there are none, the two frames are the
+    # same object and nothing is added.
     return (
-        apply_skill_cluster_labels(skill_clustered, labels),
+        apply_skill_cluster_labels(ranked, labels),
         [labels[cluster] for cluster in order],
         source,
     )
@@ -431,8 +437,11 @@ def run_pipeline(gated_df, rally_points=None):
     Runs the vendored pipeline end to end and returns one row per
     player, plus a report of what happened structurally.
 
-    `rally_points` maps player id to rally points and names the skill
-    groups; without it the old score names them. See name_skill_groups.
+    `rally_points` maps player id to rally points. When given, it is
+    what the pipeline treats as "how good someone is": it names the
+    skill groups (see name_skill_groups) and is subtracted from the
+    playstyle features at Level 2. Without it the old score does both,
+    which is what the offline tests exercise.
 
     Every player who goes in comes out. That is asserted, not assumed --
     see the integrity check at the bottom.
@@ -463,13 +472,31 @@ def run_pipeline(gated_df, rally_points=None):
     # Skill's influence is removed from the playstyle features first, so
     # the archetypes describe how someone plays rather than how well --
     # otherwise Level 2 just rediscovers Level 1 in disguise.
+    #
+    # What counts as "how well" is the rally points when they are
+    # available, and the old score only when they are not. Measured on
+    # the synthetic pool, whose players have a hidden ability, over ten
+    # random starts: subtracting the old score left a fifth of the
+    # playstyle spread still explained by ability (0.20 against a chance
+    # level of 0.09), so a fifth of what the archetypes separated was
+    # skill under another name. Subtracting the rally points instead
+    # left 0.09 -- chance, i.e. nothing. The styles kept just as much of
+    # the hidden net-game habit either way (0.37 against 0.34, inside
+    # the spread), so this removes the contamination without costing the
+    # signal. See ml/scripts/playstyle_truth_check.py, which reruns it.
+    residualise_column = "skill_score" if rally_points is None else "rally_points"
+    carried = ["player_id", "skill_group", "skill_score"]
+    if residualise_column not in carried:
+        carried.append(residualise_column)
     with_skill = playstyle_features.merge(
-        skill_clustered[["player_id", "skill_group", "skill_score"]],
+        skill_clustered[carried],
         on="player_id",
         how="inner",
         validate="one_to_one",
     )
-    adjusted = residualize_playstyle_features(with_skill)
+    adjusted = residualize_playstyle_features(
+        with_skill, target_column=residualise_column
+    )
     scaled_playstyle, _ = scale_playstyle_features(
         prepare_playstyle_features(adjusted)
     )
@@ -588,6 +615,10 @@ def run_pipeline(gated_df, rally_points=None):
         # rungs always agree with the names the groups were given.
         "groupOrder": group_order,
         "groupNamesFrom": group_names_from,
+        # Which number was subtracted from the playstyle features before
+        # Level 2. Recorded because it changes what the archetypes mean,
+        # and a run published months apart should say which it was.
+        "residualisedBy": residualise_column,
         "skillK": int(best_skill_k),
         "groupsTooSmallToCluster": unclustered,
     }
