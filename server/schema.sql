@@ -721,6 +721,40 @@ BEGIN
   END IF;
 END $$;
 
+-- Two repairs that run on EVERY boot, unlike the one-time switch-over
+-- above.
+--
+-- 1. A session with no facility. The switch-over cannot catch one made
+--    afterwards (it stops for good once any facility exists), and a
+--    session's facility is simply its umpire's, so fill it in. A
+--    session whose umpire is somehow gone stays blank, and a blank
+--    session is visible to no umpire -- fail closed rather than
+--    guessing.
+--
+-- 2. umpires.facility_id becomes NOT NULL, so no future code path can
+--    make an umpire belonging nowhere. Applied only once nothing is
+--    left blank: a boot must never fail because of old data, so if any
+--    umpire is still missing one the rule is skipped and said out loud
+--    instead. Re-running SET NOT NULL on a column that already has it
+--    is a no-op, so this is safe on every boot.
+DO $$
+DECLARE stranded INT;
+BEGIN
+  UPDATE sessions s
+     SET facility_id = u.facility_id
+    FROM umpires u
+   WHERE u.id = s.created_by
+     AND s.facility_id IS NULL
+     AND u.facility_id IS NOT NULL;
+
+  SELECT count(*) INTO stranded FROM umpires WHERE facility_id IS NULL;
+  IF stranded = 0 THEN
+    EXECUTE 'ALTER TABLE umpires ALTER COLUMN facility_id SET NOT NULL';
+  ELSE
+    RAISE NOTICE 'umpires.facility_id left nullable: % umpire(s) have no facility', stranded;
+  END IF;
+END $$;
+
 -- ============================================================
 -- The Overview (admin site's landing page)
 --
