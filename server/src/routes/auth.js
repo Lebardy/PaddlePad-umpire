@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { Router } from 'express'
 import { query, withTransaction } from '../db.js'
 import {
@@ -13,6 +14,7 @@ import {
   verifyPassword,
 } from '../auth.js'
 import { generateInviteCode, normalizeInviteCode } from '../invites.js'
+import { STARTING_FACILITY_NAME } from '../facility-rules.js'
 import { resolveGoogleProfile } from '../google.js'
 import { PAUSED_MESSAGE, signInRefusal } from '../people-rules.js'
 import { noteSignIn } from '../player-accounts.js'
@@ -74,17 +76,83 @@ function refuseSignIn(res, row, closedColumn) {
 const BOOTSTRAP_INVITE_CODE = process.env.BOOTSTRAP_INVITE_CODE
 
 /**
- * Claims a single-use invite, or accepts the bootstrap code while no
- * umpires exist yet.
+ * Which facility a new umpire joins, worked out BEFORE the row is
+ * created.
  *
- * Runs inside the caller's transaction and marks the invite used in
- * the same breath as creating the umpire. That ordering matters: a
- * check-then-insert would let two people submitting the same code
- * concurrently both pass the check and both get accounts. Here the
- * UPDATE only matches while `used_by IS NULL`, so the second one
- * matches zero rows and its whole transaction rolls back.
+ * umpires.facility_id is NOT NULL, so the facility has to be in hand at
+ * insert time. The code cannot simply be claimed first, because
+ * invites.used_by is a foreign key to an umpire that does not exist
+ * yet. So this reads the answer and claimInvite() below still holds the
+ * only guard that matters -- a failed claim rolls the umpire insert
+ * back with it, exactly as before.
  *
- * @returns {Promise<{error: string} | {facilityId: string|null}>}
+ * Reading twice is safe: an invite's facility is set when the code is
+ * made and never changed afterwards, and whether the code is still
+ * usable is decided by the claim, not here.
+ *
+ * @returns {Promise<{error: string} | {facilityId: string}>}
+ */
+async function facilityToJoin(client, rawCode) {
+  const code = normalizeInviteCode(rawCode)
+
+  if (BOOTSTRAP_INVITE_CODE && code === normalizeInviteCode(BOOTSTRAP_INVITE_CODE)) {
+    const { rows } = await client.query('SELECT count(*)::int AS n FROM umpires')
+    // No umpire has been inserted yet at this point, so an empty
+    // database reads as 0 here -- claimInvite() below runs after the
+    // insert and still expects 1.
+    if (rows[0].n === 0) {
+      // The very first umpire on a blank database. There is no invite
+      // code to read a facility from, so they join the only facility if
+      // there is one, and otherwise the starting facility is created for
+      // them. The advisory lock is the same one schema.sql's switch-over
+      // takes, so the two can never both create it.
+      await client.query('SELECT pg_advisory_xact_lock(729016455)')
+      const { rows: facilities } = await client.query(
+        'SELECT id FROM facilities ORDER BY created_at LIMIT 2',
+      )
+      if (facilities.length === 1) return { facilityId: facilities[0].id }
+      if (facilities.length === 0) {
+        const { rows: made } = await client.query(
+          `INSERT INTO facilities (name) VALUES ($1) RETURNING id`,
+          [STARTING_FACILITY_NAME],
+        )
+        return { facilityId: made[0].id }
+      }
+      // More than one facility already exists, so there is no honest
+      // guess. An invite code names the facility; ask for one.
+      return { error: 'An invite code is required' }
+    }
+  }
+
+  if (!code) return { error: 'An invite code is required' }
+
+  const { rows } = await client.query(
+    `SELECT facility_id
+       FROM invites
+      WHERE code = $1
+        AND used_by IS NULL
+        AND (expires_at IS NULL OR expires_at > now())`,
+    [code],
+  )
+  // One message for "wrong", "already used" and "expired" alike, so the
+  // endpoint can't be used to probe which codes exist.
+  if (rows.length !== 1 || !rows[0].facility_id) {
+    return { error: 'That invite code is not valid' }
+  }
+  return { facilityId: rows[0].facility_id }
+}
+
+/**
+ * Marks the invite code used by this umpire, and refuses if it is not
+ * usable. The facility was already settled by facilityToJoin() above;
+ * this is purely the guard.
+ *
+ * Runs inside the caller's transaction. The UPDATE only matches while
+ * `used_by IS NULL`, so two people submitting the same code
+ * concurrently cannot both pass: the second matches zero rows and its
+ * whole transaction rolls back, taking its umpire row with it.
+ *
+ * @returns {Promise<{error: string} | {ok: true}>}
  */
 async function claimInvite(client, rawCode, umpireId) {
   const code = normalizeInviteCode(rawCode)
@@ -94,12 +162,7 @@ async function claimInvite(client, rawCode, umpireId) {
     // The new umpire is already inserted at this point, so "empty
     // before this registration" means exactly one row.
     if (rows[0].n === 1 && code === normalizeInviteCode(BOOTSTRAP_INVITE_CODE)) {
-      // Lets the very first umpire in. Admin powers live on the admin
-      // site now, so this makes no one an admin. There is no invite
-      // code to read a facility from, so the new umpire joins the only
-      // facility if there is exactly one, and otherwise joins none yet.
-      const { rows: facilities } = await client.query('SELECT id FROM facilities')
-      return { facilityId: facilities.length === 1 ? facilities[0].id : null }
+      return { ok: true }
     }
   }
 
@@ -111,14 +174,12 @@ async function claimInvite(client, rawCode, umpireId) {
       WHERE code = $1
         AND used_by IS NULL
         AND (expires_at IS NULL OR expires_at > now())
-      RETURNING facility_id`,
+      RETURNING code`,
     [code, umpireId],
   )
 
-  // One message for "wrong", "already used" and "expired" alike, so
-  // the endpoint can't be used to probe which codes exist.
   if (rows.length !== 1) return { error: 'That invite code is not valid' }
-  return { facilityId: rows[0].facility_id }
+  return { ok: true }
 }
 
 router.post('/register', async (req, res) => {
@@ -143,11 +204,14 @@ router.post('/register', async (req, res) => {
 
   try {
     const umpire = await withTransaction(async (client) => {
+      const joining = await facilityToJoin(client, invite)
+      if (joining.error) throw refusal(403, joining.error)
+
       const { rows } = await client.query(
-        `INSERT INTO umpires (email, name, password_hash)
-         VALUES ($1, $2, $3)
+        `INSERT INTO umpires (id, email, name, password_hash, facility_id)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING id, email, name, password_hash, google_email`,
-        [email, name, password_hash],
+        [randomUUID(), email, name, password_hash, joining.facilityId],
       )
       const created = rows[0]
 
@@ -156,7 +220,6 @@ router.post('/register', async (req, res) => {
         // Rolls back the umpire insert above.
         throw refusal(403, claimed.error)
       }
-      await client.query('UPDATE umpires SET facility_id = $2 WHERE id = $1', [created.id, claimed.facilityId])
 
       return created
     })
@@ -266,11 +329,14 @@ router.post('/google', async (req, res) => {
 
   try {
     const umpire = await withTransaction(async (client) => {
+      const joining = await facilityToJoin(client, req.body?.invite)
+      if (joining.error) throw refusal(403, joining.error)
+
       const { rows } = await client.query(
-        `INSERT INTO umpires (email, name, google_sub, google_email)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO umpires (id, email, name, google_sub, google_email, facility_id)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id, email, name, password_hash, google_email`,
-        [profile.email, profile.name, profile.sub, profile.email],
+        [randomUUID(), profile.email, profile.name, profile.sub, profile.email, joining.facilityId],
       )
       const created = rows[0]
 
@@ -278,7 +344,6 @@ router.post('/google', async (req, res) => {
       // Rolls back the insert above, so a refused invite leaves no
       // half-made account behind.
       if (claimed.error) throw refusal(403, claimed.error)
-      await client.query('UPDATE umpires SET facility_id = $2 WHERE id = $1', [created.id, claimed.facilityId])
 
       return created
     })

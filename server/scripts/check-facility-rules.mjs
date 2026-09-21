@@ -138,5 +138,26 @@ section('what the site sees')
   check('the starting facility name', rules.STARTING_FACILITY_NAME, 'Starting facility')
 }
 
+section('an umpire can never be made without a facility')
+{
+  // These pin refusals that already exist, so they cannot be removed by
+  // accident later. They read the route files as text rather than
+  // calling them, because both need a database and an admin session;
+  // the staging smoke proves the behaviour itself.
+  const { readFileSync } = await import('node:fs')
+  const invitesRoute = readFileSync(new URL('../src/routes/admin-invites.js', import.meta.url), 'utf8')
+  const adminsRoute = readFileSync(new URL('../src/routes/admin-admins.js', import.meta.url), 'utf8')
+  const authRoute = readFileSync(new URL('../src/routes/auth.js', import.meta.url), 'utf8')
+
+  check('making an invite code refuses without a facility',
+    invitesRoute.includes("if (!facility) return res.status(400).json({ error: 'Choose a facility' })"), true)
+  check('adding an admin refuses without a facility',
+    adminsRoute.includes("if (!facility) return res.status(400).json({ error: 'Choose a facility' })"), true)
+  check('sign-up never creates an umpire without naming its facility',
+    /INSERT INTO umpires \((?![^)]*facility_id)/.test(authRoute), false)
+  check('sign-up no longer fills the facility in after the insert',
+    authRoute.includes('UPDATE umpires SET facility_id = $2 WHERE id = $1'), false)
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail === 0 ? 0 : 1)
