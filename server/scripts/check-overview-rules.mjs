@@ -191,8 +191,21 @@ section('merging')
   const plain = (id) => ({ id, hasSignIn: false, closed: false })
   const signed = (id) => ({ id, hasSignIn: true, closed: false })
   check('sign-in: an umpire-made player has none', rules.hasSignIn({ username: null, password_hash: null, google_sub: null, claimed_at: null, registered_at: null }), false)
-  check('sign-in: a claimed player has one', rules.hasSignIn({ claimed_at: '2026-09-01' }), true)
+  // A claimed code is not an account: it was minted by an umpire and
+  // handed over, and it leaves the person nothing of their own to lose
+  // in a merge. Counting it stopped genuine duplicates being merged.
+  check('sign-in: scanning a claim code is NOT an account', rules.hasSignIn({ claimed_at: '2026-09-01' }), false)
+  check('sign-in: a claimed player who then set a username HAS one', rules.hasSignIn({ claimed_at: '2026-09-01', username: 'mae' }), true)
+  check('sign-in: a username is an account', rules.hasSignIn({ username: 'mae' }), true)
+  check('sign-in: a password is an account', rules.hasSignIn({ password_hash: 'x:y' }), true)
   check('sign-in: a Google player has one', rules.hasSignIn({ google_sub: 'g-1' }), true)
+  check('sign-in: a registered player has one', rules.hasSignIn({ registered_at: '2026-09-01' }), true)
+  check('sign-in: two claimed-only players may merge',
+    rules.mergeRefusal({
+      keep: { id: 'a', hasSignIn: rules.hasSignIn({ claimed_at: '2026-09-01' }), closed: false },
+      remove: { id: 'b', hasSignIn: rules.hasSignIn({ claimed_at: '2026-09-02' }), closed: false },
+      sharedMatch: false, removeInLiveSession: false,
+    }), null)
   check('two plain players may merge', rules.mergeRefusal({ keep: plain('a'), remove: plain('b'), sharedMatch: false, removeInLiveSession: false }), null)
   check('keeping the signed-in one is fine', rules.mergeRefusal({ keep: signed('a'), remove: plain('b'), sharedMatch: false, removeInLiveSession: false }), null)
   check('removing the signed-in one is refused', rules.mergeRefusal({ keep: plain('a'), remove: signed('b'), sharedMatch: false, removeInLiveSession: false }), rules.KEEP_SIGNED_IN_MESSAGE)

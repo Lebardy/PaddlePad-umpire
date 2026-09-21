@@ -256,9 +256,25 @@ export function duplicatePairs(players, { sharedPairs, sameDay, dismissed }) {
   return found
 }
 
-/** Whether a player row has any way to sign in to the player app. */
+/**
+ * Whether a player has an account of their own in the player app.
+ *
+ * An account means something only that person holds: a username and
+ * password, or a Google sign-in. Merging two of those would have to
+ * decide whose way in survives and would quietly lock the other person
+ * out, which is why the Overview refuses it.
+ *
+ * A claimed code is deliberately NOT an account. A claim code is minted
+ * by an umpire and handed over, and scanning one lets someone look at
+ * their matches without ever setting up a way in of their own. Counting
+ * that as an account blocked merging two records that were only ever
+ * two spellings of the same name -- exactly the case this screen exists
+ * to fix. If a merge takes a claimed record away, the person is not
+ * locked out of anything: their history moves to the record that is
+ * kept, and an umpire mints them a fresh code for it.
+ */
 export function hasSignIn(row) {
-  return Boolean(row.username || row.password_hash || row.google_sub || row.claimed_at || row.registered_at)
+  return Boolean(row.username || row.password_hash || row.google_sub || row.registered_at)
 }
 
 /** Why two players can't be merged right now, or null when they can. */
