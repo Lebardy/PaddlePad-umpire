@@ -128,22 +128,26 @@
   line-height: 1.15;
 }
 
-.umpire-name {
-  font-weight: 600;
-  font-size: 0.9rem;
+/* Both lines share one width budget, so neither is cut short while the
+   other still has room. The facility's smaller type fits more of a long
+   name like "Greenfield Sports Complex" in the same space, and whatever
+   is cut is still spoken in full by the button's label and shown whole on
+   the account screen. */
+.umpire-name, .umpire-facility {
   max-width: 9rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.umpire-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
 .umpire-facility {
   font-size: 0.75rem;
   color: var(--text-muted);
-  max-width: 14ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 @media (max-width: 560px) {
