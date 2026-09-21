@@ -182,5 +182,36 @@ section("an umpire's own facility, as SQL")
   }
 }
 
+section('every umpire route stays scoped to its facility')
+{
+  // The checks above exercise umpireScope() in isolation -- they would
+  // stay green even if a route stopped calling it. This counts each
+  // route file's handlers against its calls to umpireScope() instead,
+  // so a handler that quietly loses its scoping (or a new one that
+  // never had it) shows up as a mismatch here.
+  //
+  // These counts include every route's write AND any read-back it does
+  // afterward, since each is its own place scoping can be dropped. When
+  // you add a legitimate new route: give it its own umpireScope() call
+  // (or calls, for a write plus a read-back), update the expected
+  // numbers below to match, and only then should this section go green
+  // again -- do not raise the expected number without checking the new
+  // route actually calls umpireScope() itself.
+  const { readFileSync } = await import('node:fs')
+  const sessionsRoute = readFileSync(new URL('../src/routes/sessions.js', import.meta.url), 'utf8')
+  const matchesRoute = readFileSync(new URL('../src/routes/matches.js', import.meta.url), 'utf8')
+
+  const handlerCount = (source) => (source.match(/router\.(get|post|put|delete)\(/g) ?? []).length
+  const scopeCallCount = (source) => (source.match(/umpireScope\(/g) ?? []).length
+
+  check('sessions.js has the routes this count expects', handlerCount(sessionsRoute), 7)
+  check('sessions.js calls umpireScope at least once per route (writes plus read-backs)',
+    scopeCallCount(sessionsRoute), 9)
+
+  check('matches.js has the routes this count expects', handlerCount(matchesRoute), 7)
+  check('matches.js calls umpireScope at least once per route (writes plus read-backs)',
+    scopeCallCount(matchesRoute), 12)
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail === 0 ? 0 : 1)
