@@ -119,17 +119,39 @@
   letter-spacing: 0.03em;
 }
 
-.umpire-name {
-  font-weight: 600;
-  font-size: 0.9rem;
+/* The name and the facility stack, so the header stays one row tall on
+   a tablet held either way. */
+.account-who {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+}
+
+/* Both lines share one width budget, so neither is cut short while the
+   other still has room. The facility's smaller type fits more of a long
+   name like "Greenfield Sports Complex" in the same space, and whatever
+   is cut is still spoken in full by the button's label and shown whole on
+   the account screen. */
+.umpire-name, .umpire-facility {
   max-width: 9rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.umpire-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.umpire-facility {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 @media (max-width: 560px) {
-  .umpire-name { display: none; }
+  .umpire-name, .umpire-facility { display: none; }
 }
 
 .account-btn:hover .umpire-name { color: var(--primary); }

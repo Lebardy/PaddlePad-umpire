@@ -2356,6 +2356,7 @@ async function main() {
     })
     check('the throwaway umpire registers into facility B -> 201', umpBReg.status === 201, redacted(umpBReg.body).slice(0, 80))
     const umpireBId = umpBReg.body.umpire?.id
+    const umpBToken = umpBReg.body.token
 
     // GET /admin/invites once crashed on a bad argument -- check it
     // plainly works for the owner and for a facility admin.
@@ -2449,6 +2450,140 @@ async function main() {
     const namesFilterB = (activityFilterB.body.entries ?? []).map((e) => e.facilityName)
     check("the owner's filter by B shows only B's entries",
       namesFilterB.length > 0 && namesFilterB.every((n) => n === nameFacB), JSON.stringify([...new Set(namesFilterB)]))
+
+    // --- 7b: the umpire app sees only its own facility ---
+    // A's umpire and B's umpire were registered above through real
+    // invite codes, so these are the genuine tokens the app would hold.
+    // Runs here, before umpire A is moved to facility B below, so both
+    // umpires are still genuinely at their own facilities.
+    const sessionAId = uuid()
+    const madeSessionA = await request('/sessions', {
+      method: 'POST', bearer: umpAToken,
+      body: { id: sessionAId, name: `Smoke Facility A session ${fStamp}` },
+    })
+    check("A's umpire opens a session -> 201", madeSessionA.status === 201, String(madeSessionA.status))
+
+    const sessionBId = uuid()
+    const madeSessionB = await request('/sessions', {
+      method: 'POST', bearer: umpBToken,
+      body: { id: sessionBId, name: `Smoke Facility B session ${fStamp}` },
+    })
+    check("B's umpire opens a session -> 201", madeSessionB.status === 201, String(madeSessionB.status))
+
+    const listForA = await request('/sessions', { bearer: umpAToken })
+    const idsForA = (listForA.body.sessions ?? []).map((s) => s.id)
+    check("A's list holds A's session", idsForA.includes(sessionAId), String(idsForA.length))
+    check("A's list does NOT hold B's session", !idsForA.includes(sessionBId), 'B leaked into A')
+
+    const readBAsA = await request(`/sessions/${sessionBId}`, { bearer: umpAToken })
+    check("A's umpire reading B's session -> 404", readBAsA.status === 404, String(readBAsA.status))
+
+    const rosterBAsA = await request(`/sessions/${sessionBId}/players`, {
+      method: 'PUT', bearer: umpAToken, body: { playerIds: [] },
+    })
+    check("A's umpire editing B's roster -> 404", rosterBAsA.status === 404, String(rosterBAsA.status))
+
+    const endBAsA = await request(`/sessions/${sessionBId}/end`, {
+      method: 'POST', bearer: umpAToken, body: { ended: true },
+    })
+    check("A's umpire ending B's session -> 404", endBAsA.status === 404, String(endBAsA.status))
+
+    const voidBAsA = await request(`/sessions/${sessionBId}/void`, {
+      method: 'POST', bearer: umpAToken, body: { voided: true, reason: 'smoke' },
+    })
+    check("A's umpire voiding B's session -> 404", voidBAsA.status === 404, String(voidBAsA.status))
+
+    const deleteBAsA = await request(`/sessions/${sessionBId}`, { method: 'DELETE', bearer: umpAToken })
+    check("A's umpire deleting B's session -> 404", deleteBAsA.status === 404, String(deleteBAsA.status))
+
+    // B's session must still be there -- the refusals above must refuse,
+    // not quietly succeed.
+    const stillThere = await request(`/sessions/${sessionBId}`, { bearer: umpBToken })
+    check("B's session survived every one of A's attempts -> 200", stillThere.status === 200,
+      String(stillThere.status))
+    check("B's session was not ended by A", !stillThere.body.session?.ended_at,
+      String(stillThere.body.session?.ended_at))
+    check("B's session was not voided by A", !stillThere.body.session?.voided_at,
+      String(stillThere.body.session?.voided_at))
+
+    // A match at B, reached by A.
+    const playerB1 = await request('/players', {
+      method: 'POST', bearer: umpBToken, body: { name: `Smoke Fac B One ${fStamp}` },
+    })
+    const playerB2 = await request('/players', {
+      method: 'POST', bearer: umpBToken, body: { name: `Smoke Fac B Two ${fStamp}` },
+    })
+    const bOne = playerB1.body.player?.id
+    const bTwo = playerB2.body.player?.id
+    await request(`/sessions/${sessionBId}/players`, {
+      method: 'PUT', bearer: umpBToken, body: { playerIds: [bOne, bTwo] },
+    })
+
+    const matchBId = uuid()
+    const madeMatchB = await request('/matches', {
+      method: 'POST', bearer: umpBToken,
+      body: {
+        id: matchBId, sessionId: sessionBId, teamA: [bOne], teamB: [bTwo],
+        firstServer: { team: 'A', playerId: bOne },
+      },
+    })
+    check("B's umpire starts a match -> 201", madeMatchB.status === 201, JSON.stringify(madeMatchB.body).slice(0, 120))
+
+    const readMatchAsA = await request(`/matches/${matchBId}`, { bearer: umpAToken })
+    check("A's umpire reading B's match -> 404", readMatchAsA.status === 404, String(readMatchAsA.status))
+
+    const listMatchesAsA = await request(`/matches/session/${sessionBId}`, { bearer: umpAToken })
+    check("A's umpire listing B's session's matches -> empty",
+      (listMatchesAsA.body.matches ?? []).length === 0, String((listMatchesAsA.body.matches ?? []).length))
+
+    const claimAsA = await request(`/matches/${matchBId}/claim`, {
+      method: 'POST', bearer: umpAToken, body: { deviceId: `smoke-${uuid()}`, force: true },
+    })
+    check("A's umpire taking over B's match -> 404", claimAsA.status === 404, String(claimAsA.status))
+    check('the refusal names no umpire', !claimAsA.body?.heldBy, JSON.stringify(claimAsA.body ?? {}).slice(0, 80))
+
+    const logAsA = await request(`/matches/${matchBId}/log`, {
+      method: 'PUT', bearer: umpAToken, body: { deviceId: `smoke-${uuid()}`, events: [] },
+    })
+    check("A's umpire logging to B's match -> 404", logAsA.status === 404, String(logAsA.status))
+
+    const voidMatchAsA = await request(`/matches/${matchBId}/void`, {
+      method: 'POST', bearer: umpAToken, body: { voided: true, reason: 'smoke' },
+    })
+    check("A's umpire voiding B's match -> 404", voidMatchAsA.status === 404, String(voidMatchAsA.status))
+
+    const deleteMatchAsA = await request(`/matches/${matchBId}`, { method: 'DELETE', bearer: umpAToken })
+    check("A's umpire deleting B's match -> 404", deleteMatchAsA.status === 404, String(deleteMatchAsA.status))
+
+    const matchIntact = await request(`/matches/${matchBId}`, { bearer: umpBToken })
+    check("B's match survived every one of A's attempts -> 200", matchIntact.status === 200,
+      String(matchIntact.status))
+    check("B's match was not voided by A", !matchIntact.body.match?.voidedAt,
+      String(matchIntact.body.match?.voidedAt))
+
+    const smuggled = await request('/matches', {
+      method: 'POST', bearer: umpAToken,
+      body: {
+        id: uuid(), sessionId: sessionBId, teamA: [bOne], teamB: [bTwo],
+        firstServer: { team: 'A', playerId: bOne },
+      },
+    })
+    check("A's umpire starting a match in B's session -> 404", smuggled.status === 404, String(smuggled.status))
+
+    // Players stay across everyone: B's new players are in A's roster.
+    const playersAsA = await request(`/players?q=${fStamp}`, { bearer: umpAToken })
+    const playerIdsAsA = (playersAsA.body.players ?? []).map((p) => p.id)
+    check("players are NOT scoped by facility -- A's umpire sees B's players",
+      playerIdsAsA.includes(bOne), String(playerIdsAsA.length))
+
+    // The account screen's facility name.
+    const meA = await request('/auth/me', { bearer: umpAToken })
+    check("A's umpire's account names facility A", meA.body.umpire?.facilityName === nameFacA,
+      String(meA.body.umpire?.facilityName))
+
+    // Tidy: end both throwaway sessions as their own umpires.
+    await request(`/sessions/${sessionAId}/end`, { method: 'POST', bearer: umpAToken, body: { ended: true } })
+    await request(`/sessions/${sessionBId}/end`, { method: 'POST', bearer: umpBToken, body: { ended: true } })
 
     // --- 9 (done before 8): a session opened while umpire A is still in
     // facility A is stamped with that facility -- checked before the move

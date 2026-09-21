@@ -40,9 +40,11 @@ function DetailRow({ label, value, action, isOpen, onToggle, saved, children }) 
           <span className="detail-label">{label}</span>
           <span className="detail-value">{value}</span>
         </div>
-        <button type="button" className="link-btn" onClick={onToggle}>
-          {isOpen ? 'Cancel' : action}
-        </button>
+        {action && (
+          <button type="button" className="link-btn" onClick={onToggle}>
+            {isOpen ? 'Cancel' : action}
+          </button>
+        )}
       </div>
       {!isOpen && saved && <p className="detail-saved">Saved.</p>}
       {isOpen && children}
@@ -252,6 +254,10 @@ function Account({ umpire, onUmpireChange, onBack, onSignOut }) {
         How you sign in, and how the app looks. Your name is what other
         umpires see against the sessions you score.
       </p>
+
+      {umpire.facilityName && (
+        <DetailRow label="Where you umpire" value={umpire.facilityName} />
+      )}
 
       <DetailRow
         label="Name"

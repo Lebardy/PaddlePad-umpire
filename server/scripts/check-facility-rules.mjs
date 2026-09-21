@@ -138,5 +138,97 @@ section('what the site sees')
   check('the starting facility name', rules.STARTING_FACILITY_NAME, 'Starting facility')
 }
 
+section('an umpire can never be made without a facility')
+{
+  // These pin refusals that already exist, so they cannot be removed by
+  // accident later. They read the route files as text rather than
+  // calling them, because both need a database and an admin session;
+  // the staging smoke proves the behaviour itself.
+  const { readFileSync } = await import('node:fs')
+  const invitesRoute = readFileSync(new URL('../src/routes/admin-invites.js', import.meta.url), 'utf8')
+  const adminsRoute = readFileSync(new URL('../src/routes/admin-admins.js', import.meta.url), 'utf8')
+  const authRoute = readFileSync(new URL('../src/routes/auth.js', import.meta.url), 'utf8')
+
+  check('making an invite code refuses without a facility',
+    invitesRoute.includes("if (!facility) return res.status(400).json({ error: 'Choose a facility' })"), true)
+  check('adding an admin refuses without a facility',
+    adminsRoute.includes("if (!facility) return res.status(400).json({ error: 'Choose a facility' })"), true)
+  check('sign-up never creates an umpire without naming its facility',
+    /INSERT INTO umpires \((?![^)]*facility_id)/.test(authRoute), false)
+  check('sign-up no longer fills the facility in after the insert',
+    authRoute.includes('UPDATE umpires SET facility_id = $2 WHERE id = $1'), false)
+}
+
+section("an umpire's own facility, as SQL")
+{
+  {
+    const params = ['some-session-id']
+    check('a facility becomes a condition on the column',
+      rules.umpireScope('fa', params, 's.facility_id'), 's.facility_id = $2::uuid')
+    check('and the id is appended to the parameters', params, ['some-session-id', 'fa'])
+  }
+  {
+    const params = []
+    check('the first parameter is numbered 1', rules.umpireScope('fa', params, 'x'), 'x = $1::uuid')
+  }
+  {
+    const params = []
+    check('no facility matches nothing', rules.umpireScope(null, params, 's.facility_id'), 'FALSE')
+    check('and adds no parameter', params, [])
+  }
+  {
+    const params = []
+    check('undefined matches nothing too', rules.umpireScope(undefined, params, 's.facility_id'), 'FALSE')
+  }
+}
+
+section('every umpire route stays scoped to its facility')
+{
+  // The checks above exercise umpireScope() in isolation -- they would
+  // stay green even if a route stopped calling it. This counts each
+  // route file's handlers against its calls to umpireScope() instead,
+  // so a handler that quietly loses its scoping (or a new one that
+  // never had it) shows up as a mismatch here.
+  //
+  // A call alone is not enough: someone could delete the ${scope}
+  // interpolation from a query template while leaving the
+  // `const scope = umpireScope(...)` line sitting right above it,
+  // unused -- the call count would stay the same and this check would
+  // stay green while the query itself is wide open. So this also counts
+  // how many times a `${...scope}`-named variable is actually
+  // interpolated into a template string, and checks that number too.
+  // The two numbers are expected to match one-for-one, one call feeding
+  // exactly one interpolation, so a mismatch between them is itself
+  // worth seeing.
+  //
+  // These counts include every route's write AND any read-back it does
+  // afterward, since each is its own place scoping can be dropped. When
+  // you add a legitimate new route: give it its own umpireScope() call
+  // (or calls, for a write plus a read-back), each one actually
+  // interpolated into its query, update BOTH expected numbers below to
+  // match, and only then should this section go green again -- do not
+  // raise either expected number without checking the new route both
+  // calls umpireScope() and uses what it returns.
+  const { readFileSync } = await import('node:fs')
+  const sessionsRoute = readFileSync(new URL('../src/routes/sessions.js', import.meta.url), 'utf8')
+  const matchesRoute = readFileSync(new URL('../src/routes/matches.js', import.meta.url), 'utf8')
+
+  const handlerCount = (source) => (source.match(/router\.(get|post|put|delete)\(/g) ?? []).length
+  const scopeCallCount = (source) => (source.match(/umpireScope\(/g) ?? []).length
+  const scopeUseCount = (source) => (source.match(/\$\{\w*[Ss]cope\}/g) ?? []).length
+
+  check('sessions.js has the routes this count expects', handlerCount(sessionsRoute), 7)
+  check('sessions.js calls umpireScope at least once per route (writes plus read-backs)',
+    scopeCallCount(sessionsRoute), 9)
+  check('sessions.js actually uses every umpireScope result it computes',
+    scopeUseCount(sessionsRoute), 9)
+
+  check('matches.js has the routes this count expects', handlerCount(matchesRoute), 7)
+  check('matches.js calls umpireScope at least once per route (writes plus read-backs)',
+    scopeCallCount(matchesRoute), 12)
+  check('matches.js actually uses every umpireScope result it computes',
+    scopeUseCount(matchesRoute), 12)
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail === 0 ? 0 : 1)

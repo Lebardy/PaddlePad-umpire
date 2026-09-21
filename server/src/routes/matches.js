@@ -10,6 +10,7 @@ import {
 import { isUuid, stackingFromColumns, stackingToColumns } from '../validate.js'
 import { rallyEndingProblem } from '../rally-endings.js'
 import { invalidateRallyRatings } from '../rally-rating-store.js'
+import { umpireScope } from '../facility-rules.js'
 
 const router = Router()
 router.use(requireAuth, requireActiveUmpire(query))
@@ -54,6 +55,10 @@ const MATCH_SELECT = `
          (SELECT count(*)::int FROM match_events e WHERE e.match_id = m.id) AS event_count
     FROM matches m
     LEFT JOIN umpires u ON u.id = m.recorded_by
+    -- A match belongs to the facility its session belongs to. An inner
+    -- join, not a left one: a match whose session is somehow gone is
+    -- out of everyone's reach rather than in everyone's.
+    JOIN sessions sess ON sess.id = m.session_id
 `
 
 /** Reshapes a database row into the shape the app already speaks. */
@@ -101,15 +106,19 @@ async function loadEvents(matchId, client = { query }) {
 }
 
 router.get('/session/:sessionId', async (req, res) => {
+  const params = [req.params.sessionId]
+  const scope = umpireScope(req.umpire.facilityId, params, 'sess.facility_id')
   const { rows } = await query(
-    `${MATCH_SELECT} WHERE m.session_id = $1 ORDER BY m.started_at DESC`,
-    [req.params.sessionId],
+    `${MATCH_SELECT} WHERE m.session_id = $1 AND ${scope} ORDER BY m.started_at DESC`,
+    params,
   )
   res.json({ matches: rows.map((r) => toClientMatch(r)) })
 })
 
 router.get('/:id', async (req, res) => {
-  const { rows } = await query(`${MATCH_SELECT} WHERE m.id = $1`, [req.params.id])
+  const params = [req.params.id]
+  const scope = umpireScope(req.umpire.facilityId, params, 'sess.facility_id')
+  const { rows } = await query(`${MATCH_SELECT} WHERE m.id = $1 AND ${scope}`, params)
   if (!rows[0]) return res.status(404).json({ error: 'No such match' })
   res.json({ match: toClientMatch(rows[0], await loadEvents(req.params.id)) })
 })
@@ -187,6 +196,18 @@ router.post('/', async (req, res) => {
       // statements that lock the same rows in the same order can only ever
       // queue behind each other, never deadlock holding half of what the
       // other wants.
+      // The session decides the facility, so this is the one place a
+      // match could be smuggled into another facility. 404 rather than
+      // 403: a session at another facility does not exist as far as
+      // this umpire is concerned.
+      const sessionParams = [sessionId]
+      const sessionScope = umpireScope(req.umpire.facilityId, sessionParams, 'facility_id')
+      const { rows: ownSession } = await client.query(
+        `SELECT 1 FROM sessions WHERE id = $1 AND ${sessionScope}`,
+        sessionParams,
+      )
+      if (ownSession.length === 0) throw refusal(404, 'No such session')
+
       const { rows: already } = await client.query('SELECT 1 FROM matches WHERE id = $1', [id])
       if (already.length === 0) {
         const allPlayerIds = [...new Set([...teamA, ...teamB])]
@@ -216,7 +237,9 @@ router.post('/', async (req, res) => {
       )
     })
 
-    const { rows } = await query(`${MATCH_SELECT} WHERE m.id = $1`, [id])
+    const readParams = [id]
+    const readScope = umpireScope(req.umpire.facilityId, readParams, 'sess.facility_id')
+    const { rows } = await query(`${MATCH_SELECT} WHERE m.id = $1 AND ${readScope}`, readParams)
     if (!rows[0]) return res.status(404).json({ error: 'Match could not be created' })
     res.status(201).json({ match: toClientMatch(rows[0]) })
   } catch (error) {
@@ -246,24 +269,35 @@ router.post('/:id/claim', async (req, res) => {
 
   if (!deviceId) return res.status(400).json({ error: 'A deviceId is required' })
 
+  const params = [req.params.id, deviceId, force, LEASE_MINUTES]
+  const scope = umpireScope(req.umpire.facilityId, params, 'sessions.facility_id')
   const { rows } = await query(
     `UPDATE matches
         SET scoring_device = $2, scoring_claimed_at = now()
       WHERE id = $1
+        AND EXISTS (SELECT 1 FROM sessions
+                     WHERE sessions.id = matches.session_id AND ${scope})
         AND ($3
              OR scoring_device IS NULL
              OR scoring_device = $2
              OR scoring_claimed_at < now() - ($4 || ' minutes')::interval)
       RETURNING id`,
-    [req.params.id, deviceId, force, LEASE_MINUTES],
+    params,
   )
 
   if (rows.length === 0) {
+    // Scoped too: a match at another facility must read as missing, not
+    // as held by someone -- naming the umpire holding it would leak
+    // that it exists and who is scoring it.
+    const heldParams = [req.params.id]
+    const heldScope = umpireScope(req.umpire.facilityId, heldParams, 'sess.facility_id')
     const held = await query(
       `SELECT m.scoring_device, m.scoring_claimed_at, u.name AS umpire_name
-         FROM matches m LEFT JOIN umpires u ON u.id = m.recorded_by
-        WHERE m.id = $1`,
-      [req.params.id],
+         FROM matches m
+         LEFT JOIN umpires u ON u.id = m.recorded_by
+         JOIN sessions sess ON sess.id = m.session_id
+        WHERE m.id = $1 AND ${heldScope}`,
+      heldParams,
     )
     if (held.rowCount === 0) return res.status(404).json({ error: 'No such match' })
     return res.status(409).json({
@@ -275,7 +309,9 @@ router.post('/:id/claim', async (req, res) => {
     })
   }
 
-  const match = await query(`${MATCH_SELECT} WHERE m.id = $1`, [req.params.id])
+  const matchParams = [req.params.id]
+  const matchScope = umpireScope(req.umpire.facilityId, matchParams, 'sess.facility_id')
+  const match = await query(`${MATCH_SELECT} WHERE m.id = $1 AND ${matchScope}`, matchParams)
   res.json({ match: toClientMatch(match.rows[0]) })
 })
 
@@ -309,7 +345,9 @@ router.put('/:id/log', async (req, res) => {
     return res.status(400).json({ error: `A match cannot have more than ${MAX_EVENTS} events` })
   }
 
-  const existing = await query(`${MATCH_SELECT} WHERE m.id = $1`, [req.params.id])
+  const existingParams = [req.params.id]
+  const existingScope = umpireScope(req.umpire.facilityId, existingParams, 'sess.facility_id')
+  const existing = await query(`${MATCH_SELECT} WHERE m.id = $1 AND ${existingScope}`, existingParams)
   if (!existing.rows[0]) return res.status(404).json({ error: 'No such match' })
   const row = existing.rows[0]
 
@@ -434,7 +472,9 @@ router.put('/:id/log', async (req, res) => {
   // can change the rally rating.
   invalidateRallyRatings()
 
-  const updated = await query(`${MATCH_SELECT} WHERE m.id = $1`, [req.params.id])
+  const updatedParams = [req.params.id]
+  const updatedScope = umpireScope(req.umpire.facilityId, updatedParams, 'sess.facility_id')
+  const updated = await query(`${MATCH_SELECT} WHERE m.id = $1 AND ${updatedScope}`, updatedParams)
   res.json({ match: toClientMatch(updated.rows[0], await loadEvents(req.params.id)) })
 })
 
@@ -449,11 +489,23 @@ router.put('/:id/log', async (req, res) => {
  * achieved exactly what was asked.
  */
 router.delete('/:id', async (req, res) => {
-  const { rows } = await query('SELECT status FROM matches WHERE id = $1', [
-    req.params.id,
-  ])
+  const params = [req.params.id]
+  const scope = umpireScope(req.umpire.facilityId, params, 'sess.facility_id')
+  const { rows } = await query(
+    `SELECT m.status FROM matches m JOIN sessions sess ON sess.id = m.session_id
+      WHERE m.id = $1 AND ${scope}`,
+    params,
+  )
 
-  if (rows[0]?.status === 'completed') {
+  if (rows.length === 0) {
+    // Gone is success (a queued delete retried after someone else
+    // removed it); existing at another facility is not.
+    const elsewhere = await query('SELECT 1 FROM matches WHERE id = $1', [req.params.id])
+    if (elsewhere.rowCount > 0) return res.status(404).json({ error: 'No such match' })
+    return res.status(204).end()
+  }
+
+  if (rows[0].status === 'completed') {
     return res.status(409).json({
       error: 'That match is already finished — void it instead of deleting it',
     })
@@ -480,6 +532,8 @@ router.post('/:id/void', async (req, res) => {
   const voided = req.body?.voided !== false
   const reason = String(req.body?.reason ?? '').trim() || null
 
+  const params = [req.params.id, voided, req.umpire.id, reason]
+  const scope = umpireScope(req.umpire.facilityId, params, 'sessions.facility_id')
   const { rows } = await query(
     `UPDATE matches
         SET voided_at = CASE WHEN $2 THEN now() END,
@@ -487,13 +541,17 @@ router.post('/:id/void', async (req, res) => {
             voided_by_admin = NULL,
             void_reason = CASE WHEN $2 THEN $4 END
       WHERE id = $1
+        AND EXISTS (SELECT 1 FROM sessions
+                     WHERE sessions.id = matches.session_id AND ${scope})
       RETURNING id`,
-    [req.params.id, voided, req.umpire.id, reason],
+    params,
   )
   if (rows.length === 0) return res.status(404).json({ error: 'No such match' })
   invalidateRallyRatings()
 
-  const updated = await query(`${MATCH_SELECT} WHERE m.id = $1`, [req.params.id])
+  const readParams = [req.params.id]
+  const readScope = umpireScope(req.umpire.facilityId, readParams, 'sess.facility_id')
+  const updated = await query(`${MATCH_SELECT} WHERE m.id = $1 AND ${readScope}`, readParams)
   res.json({ match: toClientMatch(updated.rows[0]) })
 })
 

@@ -132,16 +132,25 @@ export function requireAuth(req, res, next) {
  * requireAuth reads only the token, so without this a paused or closed
  * umpire would keep scoring for a month. One primary-key lookup, the
  * same trade requireActivePlayer makes.
+ *
+ * Also attaches `req.umpire.facilityId`, the facility whose sessions
+ * and matches this umpire may see. Null only on a database old enough
+ * to still allow an umpire without one; every route treats that as
+ * seeing nothing.
  */
 export function requireActiveUmpire(queryFn) {
   return async function requireActiveUmpireMiddleware(req, res, next) {
     try {
+      // facility_id rides along on the lookup that already happens on
+      // every umpire request, so scoping a session or match by facility
+      // costs no extra round-trip.
       const { rows } = await queryFn(
-        'SELECT paused_at, closed_at FROM umpires WHERE id = $1',
+        'SELECT paused_at, closed_at, facility_id FROM umpires WHERE id = $1',
         [req.umpire.id],
       )
       const refused = sessionRefusal(rows[0], 'closed_at')
       if (refused) return res.status(refused.statusCode).json(refused.body)
+      req.umpire.facilityId = rows[0]?.facility_id ?? null
       next()
     } catch (error) {
       next(error)

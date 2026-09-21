@@ -176,12 +176,21 @@ function App() {
               className="account-btn"
               onClick={() => setView({ name: 'account' })}
               title="Your account"
-              aria-label={`Your account, ${umpire.name}`}
+              aria-label={
+                umpire.facilityName
+                  ? `Your account, ${umpire.name}, at ${umpire.facilityName}`
+                  : `Your account, ${umpire.name}`
+              }
             >
               <span className="account-initials" aria-hidden="true">
                 {initialsOf(umpire.name)}
               </span>
-              <span className="umpire-name">{umpire.name}</span>
+              <span className="account-who">
+                <span className="umpire-name">{umpire.name}</span>
+                {umpire.facilityName && (
+                  <span className="umpire-facility">{umpire.facilityName}</span>
+                )}
+              </span>
             </button>
           </div>
         )}

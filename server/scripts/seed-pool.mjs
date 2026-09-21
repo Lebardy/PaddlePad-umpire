@@ -82,8 +82,19 @@ if (existing[0].n > 0) {
   process.exit(1)
 }
 
-const { rows: umpires } = await pool.query('SELECT id FROM umpires ORDER BY created_at LIMIT 1')
+const { rows: umpires } = await pool.query(
+  'SELECT id, facility_id FROM umpires ORDER BY created_at LIMIT 1',
+)
 const recordedBy = umpires[0]?.id ?? null
+const facilityId = umpires[0]?.facility_id ?? null
+
+if (!facilityId) {
+  console.error(
+    'The oldest umpire has no facility, so the seeded session would be\n' +
+    'invisible in the umpire app. Make a facility and put an umpire in it first.',
+  )
+  process.exit(1)
+}
 
 // ============================================================
 // Hidden profiles
@@ -132,9 +143,10 @@ for (const person of people) {
 
 await pool.query('DELETE FROM sessions WHERE name = $1', [SESSION_NAME])
 const sessionId = randomUUID()
-await pool.query('INSERT INTO sessions (id, name, created_by) VALUES ($1, $2, $3)', [
-  sessionId, SESSION_NAME, recordedBy,
-])
+await pool.query(
+  'INSERT INTO sessions (id, name, created_by, facility_id) VALUES ($1, $2, $3, $4)',
+  [sessionId, SESSION_NAME, recordedBy, facilityId],
+)
 for (const person of people) {
   await pool.query(
     'INSERT INTO session_players (session_id, player_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',

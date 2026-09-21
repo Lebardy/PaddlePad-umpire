@@ -3,6 +3,7 @@ import { query, withTransaction } from '../db.js'
 import { requireActiveUmpire, requireAuth } from '../auth.js'
 import { isUuid } from '../validate.js'
 import { invalidateRallyRatings } from '../rally-rating-store.js'
+import { umpireScope } from '../facility-rules.js'
 
 const router = Router()
 router.use(requireAuth, requireActiveUmpire(query))
@@ -28,8 +29,10 @@ const SESSION_SELECT = `
     LEFT JOIN umpires u ON u.id = s.created_by
 `
 
-router.get('/', async (_req, res) => {
-  const { rows } = await query(`${SESSION_SELECT} ORDER BY s.created_at DESC`)
+router.get('/', async (req, res) => {
+  const params = []
+  const scope = umpireScope(req.umpire.facilityId, params, 's.facility_id')
+  const { rows } = await query(`${SESSION_SELECT} WHERE ${scope} ORDER BY s.created_at DESC`, params)
   res.json({ sessions: rows })
 })
 
@@ -61,13 +64,18 @@ router.post('/', async (req, res) => {
     [id, name, req.umpire.id],
   )
 
-  const { rows } = await query(`${SESSION_SELECT} WHERE s.id = $1`, [id])
+  const params = [id]
+  const scope = umpireScope(req.umpire.facilityId, params, 's.facility_id')
+  const { rows } = await query(`${SESSION_SELECT} WHERE s.id = $1 AND ${scope}`, params)
+  if (!rows[0]) return res.status(404).json({ error: 'No such session' })
   res.status(201).json({ session: rows[0] })
 })
 
 /** One session plus its roster, with each player's stats for display. */
 router.get('/:id', async (req, res) => {
-  const { rows } = await query(`${SESSION_SELECT} WHERE s.id = $1`, [req.params.id])
+  const params = [req.params.id]
+  const scope = umpireScope(req.umpire.facilityId, params, 's.facility_id')
+  const { rows } = await query(`${SESSION_SELECT} WHERE s.id = $1 AND ${scope}`, params)
   if (!rows[0]) return res.status(404).json({ error: 'No such session' })
 
   const players = await query(
@@ -107,7 +115,9 @@ router.put('/:id/players', async (req, res) => {
     return res.status(400).json({ error: 'Every player id must be a valid id' })
   }
 
-  const exists = await query('SELECT 1 FROM sessions WHERE id = $1', [req.params.id])
+  const params = [req.params.id]
+  const scope = umpireScope(req.umpire.facilityId, params, 'facility_id')
+  const exists = await query(`SELECT 1 FROM sessions WHERE id = $1 AND ${scope}`, params)
   if (exists.rowCount === 0) {
     return res.status(404).json({ error: 'No such session' })
   }
@@ -163,6 +173,19 @@ router.put('/:id/players', async (req, res) => {
  * dead-lettering.
  */
 router.delete('/:id', async (req, res) => {
+  const scopeParams = [req.params.id]
+  const scope = umpireScope(req.umpire.facilityId, scopeParams, 'facility_id')
+  const mine = await query(`SELECT 1 FROM sessions WHERE id = $1 AND ${scope}`, scopeParams)
+  // Deleting is idempotent on purpose -- a device may queue it offline
+  // and retry after another umpire already removed the same session --
+  // so a session that is simply gone still answers 204. What must not
+  // pass is a session that EXISTS at another facility.
+  if (mine.rowCount === 0) {
+    const elsewhere = await query('SELECT 1 FROM sessions WHERE id = $1', [req.params.id])
+    if (elsewhere.rowCount > 0) return res.status(404).json({ error: 'No such session' })
+    return res.status(204).end()
+  }
+
   const finished = await query(
     "SELECT count(*)::int AS n FROM matches WHERE session_id = $1 AND status = 'completed'",
     [req.params.id],
@@ -199,19 +222,23 @@ router.post('/:id/void', async (req, res) => {
   const voided = req.body?.voided !== false
   const reason = String(req.body?.reason ?? '').trim() || null
 
+  const params = [req.params.id, voided, req.umpire.id, reason]
+  const scope = umpireScope(req.umpire.facilityId, params, 'facility_id')
   const { rows } = await query(
     `UPDATE sessions
         SET voided_at = CASE WHEN $2 THEN now() END,
             voided_by = CASE WHEN $2 THEN $3::uuid END,
             void_reason = CASE WHEN $2 THEN $4 END
-      WHERE id = $1
+      WHERE id = $1 AND ${scope}
       RETURNING id`,
-    [req.params.id, voided, req.umpire.id, reason],
+    params,
   )
   if (rows.length === 0) return res.status(404).json({ error: 'No such session' })
   invalidateRallyRatings()
 
-  const updated = await query(`${SESSION_SELECT} WHERE s.id = $1`, [req.params.id])
+  const readParams = [req.params.id]
+  const readScope = umpireScope(req.umpire.facilityId, readParams, 's.facility_id')
+  const updated = await query(`${SESSION_SELECT} WHERE s.id = $1 AND ${readScope}`, readParams)
   res.json({ session: updated.rows[0] })
 })
 
@@ -236,18 +263,22 @@ router.post('/:id/void', async (req, res) => {
 router.post('/:id/end', async (req, res) => {
   const ended = req.body?.ended !== false
 
+  const params = [req.params.id, ended, req.umpire.id]
+  const scope = umpireScope(req.umpire.facilityId, params, 'facility_id')
   const { rows } = await query(
     `UPDATE sessions
         SET ended_at = CASE WHEN $2 THEN now() END,
             ended_by = CASE WHEN $2 THEN $3::uuid END,
             ended_by_admin = NULL
-      WHERE id = $1
+      WHERE id = $1 AND ${scope}
       RETURNING id`,
-    [req.params.id, ended, req.umpire.id],
+    params,
   )
   if (rows.length === 0) return res.status(404).json({ error: 'No such session' })
 
-  const updated = await query(`${SESSION_SELECT} WHERE s.id = $1`, [req.params.id])
+  const readParams = [req.params.id]
+  const readScope = umpireScope(req.umpire.facilityId, readParams, 's.facility_id')
+  const updated = await query(`${SESSION_SELECT} WHERE s.id = $1 AND ${readScope}`, readParams)
   res.json({ session: updated.rows[0] })
 })
 
