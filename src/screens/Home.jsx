@@ -1,12 +1,8 @@
 import { useState } from 'react'
 import { createSession } from '../lib/storage'
-import { fetchExportCsv } from '../lib/api'
 import { useSessions } from '../lib/useLocalStore'
 
-// Landing screen: create/open sessions, and export the whole app's
-// match history as the CSV the separate PaddlePad ML pipeline
-// consumes (export is global, not per-session, since the ML pipeline
-// aggregates a player's stats across every match they've ever played).
+// Landing screen: create and open sessions.
 const GUIDE_NUDGE_KEY = 'paddlepad.umpire.guideDismissed'
 
 /** One group of sessions. `showOwner` names whose they are. */
@@ -42,8 +38,6 @@ function Home({ onOpenSession, onOpenGuide, onOpenPlayers, umpire }) {
   // away unmounted the screen.
   const sessions = useSessions()
   const [name, setName] = useState('')
-  const [exporting, setExporting] = useState(false)
-  const [exportError, setExportError] = useState(null)
 
   // Persisted, so it does not reappear on every launch. Read through a
   // try/catch because private mode throws on localStorage, and a nudge
@@ -71,46 +65,6 @@ function Home({ onOpenSession, onOpenGuide, onOpenPlayers, umpire }) {
     const session = createSession(name)
     setName('')
     onOpenSession(session.id)
-  }
-
-  // Downloads the ML pipeline CSV.
-  //
-  // This now comes from the server rather than being built here, which
-  // is the whole point of moving data off the device: a locally-built
-  // export could only ever contain matches THIS phone recorded, so the
-  // pipeline would silently receive one umpire's slice of the club's
-  // data no matter how many matches everyone else logged.
-  //
-  // The download is triggered after an await. That is fine for a
-  // programmatic anchor -- unlike popups, blob downloads are not gated
-  // on an unbroken user gesture -- but it is the reason for the
-  // "Preparing..." state rather than an instant response.
-  async function handleExport() {
-    setExporting(true)
-    setExportError(null)
-    try {
-      const csv = await fetchExportCsv()
-      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `paddlepad_match_logs_${new Date().toISOString().slice(0, 10)}.csv`
-      link.click()
-      URL.revokeObjectURL(url)
-    } catch (err) {
-      // A 401 here already means the session just ended (paused, most
-      // commonly) -- api.js has already cleared it and the app is about
-      // to swap this whole screen for Login, so there is nothing useful
-      // to show in the export's own error slot.
-      if (err.status !== 401) {
-        setExportError(
-          err.status === 0
-            ? 'The export needs a connection — it gathers every umpire\u2019s matches from the server.'
-            : err.message,
-        )
-      }
-    } finally {
-      setExporting(false)
-    }
   }
 
   // A session with no createdBy has been made on this device and not yet
@@ -180,29 +134,22 @@ function Home({ onOpenSession, onOpenGuide, onOpenPlayers, umpire }) {
         </>
       )}
 
-      {/* First of the three, because it is the one an ordinary umpire
-          actually needs. The export is for the ML pipeline and the
-          invite is admin-only; a player asking for their code is a
-          Tuesday. It should not require building a session around them
-          first, which is what it used to. */}
-      <h2>Tools</h2>
-      {exportError && <p className="form-error">{exportError}</p>}
-      <ul className="tool-list">
-        {onOpenPlayers && (
-          <li>
-            <button className="export-btn" onClick={onOpenPlayers}>
-              <span>Players &amp; codes</span>
-              <span className="tool-note">Show a player their sign-in code</span>
-            </button>
-          </li>
-        )}
-        <li>
-          <button className="export-btn" onClick={handleExport} disabled={exporting}>
-            <span>{exporting ? 'Preparing…' : 'Export match data (CSV)'}</span>
-            <span className="tool-note">Every umpire&rsquo;s matches, for the rating pipeline</span>
-          </button>
-        </li>
-      </ul>
+      {/* A player asking for their code is a Tuesday, and it should not
+          require building a session around them first, which is what it
+          used to. */}
+      {onOpenPlayers && (
+        <>
+          <h2>Tools</h2>
+          <ul className="tool-list">
+            <li>
+              <button className="export-btn" onClick={onOpenPlayers}>
+                <span>Players &amp; codes</span>
+                <span className="tool-note">Show a player their sign-in code</span>
+              </button>
+            </li>
+          </ul>
+        </>
+      )}
     </div>
   )
 }

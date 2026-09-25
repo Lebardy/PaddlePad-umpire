@@ -7,9 +7,13 @@
 // the reference set this mirrors).
 //
 // This lives on the server rather than in the app because that is the
-// entire point of phase 2: a device can only export the matches it
-// recorded itself, so a per-device export can never give the pipeline
-// the club's full data no matter how many matches get logged.
+// entire point of phase 2: a device only ever holds the matches it
+// recorded itself, so a per-device export could never give the
+// pipeline the whole picture no matter how many matches get logged.
+//
+// These rows leave the server through GET /internal/match-logs.json
+// and nowhere else. They cover every facility, which is why that route
+// is behind the internal key rather than an umpire's token.
 // ============================================================
 
 import { deriveMatchState, eventFromRow } from './pickleball.js'
@@ -203,26 +207,4 @@ export async function buildMatchLogRows(query) {
   }
 
   return rows
-}
-
-/**
- * Escapes one CSV field per RFC 4180.
- *
- * Every column emitted today is a UUID, a number or an ISO timestamp,
- * so this is latent -- but a server-side export is exactly where
- * someone later adds `player_name`, and an unescaped comma in
- * "Cruz, John" would silently shift every following column by one with
- * nothing failing loudly.
- */
-function escapeCsvField(value) {
-  const text = value === null || value === undefined ? '' : String(value)
-  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
-}
-
-export function matchLogsToCSV(rows) {
-  const lines = [RAW_MATCH_LOG_COLUMNS.join(',')]
-  for (const row of rows) {
-    lines.push(RAW_MATCH_LOG_COLUMNS.map((col) => escapeCsvField(row[col])).join(','))
-  }
-  return lines.join('\n')
 }

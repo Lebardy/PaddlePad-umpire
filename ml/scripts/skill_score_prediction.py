@@ -2,7 +2,7 @@
 The old skill score's accuracy on the same matches the rally rating was
 tested on.
 
-    UMPIRE_TOKEN=... .venv/bin/python scripts/skill_score_prediction.py \
+    INTERNAL_API_KEY=... .venv/bin/python scripts/skill_score_prediction.py \
         https://api-staging-8ac6.up.railway.app ../server/scripts/.rating-split.json
 
 Read-only. Builds the pipeline's skill score from the split's "train"
@@ -10,7 +10,6 @@ matches only, then picks the side with the higher average score in each
 "test" match. Uses the vendored pipeline functions unchanged.
 """
 
-import io
 import json
 import math
 import os
@@ -28,11 +27,19 @@ MIN_MATCHES = 5
 
 api = sys.argv[1].rstrip("/")
 split = json.loads(Path(sys.argv[2]).read_text())
-token = os.environ["UMPIRE_TOKEN"]
+key = os.environ["INTERNAL_API_KEY"]
 
-response = requests.get(f"{api}/export/match-logs.csv", headers={"authorization": f"Bearer {token}"}, timeout=60)
+# The same door run.py uses. The umpire-facing CSV download this script
+# used to read was removed: it showed every facility's matches to any
+# signed-in umpire, while the app itself scopes an umpire to one.
+#
+# One difference from read_csv, if a column is ever read that is not
+# read today: an empty value arrives as "" and stays "", where the CSV
+# reader turned it into NaN. `won` is the one that carries them (a
+# match with no winner recorded), so it reads as object, not a number.
+response = requests.get(f"{api}/internal/match-logs.json", headers={"x-internal-key": key}, timeout=60)
 response.raise_for_status()
-rows = pd.read_csv(io.StringIO(response.text))
+rows = pd.DataFrame(response.json()["rows"])
 # pandas' datetime parsing crashes on this machine's Python 3.14 build,
 # and nothing here needs the timestamps as dates.
 rows["ended_at"] = rows["ended_at"].astype(str)

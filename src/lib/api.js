@@ -430,15 +430,6 @@ export function claimMatch(matchId, { deviceId, force = false }) {
   }).then((d) => d.match)
 }
 
-// ============================================================
-// Export
-// ============================================================
-
-/** The ML pipeline CSV, covering every umpire's matches. */
-export function fetchExportCsv() {
-  return apiFetch('/export/match-logs.csv', { raw: true }).then((r) => r.text())
-}
-
 /** Cancels an unfinished match. Idempotent server-side. */
 export function deleteMatchOnServer(matchId) {
   return apiFetch(`/matches/${matchId}`, { method: 'DELETE' })
