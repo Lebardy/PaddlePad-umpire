@@ -2,7 +2,7 @@
 Does the old skill score or the rally rating give K-Means better results,
 judged against the simulated pool's hidden truth?
 
-    UMPIRE_TOKEN=... .venv/bin/python scripts/playstyle_truth_check.py \
+    INTERNAL_API_KEY=... .venv/bin/python scripts/playstyle_truth_check.py \
         https://api-staging-8ac6.up.railway.app \
         ../server/scripts/.rally-points.json ../server/scripts/.sim-pool-truth.json
 
@@ -59,11 +59,14 @@ rally_points = json.loads(Path(sys.argv[2]).read_text())
 truth = pd.DataFrame(json.loads(Path(sys.argv[3]).read_text())["players"])[
     ["id", "ability", "netPlay"]
 ].rename(columns={"id": "player_id"})
-token = os.environ["UMPIRE_TOKEN"]
+key = os.environ["INTERNAL_API_KEY"]
 
-response = requests.get(f"{api}/export/match-logs.csv", headers={"authorization": f"Bearer {token}"}, timeout=60)
+# The same door run.py uses. The umpire-facing CSV download this script
+# used to read was removed: it showed every facility's matches to any
+# signed-in umpire, while the app itself scopes an umpire to one.
+response = requests.get(f"{api}/internal/match-logs.json", headers={"x-internal-key": key}, timeout=60)
 response.raise_for_status()
-rows = pd.read_csv(io.StringIO(response.text))
+rows = pd.DataFrame(response.json()["rows"])
 # pandas' datetime parsing crashes on this machine's Python 3.14 build.
 rows["ended_at"] = rows["ended_at"].astype(str)
 counts = rows.groupby("player_id")["match_id"].nunique()

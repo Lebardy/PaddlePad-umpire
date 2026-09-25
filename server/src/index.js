@@ -8,7 +8,6 @@ import authRoutes from './routes/auth.js'
 import playerAdminRoutes from './routes/players.js'
 import sessionRoutes from './routes/sessions.js'
 import matchRoutes from './routes/matches.js'
-import exportRoutes from './routes/export.js'
 // Player-facing: a claimed player reading their OWN history.
 import playerSelfRoutes from './routes/player.js'
 // Service-to-service: the ML pipeline reading match logs and writing
@@ -163,7 +162,6 @@ app.use('/auth/player/google', rateLimit({ max: 10, windowMs: 60_000 }))
 // bucket rather than sharing /player's.
 app.use('/player/link', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/player', rateLimit({ max: 60, windowMs: 60_000 }))
-app.use('/export', rateLimit({ max: 5, windowMs: 60_000 }))
 // One caller, a handful of calls per run. Tight enough that a leaked
 // key cannot be used to scrape the whole club's match log repeatedly,
 // loose enough for a nightly run plus a few manual triggers in a demo.
@@ -186,7 +184,6 @@ app.use('/auth', authRoutes)
 app.use('/players', playerAdminRoutes)
 app.use('/sessions', sessionRoutes)
 app.use('/matches', matchRoutes)
-app.use('/export', exportRoutes)
 app.use('/player', playerSelfRoutes)
 app.use('/internal', internalRoutes)
 app.use('/admin/auth', adminAuthRoutes)

@@ -30,9 +30,10 @@ router.use(requireInternalKey)
  * Every completed, non-voided match row, in the shape
  * aggregate_player_profiles() consumes.
  *
- * Identical rows to GET /export/match-logs.json, which stays as it is
- * for the umpire-facing download. Shared through buildMatchLogRows
- * rather than by loosening the guard on that route.
+ * The only way these rows leave the server. There used to be an
+ * umpire-facing download beside this one, open to any signed-in
+ * umpire; it was removed, because it handed every facility's matches
+ * to an umpire who may only see their own.
  */
 router.get('/match-logs.json', async (_req, res) => {
   const [rows, ratings] = await Promise.all([buildMatchLogRows(query), getRallyRatings(query)])

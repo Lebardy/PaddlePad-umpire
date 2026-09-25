@@ -659,50 +659,15 @@ async function main() {
   check('a match sent without a target defaults to 11',
     noTarget.body.match?.pointTarget === 11, String(noTarget.body.match?.pointTarget))
 
-  section('export — every umpire\'s matches, not just one device\'s')
-  const json = await call('/export/match-logs.json')
-  check('export json -> 200', json.status === 200)
-  const mine = (json.body.rows ?? []).filter((r) => r.match_id === matchId)
-  check('4 rows for the doubles match (one per player)', mine.length === 4, String(mine.length))
-  const winnerRow = mine.find((r) => r.player_id === teamA[0])
-  check('winning player has won=1', winnerRow?.won === 1, String(winnerRow?.won))
-  check('winning player has 11 clean winners', winnerRow?.clean_winners === 11, String(winnerRow?.clean_winners))
-  check('uses_stacking=1 for team A', winnerRow?.uses_stacking === 1, String(winnerRow?.uses_stacking))
-  check('partner is the other team-A player', winnerRow?.partner_id === teamA[1])
-  check('match_number assigned', typeof winnerRow?.match_number === 'number' && winnerRow.match_number >= 1)
-  const loserRow = mine.find((r) => r.player_id === teamB[0])
-  check('losing player has won=0 (not blank)', loserRow?.won === 0, String(loserRow?.won))
-
-  const longRows = (json.body.rows ?? []).filter((r) => r.match_id === longMatchId)
-  check('the 15-point match exports point_target=15',
-    longRows.length > 0 && longRows.every((r) => r.point_target === 15),
-    JSON.stringify(longRows.map((r) => r.point_target)))
-  check('an 11-point match still exports point_target=11', winnerRow?.point_target === 11,
-    String(winnerRow?.point_target))
-
-  const csv = await call('/export/match-logs.csv', { raw: true })
-  check('export csv -> 200', csv.status === 200)
-  const lines = csv.text.trim().split('\n')
-  // Asserted as the exact header rather than a column COUNT: the first
-  // twelve are the columns aggregate_player_profiles() reads positionally
-  // in the ML pipeline, so a reordering is as damaging as a missing
-  // column and a count would not notice it.
-  const expectedHeader = [
-    'player_id', 'match_id', 'match_number',
-    'drop_attempts', 'drop_successes', 'drive_attempts',
-    'dink_errors', 'clean_winners', 'dink_winners', 'unforced_errors',
-    'match_duration_mins', 'uses_stacking',
-    'team', 'won', 'partner_id', 'opponent_1_id', 'opponent_2_id',
-    'ended_at', 'point_target',
-    // How each rally ended, one count per ending, after everything the
-    // pipeline already reads (see rally-endings.js).
-    ...RALLY_ENDINGS.map((ending) => rallyEndingColumn(ending.key)),
-  ].join(',')
-  check('csv header is exactly the expected columns, in order',
-    lines[0] === expectedHeader, lines[0])
-  const headerCols = lines[0].split(',').length
-  check('every csv row has the same column count',
-    lines.slice(1).every((l) => l.split(',').length === headerCols))
+  section('export — the umpire-facing download is gone')
+  // Removed, not hidden: it handed every facility's completed matches
+  // to any signed-in umpire, which is the one thing facility scoping
+  // exists to prevent. The rows still leave the server, through
+  // /internal/match-logs.json below, behind the service key.
+  check('GET /export/match-logs.csv is gone -> 404',
+    (await call('/export/match-logs.csv')).status === 404)
+  check('GET /export/match-logs.json is gone -> 404',
+    (await call('/export/match-logs.json')).status === 404)
 
   // ============================================================
   section('internal — the ML pipeline seam')
@@ -743,10 +708,49 @@ async function main() {
 
     const logs = await internal('/internal/match-logs.json')
     check('internal match-logs with the key -> 200', logs.status === 200)
-    check('internal returns the same rows as the umpire export',
-      logs.body.count === (json.body.rows ?? []).length,
-      `${logs.body.count} vs ${(json.body.rows ?? []).length}`)
+    check('the count matches the rows actually sent',
+      logs.body.count === (logs.body.rows ?? []).length,
+      `${logs.body.count} vs ${(logs.body.rows ?? []).length}`)
 
+    // What one match looks like by the time the pipeline reads it.
+    // These used to live on the umpire-facing export; the rows are the
+    // same rows, so they moved here rather than being dropped.
+    const mine = (logs.body.rows ?? []).filter((r) => r.match_id === matchId)
+    check('4 rows for the doubles match (one per player)', mine.length === 4, String(mine.length))
+    const winnerRow = mine.find((r) => r.player_id === teamA[0])
+    check('winning player has won=1', winnerRow?.won === 1, String(winnerRow?.won))
+    check('winning player has 11 clean winners', winnerRow?.clean_winners === 11, String(winnerRow?.clean_winners))
+    check('uses_stacking=1 for team A', winnerRow?.uses_stacking === 1, String(winnerRow?.uses_stacking))
+    check('partner is the other team-A player', winnerRow?.partner_id === teamA[1])
+    check('match_number assigned', typeof winnerRow?.match_number === 'number' && winnerRow.match_number >= 1)
+    const loserRow = mine.find((r) => r.player_id === teamB[0])
+    check('losing player has won=0 (not blank)', loserRow?.won === 0, String(loserRow?.won))
+
+    const longRows = (logs.body.rows ?? []).filter((r) => r.match_id === longMatchId)
+    check('the 15-point match carries point_target=15',
+      longRows.length > 0 && longRows.every((r) => r.point_target === 15),
+      JSON.stringify(longRows.map((r) => r.point_target)))
+    check('an 11-point match still carries point_target=11', winnerRow?.point_target === 11,
+      String(winnerRow?.point_target))
+
+    // Asserted as the exact column list rather than a COUNT: the first
+    // twelve are the columns aggregate_player_profiles() reads
+    // positionally in the ML pipeline, so one going missing is as
+    // damaging as the shape changing, and a count would not notice.
+    const expectedColumns = [
+      'player_id', 'match_id', 'match_number',
+      'drop_attempts', 'drop_successes', 'drive_attempts',
+      'dink_errors', 'clean_winners', 'dink_winners', 'unforced_errors',
+      'match_duration_mins', 'uses_stacking',
+      'team', 'won', 'partner_id', 'opponent_1_id', 'opponent_2_id',
+      'ended_at', 'point_target',
+      // How each rally ended, one count per ending, after everything the
+      // pipeline already reads (see rally-endings.js).
+      ...RALLY_ENDINGS.map((ending) => rallyEndingColumn(ending.key)),
+    ]
+    const missingColumns = expectedColumns.filter((col) => !(col in (winnerRow ?? {})))
+    check('every column the pipeline reads is on the row',
+      missingColumns.length === 0, missingColumns.join(', '))
     // The gate rides along with the data so the Python side does not
     // keep its own copy of the thresholds to drift out of step with.
     check('internal carries the rating gate thresholds',
