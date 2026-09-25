@@ -53,6 +53,82 @@ let token = null
 // the point they are registered.
 const selfRegistered = []
 
+// Sessions this run has opened and not closed again. Every run used to
+// leave its nights open behind it, and the admin Overview's "worth a
+// look" list filled up with them -- 161 at the last count, all of them
+// this file's doing. The tidy pass at the end of main() closes them.
+//
+// Watching the requests go past, rather than asking each section to
+// remember, means a section added later is covered without being told.
+const openSessions = new Map()
+
+function noteSession(path, method, body, bearer, status, json) {
+  if (method !== 'POST') return
+  if (path === '/sessions' && status === 201 && json?.session?.id) {
+    openSessions.set(json.session.id, { bearer: bearer ?? token, umpireId: json.session.created_by })
+    return
+  }
+  const ending = /^\/sessions\/([^/]+)\/end$/.exec(path)
+  if (ending && status === 200) {
+    // `ended: false` is a reopen, which puts it back on the list.
+    if (body?.ended === false) {
+      openSessions.set(ending[1], { bearer: bearer ?? token, umpireId: json?.session?.created_by })
+    } else {
+      openSessions.delete(ending[1])
+    }
+    return
+  }
+  const adminClose = /^\/admin\/overview\/sessions\/([^/]+)\/close$/.exec(path)
+  if (adminClose && status === 200) openSessions.delete(adminClose[1])
+}
+
+/**
+ * End every session this run still has open, as the umpire who opened
+ * it.
+ *
+ * Ending is not voiding and not deleting: it stamps `ended_at` and
+ * nothing else, so every match played in the session still counts.
+ * Returns the ones it could not close, which should always be none.
+ */
+async function closeOpenSessions(umpireId = null) {
+  const left = []
+  for (const [id, who] of [...openSessions]) {
+    if (umpireId && who.umpireId !== umpireId) continue
+    const ended = await request(`/sessions/${id}/end`, { method: 'POST', bearer: who.bearer, body: {} })
+    // A 404 means it is already gone, which is just as tidy.
+    if (ended.status === 200 || ended.status === 404) openSessions.delete(id)
+    else left.push(`${id} -> ${ended.status}`)
+  }
+  return left
+}
+
+// Guards the tidy below from tidying its own requests.
+let tidying = false
+
+/**
+ * Closing an umpire takes away the only credential that can end their
+ * sessions -- only the umpire who opened a session may end it, and an
+ * admin may only close one the Overview has already flagged as left
+ * open, which a session opened seconds ago is not.
+ *
+ * So the moment before a throwaway umpire is closed is the last moment
+ * their nights can be tidied, and this is that moment. Catching it here
+ * rather than beside each cleanup means a section added later gets it
+ * without being told, and only that umpire's sessions are touched, so
+ * nothing another section is still using is ended underneath it.
+ */
+async function tidyBeforeUmpireCloses(path, method) {
+  if (tidying || method !== 'POST') return
+  const closing = /^\/admin\/umpires\/([^/]+)\/close$/.exec(path)
+  if (!closing) return
+  tidying = true
+  try {
+    await closeOpenSessions(closing[1])
+  } finally {
+    tidying = false
+  }
+}
+
 // How many times to wait out a rate-limit window before giving up.
 const RATE_LIMIT_RETRIES = 4
 
@@ -73,6 +149,8 @@ const RATE_LIMIT_RETRIES = 4
  * If one is ever added, it must call fetch directly.
  */
 async function request(path, { method = 'GET', body, bearer, raw = false } = {}) {
+  await tidyBeforeUmpireCloses(path, method)
+
   for (let attempt = 0; ; attempt += 1) {
     const response = await fetch(API + path, {
       method,
@@ -100,6 +178,7 @@ async function request(path, { method = 'GET', body, bearer, raw = false } = {})
     } catch {
       json = { raw: text }
     }
+    noteSession(path, method, body, bearer, response.status, json)
     return { status: response.status, body: json }
   }
 }
@@ -667,6 +746,7 @@ async function main() {
     check('internal returns the same rows as the umpire export',
       logs.body.count === (json.body.rows ?? []).length,
       `${logs.body.count} vs ${(json.body.rows ?? []).length}`)
+
     // The gate rides along with the data so the Python side does not
     // keep its own copy of the thresholds to drift out of step with.
     check('internal carries the rating gate thresholds',
@@ -2997,6 +3077,18 @@ async function main() {
     const renameB = await request(`/admin/facilities/${facilityBId}`, { method: 'PATCH', bearer: fOwnerToken, body: { name: `Smoke Overview (done) B ${stamp}` } })
     check('renaming facility B for cleanup -> 200', renameB.status === 200, JSON.stringify(renameB.body).slice(0, 80))
   }
+
+  // ============================================================
+  section('tidy — the sessions this run opened')
+  // ============================================================
+  // Left to itself this suite opens a dozen nights and walks away from
+  // them, and every one turns up on the admin Overview as something
+  // worth a look. Nothing here is deleted: the matches, the players and
+  // the taps all stay exactly where they are.
+
+  const stillOpen = await closeOpenSessions()
+  check('every session this run opened is closed again',
+    stillOpen.length === 0, stillOpen.join(', '))
 
   if (selfRegistered.length > 0) {
     console.log(
