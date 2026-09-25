@@ -64,6 +64,11 @@ key = os.environ["INTERNAL_API_KEY"]
 # The same door run.py uses. The umpire-facing CSV download this script
 # used to read was removed: it showed every facility's matches to any
 # signed-in umpire, while the app itself scopes an umpire to one.
+#
+# One difference from read_csv, if a column is ever read that is not
+# read today: an empty value arrives as "" and stays "", where the CSV
+# reader turned it into NaN. `won` is the one that carries them (a
+# match with no winner recorded), so it reads as object, not a number.
 response = requests.get(f"{api}/internal/match-logs.json", headers={"x-internal-key": key}, timeout=60)
 response.raise_for_status()
 rows = pd.DataFrame(response.json()["rows"])
