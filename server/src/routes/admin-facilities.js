@@ -6,7 +6,7 @@ import {
   changedFacilityColumns, facilityColumns, facilityFilterFor, facilityPayload, mayCreateFacility, mayManageFacility,
   readFacility,
 } from '../facility-rules.js'
-import { createFacility, facilityPeople, findFacility, listFacilities, lockFacility, updateFacility } from '../facility-store.js'
+import { createFacility, facilityPeople, facilityPeopleCounts, findFacility, listFacilities, lockFacility, updateFacility } from '../facility-store.js'
 import { isUuid } from '../validate.js'
 
 // Facilities: where umpires work. The owner sees and manages every one;
@@ -40,7 +40,16 @@ const FIELD_LABELS = {
 
 router.get('/', async (req, res) => {
   const rows = await listFacilities(query, facilityFilterFor(req.admin, null))
-  res.json({ facilities: rows.map(facilityPayload) })
+  // The counts ride along so the owner's table needs no request per
+  // facility (one each used to run a busy owner into the rate limit).
+  const counts = await facilityPeopleCounts(query, rows.map((row) => row.id))
+  res.json({
+    facilities: rows.map((row) => ({
+      ...facilityPayload(row),
+      umpireCount: counts.get(row.id).umpires,
+      adminCount: counts.get(row.id).admins,
+    })),
+  })
 })
 
 router.post('/', async (req, res) => {

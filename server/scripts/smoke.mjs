@@ -2476,6 +2476,17 @@ async function main() {
     const facIdsAsA = (facilitiesAsA.body.facilities ?? []).map((f) => f.id)
     check('admin A sees only facility A', facIdsAsA.length === 1 && facIdsAsA[0] === facilityAId, JSON.stringify(facIdsAsA))
 
+    // The owner's facility table shows each facility's umpire and admin
+    // counts from the list alone: fetching every facility's page for them
+    // used a request per facility and ran the owner into the rate limit.
+    const ownerList = await request('/admin/facilities', { bearer: fOwnerToken })
+    const listedA = (ownerList.body.facilities ?? []).find((f) => f.id === facilityAId)
+    const pageA = await request(`/admin/facilities/${facilityAId}`, { bearer: fOwnerToken })
+    check("the facility list carries each facility's umpire and admin counts, matching its page",
+      listedA?.umpireCount === pageA.body.umpires?.length && listedA?.adminCount === pageA.body.admins?.length
+        && listedA.umpireCount > 0 && listedA.adminCount > 0,
+      JSON.stringify({ list: [listedA?.umpireCount, listedA?.adminCount], page: [pageA.body.umpires?.length, pageA.body.admins?.length] }))
+
     const patchBAsA = await request(`/admin/facilities/${facilityBId}`, {
       method: 'PATCH', bearer: adminAToken, body: { openingHours: 'Mon-Sun 6am-10pm' },
     })

@@ -85,6 +85,25 @@ export async function updateFacility(db, id, values) {
   return rows[0] ?? null
 }
 
+/**
+ * How many admins and umpires belong to each facility in `ids` -- the
+ * same rows facilityPeople lists, switched off and closed included --
+ * as a Map from facility id to { admins, umpires }. Two queries however
+ * many facilities there are, so a list of facilities can show its
+ * counts without a request per facility.
+ */
+export async function facilityPeopleCounts(queryFn, ids) {
+  const counts = new Map(ids.map((id) => [id, { admins: 0, umpires: 0 }]))
+  if (ids.length === 0) return counts
+  const [{ rows: admins }, { rows: umpires }] = await Promise.all([
+    queryFn('SELECT facility_id, count(*)::int AS n FROM admins WHERE facility_id = ANY($1) GROUP BY facility_id', [ids]),
+    queryFn('SELECT facility_id, count(*)::int AS n FROM umpires WHERE facility_id = ANY($1) GROUP BY facility_id', [ids]),
+  ])
+  for (const row of admins) counts.get(row.facility_id).admins = row.n
+  for (const row of umpires) counts.get(row.facility_id).umpires = row.n
+  return counts
+}
+
 /** The facility's admins and umpires, for its detail page. */
 export async function facilityPeople(queryFn, id) {
   const [{ rows: admins }, { rows: umpires }] = await Promise.all([
