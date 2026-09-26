@@ -462,6 +462,7 @@
 .rating > .section-head,
 .recent > .section-head,
 .board > .section-head,
+.places > .section-head,
 .trend > .trend-head,
 .detail-shape > .board-match-head {
   display: flex;
@@ -1466,7 +1467,7 @@ a.highlight:active,
 
 /* ============ Places to play ============ */
 
-.places { margin-top: 1.5rem; }
+.places { margin-block: 1.5rem; }
 .place-list {
   background: var(--surface);
   margin-inline: calc(var(--gutter) * -1);
@@ -1490,8 +1491,11 @@ a.highlight:active,
 /* A logo sits on white in both themes: many are dark lettering on a
    see-through background and would vanish on the dark one. */
 .place-logo {
-  display: inline-grid;
-  place-items: center;
+  /* Flex, not grid: in a grid a picture's 100% height doesn't resolve,
+     so a tall logo would overflow the tile and be cut off. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   overflow: hidden;
   background: #ffffff;
