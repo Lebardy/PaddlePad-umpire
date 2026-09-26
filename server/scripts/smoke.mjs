@@ -2693,6 +2693,11 @@ async function main() {
     const facSessionGet = await request(`/sessions/${facSessionId}`, { bearer: umpAToken })
     check('and GET /sessions/:id carries the same facility_id',
       facSessionGet.body.session?.facility_id === facilityAId, String(facSessionGet.body.session?.facility_id))
+    // Ended now, while umpire A can still reach it: after the move below
+    // it belongs to a facility A is no longer in, so the tidy pass at the
+    // end of the run cannot end it, and every run left one open.
+    const facSessionEnd = await request(`/sessions/${facSessionId}/end`, { method: 'POST', bearer: umpAToken, body: { ended: true } })
+    check('and umpire A ends it again -> 200', facSessionEnd.status === 200, String(facSessionEnd.status))
 
     // --- 8: moving people between facilities ---
     const moveUmpA = await request(`/admin/umpires/${umpireAId}/move`, {
