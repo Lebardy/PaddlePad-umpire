@@ -1132,7 +1132,8 @@ def test_playstyle_stability(
     skill_group,
     random_states=None,
     k_min=2,
-    k_max=5
+    k_max=5,
+    features=None
 ):
     """
     Test the stability of Level 2 playstyle clustering
@@ -1145,7 +1146,14 @@ def test_playstyle_stability(
         3. Cluster agreement using ARI
 
     The first run is used as the reference partition.
+
+    `features` names the columns K-Means sees, as in
+    test_playstyle_k_values; pass the same columns the
+    real clustering used, or this tests a different setup.
     """
+
+    if features is None:
+        features = PLAYSTYLE_CLUSTERING_FEATURES
 
     if random_states is None:
         random_states = [
@@ -1176,7 +1184,7 @@ def test_playstyle_stability(
         )
 
     X = group_data[
-        PLAYSTYLE_CLUSTERING_FEATURES
+        features
     ].copy()
 
     results = {}

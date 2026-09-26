@@ -25,6 +25,7 @@ from pipeline.clustering import (
     PLAYSTYLE_CLUSTERING_FEATURES,
     cluster_playstyles,
     test_playstyle_k_values,
+    test_playstyle_stability,
 )
 from pipeline.feature_engineering import (
     PLAYSTYLE_FEATURES,
@@ -268,6 +269,25 @@ check("and puts each half in a style of its own",
       str(by_columns["playstyle_cluster"].tolist()))
 check("left alone, it still clusters on the thirteen measurements",
       (by_default["playstyle_cluster"] == by_measurements["playstyle_cluster"]).all())
+
+# The stability check has to test the same setup: pointed at the extra
+# columns, every seed should find the halves; left alone, it should match
+# being handed the thirteen measurements.
+stable_columns = test_playstyle_stability(
+    columns_frame, "Everyone", features=["pc_1", "pc_2"])
+stable_default = test_playstyle_stability(columns_frame, "Everyone")
+stable_measurements = test_playstyle_stability(
+    columns_frame, "Everyone", features=PLAYSTYLE_CLUSTERING_FEATURES)
+
+check("the stability check, pointed at other columns, finds the halves on every seed",
+      all(run["k"] == 2
+          and pd.Series(run["labels"]).groupby(halves).nunique().max() == 1
+          for run in stable_columns.values()),
+      str({seed: run["k"] for seed, run in stable_columns.items()}))
+check("left alone, the stability check still uses the thirteen measurements",
+      all(stable_default[seed]["k"] == stable_measurements[seed]["k"]
+          and (stable_default[seed]["labels"] == stable_measurements[seed]["labels"]).all()
+          for seed in stable_default))
 
 
 print("\nboil-down step")
