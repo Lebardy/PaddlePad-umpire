@@ -1010,60 +1010,68 @@ a.highlight:active,
 .ribbon-swatch.is-losers { border: 2px solid var(--series-2); }
 
 .ribbon-readout {
+  display: grid;
+  align-content: start;
+  gap: 0.1rem;
+  margin: 0.6rem 0 0.55rem;
+  /* Room for all four lines, so tapping never pushes the boxes down. */
+  min-height: 5.6rem;
+}
+.ribbon-hint,
+.ribbon-who {
   font-family: var(--label);
   font-size: 1rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  margin: 0.6rem 0 0.45rem;
-  min-height: 1.3em;
 }
+.ribbon-hint { color: var(--text-muted); }
+.ribbon-at {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 1.8rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.ribbon-who { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; }
+.ribbon-kind {
+  padding: 0.05rem 0.45rem;
+  border-radius: 3px;
+  font-size: 0.82rem;
+  letter-spacing: 0.05em;
+}
+.ribbon-kind.is-winner { color: var(--status-good); background: var(--status-good-soft); }
+.ribbon-kind.is-mistake { color: var(--status-critical); background: var(--status-critical-soft); }
+.ribbon-how { color: var(--text-secondary); }
+.ribbon-tags { color: var(--text-muted); font-size: 0.88rem; }
 
-.ribbon-blocks,
-.ribbon-marks {
+.ribbon-blocks {
   display: grid;
-  grid-template-columns: repeat(var(--points), 1fr);
-  gap: 2px;
+  grid-template-columns: repeat(auto-fill, minmax(1.75rem, 1fr));
+  gap: 3px;
 }
 .ribbon-block {
-  height: 32px;
+  height: 1.9rem;
   padding: 0;
-  border-radius: 1px;
+  border-radius: 2px;
   border: 2px solid var(--series-2);
   background: none;
+  color: var(--series-2-ink);
+  font-family: var(--label);
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
   cursor: pointer;
   animation: rise 220ms ease-out both;
-  /* Paused until the ribbon is scrolled to. */
+  /* Paused until the boxes are scrolled to. */
   animation-play-state: paused;
   animation-delay: calc(var(--i) * 22ms);
 }
 .ribbon.is-in .ribbon-block { animation-play-state: running; }
-.ribbon-block.is-winners { background: var(--series-1); border-color: var(--series-1); }
+.ribbon-block.is-winners { background: var(--series-1); border-color: var(--series-1); color: var(--series-1-ink); }
 .ribbon-block.is-selected { outline: 2px solid var(--text); outline-offset: 2px; }
 .ribbon-block:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-
-.ribbon-marks { margin-top: 0.25rem; min-height: 2.4rem; }
-.ribbon-mark {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 0;
-  opacity: 0;
-}
-.ribbon.is-in .ribbon-mark {
-  animation: fade-in 240ms ease-out both;
-  animation-delay: calc(var(--points) * 22ms + 120ms);
-}
-.ribbon-icon { color: var(--text-muted); }
-.ribbon-icon.is-star { color: var(--series-1); }
-.ribbon-icon.is-flag { color: var(--series-2); }
-.ribbon-score {
-  font-size: 0.7rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  color: var(--text);
-}
 
 /* ============ Match of the month ============ */
 
@@ -1844,7 +1852,6 @@ a.highlight:active,
 @media (prefers-reduced-motion: reduce) {
   .rise,
   .ribbon-block,
-  .ribbon-mark,
   .mchart,
   .mchart-mark,
   .dist-bar,
@@ -1852,7 +1859,6 @@ a.highlight:active,
   .ghost {
     animation: none;
   }
-  .ribbon-mark { opacity: 1; }
 }
 
 /* ============ Rally rating ============ */

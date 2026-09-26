@@ -47,6 +47,11 @@
      substitute by eye. */
   --series-1: #2358a6;
   --series-2: #eb6834;
+  /* Numbers on those: on a filled slot-1 box, and on a slot-2 outline
+     over the page surface, where the slot colour itself is too light
+     for small text. */
+  --series-1-ink: #ffffff;
+  --series-2-ink: #b4461b;
 
   /* Sequential, for meters: one hue, light track to dark fill. */
   --seq-track: #d9dde3;
@@ -110,6 +115,8 @@
      palette, not an automatic flip of the light one. */
   --series-1: #5b93ea;
   --series-2: #e0662f;
+  --series-1-ink: #0a0c0f;
+  --series-2-ink: #f08a5d;
 
   --seq-track: #242a35;
   --seq-fill: #5b93ea;

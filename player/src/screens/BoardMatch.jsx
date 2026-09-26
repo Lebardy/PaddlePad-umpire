@@ -1,10 +1,9 @@
 // ============================================================
 // This month's match of the month, for someone who was not in it.
 //
-// The story of the GAME and nothing about the people in it beyond their
-// names. Nobody's winning shots, mistakes or drops -- leaving a name
-// visible agreed to being named on the board, not to having one's
-// mistakes shown to everyone on PaddlePad.
+// The story of the game: who played, the score, how the lead moved,
+// and -- tap a point -- how each point was won and by whom. The board
+// is a leaderboard, and everyone on it is named.
 //
 // A player who WAS in it never lands here: the board sends them to
 // their own full match page instead, shots and all.
@@ -220,6 +219,7 @@ function Story({ match }) {
           <MomentumRibbon
             moments={game.moments}
             path={game.path}
+            points={match.points}
             asShown={asShown}
             winners={winners}
             losers={losers}

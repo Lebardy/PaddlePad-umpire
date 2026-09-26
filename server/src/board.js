@@ -28,7 +28,7 @@
 // ============================================================
 
 import { deriveMatchState, eventFromRow } from './pickleball.js'
-import { getPlayerMatches, scoreProgression } from './player-stats.js'
+import { getPlayerMatches, pointEndings, scoreProgression } from './player-stats.js'
 import { DRAMA_ORDER, readGame } from './drama.js'
 
 // The month turns over at midnight where the players are, not in UTC,
@@ -498,10 +498,9 @@ export async function getMonthlyBoard(query) {
  * on the board -- including ones with a closed account in them, which
  * the board passes over for exactly that reason.
  *
- * What it tells is the GAME, not the people in it: names, the score, and
- * how the lead moved. No one's winning shots, mistakes or drops. Leaving
- * a name visible agreed to being named on the board, not to having one's
- * mistakes shown to everyone.
+ * What it tells is the game: names, the score, how the lead moved, and
+ * how each point was won and by whom -- the board is a leaderboard, and
+ * everyone on it is named.
  */
 export async function getMatchOfTheMonthStory(query, matchId) {
   const month = await gatherMonth(query)
@@ -536,8 +535,14 @@ export async function getMatchOfTheMonthStory(query, matchId) {
     // show a different number from the one that got it picked.
     game: chosen.game,
     // Every rally, including the ones that only changed the serve.
-    // A count for the whole game, not split by anyone.
     rallies: events.filter((e) => e.type === 'rally').length,
+    // How each point was won and who did it, for the tap on each box --
+    // the same points as `margins`, in the same order.
+    points: pointEndings(row, events).map(({ how, ending, by }) => ({
+      how,
+      ending,
+      by: month.nameOf.get(by) ?? null,
+    })),
     minutes: minutes > 0 && minutes <= 240 ? minutes : null,
   }
 }
