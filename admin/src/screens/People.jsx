@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import FacilityPicker from '../components/FacilityPicker'
 import PageBoard from '../components/PageBoard'
 import StatusTag from '../components/StatusTag'
+import UmpireTabs from '../components/UmpireTabs'
 import { listPlayers, listUmpires } from '../lib/api'
 import { formatWhen, lastSignedInText, signInMethodsText } from '../lib/format'
 import { navigate } from '../lib/navigation'
@@ -17,19 +18,23 @@ const STATUSES = [
 const KIND = {
   players: {
     list: listPlayers,
+    title: 'Players',
+    intro: 'Everyone who plays on PaddlePad. Open someone to see their details, pause their account or make a new claim code.',
     searchLabel: 'Search by name, username or email',
     emptyAll: 'No players yet.',
-    detailPath: (id) => `/people/players/${id}`,
+    detailPath: (id) => `/players/${id}`,
   },
   umpires: {
     list: listUmpires,
+    title: 'Umpires',
+    intro: 'The umpires who score matches. Open someone to see their details or pause their account; new umpires join with an invite code.',
     searchLabel: 'Search by name or email',
     emptyAll: 'No umpires yet.',
-    detailPath: (id) => `/people/umpires/${id}`,
+    detailPath: (id) => `/umpires/${id}`,
   },
 }
 
-/** Everyone using PaddlePad: players and umpires, searched and filtered the same way. */
+/** The Players page and the Umpires page's list: searched and filtered the same way. */
 export default function People({ kind, me }) {
   const config = KIND[kind]
   const [typed, setTyped] = useState('')
@@ -104,13 +109,10 @@ export default function People({ kind, me }) {
 
   return (
     <section>
-      <PageBoard title="People" intro="Everyone using PaddlePad. Open someone to see their details, pause their account or make a new claim code." />
+      <PageBoard title={config.title} intro={config.intro} />
 
       <div className="sheet">
-        <nav className="subtabs" aria-label="Players or umpires">
-          <Link to="/people" aria-current={kind === 'players' ? 'page' : undefined}>Players</Link>
-          <Link to="/people/umpires" aria-current={kind === 'umpires' ? 'page' : undefined}>Umpires</Link>
-        </nav>
+        {kind === 'umpires' && <UmpireTabs current="umpires" />}
 
         <div className="form-strip">
           <label className="field grow">

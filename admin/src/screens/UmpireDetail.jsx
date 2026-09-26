@@ -51,7 +51,7 @@ export default function UmpireDetail({ id, me }) {
     return (
       <section className="sheet">
         <p className="empty missing">There’s no umpire here.</p>
-        <p><Link to="/people/umpires" className="back-link">← People</Link></p>
+        <p><Link to="/umpires" className="back-link">← Umpires</Link></p>
       </section>
     )
   }
@@ -60,7 +60,7 @@ export default function UmpireDetail({ id, me }) {
     return (
       <section className="sheet">
         <p className="form-error" role="alert">{result.error}</p>
-        <p><Link to="/people/umpires" className="back-link">← People</Link></p>
+        <p><Link to="/umpires" className="back-link">← Umpires</Link></p>
       </section>
     )
   }
@@ -83,7 +83,7 @@ export default function UmpireDetail({ id, me }) {
       </PageBoard>
 
       <div className="sheet">
-        <Link to="/people/umpires" className="back-link">← People</Link>
+        <Link to="/umpires" className="back-link">← Umpires</Link>
 
         {umpire.status === 'paused' && (
           <p className="notice">Paused on {formatWhen(umpire.pausedAt)}: {umpire.pausedReason}</p>

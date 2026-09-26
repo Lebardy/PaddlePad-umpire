@@ -58,7 +58,7 @@ export default function PlayerDetail({ id, me }) {
     return (
       <section className="sheet">
         <p className="empty missing">There’s no player here.</p>
-        <p><Link to="/people" className="back-link">← People</Link></p>
+        <p><Link to="/players" className="back-link">← Players</Link></p>
       </section>
     )
   }
@@ -67,7 +67,7 @@ export default function PlayerDetail({ id, me }) {
     return (
       <section className="sheet">
         <p className="form-error" role="alert">{result.error}</p>
-        <p><Link to="/people" className="back-link">← People</Link></p>
+        <p><Link to="/players" className="back-link">← Players</Link></p>
       </section>
     )
   }
@@ -83,7 +83,7 @@ export default function PlayerDetail({ id, me }) {
       </PageBoard>
 
       <div className="sheet">
-        <Link to="/people" className="back-link">← People</Link>
+        <Link to="/players" className="back-link">← Players</Link>
 
         {player.status === 'paused' && (
           <p className="notice">Paused on {formatWhen(player.pausedAt)}: {player.pausedReason}</p>

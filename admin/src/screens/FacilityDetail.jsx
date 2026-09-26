@@ -186,8 +186,8 @@ export default function FacilityDetail({ id, me }) {
                 <thead><tr><th>Name</th><th>Email</th><th>Status</th></tr></thead>
                 <tbody>
                   {result.umpires.map((umpire) => (
-                    <tr key={umpire.id} className="row-clickable" onClick={() => navigate(`/people/umpires/${umpire.id}`)}>
-                      <td><Link to={`/people/umpires/${umpire.id}`} className="row-link"><strong>{umpire.name}</strong></Link></td>
+                    <tr key={umpire.id} className="row-clickable" onClick={() => navigate(`/umpires/${umpire.id}`)}>
+                      <td><Link to={`/umpires/${umpire.id}`} className="row-link"><strong>{umpire.name}</strong></Link></td>
                       <td>{umpire.email}</td>
                       <td><StatusTag status={umpire.status} /></td>
                     </tr>
