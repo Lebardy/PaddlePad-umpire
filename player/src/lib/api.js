@@ -402,6 +402,19 @@ export function fetchBoard({ signal } = {}) {
   return apiFetch('/player/board', { signal }).then((d) => d.board)
 }
 
+export function fetchFacilities({ signal } = {}) {
+  return apiFetch('/player/facilities', { signal }).then((d) => d.facilities)
+}
+
+export function fetchFacility(id, { signal } = {}) {
+  return apiFetch(`/player/facilities/${encodeURIComponent(id)}`, { signal }).then((d) => d.facility)
+}
+
+/** Where an <img> loads a facility's logo from, or null when it has none. */
+export function logoSrc(logoUrl, { small = false } = {}) {
+  return logoUrl ? `${API_URL}${logoUrl}${small ? '&size=small' : ''}` : null
+}
+
 /**
  * How this month's match of the month went. The server answers for that
  * one match only, and never with anyone's individual shots.
