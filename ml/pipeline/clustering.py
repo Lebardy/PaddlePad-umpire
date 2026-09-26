@@ -1361,13 +1361,13 @@ def test_playstyle_stability(
 #
 #     {skill prefix} {0-N trait adjectives} {identity noun}
 #
-# e.g. "Advanced Aggressive Net Player" or
+# e.g. "Advanced Clean Net Player" or
 # "Developing All-Court Player" -- always a grammatically
 # complete phrase (adjectives, then a noun), never a bare list
 # of unrelated words.
 #
 # TRAIT_DESCRIPTORS supply the adjectives: how the player plays
-# (temperament, precision, consistency). IDENTITY_DESCRIPTORS
+# (precision, consistency). IDENTITY_DESCRIPTORS
 # supply the single noun that anchors the name: what kind of
 # player they are, based on shot selection. Splitting these two
 # roles is what keeps combinations readable -- two adjectives
@@ -1385,6 +1385,16 @@ def test_playstyle_stability(
 # deliberately left out of naming (not the clustering feature
 # set): they overlap heavily with the two identity features
 # below and would just add redundant wording.
+#
+# aggression_mean is left out of naming too, though it still
+# shapes the clusters. It is winners / (winners + unforced
+# errors): how cleanly a player finishes, not how often they
+# attack, so "Patient" / "Aggressive" said something it does
+# not measure. It also ranks players almost exactly opposite to
+# error_to_winner_ratio (-0.96 on the pklmart players), so the
+# precision words already carry what it says. Taking it out of
+# the clustering failed a check on the simulated pool, so only
+# its words were removed.
 # ============================================================
 
 # Words are kept neutral: a name is a label a player wears, not a
@@ -1397,7 +1407,6 @@ def test_playstyle_stability(
 # A trait whose side has no word is skipped when naming, and
 # the next-biggest difference supplies the word.
 TRAIT_DESCRIPTORS = {
-    "aggression_mean": ("Patient", "Aggressive"),
     "drop_efficiency_mean": (None, "Precise"),
     "error_to_winner_ratio": ("Clean", None),
     "aggression_std": ("Steady", "Unpredictable"),
@@ -1417,17 +1426,16 @@ DEFAULT_IDENTITY_NOUN = "All-Court Player"
 # Which FAMILY each trait belongs to. A name takes at most one
 # adjective per family.
 #
-# Five of the eight traits describe five different spread
-# features -- whether the aggression varies, whether the drops
+# Five of the seven traits describe five different spread
+# features -- whether the finishing varies, whether the drops
 # do, whether the scoring does -- and each is a genuinely
 # different measurement. To a reader they are the same word. A
 # cluster above average on two of them used to be named
 # "Advanced Streaky Inconsistent Driver", which nobody can read
 # aloud and which says one thing twice. One word per family
-# keeps the real detail (a temperament word AND a consistency
+# keeps the real detail (a precision word AND a consistency
 # word still both appear) while never repeating itself.
 TRAIT_FAMILIES = {
-    "aggression_mean": "temperament",
     "drop_efficiency_mean": "precision",
     "error_to_winner_ratio": "precision",
     "aggression_std": "consistency",
@@ -1802,23 +1810,23 @@ def _generate_unique_playstyle_names(
 
     This is what lets naming keep working if a skill group is
     ever split into more style clusters than 2 adjectives can
-    tell apart -- as clusters increase, this tries 3 adjectives,
-    then the full trait vocabulary, before it ever resorts to
-    numbering duplicates.
+    tell apart -- as clusters increase, this tries one adjective
+    per family before it ever resorts to numbering duplicates.
     """
 
     cluster_ids = list(
         scaled_centroids.index
     )
 
-    # Two, then three. There is no point trying more: a name
-    # takes at most one adjective per family and there are three
-    # families, so the fourth attempt would produce the same
-    # words. Breaking a tie by stacking two words from the same
-    # family is exactly what TRAIT_FAMILIES removed, and it must
-    # not come back in through this door -- a numbered duplicate
-    # below is honest, "Streaky Inconsistent" is not.
-    trait_counts_to_try = [2, 3]
+    # Two, then one per family. There is no point trying more: a
+    # name takes at most one adjective per family, so a longer
+    # attempt would produce the same words. Breaking a tie by
+    # stacking two words from the same family is exactly what
+    # TRAIT_FAMILIES removed, and it must not come back in through
+    # this door -- a numbered duplicate below is honest,
+    # "Streaky Inconsistent" is not.
+    families = len(set(TRAIT_FAMILIES.values()))
+    trait_counts_to_try = sorted({min(2, families), families})
 
     archetype_map = {}
 

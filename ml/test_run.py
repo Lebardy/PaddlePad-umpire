@@ -393,12 +393,17 @@ check("two of those at once still say Unpredictable only once",
       words_for(aggression_std=1.0, dink_error_rate_std=0.9) == ["Unpredictable"],
       str(words_for(aggression_std=1.0, dink_error_rate_std=0.9)))
 check("a style most set apart by more mistakes per winner gets the next difference's word instead",
-      words_for(error_to_winner_ratio=1.5, aggression_mean=-0.6, winner_rate_std=-0.4)
-      == ["Patient", "Consistent"],
-      str(words_for(error_to_winner_ratio=1.5, aggression_mean=-0.6, winner_rate_std=-0.4)))
+      words_for(error_to_winner_ratio=1.5, winner_rate_std=-0.4) == ["Consistent"],
+      str(words_for(error_to_winner_ratio=1.5, winner_rate_std=-0.4)))
 check("and so does one most set apart by fewer drops landing",
-      words_for(drop_efficiency_mean=-1.5, aggression_mean=0.6) == ["Aggressive"],
-      str(words_for(drop_efficiency_mean=-1.5, aggression_mean=0.6)))
+      words_for(drop_efficiency_mean=-1.5, drop_efficiency_std=0.6) == ["Inconsistent"],
+      str(words_for(drop_efficiency_mean=-1.5, drop_efficiency_std=0.6)))
+check("the share of finishes that are winners shapes the styles but is never a word",
+      "aggression_mean" in PLAYSTYLE_CLUSTERING_FEATURES
+      and not every_word & {"Patient", "Aggressive"}
+      and words_for(aggression_mean=2.0, winner_rate_std=0.5) == ["Streaky"]
+      and words_for(aggression_mean=-2.0) == [],
+      str([words_for(aggression_mean=2.0, winner_rate_std=0.5), words_for(aggression_mean=-2.0)]))
 check("the other side of those two keeps its word",
       [words_for(error_to_winner_ratio=-1.0), words_for(drop_efficiency_mean=1.0)]
       == [["Clean"], ["Precise"]])

@@ -66,10 +66,6 @@ import Collapsible from '../components/Collapsible'
 // `says(way)` finishes "Compared with your group, players with your
 // style …" for a style that sits higher or lower than its group.
 const MEASURES = {
-  aggression_mean: {
-    label: 'going for winners', as: 'percent', better: 'neither',
-    says: (way) => `go for winners ${way === 'higher' ? 'more' : 'less'} often`,
-  },
   drop_efficiency_mean: {
     label: 'drop shots landing', as: 'percent', better: 'higher',
     says: (way) => `land their drop shots ${way === 'higher' ? 'more' : 'less'} often`,
@@ -78,9 +74,11 @@ const MEASURES = {
     label: 'mistakes per winning shot', as: 'ratio', better: 'lower',
     says: (way) => `make ${way === 'higher' ? 'more' : 'fewer'} mistakes for every winning shot`,
   },
+  // The share of a player's finishes (winners and mistakes) that were
+  // winners: how cleanly they finish, not how often they attack.
   aggression_std: {
-    label: 'change in going for winners, match to match', as: 'swing-percent', better: 'neither',
-    says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how often they go for winners`,
+    label: 'change in how many of your finishes are winners, match to match', as: 'swing-percent', better: 'neither',
+    says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how many of their finishes are winners`,
   },
   drop_efficiency_std: {
     label: 'change in drops landing, match to match', as: 'swing-percent', better: 'neither',
