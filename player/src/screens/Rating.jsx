@@ -213,7 +213,9 @@ function PointsArm({ points, widest, label }) {
  * with the one-line answer and the total still showing while it is shut.
  */
 function Score({ rallyRating }) {
-  const moved = rallyRating.movedMost
+  const often = rallyRating.mostOften
+  const won = often?.won[0]
+  const lost = often?.lost[0]
   const rows = [...(rallyRating.breakdown ?? [])].sort((a, b) => b.points - a.points)
   const widest = Math.max(...rows.map((row) => Math.abs(row.points)), 0)
   const total = rallyRating.points - 1500
@@ -230,15 +232,15 @@ function Score({ rallyRating }) {
               <p className="step-line">
                 {/* The table's answer in words, only once there are enough
                     rallies with an ending to call it a habit. */}
-                {moved && (moved.gained[0] || moved.cost[0]) && (
+                {often && (won || lost) && (
                   <>
-                    Of the rallies you ended,{' '}
-                    {moved.gained[0] && (
-                      <><strong>{endingPhrase(moved.gained[0].ending).toLowerCase()}</strong> earned you the most</>
+                    Of the rallies you ended, you{' '}
+                    {won && (
+                      <>won the most with <strong>{endingPhrase(won.ending).toLowerCase()}</strong> ({countWords(won)}, {signed(won.points)})</>
                     )}
-                    {moved.gained[0] && moved.cost[0] && '; '}
-                    {moved.cost[0] && (
-                      <><strong>{endingPhrase(moved.cost[0].ending).toLowerCase()}</strong> cost you the most</>
+                    {won && lost && ' and '}
+                    {lost && (
+                      <>lost the most with <strong>{endingPhrase(lost.ending).toLowerCase()}</strong> ({countWords(lost)}, {signed(lost.points)})</>
                     )}
                     .{' '}
                   </>
@@ -320,11 +322,11 @@ function Score({ rallyRating }) {
  * practise. It needs no nightly run, so it shows for any rated player.
  *
  * Waits for the same 20 rallies with an ending that "What's moving it"
- * waits for before naming a habit (movedMost is null until then): a tip
+ * waits for before naming a habit (mostOften is null until then): a tip
  * aimed at two unlucky rallies would be advice about nothing.
  */
 function WorkOn({ rallyRating }) {
-  const enough = Boolean(rallyRating.movedMost)
+  const enough = Boolean(rallyRating.mostOften)
   const faults = enough ? faultsToWorkOn(rallyRating.breakdown) : []
 
   return (

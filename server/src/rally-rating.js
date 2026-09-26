@@ -323,21 +323,26 @@ export function rateHistory(matches, options = {}) {
   return ratings
 }
 
-export const MOVED_MOST_MIN_RALLIES = 20
+export const MOST_OFTEN_MIN_RALLIES = 20
 
 /**
- * The two endings that earned this player the most points, and the two
- * that cost the most, from the shots they ended themselves. Null until
- * enough rallies carry an ending to say anything.
+ * The two winning shots and the two mistakes this player ended the most
+ * rallies with, and what each did to their points. Ranked by how often,
+ * not by points: every rally counts the same, so the two nearly always
+ * agree, and where they don't (a rally against a newcomer can move
+ * nothing) "the most" should still mean what it says. The numbers are the
+ * rating screen's own table rows, so the sentence and the table match.
+ * Null until enough rallies carry an ending to say anything.
  */
-export function movedMost(rating) {
-  if (!rating || rating.detailedRallies < MOVED_MOST_MIN_RALLIES) return null
-  const entries = Object.entries(rating.byEnding).map(([ending, points]) => ({ ending, points }))
-  const round = ({ ending, points }) => ({ ending, points: Math.round(points) })
-  return {
-    gained: entries.filter((e) => e.points > 0).sort((a, b) => b.points - a.points).slice(0, 2).map(round),
-    cost: entries.filter((e) => e.points < 0).sort((a, b) => a.points - b.points).slice(0, 2).map(round),
-  }
+export function mostOften(rating) {
+  if (!rating || rating.detailedRallies < MOST_OFTEN_MIN_RALLIES) return null
+  const rows = wholeBreakdown(rating).filter((row) => row.kind === 'ending')
+  const top = (outcome, sign) => rows
+    .filter((row) => rallyEnding(row.ending)?.outcome === outcome)
+    .sort((a, b) => b.rallies - a.rallies || sign * (b.points - a.points) || a.ending.localeCompare(b.ending))
+    .slice(0, 2)
+    .map(({ ending, rallies, points }) => ({ ending, rallies, points }))
+  return { won: top('winner', 1), lost: top('error', -1) }
 }
 
 /**
@@ -386,7 +391,7 @@ export function rallyRatingFor(ratings, playerId, { forRatingScreen = false } = 
     earlyEstimate: rating.matches < EARLY_ESTIMATE_MATCHES,
   }
   if (forRatingScreen) {
-    response.movedMost = movedMost(rating)
+    response.mostOften = mostOften(rating)
     // The player's own arithmetic only: their rows and their matches.
     // Partner and opponent rows are totals of what those rallies did to
     // THIS player's points, which says nothing about anyone else's.

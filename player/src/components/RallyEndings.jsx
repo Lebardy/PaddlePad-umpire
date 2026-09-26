@@ -3,9 +3,9 @@
 //
 // Two short lists -- won with a shot, lost with a mistake -- in everyday
 // words, largest first, each with a bar scaled to its own list. Under
-// them, one sentence per list naming the ending that moved the player's
-// points most; before they are rated (no points yet) it names the most
-// frequent ending instead, so no points appear early.
+// them, one sentence per list naming the ending they had most often, with
+// its count and, once they are rated, what it did to their points; before
+// then no points appear.
 //
 // Only rallies this player ended themselves: a partner's shots describe
 // the partner. Renders nothing when no rally they ended carried an ending,
@@ -35,10 +35,19 @@ function EndingList({ title, rows, className }) {
   )
 }
 
-function mostMoved(rows, sign) {
-  const moved = rows.filter((row) => row.points !== null && Math.sign(row.points) === sign)
-  if (moved.length === 0) return null
-  return moved.reduce((best, row) => (Math.abs(row.points) > Math.abs(best.points) ? row : best))
+// The row with the most rallies; on a tie, the one that moved the points
+// most. Ranked by how often because the sentence says "the most rallies".
+function mostOften(rows) {
+  if (rows.length === 0) return null
+  return rows.reduce((best, row) =>
+    row.rallies > best.rallies ||
+    (row.rallies === best.rallies && Math.abs(row.points ?? 0) > Math.abs(best.points ?? 0))
+      ? row
+      : best)
+}
+
+function signed(value) {
+  return value > 0 ? `+${value}` : value < 0 ? `−${Math.abs(value)}` : '0'
 }
 
 function RallyEndings({ rally }) {
@@ -49,8 +58,8 @@ function RallyEndings({ rally }) {
   const lost = endings.filter((row) => row.outcome === 'error')
   const rated = endings.some((row) => row.points !== null)
 
-  const earned = rated ? mostMoved(won, 1) : won[0]
-  const cost = rated ? mostMoved(lost, -1) : lost[0]
+  const earned = mostOften(won)
+  const cost = mostOften(lost)
 
   return (
     <div className="endings">
@@ -60,10 +69,10 @@ function RallyEndings({ rally }) {
       {(earned || cost) && (
         <p className="endings-note">
           {cost && (rated
-            ? <><strong>{endingPhrase(cost.ending)}</strong> cost you the most points in this match ({`−${Math.abs(cost.points)}`}).{' '}</>
+            ? <><strong>{endingPhrase(cost.ending)}</strong> lost you the most rallies in this match ({cost.rallies}, {signed(cost.points)}).{' '}</>
             : <><strong>{endingPhrase(cost.ending)}</strong> was your most common mistake.{' '}</>)}
           {earned && (rated
-            ? <><strong>{endingPhrase(earned.ending)}</strong> earned you the most (+{earned.points}).</>
+            ? <><strong>{endingPhrase(earned.ending)}</strong> won you the most ({earned.rallies}, {signed(earned.points)}).</>
             : <><strong>{endingPhrase(earned.ending)}</strong> was your most common winning shot.</>)}
         </p>
       )}
