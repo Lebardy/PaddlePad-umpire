@@ -22,6 +22,7 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
 
 const TABLES = [
   'facilities',
+  'facility_logos',
   'umpires',
   'admins',
   'admin_setup_links',
@@ -39,7 +40,11 @@ const dump = { takenAt: new Date().toISOString(), tables: {} }
 
 for (const table of TABLES) {
   const { rows } = await pool.query(`SELECT * FROM ${table}`)
-  dump.tables[table] = rows
+  // Pictures (facility_logos) as base64 text: a Buffer would otherwise
+  // be written out as one JSON number per byte.
+  dump.tables[table] = rows.map((row) => Object.fromEntries(
+    Object.entries(row).map(([key, value]) => [key, Buffer.isBuffer(value) ? value.toString('base64') : value]),
+  ))
 }
 
 // Counts on stderr so they're visible even while stdout is redirected

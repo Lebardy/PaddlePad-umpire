@@ -180,6 +180,16 @@ export function umpireScope(facilityId, params, column) {
   return `${column} = $${params.length}::uuid`
 }
 
+/**
+ * The address a facility's logo is served at, or null without one. The
+ * `v` stamp is when the logo last changed, so the long cache on that
+ * address never shows an old logo after a new one is uploaded.
+ */
+export function logoPath(facilityId, logoUpdatedAt) {
+  if (!logoUpdatedAt) return null
+  return `/logos/${facilityId}?v=${new Date(logoUpdatedAt).getTime()}`
+}
+
 export function facilityPayload(row) {
   return {
     id: row.id,
@@ -190,6 +200,7 @@ export function facilityPayload(row) {
     hourlyFeeCentavos: row.hourly_fee_centavos ?? null,
     feeText: feeText(row.hourly_fee_centavos ?? null),
     details: row.details ?? null,
+    logoUrl: logoPath(row.id, row.logo_updated_at ?? null),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

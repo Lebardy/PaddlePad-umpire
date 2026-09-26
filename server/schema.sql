@@ -686,6 +686,18 @@ CREATE TABLE IF NOT EXISTS facilities (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS facilities_name_lower_idx ON facilities (lower(name));
 
+-- A facility's logo, shrunk in the admin's browser before upload: the
+-- full one fits inside 512 x 512, the small one (for lists) inside
+-- 128 x 128. Its own table so facility lists never carry picture bytes.
+CREATE TABLE IF NOT EXISTS facility_logos (
+    facility_id UUID PRIMARY KEY REFERENCES facilities (id) ON DELETE CASCADE,
+    full_image  BYTEA NOT NULL,
+    small_image BYTEA NOT NULL,
+    mime_type   TEXT  NOT NULL CHECK (mime_type IN ('image/webp', 'image/png', 'image/jpeg')),
+    updated_by  UUID REFERENCES admins (id) ON DELETE SET NULL,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 ALTER TABLE umpires        ADD COLUMN IF NOT EXISTS facility_id UUID REFERENCES facilities (id);
 ALTER TABLE admins         ADD COLUMN IF NOT EXISTS facility_id UUID REFERENCES facilities (id);
 ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS facility_id UUID REFERENCES facilities (id);
