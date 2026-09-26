@@ -22,7 +22,7 @@ import { getMatchOfTheMonthStory, getMonthlyBoard } from '../board.js'
 import { isUuid, normalizePlayerName, playerNameError } from '../validate.js'
 import { readGame } from '../drama.js'
 import { getRallyRatings, invalidateRallyRatings } from '../rally-rating-store.js'
-import { rallyRatingFor } from '../rally-rating.js'
+import { rallyRatingFor, ratingHistoryFor } from '../rally-rating.js'
 import { findFacility, listFacilities } from '../facility-store.js'
 import { playerFacilityPage, playerFacilitySummary } from '../facility-rules.js'
 
@@ -110,6 +110,17 @@ router.get('/standing', async (req, res) => {
       rallyRating: rallyRatingFor(ratings, req.player.id, { forRatingScreen: true }),
     },
   })
+})
+
+/**
+ * The player's whole rating history, for the graph page only.
+ *
+ * Its own route for the same reason as /standing: a long history is
+ * only wanted once somebody taps through to the graph, not on every
+ * launch. Null until they are rated.
+ */
+router.get('/rating/history', async (req, res) => {
+  res.json({ history: ratingHistoryFor(await getRallyRatings(query), req.player.id) })
 })
 
 /**

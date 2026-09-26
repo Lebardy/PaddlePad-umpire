@@ -306,6 +306,10 @@ export function rateHistory(matches, options = {}) {
       rallies: p.rallies,
       detailedRallies: p.detailedRallies,
       trend: p.history.slice(-TREND_MATCHES).map((value) => Math.round(value)),
+      // Rounded points after every counted match, oldest first, for the
+      // rating graph. Rounded per match, like the trend, so the line ends
+      // exactly on the number shown.
+      timeline: p.history.map((value, i) => ({ at: isoDate(p.playedIn[i][1]), points: Math.round(value) })),
       recentChange: Math.round(p.points - before),
       byEnding: p.byEnding,
       ledger: p.ledger,
@@ -376,11 +380,44 @@ function wholeBreakdown(rating) {
   return rows.map(({ exact, ...row }) => row)
 }
 
+/** pg returns timestamps as Dates; the app is sent ISO strings either way. */
+function isoDate(value) {
+  return value instanceof Date ? value.toISOString() : value
+}
+
+const WEEK_MS = 7 * 86_400_000
+
+/**
+ * The last seven days for the overview card: where the player stood
+ * seven days before `now`, and the points after each match since. An
+ * empty week still has a `from`, which is simply where they are now.
+ */
+function lastWeekOf(rating, now) {
+  const cutoff = now - WEEK_MS
+  const inside = rating.timeline.findIndex((entry) => Date.parse(entry.at) > cutoff)
+  const start = inside === -1 ? rating.timeline.length : inside
+  return {
+    from: start === 0 ? START_POINTS : rating.timeline[start - 1].points,
+    matches: rating.timeline.slice(start),
+  }
+}
+
+/**
+ * The player's whole rating history for the graph page: rounded points
+ * after every counted match, with when it ended. Their own numbers only,
+ * and null until they are rated, like the headline itself.
+ */
+export function ratingHistoryFor(ratings, playerId) {
+  const rating = ratings.get(playerId)
+  if (!rating || rating.matches < MIN_MATCHES) return null
+  return { matches: rating.timeline }
+}
+
 /** Ledger rows that are not one of the player's own endings. */
 export const LEDGER_KINDS = ['untagged', 'partner', 'opponent_winner', 'opponent_error', 'match_result']
 
 /** What one player is sent about their own rally rating. */
-export function rallyRatingFor(ratings, playerId, { forRatingScreen = false } = {}) {
+export function rallyRatingFor(ratings, playerId, { forRatingScreen = false, now = Date.now() } = {}) {
   const rating = ratings.get(playerId)
   const have = rating?.matches ?? 0
   if (have < MIN_MATCHES) return { state: 'not_enough_matches', have, need: MIN_MATCHES }
@@ -394,6 +431,8 @@ export function rallyRatingFor(ratings, playerId, { forRatingScreen = false } = 
     matches: rating.matches,
     winChanceVsStart: Math.round(expectedWin(rating.rawPoints, START_POINTS) * 100),
     earlyEstimate: rating.matches < EARLY_ESTIMATE_MATCHES,
+    lastWeek: lastWeekOf(rating, now),
+    lastPlayedAt: rating.timeline.at(-1).at,
   }
   if (forRatingScreen) {
     response.mostOften = mostOften(rating)
