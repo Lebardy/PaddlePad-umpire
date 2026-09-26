@@ -21,6 +21,11 @@ sys.path.insert(0, str(HERE))
 
 from pipeline.player_profiles import aggregate_player_profiles
 from pipeline.skill_model import build_skill_model
+from pipeline.clustering import (
+    PLAYSTYLE_CLUSTERING_FEATURES,
+    cluster_playstyles,
+    test_playstyle_k_values,
+)
 from run import (
     EVIDENCE_COLUMNS,
     SCORE_PARTS,
@@ -219,6 +224,38 @@ try:
     check("a rated player with no rally points is refused", False, "it published")
 except RuntimeError as error:
     check("a rated player with no rally points is refused", "no rally points" in str(error), str(error))
+
+
+print("\nstyle K-Means on chosen columns")
+
+# Twenty players whose two extra columns split them cleanly in half, while
+# the thirteen measurements are noise that splits them some other way.
+# Pointed at the extra columns, the style K-Means has to find the halves.
+column_rng = np.random.default_rng(11)
+halves = np.repeat([0, 1], 10)
+columns_frame = pd.DataFrame(
+    column_rng.normal(size=(20, len(PLAYSTYLE_CLUSTERING_FEATURES))),
+    columns=PLAYSTYLE_CLUSTERING_FEATURES,
+)
+columns_frame.insert(0, "player_id", [f"p{i}" for i in range(20)])
+columns_frame["skill_group"] = "Everyone"
+columns_frame["pc_1"] = np.where(halves == 0, -5.0, 5.0) + column_rng.normal(scale=0.1, size=20)
+columns_frame["pc_2"] = column_rng.normal(scale=0.1, size=20)
+
+chosen_data, chosen_k, _ = test_playstyle_k_values(
+    columns_frame, "Everyone", features=["pc_1", "pc_2"])
+by_columns, _, _ = cluster_playstyles(chosen_data, chosen_k, features=["pc_1", "pc_2"])
+by_default, _, _ = cluster_playstyles(chosen_data, 2)
+by_measurements, _, _ = cluster_playstyles(chosen_data, 2, features=PLAYSTYLE_CLUSTERING_FEATURES)
+
+check("pointed at other columns, the style K-Means picks the split they show",
+      chosen_k == 2, f"k={chosen_k}")
+check("and puts each half in a style of its own",
+      by_columns["playstyle_cluster"].nunique() == 2
+      and by_columns.groupby(halves)["playstyle_cluster"].nunique().max() == 1,
+      str(by_columns["playstyle_cluster"].tolist()))
+check("left alone, it still clusters on the thirteen measurements",
+      (by_default["playstyle_cluster"] == by_measurements["playstyle_cluster"]).all())
 
 
 print("\npayload")

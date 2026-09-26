@@ -794,7 +794,8 @@ def test_playstyle_k_values(
     skill_group,
     k_min=2,
     k_max=5,
-    random_state=42
+    random_state=42,
+    features=None
 ):
     """
     Test K values for second-level playstyle clustering
@@ -809,6 +810,11 @@ def test_playstyle_k_values(
               K-Means #2
                     ↓
               playstyle groups
+
+    `features` names the columns K-Means sees. By default
+    the standardized playstyle features; PaddlePad passes
+    the component scores from
+    feature_engineering.extract_playstyle_components.
     """
 
     # --------------------------------------------------------
@@ -837,8 +843,11 @@ def test_playstyle_k_values(
     # Extract standardized behavioral features
     # --------------------------------------------------------
 
+    if features is None:
+        features = PLAYSTYLE_CLUSTERING_FEATURES
+
     X = group_data[
-        PLAYSTYLE_CLUSTERING_FEATURES
+        features
     ].copy()
 
     maximum_k = min(
@@ -916,14 +925,21 @@ def test_playstyle_k_values(
 def cluster_playstyles(
     group_data,
     best_k,
-    random_state=42
+    random_state=42,
+    features=None
 ):
     """
     Run second-level K-Means inside one skill group.
+
+    `features` names the columns K-Means sees, as in
+    test_playstyle_k_values.
     """
 
+    if features is None:
+        features = PLAYSTYLE_CLUSTERING_FEATURES
+
     X = group_data[
-        PLAYSTYLE_CLUSTERING_FEATURES
+        features
     ].copy()
 
     kmeans = KMeans(
