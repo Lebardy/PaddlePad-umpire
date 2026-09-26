@@ -219,7 +219,7 @@ section('What a player is sent')
     rated.state, 'rated', 'Five counted matches is enough.')
   check('the response carries exactly the agreed fields',
     Object.keys(rated).sort(),
-    ['matches', 'points', 'rallies', 'recentChange', 'state', 'trend', 'winChanceVsStart'],
+    ['earlyEstimate', 'matches', 'points', 'rallies', 'recentChange', 'state', 'trend', 'winChanceVsStart'],
     'Nothing about anyone else, and no movedMost unless asked for.')
   check('winChanceVsStart is a whole percentage against a 1500 player',
     rated.winChanceVsStart, Math.round(expectedWin(rateHistory(five).get(A1).rawPoints, START_POINTS) * 100),
@@ -246,6 +246,22 @@ section('What a player is sent')
   check('the rating screen response includes movedMost and the breakdown',
     ['movedMost', 'breakdown'].every((key) => key in rallyRatingFor(rateHistory(many), A1, { forRatingScreen: true })), true,
     'Only the rating screen needs them; the overview card stays small.')
+}
+
+section('Early estimate')
+{
+  // A1 plays one more match each time, from 4 matches to 11.
+  const games = Array.from({ length: 11 }, () => match([rally(A1, 'putaway')]))
+  const flag = (count, options) => {
+    const sent = rallyRatingFor(rateHistory(games.slice(0, count)), A1, options)
+    return 'earlyEstimate' in sent ? sent.earlyEstimate : 'absent'
+  }
+  check('the early-estimate label shows from 5 to 9 matches, not from 10, and not before a rating',
+    [4, 5, 6, 7, 8, 9, 10, 11].map((count) => flag(count)), ['absent', true, true, true, true, true, false, false],
+    'Matches played only, as decided on 2026-09-26; 10 is a judgment call that no data can pin down yet.')
+  check('the rating screen is sent the same flag',
+    [flag(7, { forRatingScreen: true }), flag(10, { forRatingScreen: true })], [true, false],
+    'The overview card and the rating screen share one headline, so both show the label.')
 }
 
 section('Where every point came from')

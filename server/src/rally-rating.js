@@ -41,6 +41,14 @@ export const MIN_MATCHES = 5
 export const TREND_MATCHES = 10
 export const RECENT_MATCHES = 5
 
+// A rating from fewer counted matches than this is shown to the player
+// as an early estimate. A judgment call, not a measured threshold: no
+// data can pin it down yet (decided 2026-09-26). It counts matches
+// played only, not who they were against: early on many small groups
+// only play each other, and a label nearly everyone carries means
+// nothing.
+export const EARLY_ESTIMATE_MATCHES = 10
+
 // The most a side can gain by winning a match, reached only by beating a
 // side they had no chance against: the side's reward is MATCH_REWARD
 // times (1 - their chance of winning the game), and the losers give up
@@ -375,6 +383,7 @@ export function rallyRatingFor(ratings, playerId, { forRatingScreen = false } = 
     rallies: rating.rallies,
     matches: rating.matches,
     winChanceVsStart: Math.round(expectedWin(rating.rawPoints, START_POINTS) * 100),
+    earlyEstimate: rating.matches < EARLY_ESTIMATE_MATCHES,
   }
   if (forRatingScreen) {
     response.movedMost = movedMost(rating)
