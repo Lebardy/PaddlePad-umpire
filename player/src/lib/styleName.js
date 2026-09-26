@@ -7,7 +7,7 @@
 // nothing to a player and makes them wonder what groups 1 and 2 are,
 // and the rating screen's ladder already shows where their group sits.
 // So the prefix is dropped whatever it is, and every name reads the
-// same way: "Erratic Patient All-Court Player".
+// same way: "Unpredictable Patient All-Court Player".
 //
 // The prefix is worked out from the group's own name the same way the
 // pipeline does (_skill_group_prefix in ml/pipeline/clustering.py), so

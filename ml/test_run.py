@@ -23,7 +23,9 @@ from pipeline.player_profiles import aggregate_player_profiles
 from pipeline.skill_model import build_skill_model
 from pipeline.clustering import (
     PLAYSTYLE_CLUSTERING_FEATURES,
+    TRAIT_DESCRIPTORS,
     cluster_playstyles,
+    describe_playstyle_name,
     test_playstyle_k_values,
     test_playstyle_stability,
 )
@@ -363,6 +365,46 @@ check("the style groups follow the boiled-down scores, not the raw measurements"
 check("and the styles still get names",
       clustered_rows["playstyle_archetype"].notna().all(),
       str(clustered_rows["playstyle_archetype"].unique().tolist()))
+
+
+print("\nplaystyle words")
+
+def words_for(**differences):
+    """The name's describing words for a style that differs from its
+    group's average only where given (in standard deviations)."""
+    profile = pd.Series(0.0, index=PLAYSTYLE_CLUSTERING_FEATURES)
+    for feature, z in differences.items():
+        profile[feature] = z
+    return [part["label"] for part in describe_playstyle_name(profile)
+            if part["family"] != "identity"]
+
+every_word = {word for pair in TRAIT_DESCRIPTORS.values() for word in pair}
+check("the stinging words are gone",
+      not every_word & {"Raw", "Error-Prone", "Erratic", "Volatile", "Shaky-Net"},
+      str(sorted(w for w in every_word if w)))
+check("Inconsistent and Streaky stay",
+      {"Inconsistent", "Streaky"} <= every_word)
+check("changing a lot from match to match in attack, mistakes or net play reads Unpredictable",
+      [words_for(aggression_std=1.0), words_for(general_error_rate_std=1.0),
+       words_for(dink_error_rate_std=1.0)] == [["Unpredictable"]] * 3,
+      str([words_for(aggression_std=1.0), words_for(general_error_rate_std=1.0),
+           words_for(dink_error_rate_std=1.0)]))
+check("two of those at once still say Unpredictable only once",
+      words_for(aggression_std=1.0, dink_error_rate_std=0.9) == ["Unpredictable"],
+      str(words_for(aggression_std=1.0, dink_error_rate_std=0.9)))
+check("a style most set apart by more mistakes per winner gets the next difference's word instead",
+      words_for(error_to_winner_ratio=1.5, aggression_mean=-0.6, winner_rate_std=-0.4)
+      == ["Patient", "Consistent"],
+      str(words_for(error_to_winner_ratio=1.5, aggression_mean=-0.6, winner_rate_std=-0.4)))
+check("and so does one most set apart by fewer drops landing",
+      words_for(drop_efficiency_mean=-1.5, aggression_mean=0.6) == ["Aggressive"],
+      str(words_for(drop_efficiency_mean=-1.5, aggression_mean=0.6)))
+check("the other side of those two keeps its word",
+      [words_for(error_to_winner_ratio=-1.0), words_for(drop_efficiency_mean=1.0)]
+      == [["Clean"], ["Precise"]])
+check("a style set apart only where there is no word gets none",
+      words_for(error_to_winner_ratio=1.5, drop_efficiency_mean=-1.0) == [],
+      str(words_for(error_to_winner_ratio=1.5, drop_efficiency_mean=-1.0)))
 
 
 print("\npayload")

@@ -1375,8 +1375,9 @@ def test_playstyle_stability(
 # arbitrary adjectives together does not.
 #
 # Naming compares a cluster only to its own siblings (other
-# style clusters in the same skill group), using the same
-# z-scored numbers K-Means itself clustered on -- this is
+# style clusters in the same skill group), using the thirteen
+# z-scored playstyle features (K-Means itself may cluster on
+# component scores; see interpret_playstyle_clusters) -- this is
 # dataset-agnostic by construction, unlike fixed absolute
 # thresholds.
 #
@@ -1386,15 +1387,24 @@ def test_playstyle_stability(
 # below and would just add redundant wording.
 # ============================================================
 
+# Words are kept neutral: a name is a label a player wears, not a
+# verdict. The high side of three spread features shares one
+# word, "Unpredictable", since each says only that something
+# changes a lot from match to match (the app names the exact
+# measurement beside the word). Two sides have no word at all
+# (None): fewer drops landing, and more mistakes per winner.
+# Mistakes are shown in the app as things to work on instead.
+# A trait whose side has no word is skipped when naming, and
+# the next-biggest difference supplies the word.
 TRAIT_DESCRIPTORS = {
     "aggression_mean": ("Patient", "Aggressive"),
-    "drop_efficiency_mean": ("Raw", "Precise"),
-    "error_to_winner_ratio": ("Clean", "Error-Prone"),
-    "aggression_std": ("Steady", "Erratic"),
+    "drop_efficiency_mean": (None, "Precise"),
+    "error_to_winner_ratio": ("Clean", None),
+    "aggression_std": ("Steady", "Unpredictable"),
     "drop_efficiency_std": ("Reliable", "Inconsistent"),
     "winner_rate_std": ("Consistent", "Streaky"),
-    "general_error_rate_std": ("Composed", "Volatile"),
-    "dink_error_rate_std": ("Solid-Net", "Shaky-Net")
+    "general_error_rate_std": ("Composed", "Unpredictable"),
+    "dink_error_rate_std": ("Solid-Net", "Unpredictable")
 }
 
 IDENTITY_DESCRIPTORS = {
@@ -1687,6 +1697,9 @@ def _rank_trait_descriptors(
     -- the feature travels with the label so callers can tell
     which family a word came from, and so a name can say what it
     was built from.
+
+    A side with no word (None in TRAIT_DESCRIPTORS) is left out,
+    so the next-biggest difference names the cluster instead.
     """
 
     scored = []
@@ -1702,6 +1715,9 @@ def _rank_trait_descriptors(
             if z >= 0
             else low_label
         )
+
+        if label is None:
+            continue
 
         scored.append(
             (abs(z), label, feature)
@@ -1726,9 +1742,9 @@ def generate_playstyle_archetype_name(
 ):
     """
     Generate a human-readable playstyle name from a cluster's
-    centroid in the SAME z-scored, skill-residualized space
-    K-Means actually clustered on (one row of the scaled
-    centroids computed in interpret_playstyle_clusters).
+    centroid in the z-scored, skill-residualized playstyle
+    features (one row of the scaled centroids computed in
+    interpret_playstyle_clusters).
 
     The name always has the shape:
 
