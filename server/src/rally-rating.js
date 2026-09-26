@@ -3,9 +3,9 @@
 //
 // Every counted rally is a small contest. The side that won it takes
 // points from the side that lost it -- more when the winners were the
-// weaker side -- weighted by how the rally ended. The player who ended
-// the rally takes three quarters of their side's share, their partner a
-// quarter; the other side splits theirs evenly.
+// weaker side -- and every rally counts the same, however it ended. The
+// player who ended the rally takes three quarters of their side's share,
+// their partner a quarter; the other side splits theirs evenly.
 //
 // Separate from the ML pipeline's skill_score on purpose. That score is
 // part of the thesis's K-Means pipeline (it names the skill clusters and
@@ -23,7 +23,7 @@
 
 import { DEFAULT_POINT_TARGET, deriveMatchState } from './pickleball.js'
 import { gameWinChance } from './game-chance.js'
-import { RALLY_ENDINGS, rallyEnding } from './rally-endings.js'
+import { rallyEnding } from './rally-endings.js'
 
 export const START_POINTS = 1500
 export const DEFAULT_K = 4
@@ -44,42 +44,6 @@ export const RECENT_MATCHES = 5
 // (0.839 with none), and the favourite won 19/24 (79%). The worst
 // winner's loss moved from −13 with no reward to −15 with it.
 export const MATCH_REWARD = 16
-
-// How much each ending moves. A first guess, agreed before any real
-// match carried endings: self-inflicted faults weigh more, faults that
-// are often forced or are bookkeeping weigh less. Revisit with real data.
-export const ENDING_WEIGHTS = {
-  ace: 1,
-  putaway: 1,
-  passing: 1,
-  lob: 1,
-  drop_winner: 1,
-  dink_winner: 1,
-  other_winner: 0.75,
-  out: 1,
-  net: 1,
-  dink_error: 1,
-  kitchen: 1.25,
-  service: 1.25,
-  foot_fault: 1.25,
-  two_bounce: 1.25,
-  net_touch: 0.5,
-  hit_by_ball: 0.5,
-  wrong_position: 0.5,
-  other_fault: 0.75,
-}
-
-for (const ending of RALLY_ENDINGS) {
-  if (typeof ENDING_WEIGHTS[ending.key] !== 'number') {
-    throw new Error(`rally-rating: no weight for ending ${ending.key}`)
-  }
-}
-
-/** A rally's weight. No detail (a rally from before endings) weighs 1. */
-export function endingWeight(detail) {
-  if (detail === undefined || detail === null) return 1
-  return ENDING_WEIGHTS[detail] ?? 1
-}
 
 /** The chance a side rated `ratingFor` wins a rally against `ratingAgainst`. */
 export function expectedWin(ratingFor, ratingAgainst, scale = DEFAULT_SCALE) {
@@ -133,10 +97,10 @@ function byWhenEnded(a, b) {
  * `matches` must already be the ones that count: completed and not voided.
  *
  * `options.onRally`, if given, is called once per counted rally with
- * `{ expected, weight }` -- the pre-rally chance the side that actually
- * won the rally was expected to (the same value the points update uses)
- * and that rally's ending weight. Lets callers (tuning scripts) score
- * per-rally predictions without duplicating the model.
+ * `{ expected }` -- the pre-rally chance the side that actually won the
+ * rally was expected to (the same value the points update uses). Lets
+ * callers (tuning scripts) score per-rally predictions without
+ * duplicating the model.
  *
  * `options.matchReward` sets the size of the match reward applied after
  * each match with a winner; defaults to MATCH_REWARD. 0 turns the
@@ -209,11 +173,14 @@ export function rateHistory(matches, options = {}) {
       const winners = actorSideWon ? actorSide : otherSide
       const losers = actorSideWon ? otherSide : actorSide
 
-      const weight = endingWeight(event.detail)
       const expected = expectedWin(average(winners), average(losers), scale)
-      options.onRally?.({ expected, weight })
+      options.onRally?.({ expected })
 
-      const stake = k * weight * (1 - expected)
+      // The same for every rally, however it ended. Hand-picked weights
+      // per ending were dropped on 2026-09-26: none of the real games
+      // available record the app's endings, so they could never be
+      // tested.
+      const stake = k * (1 - expected)
       const actorSideChange = actorSideWon ? stake : -stake
 
       // Worked out in full before anything is applied, so every share is

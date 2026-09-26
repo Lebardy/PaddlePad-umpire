@@ -5,20 +5,19 @@
 //   node server/scripts/check-rally-rating.mjs
 //
 // Every rally is a small contest: the side that won it takes points
-// from the side that lost, more for an upset, weighted by how the rally
-// ended. Pure functions only: hand-built matches, no database.
+// from the side that lost, more for an upset, and every rally counts the
+// same however it ended. Pure functions only: hand-built matches, no
+// database.
 // ============================================================
 
 import { randomUUID } from 'node:crypto'
 import {
   ACTOR_SHARE,
   DEFAULT_K,
-  ENDING_WEIGHTS,
   MATCH_REWARD,
   MIN_MATCHES,
   MOVED_MOST_MIN_RALLIES,
   START_POINTS,
-  endingWeight,
   expectedWin,
   movedMost,
   rallyRatingFor,
@@ -68,24 +67,29 @@ function match(events, { doubles = true, id = randomUUID() } = {}) {
   }
 }
 
-section('The ending weights')
-check(
-  'every ending has a weight',
-  RALLY_ENDINGS.filter((e) => typeof ENDING_WEIGHTS[e.key] !== 'number').map((e) => e.key),
-  [],
-  'An ending without a weight would silently count as 1 and nobody would notice.',
-)
-check(
-  'weights match the agreed table',
-  [endingWeight('kitchen'), endingWeight('out'), endingWeight('other_winner'), endingWeight('hit_by_ball'), endingWeight(undefined)],
-  [1.25, 1, 0.75, 0.5, 1],
-  'Self-inflicted faults weigh more, forced or bookkeeping ones less, and older rallies with no ending count normally.',
-)
+section('Every rally counts the same')
+{
+  // One rally ended by A1 between fresh sides, once for every ending.
+  const moved = (key) => rateHistory([match([rally(A1, key)])]).get(A1).rawPoints - START_POINTS
+  const stake = DEFAULT_K * (1 - 0.5) * ACTOR_SHARE
+  check(
+    'every ending moves points by the same amount',
+    RALLY_ENDINGS.filter((e) => !near(Math.abs(moved(e.key)), stake)).map((e) => e.key),
+    [],
+    'Endings are still recorded and shown; they no longer change what a rally is worth (decided 2026-09-26).',
+  )
+  check(
+    'endings that used to weigh more or less now move exactly as much as a put-away',
+    ['kitchen', 'other_winner', 'hit_by_ball', 'out'].map((key) => near(Math.abs(moved(key)), moved('putaway'))),
+    [true, true, true, true],
+    'A kitchen fault used to weigh 1.25, another kind of winner 0.75, being hit by the ball 0.5.',
+  )
+}
 
 section('One rally between equal sides')
 {
   const ratings = rateHistory([match([rally(A1, 'putaway')])])
-  const stake = DEFAULT_K * 1 * (1 - 0.5)
+  const stake = DEFAULT_K * (1 - 0.5)
   check('everyone started at 1500 and equal sides expect 50%', expectedWin(START_POINTS, START_POINTS), 0.5,
     'With no history, a rally is a coin flip.')
   check('the hitter gains three quarters of the stake',
@@ -105,10 +109,10 @@ section('One rally between equal sides')
 section('A fault')
 {
   const ratings = rateHistory([match([rally(A1, 'kitchen')])])
-  const stake = DEFAULT_K * 1.25 * (1 - 0.5)
-  check('the player who faulted loses three quarters of a heavier stake',
+  const stake = DEFAULT_K * (1 - 0.5)
+  check('the player who faulted loses three quarters of the stake',
     near(ratings.get(A1).rawPoints, START_POINTS - stake * ACTOR_SHARE), true,
-    'A kitchen fault weighs 1.25 and costs the player who made it.')
+    'A kitchen fault costs the player who made it the same as any other lost rally.')
   check('the other side gains it',
     near(ratings.get(B1).rawPoints, START_POINTS + stake / 2), true,
     'Their opponents won that rally.')
@@ -154,7 +158,7 @@ section('What does not count')
     'Scoring stops when the game is won, so points must too.')
 
   const old = rateHistory([match([rally(A1, 'winner')])])
-  check('a rally with no ending still counts at weight 1',
+  check('a rally with no ending still counts in full',
     near(old.get(A1).rawPoints, START_POINTS + DEFAULT_K * 0.5 * ACTOR_SHARE), true,
     'Every match scored before endings existed still says who won each rally.')
 }
@@ -168,8 +172,9 @@ section('The onRally callback')
     calls.length, 1, 'A third shot describes how a rally started, not a contest of its own.')
   check('expected is 0.5 on the first rally between fresh players',
     calls[0].expected, 0.5, 'With no history yet, either side is an even chance to win the rally.')
-  check('weight matches the ending that closed the rally',
-    calls[0].weight, endingWeight('putaway'), 'The callback carries the same weight the points update used.')
+  check('the callback carries the expected chance and nothing else',
+    Object.keys(calls[0]), ['expected'],
+    'Every rally weighs the same, so there is no weight to pass on; the prediction script reads only expected.')
 }
 
 section('Order, history and the summary fields')
@@ -223,14 +228,14 @@ section('What a player is sent')
     'Naming a habit from five rallies would be guessing.')
 
   const many = Array.from({ length: 6 }, () =>
-    match([rally(A1, 'putaway'), rally(A1, 'putaway'), rally(A1, 'lob'), rally(A1, 'net'), rally(A1, 'kitchen')]),
+    match([rally(A1, 'putaway'), rally(A1, 'putaway'), rally(A1, 'lob'), rally(A1, 'net'), rally(A1, 'net'), rally(A1, 'kitchen')]),
   )
   const rich = rateHistory(many).get(A1)
   const moved = movedMost(rich)
   check('with enough rallies it names the top gains and costs',
     [moved.gained.map((g) => g.ending), moved.cost.map((c) => c.ending)],
-    [['putaway', 'lob'], ['kitchen', 'net']],
-    'Put-aways earned the most; the heavier kitchen fault cost more than hitting into the net.')
+    [['putaway', 'lob'], ['net', 'kitchen']],
+    'Two put-aways a match earned more than one lob; two nets a match cost more than one kitchen fault.')
   check('points in movedMost are whole numbers',
     moved.gained.every((g) => Number.isInteger(g.points)), true, 'Players never see decimals.')
   check('the rating screen response includes movedMost and the breakdown',
@@ -240,7 +245,7 @@ section('What a player is sent')
 
 section('Where every point came from')
 {
-  // One put-away by A1 between fresh sides: stake = K * 1 * 0.5.
+  // One put-away by A1 between fresh sides: stake = K * 0.5.
   const one = rateHistory([match([rally(A1, 'putaway')])])
   const stake = DEFAULT_K * 0.5
   const ledger = (id) => Object.fromEntries(Object.entries(one.get(id).ledger).map(([k, v]) => [k, [v.rallies, Math.round(v.points * 1e6) / 1e6]]))
