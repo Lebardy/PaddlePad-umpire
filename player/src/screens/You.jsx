@@ -537,8 +537,8 @@ function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
         <More label="Where do the numbers come from?">
           <p>
             Most numbers here are plain counts of what was tapped courtside.
-            Two things look further: your skill rating, which is measured
-            against everyone who has been rated, and the monthly board, which
+            Two things look further: your PaddlePad Rating, which is worked
+            out rally by rally from every match you play, and the monthly board, which
             names people for what they did — it never ranks anyone.
           </p>
         </More>

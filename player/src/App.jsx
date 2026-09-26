@@ -6,6 +6,7 @@ import MatchDetail from './screens/MatchDetail'
 import People from './screens/People'
 import PersonDetail from './screens/PersonDetail'
 import Rating from './screens/Rating'
+import RatingGraph from './screens/RatingGraph'
 import BoardMatch from './screens/BoardMatch'
 import FacilityPage from './screens/FacilityPage'
 import You from './screens/You'
@@ -28,6 +29,7 @@ const TITLES = {
   '/matches': 'Matches · PaddlePad',
   '/people': 'People · PaddlePad',
   '/you': 'You · PaddlePad',
+  '/rating/graph': 'PaddlePad Rating · PaddlePad',
 }
 
 /**
@@ -100,6 +102,7 @@ function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
   if (path === '/')
     screen = <Overview player={player} onPlayerChange={onPlayerChange} />
   else if (path === '/rating') screen = <Rating />
+  else if (path === '/rating/graph') screen = <RatingGraph />
   else if (path === '/matches') screen = <Matches />
   else if (matchRoute) screen = <MatchDetail id={matchRoute.id} />
   else if (path === '/people') screen = <People />

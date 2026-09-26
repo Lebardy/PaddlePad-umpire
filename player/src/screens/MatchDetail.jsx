@@ -67,13 +67,12 @@ function signed(value) {
 function MatchPoints({ rally, won }) {
   if (!rally || rally.change === null) return null
   const { change, result } = rally
-  const unit = Math.abs(change) === 1 ? 'point' : 'points'
   return (
     <>
       <p className={`match-points ${change > 0 ? 'is-up' : change < 0 ? 'is-down' : ''}`}>
-        {change > 0 && `▲ +${change} ${unit} in this match`}
-        {change < 0 && `▼ −${Math.abs(change)} ${unit} in this match`}
-        {change === 0 && 'No change in points'}
+        {change > 0 && `▲ +${change} PPR in this match`}
+        {change < 0 && `▼ −${Math.abs(change)} PPR in this match`}
+        {change === 0 && 'No change in PPR'}
       </p>
       {result !== null && result !== 0 && (
         <p className="match-points-split">

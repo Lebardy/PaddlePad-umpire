@@ -191,7 +191,7 @@ function Score({ rallyRating }) {
               </p>
             }
           >
-            <ul className="parts-list" aria-label="Where your points came from">
+            <ul className="parts-list" aria-label="Where your PPR came from">
               {rows.map((row, i) => {
                 const label = row.ending ? endingPhrase(row.ending) : LEDGER_WORDS[row.kind]
                 return (
@@ -208,7 +208,7 @@ function Score({ rallyRating }) {
                     <PointsArm
                       points={row.points}
                       widest={widest}
-                      label={`${label}: ${signed(row.points)} points over ${countWords(row)}`}
+                      label={`${label}: ${signed(row.points)} PPR over ${countWords(row)}`}
                     />
                   </li>
                 )
@@ -216,21 +216,21 @@ function Score({ rallyRating }) {
             </ul>
             <p className="points-sum collapsible-item" style={{ '--i': rows.length }}>
               Adds up to <strong>{signed(total)}</strong>: from 1,500 to{' '}
-              {rallyRating.points.toLocaleString()}.
+              {rallyRating.points.toLocaleString()} PPR.
             </p>
           </Collapsible>
         </div>
       )}
 
-      <More label="How are the points worked out?">
+      <More label="How is PPR worked out?">
         <p>
-          Every rally is a small contest. Win it with a shot and you gain points;
+          Every rally is a small contest. Win it with a shot and you gain PPR;
           lose it with a mistake and you give some away. Beating a stronger side
           earns more than beating a weaker one.
         </p>
         <p>
-          Winning the match counts too. The winning side gains points and the
-          losing side gives the same number up, shared equally between partners.
+          Winning the match counts too. The winning side gains PPR and the
+          losing side gives the same amount up, shared equally between partners.
           Beating a side you were expected to lose to earns much more than
           beating one you were expected to beat.
         </p>
@@ -240,13 +240,13 @@ function Score({ rallyRating }) {
           cost you less than they gain, or nothing at all in their first game.
         </p>
         <p>
-          The rally counts in points too when someone else ends it: your
-          partner&rsquo;s shots and mistakes move your points a little, and your
-          opponents&rsquo; winning shots and mistakes move them too. That is why
+          The rally counts too when someone else ends it: your
+          partner&rsquo;s shots and mistakes move your PPR a little, and your
+          opponents&rsquo; winning shots and mistakes move it too. That is why
           those rows are in the list — without them it would not add up.
         </p>
         <p>
-          Your points only change when you play — never because someone else
+          Your PPR only changes when you play — never because someone else
           did.
         </p>
       </More>
@@ -432,7 +432,7 @@ function ComparedWith({ band, styleSize }) {
         <p>
           Styles are then worked out inside each group, so a word like
           &ldquo;Steady&rdquo; means steady for players at your level, not
-          compared with everyone. Your rally points don&rsquo;t decide which
+          compared with everyone. Your PPR doesn&rsquo;t decide which
           group you&rsquo;re in.
         </p>
       </More>

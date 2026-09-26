@@ -1,32 +1,60 @@
 // ============================================================
-// The skill rating card: points, what they mean, and where they are
-// heading -- and never a comparison with anyone else. PaddlePad will be
-// a small group for a long time, and a place or percentile jumps every
-// time one person joins or plays. Points only move when you do.
+// The PaddlePad Rating card: the player's PPR, what it means, and how
+// the last seven days moved it -- and never a comparison with anyone
+// else. PaddlePad will be a small group for a long time, and a place or
+// percentile jumps every time one person joins or plays. PPR only moves
+// when you do.
+//
+// "PPR" rather than "points", which already means the points of a game.
 // ============================================================
 
+import { formatDate } from '../lib/format'
+import { changeClass, changeWords, weekView } from '../lib/ratingGraph'
 import { Link } from '../lib/router'
 import Meter from './Meter'
-import PointsTrend from './PointsTrend'
+import RatingLine from './RatingLine'
 
 const START = 1500
 
-function changeLine(change) {
-  if (change > 0) return `▲ +${change} over your last 5 matches`
-  if (change < 0) return `▼ −${Math.abs(change)} over your last 5 matches`
-  return 'Level over your last 5 matches'
+/**
+ * The last seven days, as a way into the graph page: the change, the
+ * line, and a tap anywhere on them opens the full graph. A week with no
+ * matches says when they last played instead.
+ */
+function LastWeek({ rallyRating }) {
+  const view = rallyRating.lastWeek ? weekView(rallyRating.lastWeek) : { empty: true }
+  return (
+    <Link className="points-week" to="/rating/graph">
+      {view.empty ? (
+        <p className="points-quiet">
+          No matches in the last 7 days.
+          {rallyRating.lastPlayedAt && <> You last played on {formatDate(rallyRating.lastPlayedAt)}.</>}
+        </p>
+      ) : (
+        <>
+          <p className={`points-change ${changeClass(view.headline.change)}`}>{changeWords(view.headline)}</p>
+          <RatingLine
+            view={view}
+            compact
+            label={`Your PaddlePad Rating over the last 7 days, from ${view.points[0].value.toLocaleString()} to ${rallyRating.points.toLocaleString()}.`}
+          />
+        </>
+      )}
+      <span className="points-graph-more">See your graph &rarr;</span>
+    </Link>
+  )
 }
 
 /**
- * The points and their anchors, shared with the rating screen. Under ten
- * matches the points are marked as an early estimate, in words only: no
- * counts and no reliability figure.
+ * The PPR and its anchors, shared with the rating screen. Under ten
+ * matches it is marked as an early estimate, in words only: no counts
+ * and no reliability figure.
  */
 export function RallyPointsHeadline({ rallyRating }) {
   return (
     <>
       <p className="points-figure">
-        {rallyRating.points.toLocaleString()} <span className="points-unit">points</span>
+        {rallyRating.points.toLocaleString()} <span className="points-unit">PPR</span>
       </p>
       {rallyRating.earlyEstimate && (
         <p className="points-early">
@@ -34,15 +62,12 @@ export function RallyPointsHeadline({ rallyRating }) {
           Based on only a few games so far. It will settle as you play more, and against more people.
         </p>
       )}
-      <p className={`points-change ${rallyRating.recentChange > 0 ? 'is-up' : rallyRating.recentChange < 0 ? 'is-down' : ''}`}>
-        {changeLine(rallyRating.recentChange)}
-      </p>
+      <LastWeek rallyRating={rallyRating} />
       <p className="points-anchor">
-        Everyone starts at {START.toLocaleString()}. You&rsquo;d win about{' '}
+        Everyone starts at {START.toLocaleString()} PPR. You&rsquo;d win about{' '}
         <strong>{rallyRating.winChanceVsStart} of every 100</strong> rallies against a{' '}
         {START.toLocaleString()} player.
       </p>
-      <PointsTrend trend={rallyRating.trend} />
       <p className="points-basis">
         Based on {rallyRating.rallies.toLocaleString()} rallies · {rallyRating.matches} matches
       </p>
@@ -73,16 +98,16 @@ function RallyRating({ rallyRating }) {
 
   if (rallyRating.state === 'not_enough_matches') {
     return (
-      <section className="rating rating-progress" aria-label="Skill rating">
-        <h2>Skill rating</h2>
+      <section className="rating rating-progress" aria-label="PaddlePad Rating">
+        <h2>PaddlePad Rating</h2>
         <RallyProgress rallyRating={rallyRating} />
       </section>
     )
   }
 
   return (
-    <section className="rating rating-points" aria-label="Skill rating">
-      <h2>Skill rating</h2>
+    <section className="rating rating-points" aria-label="PaddlePad Rating">
+      <h2>PaddlePad Rating</h2>
       <RallyPointsHeadline rallyRating={rallyRating} />
       <Link className="rating-more" to="/rating">
         What&rsquo;s moving it &rarr;

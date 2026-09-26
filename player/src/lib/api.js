@@ -397,6 +397,14 @@ export function fetchStanding({ signal } = {}) {
   return apiFetch('/player/standing', { signal }).then((d) => d.standing)
 }
 
+/**
+ * Every match's PPR, for the rating graph page only -- the overview card
+ * gets just the last seven days with fetchMe. Null until rated.
+ */
+export function fetchRatingHistory({ signal } = {}) {
+  return apiFetch('/player/rating/history', { signal }).then((d) => d.history)
+}
+
 /** This month on PaddlePad: the board at the top of People. */
 export function fetchBoard({ signal } = {}) {
   return apiFetch('/player/board', { signal }).then((d) => d.board)
