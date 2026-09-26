@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Layout from './components/Layout'
 import { SIGNED_OUT_EVENT, clearSession, fetchMe, getStoredAdmin, getToken, listFacilities, storeAdmin } from './lib/api'
 import { facilityLabel } from './lib/format'
+import { movedPath } from './lib/paths'
 import { matchPath, navigate, useRoute } from './lib/navigation'
 import { applyTheme, getThemeChoice, watchSystemTheme } from './lib/theme'
 import SetupScreen from './screens/Setup'
@@ -40,6 +41,12 @@ export default function App() {
 
   useEffect(() => watchSystemTheme(() => applyTheme(getThemeChoice())), [])
 
+  // An old address (People, Invite codes) goes on to where it lives now.
+  const moved = movedPath(path)
+  useEffect(() => {
+    if (moved) navigate(moved, { replace: true })
+  }, [moved])
+
   // Reads who this is on every load: a name or role may have changed.
   useEffect(() => {
     if (!getToken()) return
@@ -66,14 +73,16 @@ export default function App() {
   } else {
     let screen
     if (path === '/') screen = <Overview me={admin} facilityLabel={facilityLabel(admin, facilities ?? [])} />
-    else if (path === '/invites') screen = <Invites me={admin} />
     else if (path === '/admins' && admin.role === 'owner') screen = <Admins me={admin} />
     else if (path === '/activity') screen = <Activity me={admin} />
     else if (path === '/account') screen = <Account admin={admin} onAdminChange={updateAdmin} />
-    else if (path === '/people') screen = <People key="players" kind="players" me={admin} />
-    else if (path === '/people/umpires') screen = <People key="umpires" kind="umpires" me={admin} />
-    else if (matchPath('/people/players/:id', path)) screen = <PlayerDetail id={matchPath('/people/players/:id', path).id} me={admin} />
-    else if (matchPath('/people/umpires/:id', path)) screen = <UmpireDetail id={matchPath('/people/umpires/:id', path).id} me={admin} />
+    else if (moved) screen = null
+    else if (path === '/players') screen = <People key="players" kind="players" me={admin} />
+    else if (path === '/umpires') screen = <People key="umpires" kind="umpires" me={admin} />
+    // Before '/umpires/:id', which would read "invites" as an umpire's id.
+    else if (path === '/umpires/invites') screen = <Invites me={admin} />
+    else if (matchPath('/players/:id', path)) screen = <PlayerDetail id={matchPath('/players/:id', path).id} me={admin} />
+    else if (matchPath('/umpires/:id', path)) screen = <UmpireDetail id={matchPath('/umpires/:id', path).id} me={admin} />
     else if (path === '/facilities') screen = <Facilities me={admin} />
     else if (matchPath('/facilities/:id', path)) screen = <FacilityDetail id={matchPath('/facilities/:id', path).id} me={admin} />
     else screen = <p className="empty missing">There’s no page here.</p>

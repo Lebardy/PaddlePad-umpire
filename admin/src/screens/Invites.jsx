@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import FacilityPicker from '../components/FacilityPicker'
 import PageBoard, { TallyCell } from '../components/PageBoard'
+import UmpireTabs from '../components/UmpireTabs'
 import RowConfirm from '../components/RowConfirm'
 import { cancelInvite, createInvite, listInvites } from '../lib/api'
 import { EXPIRY_CHOICES, formatWhen, inviteStatusText, madeByText } from '../lib/format'
@@ -116,8 +117,8 @@ export default function Invites({ me }) {
   return (
     <section>
       <PageBoard
-        title="Invite codes"
-        intro="A new umpire needs a code to create their account. Each code works once. Send it to them yourself."
+        title="Umpires"
+        intro="A new umpire needs an invite code to create their account. Each code works once. Send it to them yourself."
       >
         <div className="board-head-group">
           <FacilityPicker me={me} value={filterFacilityId} onChange={updateFilterFacility} includeAll variant="board" label="Facility" />
@@ -131,6 +132,7 @@ export default function Invites({ me }) {
       </PageBoard>
 
       <div className="sheet">
+        <UmpireTabs current="invites" />
         <form className="form-strip" onSubmit={handleCreate}>
           <h2 className="form-strip-title">New code</h2>
           <label className="field grow">

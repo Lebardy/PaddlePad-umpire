@@ -3,8 +3,8 @@ import LampMark from './LampMark'
 
 const PAGES = [
   { to: '/', label: 'Overview', current: (path) => path === '/' },
-  { to: '/invites', label: 'Invite codes', current: (path) => path === '/invites' },
-  { to: '/people', label: 'People', current: (path) => path === '/people' || path.startsWith('/people/') },
+  { to: '/players', label: 'Players', current: (path) => path === '/players' || path.startsWith('/players/') },
+  { to: '/umpires', label: 'Umpires', current: (path) => path === '/umpires' || path.startsWith('/umpires/') },
   { to: '/facilities', label: 'Facilities', facilityAdminLabel: 'Facility', current: (path) => path === '/facilities' || path.startsWith('/facilities/') },
   { to: '/admins', label: 'Admins', ownerOnly: true, current: (path) => path === '/admins' },
   { to: '/activity', label: 'Activity', current: (path) => path === '/activity' },

@@ -41,9 +41,9 @@ export default function DuplicatePlayers({ pairs, actions }) {
                   <tr key={key}>
                     <td>
                       <div className="pair-names">
-                        <Link to={`/people/players/${pair.a.id}`}>{pair.a.name}</Link>
+                        <Link to={`/players/${pair.a.id}`}>{pair.a.name}</Link>
                         <span className="vs">and</span>
-                        <Link to={`/people/players/${pair.b.id}`}>{pair.b.name}</Link>
+                        <Link to={`/players/${pair.b.id}`}>{pair.b.name}</Link>
                       </div>
                       <span className="cell-sub">{playerLine(pair.a)} · {playerLine(pair.b)}</span>
                     </td>
