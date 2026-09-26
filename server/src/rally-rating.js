@@ -16,6 +16,14 @@
 // reward scaled by how unlikely the win was, and the losing side gives
 // up the same.
 //
+// A match against a newcomer counts for less for everyone else, until
+// the newcomer has MIN_MATCHES matches behind them: the app cannot know
+// yet whether they are far better or worse than the start, and a
+// regular should not pay for that. DUPR treats unrated players the same
+// way. A newcomer's own points always move in full. So points are no
+// longer only moved between players: a newcomer can gain what a regular
+// does not lose.
+//
 // Pure: matches in, ratings out. Recomputed from the whole history
 // rather than patched, so voiding a match or undoing a rally can never
 // leave stale points behind.
@@ -105,12 +113,19 @@ function byWhenEnded(a, b) {
  * `options.matchReward` sets the size of the match reward applied after
  * each match with a winner; defaults to MATCH_REWARD. 0 turns the
  * reward off and gives the ratings from before it existed.
+ *
+ * `options.newcomerProtection` (default true) scales every change a
+ * match makes to an established player -- one with MIN_MATCHES or more
+ * earlier matches -- by min(n, MIN_MATCHES) / MIN_MATCHES, where n is
+ * the fewest earlier matches among the OTHER players on court. false
+ * counts every match in full for everyone, as before the protection.
  */
 export function rateHistory(matches, options = {}) {
   const k = options.k ?? DEFAULT_K
   const scale = options.scale ?? DEFAULT_SCALE
   const actorShare = options.actorShare ?? ACTOR_SHARE
   const matchReward = options.matchReward ?? MATCH_REWARD
+  const newcomerProtection = options.newcomerProtection ?? true
 
   const players = new Map()
   const player = (id) => {
@@ -161,6 +176,17 @@ export function rateHistory(matches, options = {}) {
         result: null,
       }
     }
+    // How much this match counts for each player, from what the replay
+    // knew before it: in full for a newcomer; for everyone else by the
+    // least-known other player on court -- nothing on a newcomer's first
+    // match, a fifth more for each match they already have.
+    const counts = new Map()
+    for (const id of everyone) {
+      const leastKnown = Math.min(...everyone.filter((other) => other !== id).map((other) => player(other).matches))
+      counts.set(id, !newcomerProtection || player(id).matches < MIN_MATCHES
+        ? 1
+        : Math.min(leastKnown, MIN_MATCHES) / MIN_MATCHES)
+    }
     const { foldedEvents, winner } = deriveMatchState(match)
 
     for (const event of match.events.slice(0, foldedEvents)) {
@@ -184,16 +210,20 @@ export function rateHistory(matches, options = {}) {
       const actorSideChange = actorSideWon ? stake : -stake
 
       // Worked out in full before anything is applied, so every share is
-      // based on the points everyone had before this rally.
+      // based on the points everyone had before this rally. Each share is
+      // scaled by how much the match counts for that player BEFORE it is
+      // recorded anywhere, so the ledger, the match screen and the endings
+      // all show what was actually applied.
       const changes = new Map()
+      const give = (id, change) => changes.set(id, change * counts.get(id))
       if (actorSide.length === 1) {
-        changes.set(event.actingPlayerId, actorSideChange)
+        give(event.actingPlayerId, actorSideChange)
       } else {
         const partner = actorSide.find((id) => id !== event.actingPlayerId)
-        changes.set(event.actingPlayerId, actorSideChange * actorShare)
-        changes.set(partner, actorSideChange * (1 - actorShare))
+        give(event.actingPlayerId, actorSideChange * actorShare)
+        give(partner, actorSideChange * (1 - actorShare))
       }
-      for (const id of otherSide) changes.set(id, -actorSideChange / otherSide.length)
+      for (const id of otherSide) give(id, -actorSideChange / otherSide.length)
 
       for (const [id, change] of changes) {
         const p = player(id)
@@ -229,7 +259,8 @@ export function rateHistory(matches, options = {}) {
     // The match reward, after every rally. Worked out from each side's
     // average points BEFORE the match, like the expectation words, and
     // shared equally within a side: winning is a team result, so the
-    // three-quarters share for whoever ended a rally does not apply.
+    // three-quarters share for whoever ended a rally does not apply. Scaled
+    // for each player like their rallies.
     if (matchReward > 0 && winner) {
       const chanceA = gameWinChance(expectedWin(averageA, averageB, scale), {
         doubles: match.teamA.length === 2,
@@ -238,7 +269,7 @@ export function rateHistory(matches, options = {}) {
       })
       const sideA = matchReward * (winner === 'A' ? 1 - chanceA : -chanceA)
       for (const id of everyone) {
-        const share = onA.has(id) ? sideA / match.teamA.length : -sideA / match.teamB.length
+        const share = (onA.has(id) ? sideA / match.teamA.length : -sideA / match.teamB.length) * counts.get(id)
         const p = player(id)
         p.points += share
         const entry = (p.ledger.match_result ??= { matches: 0, points: 0 })

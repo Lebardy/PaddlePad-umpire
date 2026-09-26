@@ -6,8 +6,8 @@
 //
 // Every rally is a small contest: the side that won it takes points
 // from the side that lost, more for an upset, and every rally counts the
-// same however it ended. Pure functions only: hand-built matches, no
-// database.
+// same however it ended. A match against a newcomer counts for less for
+// everyone else. Pure functions only: hand-built matches, no database.
 // ============================================================
 
 import { randomUUID } from 'node:crypto'
@@ -53,18 +53,23 @@ function rally(playerId, detailOrOutcome) {
 }
 
 let clock = Date.parse('2026-09-01T10:00:00Z')
-function match(events, { doubles = true, id = randomUUID() } = {}) {
+/** A match between any two sides, ending an hour after the last one built. */
+function game(teamA, teamB, events, { id = randomUUID() } = {}) {
   clock += 60 * 60_000
   return {
     id,
     endedAt: new Date(clock).toISOString(),
-    teamA: doubles ? [A1, A2] : [A1],
-    teamB: doubles ? [B1, B2] : [B1],
-    firstServer: { team: 'A', playerId: A1 },
-    rightStart: doubles ? { A: A1, B: B1 } : undefined,
+    teamA,
+    teamB,
+    firstServer: { team: 'A', playerId: teamA[0] },
+    rightStart: teamA.length === 2 ? { A: teamA[0], B: teamB[0] } : undefined,
     pointTarget: 11,
     events,
   }
+}
+/** A match between the usual four: A1 and A2 against B1 and B2, or A1 against B1. */
+function match(events, { doubles = true, id } = {}) {
+  return game(doubles ? [A1, A2] : [A1], doubles ? [B1, B2] : [B1], events, { id })
 }
 
 section('Every rally counts the same')
@@ -103,7 +108,7 @@ section('One rally between equal sides')
     'Neither opponent ended the rally, so neither is singled out.')
   const total = [A1, A2, B1, B2].reduce((sum, id) => sum + ratings.get(id).rawPoints - START_POINTS, 0)
   check('points are only moved, never created', near(total, 0), true,
-    'The pool average must stay at 1500.')
+    'Four newcomers together all count in full, so a rally only moves points between the sides.')
 }
 
 section('A fault')
@@ -377,7 +382,7 @@ section('Winning the match')
     [true, true, true], 'Winning is a team result; the three-quarters rule is for rallies only.')
   check('the reward adds up to nothing across the match',
     near([A1, A2, B1, B2].reduce((s, id) => s + reward(one, id), 0), 0, 1e-9), true,
-    'Points only move between players, so the average stays at 1,500.')
+    'Four newcomers together all count in full, so the reward only moves points between the sides.')
   check('the ledger, reward included, still adds up to the points',
     [A1, B1].map((id) => near(Object.values(one.get(id).ledger).reduce((s, v) => s + v.points, 0), one.get(id).rawPoints - START_POINTS, 1e-6)),
     [true, true], 'The rating screen shows this arithmetic; it must stay exact.')
@@ -448,6 +453,128 @@ section('Winning the match')
   check('a longer game with the other side serving first still rewards from the right game chance',
     near(reward(fifteenRatings, B1), (MATCH_REWARD * chanceB) / 2, 1e-9), true,
     'B\'s chance is 1 minus A\'s chance of winning with B serving first, which by symmetry is the same number as A\'s chance with A serving first; B\'s side gets MATCH_REWARD times that chance, split evenly.')
+}
+
+section('Games against newcomers')
+{
+  // A match counts for an established player (five or more earlier
+  // matches) at min(n, 5) / 5, where n is the fewest earlier matches
+  // among the OTHER players on court. A player under five matches always
+  // moves in full. Every scenario reaches its last match through
+  // newcomers only playing newcomers, which counts in full either way,
+  // so the same history run with and without the protection differs
+  // only in that last match.
+  //
+  // Exact ratios need a last match of ONE rally: over more rallies each
+  // rally's chance comes from points the protection has already changed.
+  // The win bonus is the exception, worked out from the points before
+  // the match, so a whole match gives its ratio exactly.
+  const ids = (count) => Array.from({ length: count }, () => randomUUID())
+  const wins = (playerId, count) => Array.from({ length: count }, () => rally(playerId, 'putaway'))
+  const both = (history, last) => ({
+    last,
+    history,
+    withIt: rateHistory([...history, last]),
+    without: rateHistory([...history, last], { newcomerProtection: false }),
+  })
+  const moved = (ratings, id, last) => ratings.get(id).matchFacts[last.id].after - ratings.get(id).matchFacts[last.id].before
+  // How much of the full change the protection let through, to 9 places.
+  const share = (run, id) => Math.round((moved(run.withIt, id, run.last) / moved(run.without, id, run.last)) * 1e9) / 1e9
+  const ramp = [0, 1, 2, 3, 4, 5, 6]
+
+  // Singles: E has five matches behind them (against S), newcomer N has
+  // n (against T). Then N beats E, in one rally or 11-0.
+  const singles = (n, lastRallies) => {
+    const [E, S, N, T] = ids(4)
+    const run = both(
+      [
+        ...Array.from({ length: MIN_MATCHES }, () => game([E], [S], wins(E, 3))),
+        ...Array.from({ length: n }, () => game([N], [T], wins(N, 3))),
+      ],
+      game([N], [E], wins(N, lastRallies)),
+    )
+    return { ...run, E, N }
+  }
+  const oneRally = ramp.map((n) => singles(n, 1))
+  const elevenNil = ramp.map((n) => singles(n, 11))
+
+  const first = elevenNil[0]
+  check('a newcomer\'s first match leaves an established player\'s points unchanged',
+    moved(first.withIt, first.E, first.last), 0,
+    'The concern that started this: losing 11-0 to a strong newcomer the app has never seen costs the regular nothing.')
+  check('it counts 0, 1/5, 2/5, 3/5, 4/5, then fully, by the newcomer\'s earlier matches',
+    oneRally.map((run) => share(run, run.E)), [0, 0.2, 0.4, 0.6, 0.8, 1, 1],
+    'The table the owner approved: 1st game not at all, 2nd 20%, 3rd 40%, 4th 60%, 5th 80%, 6th onward fully.')
+  check('a player under five matches always moves at full strength',
+    oneRally.slice(0, MIN_MATCHES).map((run) => share(run, run.N)), [1, 1, 1, 1, 1],
+    'A newcomer has no rating to protect yet, and their own number should find its level quickly.')
+  check('the win bonus is scaled the same way',
+    elevenNil.map((run) => {
+      const bonus = (ratings) => ratings.get(run.E).matchFacts[run.last.id].result
+      return Math.round((bonus(run.withIt) / bonus(run.without)) * 1e9) / 1e9
+    }), [0, 0.2, 0.4, 0.6, 0.8, 1, 1],
+    'Losing the match to a newcomer counts for as little as the rallies in it.')
+  const lone = oneRally[0]
+  check('points are no longer only moved: the newcomer gains what the regular does not lose',
+    [near(moved(lone.withIt, lone.N, lone.last), moved(lone.without, lone.N, lone.last)), moved(lone.withIt, lone.E, lone.last)],
+    [true, 0],
+    'Intended (2026-09-26): the newcomer\'s rating must find its level, and the regular must not pay for the app not knowing them.')
+  check('without the protection, the same rally only moves points between the two',
+    near(moved(lone.without, lone.N, lone.last) + moved(lone.without, lone.E, lone.last), 0), true,
+    'newcomerProtection: false gives the old rules, minus the ending weights, as matchReward: 0 does for the win bonus.')
+
+  // Doubles: E1 and E2 have five matches behind them against O1 and O2.
+  // Newcomer N (n earlier matches) partners O1 and wins them a rally
+  // against E1 and E2. For E1, E2 and O1 alike the least-known other
+  // player on court is N: a partner counts the same as an opponent.
+  const doubles = ramp.map((n) => {
+    const [E1, E2, O1, O2, N, T] = ids(6)
+    const run = both(
+      [
+        ...Array.from({ length: MIN_MATCHES }, () => game([E1, E2], [O1, O2], wins(E1, 3))),
+        ...Array.from({ length: n }, () => game([N], [T], wins(N, 3))),
+      ],
+      game([N, O1], [E1, E2], wins(N, 1)),
+    )
+    return { ...run, players: [E1, E2, O1, N] }
+  })
+  check('in doubles it goes by the least-known other player on court, partner included',
+    doubles.map((run) => run.players.map((id) => share(run, id))),
+    [[0, 0, 0, 1], [0.2, 0.2, 0.2, 1], [0.4, 0.4, 0.4, 1], [0.6, 0.6, 0.6, 1], [0.8, 0.8, 0.8, 1], [1, 1, 1, 1], [1, 1, 1, 1]],
+    'E1 and E2 (opponents) and O1 (N\'s partner) count the match by N\'s earlier matches; N moves in full.')
+
+  // Two newcomers on court, with two and three earlier matches: the one
+  // with fewer decides. E1, partnered by N2, wins a rally against O1 and
+  // N3.
+  const [E1, E2, O1, O2, N2, N3, T] = ids(7)
+  const pair = both(
+    [
+      ...Array.from({ length: MIN_MATCHES }, () => game([E1, E2], [O1, O2], wins(E1, 3))),
+      ...Array.from({ length: 2 }, () => game([N2], [T], wins(N2, 3))),
+      ...Array.from({ length: 3 }, () => game([N3], [T], wins(N3, 3))),
+    ],
+    game([E1, N2], [O1, N3], wins(E1, 1)),
+  )
+  check('with two newcomers on court, the one with fewer matches decides',
+    [E1, O1, N2, N3].map((id) => share(pair, id)), [0.4, 0.4, 1, 1],
+    'N2 has two earlier matches and N3 three, so E1 and O1 count this match at 2/5.')
+  const onMatchScreen = (ratings) => ratings.get(E1).matchFacts[pair.last.id].endings.putaway.points
+  const addedToEndings = (ratings) => ratings.get(E1).byEnding.putaway - rateHistory(pair.history).get(E1).byEnding.putaway
+  check('the scaled change is what reaches the match screen and the endings too',
+    [near(onMatchScreen(pair.withIt), 0.4 * onMatchScreen(pair.without)), near(addedToEndings(pair.withIt), 0.4 * addedToEndings(pair.without))],
+    [true, true],
+    'Every change is scaled before it is recorded anywhere, so no screen shows more than was applied.')
+  check('under the protection every player\'s ledger still adds up to their points',
+    [E1, O1, N2, N3].map((id) => {
+      const r = pair.withIt.get(id)
+      return near(Object.values(r.ledger).reduce((s, v) => s + v.points, 0), r.rawPoints - START_POINTS, 1e-6)
+    }),
+    [true, true, true, true],
+    'The ledger records the changes actually applied, so the rating screen\'s arithmetic stays exact.')
+  const sent = rallyRatingFor(pair.withIt, E1, { forRatingScreen: true })
+  check('and the rows sent still add up to the points shown',
+    sent.breakdown.reduce((s, row) => s + row.points, 0), sent.points - START_POINTS,
+    'Whole numbers, exactly, as before the protection.')
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
