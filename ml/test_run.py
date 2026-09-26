@@ -37,6 +37,7 @@ from run import (
     EVIDENCE_COLUMNS,
     SCORE_PARTS,
     build_game_scores,
+    name_skill_groups,
     per_match_features,
     NotEnoughData,
     apply_gate,
@@ -246,6 +247,58 @@ try:
     check("a rated player with no rally points is refused", False, "it published")
 except RuntimeError as error:
     check("a rated player with no rally points is refused", "no rally points" in str(error), str(error))
+
+
+print("\ngroup names only when the order is clear")
+
+def named(points_by_cluster, seed=5):
+    """Name hand-made skill clusters whose players have the given rally
+    points. Returns the names by cluster, the order, the source and the
+    gaps name_skill_groups reports."""
+    rows, points = [], {}
+    for cluster, values in points_by_cluster.items():
+        for i, value in enumerate(values):
+            pid = f"c{cluster}-{i}"
+            rows.append({"player_id": pid, "skill_cluster": cluster, "skill_score": 50.0})
+            points[pid] = float(value)
+    labelled, order, source, gaps = name_skill_groups(pd.DataFrame(rows), points)
+    names = labelled.groupby("skill_cluster")["skill_group"].first().to_dict()
+    return names, order, source, gaps
+
+gap_rng = np.random.default_rng(3)
+spread = lambda centre, n=10: centre + gap_rng.normal(scale=10, size=n)
+
+names, order, source, gaps = named({0: spread(1400), 1: spread(1600)})
+check("groups far apart on points keep their level names",
+      names == {0: "Developing / Lower-Performance", 1: "Higher-Performance"}
+      and order == ["Developing / Lower-Performance", "Higher-Performance"] and source == "rally_points",
+      f"{names} {order} {source}")
+check("and the gap between them is recorded as clear",
+      len(gaps) == 1 and gaps[0]["clear"] and gaps[0]["gap"] > gaps[0]["needed"], str(gaps))
+
+names, order, source, gaps = named({0: spread(1500, 12), 1: spread(1502, 8)})
+check("groups level on points get neutral letters, biggest first, and no order",
+      names == {0: "Group A", 1: "Group B"} and order is None and source == "neutral",
+      f"{names} {order} {source}")
+check("and the gap is recorded as not clear", len(gaps) == 1 and not gaps[0]["clear"], str(gaps))
+
+names, order, source, gaps = named({0: spread(1400, 19), 1: [1900.0]})
+check("a group of one player can never show a clear gap",
+      source == "neutral" and names == {0: "Group A", 1: "Group B"} and not gaps[0]["clear"], f"{names} {gaps}")
+
+names, order, source, gaps = named({0: spread(1300), 1: spread(1500), 2: spread(1502)})
+check("one unclear gap among clear ones makes every group neutral",
+      source == "neutral" and sorted(names.values()) == ["Group A", "Group B", "Group C"]
+      and [g["clear"] for g in gaps] == [True, False], f"{names} {[g['clear'] for g in gaps]}")
+
+names, order, source, gaps = named({0: spread(1300), 1: spread(1600)})
+labelled_no_points, order_no_points, source_no_points, gaps_no_points = name_skill_groups(
+    pd.DataFrame([{"player_id": "a", "skill_cluster": 0, "skill_score": 10.0},
+                  {"player_id": "b", "skill_cluster": 1, "skill_score": 90.0}]), None)
+check("without rally points the old score still names the groups, with no gaps to judge",
+      source_no_points == "skill_score" and gaps_no_points == []
+      and order_no_points == ["Developing / Lower-Performance", "Higher-Performance"],
+      f"{source_no_points} {order_no_points} {gaps_no_points}")
 
 
 print("\nstyle K-Means on chosen columns")

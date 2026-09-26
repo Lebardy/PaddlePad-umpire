@@ -3,7 +3,9 @@
 //
 // The pipeline starts every style name with a word for the skill group
 // it was found in: "Developing", "Intermediate", "Advanced" -- or, once
-// it finds more than three groups, "Group 3". A number like that means
+// it finds more than three groups, "Group 3", and when rally points
+// can't clearly say which group is higher, a neutral "Group A" (see
+// name_skill_groups in ml/run.py). A number or letter like that means
 // nothing to a player and makes them wonder what groups 1 and 2 are,
 // and the rating screen's ladder already shows where their group sits.
 // So the prefix is dropped whatever it is, and every name reads the
