@@ -112,7 +112,6 @@ export function playerListItem(row) {
     username: row.username ?? null,
     signInMethods,
     claimed: Boolean(row.claimed_at),
-    hiddenFromBoard: row.name_visible === false,
     joinedAt: row.created_at,
     lastSignedInAt: row.last_signed_in_at ?? null,
     status: personStatus({ pausedAt: row.paused_at, closedAt: row.deactivated_at }),

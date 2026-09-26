@@ -8,7 +8,7 @@ import { countMatchesInProgress, getPlayerMatches, getRatingState } from './play
 import { deriveMatchState, eventFromRow } from './pickleball.js'
 
 const PLAYER_COLUMNS = `p.id, p.name, p.username, p.password_hash, p.google_sub, p.google_email,
-  p.claim_code, p.claimed_at, p.name_visible, p.created_at, p.last_signed_in_at,
+  p.claim_code, p.claimed_at, p.created_at, p.last_signed_in_at,
   p.paused_at, p.paused_reason, p.deactivated_at, p.closed_by_admin_at, p.created_by`
 const UMPIRE_COLUMNS = `u.id, u.name, u.email, u.password_hash, u.google_sub, u.google_email,
   u.created_at, u.last_signed_in_at, u.paused_at, u.paused_reason, u.closed_at,

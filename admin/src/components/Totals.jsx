@@ -27,9 +27,9 @@ export default function Totals({ totals, facilityName }) {
           <span className="total-new">{newLine(totals.sessions.newThisWeek, 'this week')}</span>
         </div>
         <div className="total">
-          <span className="total-label">Umpires active now</span>
+          <span className="total-label">Umpires scoring now</span>
           <span className="total-figure">{totals.umpires.active.toLocaleString()}</span>
-          <span className="total-new">{totals.umpires.notActive} not active</span>
+          <span className="total-new">{totals.umpires.notActive} not scoring</span>
         </div>
         <div className="total-rating">
           <span className="total-label">Ratings last worked out</span>

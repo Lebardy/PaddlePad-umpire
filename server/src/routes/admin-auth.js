@@ -144,7 +144,7 @@ router.post('/login', async (req, res) => {
   }
   // Said only after the right password, so it reveals nothing to a guesser.
   if (found.deactivated_at) {
-    return res.status(403).json({ error: 'Your admin access has been switched off' })
+    return res.status(403).json({ error: 'Your admin access has been paused' })
   }
 
   res.json(await completeSignIn(found.id))

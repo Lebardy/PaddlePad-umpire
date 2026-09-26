@@ -13,9 +13,9 @@ const CLOSE_EXPLANATION = {
 }
 
 /**
- * Pause, switch back on and close: the actions shared by a
+ * Pause, resume and close: the actions shared by a
  * player's and an umpire's page. `extraActions`, given the same shared
- * `confirming` state this uses for Pause / Switch back on, can add
+ * `confirming` state this uses for Pause / Resume, can add
  * another row confirmation (the player's claim code) that takes part
  * in the same "only one open at a time" behaviour.
  */
@@ -109,11 +109,11 @@ export default function AccountActions({ kind, person, me, onChanged, extraActio
 
         {canPause && person.status === 'paused' && (
           <RowConfirm
-            label="Switch back on"
+            label="Resume account"
             className="btn-quiet btn-small"
             question="They can sign in again straight away."
-            confirmLabel="Switch back on"
-            busyLabel="Switching…"
+            confirmLabel="Resume"
+            busyLabel="Resuming…"
             confirmClass="btn-primary btn-small"
             open={confirming === 'unpause'}
             onOpen={() => setConfirming('unpause')}
@@ -125,7 +125,7 @@ export default function AccountActions({ kind, person, me, onChanged, extraActio
         {extraActions?.(confirming, setConfirming)}
 
         {me.role === 'owner' && person.status !== 'closed' && !closing && (
-          <button type="button" className="btn-danger btn-small" onClick={() => setClosing(true)}>Close</button>
+          <button type="button" className="btn-danger btn-small" onClick={() => setClosing(true)}>Close account</button>
         )}
       </div>
 

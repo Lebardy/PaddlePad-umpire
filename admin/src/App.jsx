@@ -32,7 +32,7 @@ export default function App() {
     return () => { live = false }
   }, [admin?.id, admin?.role])
 
-  // The server says this session is over (expired, or switched off).
+  // The server says this session is over (expired, or paused).
   useEffect(() => {
     const onSignedOut = () => setAdmin(null)
     window.addEventListener(SIGNED_OUT_EVENT, onSignedOut)

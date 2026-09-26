@@ -85,7 +85,12 @@ router.post('/:id/setup-link', async (req, res) => {
   }
 })
 
-/** Switches an admin off (on = false) or back on. The owner cannot be switched off. */
+/**
+ * Pauses an admin (on = false) or resumes them. The owner cannot be
+ * paused. Behind the words, an admin is still simply on or off
+ * (deactivated_at); "paused" is what the admin site calls off, the same
+ * word it uses for players and umpires.
+ */
 function switchRoute(on) {
   return async (req, res) => {
     if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such admin' })
@@ -94,14 +99,14 @@ function switchRoute(on) {
         const { rows } = await client.query(`SELECT ${ADMIN_COLUMNS} FROM admins WHERE id = $1 FOR UPDATE`, [req.params.id])
         const target = rows[0]
         if (!target) throw refusal(404, 'No such admin')
-        if (target.role === 'owner') throw refusal(409, "You can't switch off the owner")
-        if (Boolean(target.deactivated_at) === !on) throw refusal(409, `This admin is already switched ${on ? 'on' : 'off'}`)
+        if (target.role === 'owner') throw refusal(409, "You can't pause the owner")
+        if (Boolean(target.deactivated_at) === !on) throw refusal(409, `This admin is already ${on ? 'active' : 'paused'}`)
 
         const { rows: updated } = await client.query(
           `UPDATE admins SET deactivated_at = ${on ? 'NULL' : 'now()'} WHERE id = $1 RETURNING ${ADMIN_COLUMNS}`,
           [target.id],
         )
-        // A switched-off admin must not be able to come back in through
+        // A paused admin must not be able to come back in through
         // a link handed out earlier, or through a session token they
         // already hold.
         if (!on) {
@@ -115,7 +120,7 @@ function switchRoute(on) {
         await recordActivity(client, {
           adminId: req.admin.id, action: on ? 'admin.switched_on' : 'admin.switched_off',
           targetType: 'admin', targetId: target.id,
-          summary: `Switched ${target.name} ${on ? 'back on' : 'off'}`,
+          summary: `${on ? 'Resumed' : 'Paused'} admin ${target.name}`,
         })
         return updated[0]
       })

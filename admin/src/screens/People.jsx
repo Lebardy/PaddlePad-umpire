@@ -155,7 +155,6 @@ export default function People({ kind, me }) {
                       <span className="cell-main name-line">
                         <Link to={config.detailPath(person.id)} className="row-link"><strong>{person.name}</strong></Link>
                         {kind === 'players' && !person.claimed && <span className="tag tag-waiting">Not claimed</span>}
-                        {kind === 'players' && person.hiddenFromBoard && <span className="tag tag-off">Hidden from the board</span>}
                       </span>
                       {kind === 'players'
                         ? person.username && <span className="cell-sub">{person.username}</span>

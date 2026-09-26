@@ -110,15 +110,15 @@ section('what a person looks like to the site')
   const player = {
     id: 'p1', name: 'Ana Cruz', username: 'ana', password_hash: 'salt:key', google_sub: 'g1',
     google_email: 'ana@gmail.com', claim_code: 'PAD-7K3M', claimed_at: '2026-09-01T00:00:00Z',
-    name_visible: false, created_at: '2026-08-01T00:00:00Z', last_signed_in_at: null,
+    created_at: '2026-08-01T00:00:00Z', last_signed_in_at: null,
     paused_at: null, deactivated_at: null,
   }
   check('a player list item never carries the code or the hash', rules.playerListItem(player), {
     id: 'p1', name: 'Ana Cruz', username: 'ana', signInMethods: ['password', 'google', 'claim code'],
-    claimed: true, hiddenFromBoard: true, joinedAt: '2026-08-01T00:00:00Z', lastSignedInAt: null, status: 'active',
+    claimed: true, joinedAt: '2026-08-01T00:00:00Z', lastSignedInAt: null, status: 'active',
   })
   check('an unclaimed player with nothing set has no ways in',
-    rules.playerListItem({ ...player, username: null, password_hash: null, google_sub: null, claim_code: null, claimed_at: null, name_visible: true }).signInMethods, [])
+    rules.playerListItem({ ...player, username: null, password_hash: null, google_sub: null, claim_code: null, claimed_at: null }).signInMethods, [])
   const umpire = {
     id: 'u1', name: 'Ref Ray', email: 'ray@example.com', password_hash: null, google_sub: 'g2',
     created_at: '2026-08-01T00:00:00Z', last_signed_in_at: '2026-09-15T00:00:00Z', paused_at: '2026-09-16T00:00:00Z', closed_at: null,

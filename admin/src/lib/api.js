@@ -77,7 +77,7 @@ async function apiFetch(path, { method = 'GET', body, auth = true } = {}) {
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
     // A signed-in request answered 401 means the session is over: it
-    // expired, or this admin was switched off.
+    // expired, or this admin was paused.
     if (token && response.status === 401) {
       clearSession()
       window.dispatchEvent(new Event(SIGNED_OUT_EVENT))
