@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import FacilityPicker from '../components/FacilityPicker'
 import PageBoard, { TallyCell } from '../components/PageBoard'
 import RowConfirm from '../components/RowConfirm'
+import StatusTag from '../components/StatusTag'
 import { addAdmin, listAdmins, listFacilities, moveAdmin, newSetupLink, switchAdmin } from '../lib/api'
 import { formatWhen, signInMethods } from '../lib/format'
 
 const notSetUp = (admin) => !admin.hasPassword && !admin.googleEmail
 
-/** Owner only: add admins, hand out setup links, switch admins off and on, and move them between facilities. */
+/** Owner only: add admins, hand out setup links, pause and resume admins, and move them between facilities. */
 export default function Admins({ me }) {
   const [admins, setAdmins] = useState(null)
   const [name, setName] = useState('')
@@ -96,7 +97,7 @@ export default function Admins({ me }) {
   }
 
   const list = admins ?? []
-  const on = list.filter((a) => a.active).length
+  const active = list.filter((a) => a.active).length
 
   function actions(admin) {
     if (admin.role === 'owner') return null
@@ -136,11 +137,11 @@ export default function Admins({ me }) {
           onConfirm={() => handleMove(admin)}
         />
         <RowConfirm
-          label={admin.active ? 'Switch off' : 'Switch on'}
+          label={admin.active ? 'Pause' : 'Resume'}
           className={`btn-small ${admin.active ? 'btn-danger' : 'btn-quiet'}`}
           question={admin.active ? 'They are signed out straight away.' : 'They can sign in again straight away.'}
-          confirmLabel={admin.active ? 'Switch off' : 'Switch on'}
-          busyLabel="Switching…"
+          confirmLabel={admin.active ? 'Pause' : 'Resume'}
+          busyLabel={admin.active ? 'Pausing…' : 'Resuming…'}
           confirmClass={`btn-small ${admin.active ? 'btn-danger is-solid' : 'btn-primary'}`}
           keepLabel="Not now"
           open={asking === 'switch'}
@@ -161,8 +162,8 @@ export default function Admins({ me }) {
       >
         <div className="tally">
           <TallyCell figure={admins ? list.length : '–'} label="Admins" />
-          <TallyCell figure={admins ? on : '–'} label="Switched on" />
-          <TallyCell figure={admins ? list.length - on : '–'} label="Switched off" />
+          <TallyCell figure={admins ? active : '–'} label="Active" />
+          <TallyCell figure={admins ? list.length - active : '–'} label="Paused" />
           <TallyCell figure={admins ? list.filter(notSetUp).length : '–'} label="Not set up" />
         </div>
       </PageBoard>
@@ -222,7 +223,7 @@ export default function Admins({ me }) {
                         : <span className="cell-main">{signInMethods(admin)}</span>}
                     </td>
                     <td className="col-when">{admin.lastSignedInAt ? formatWhen(admin.lastSignedInAt) : 'Never'}</td>
-                    <td className="col-when"><span className={`tag ${admin.active ? 'tag-on' : 'tag-off'}`}>{admin.active ? 'On' : 'Off'}</span></td>
+                    <td className="col-when"><StatusTag status={admin.active ? 'active' : 'paused'} /></td>
                     <td className="row-actions">{actions(admin)}</td>
                   </tr>
                 ))}

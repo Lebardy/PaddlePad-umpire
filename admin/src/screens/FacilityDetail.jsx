@@ -196,7 +196,7 @@ export default function FacilityDetail({ id, me }) {
                     <tr key={admin.id}>
                       <td><strong>{admin.name}</strong></td>
                       <td>{admin.email}</td>
-                      <td><span className={`tag ${admin.active ? 'tag-on' : 'tag-off'}`}>{admin.active ? 'On' : 'Off'}</span></td>
+                      <td><StatusTag status={admin.active ? 'active' : 'paused'} /></td>
                     </tr>
                   ))}
                 </tbody>

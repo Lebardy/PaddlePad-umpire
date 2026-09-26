@@ -118,7 +118,7 @@ function peopleRouter(kind) {
       await client.query(`UPDATE ${kind.table} SET paused_at = NULL, paused_reason = NULL WHERE id = $1`, [row.id])
       await recordActivity(client, {
         adminId: req.admin.id, action: `${kind.noun}.unpaused`, targetType: kind.noun, targetId: row.id,
-        summary: `Switched ${kind.noun} ${row.name} back on`,
+        summary: `Resumed ${kind.noun} ${row.name}`,
       })
     }, { guard: pauseGuard })
   })

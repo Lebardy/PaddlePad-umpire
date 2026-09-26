@@ -397,9 +397,9 @@ tr.is-faded .code { text-decoration: none; }
   content: ''; width: 0.62rem; height: 0.62rem; border-radius: 2px; flex: none; margin-top: 0.3em;
   background: var(--none-lamp); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
 }
-.tag-open::before, .tag-on::before, .status-active::before { background: var(--win-lamp); box-shadow: 0 0 6px var(--win-lamp); }
+.tag-open::before, .status-active::before { background: var(--win-lamp); box-shadow: 0 0 6px var(--win-lamp); }
 .tag-used::before { background: var(--text-muted); }
-.tag-expired::before, .tag-off::before, .status-closed::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--text-muted); }
+.tag-expired::before, .status-closed::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--text-muted); }
 .tag-waiting::before { background: var(--lamp); }
 .status-paused::before { background: var(--lamp); box-shadow: 0 0 6px var(--lamp); }
 tr.is-faded .tag, .status-closed { color: var(--text-muted); }
