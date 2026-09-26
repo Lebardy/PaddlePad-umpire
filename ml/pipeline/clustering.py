@@ -1924,10 +1924,14 @@ def interpret_playstyle_clusters(
     )
 
     # --------------------------------------------------------
-    # Scaled centroids, in the SAME z-scored space K-Means
-    # clustered on. Used ONLY for naming: this is what
-    # actually distinguishes each cluster from its siblings,
-    # already skill-adjusted and unit-free.
+    # Scaled centroids: each cluster's mean of the thirteen
+    # z-scored playstyle features. K-Means may have clustered
+    # on component scores instead (see
+    # feature_engineering.extract_playstyle_components), but
+    # names are read here because a feature can be named and a
+    # component cannot. Used ONLY for naming: this is what
+    # distinguishes each cluster from its siblings, already
+    # skill-adjusted and unit-free.
     # --------------------------------------------------------
 
     scaled_centroids = (
