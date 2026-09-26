@@ -22,6 +22,7 @@ import {
   mostOften,
   rallyRatingFor,
   rallyMatchFor,
+  ratingHistoryFor,
   rateHistory,
 } from '../src/rally-rating.js'
 import { RALLY_ENDINGS, rallyEnding } from '../src/rally-endings.js'
@@ -219,7 +220,7 @@ section('What a player is sent')
     rated.state, 'rated', 'Five counted matches is enough.')
   check('the response carries exactly the agreed fields',
     Object.keys(rated).sort(),
-    ['earlyEstimate', 'matches', 'points', 'rallies', 'recentChange', 'state', 'trend', 'winChanceVsStart'],
+    ['earlyEstimate', 'lastPlayedAt', 'lastWeek', 'matches', 'points', 'rallies', 'recentChange', 'state', 'trend', 'winChanceVsStart'],
     'Nothing about anyone else, and no mostOften unless asked for.')
   check('winChanceVsStart is a whole percentage against a 1500 player',
     rated.winChanceVsStart, Math.round(expectedWin(rateHistory(five).get(A1).rawPoints, START_POINTS) * 100),
@@ -275,6 +276,57 @@ section('What a player is sent')
     [mostOften(tied).won.map((e) => e.rallies), mostOften(tied).lost.map((e) => e.rallies)],
     [[6, 6, 6], [6, 6]],
     'Calling one of several equals "the most" would not be true; the screen decides how many to name.')
+}
+
+section('The last seven days, and the whole history')
+{
+  const DAY = 86_400_000
+  const now = Date.parse('2026-09-27T12:00:00Z')
+  /** A match A1 wins with a put-away, ending `daysAgo` days before `now`. */
+  const on = (daysAgo, rallies = 1) => ({
+    ...match(Array.from({ length: rallies }, () => rally(A1, 'putaway'))),
+    endedAt: new Date(now - daysAgo * DAY).toISOString(),
+  })
+  const games = [on(20), on(12), on(9), on(8, 3), on(6), on(2, 2), on(1)]
+  const ratings = rateHistory(games)
+  const history = ratingHistoryFor(ratings, A1)
+  const sent = rallyRatingFor(ratings, A1, { now })
+
+  check('the whole history is one entry per counted match, oldest first',
+    history.matches.map((m) => m.at), games.map((g) => g.endedAt),
+    'The graph page draws every match; grouping into days and weeks is the app\'s job.')
+  check('each entry is the rounded points after that match, ending at the points shown',
+    [history.matches.every((m) => Number.isInteger(m.points)), history.matches.at(-1).points],
+    [true, sent.points],
+    'The line must end exactly on the headline number.')
+  check('the last seven days start from the points after the last match before them',
+    sent.lastWeek.from, history.matches[3].points,
+    'Eight days ago was the last match before the window, so the line starts where that left them.')
+  check('and carry the matches inside the window, oldest first',
+    sent.lastWeek.matches, history.matches.slice(4),
+    'Six, two and one days ago.')
+  check('lastPlayedAt is when their latest match ended',
+    sent.lastPlayedAt, games.at(-1).endedAt,
+    'For "You last played on <date>" when the week is empty.')
+
+  const quiet = rallyRatingFor(ratings, A1, { now: now + 30 * DAY })
+  check('a quiet week has no matches and starts from where they are now',
+    [quiet.lastWeek.matches, quiet.lastWeek.from], [[], sent.points],
+    'The card then says when they last played instead of drawing a line.')
+  const fresh = rallyRatingFor(rateHistory([on(5), on(4), on(3), on(2), on(1)]), A1, { now })
+  check('a week that holds their very first match starts from 1,500',
+    [fresh.lastWeek.from, fresh.lastWeek.matches.length], [START_POINTS, 5],
+    'Before their first match they stood where everyone starts.')
+
+  const asDates = rateHistory(games.map((g) => ({ ...g, endedAt: new Date(g.endedAt) })))
+  check('dates from the database go out as ISO strings',
+    ratingHistoryFor(asDates, A1).matches[0].at, games[0].endedAt,
+    'pg hands back Date objects; the app parses strings.')
+  check('a player under five matches has no history to show',
+    ratingHistoryFor(rateHistory(games.slice(0, 4)), A1), null,
+    'The graph page is only reachable once they are rated.')
+  check('nor does a player nobody has seen',
+    ratingHistoryFor(ratings, randomUUID()), null, 'No matches, no line.')
 }
 
 section('Early estimate')

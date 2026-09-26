@@ -21,10 +21,10 @@ const TABS = [
 
 function isActive(tab, path) {
   // '/' would otherwise prefix-match every route.
-  // The rating page is a drill-down from the overview, not a section of
-  // its own, so Overview stays lit while it is open -- the same way a
-  // match stays under Matches.
-  if (tab.to === '/') return path === '/' || path === '/rating'
+  // The rating page and its graph are drill-downs from the overview, not
+  // sections of their own, so Overview stays lit while they are open --
+  // the same way a match stays under Matches.
+  if (tab.to === '/') return path === '/' || path === '/rating' || path === '/rating/graph'
   // The match of the month opens from the board on People, so People
   // stays lit while it is open.
   if (tab.to === '/people' && path.startsWith('/board/')) return true
