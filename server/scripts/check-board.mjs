@@ -56,16 +56,16 @@ section('played the most')
       match(['Ana'], ['Ben'], 11, 5),
       match(['Ana'], ['Cy'], 11, 7),
       match(['Ben'], ['Cy'], 11, 9),
-      match(['Hid'], ['Dee'], 11, 3),
-      match(['Hid'], ['Eli'], 11, 4),
-      match(['Hid'], ['Fay'], 11, 2),
-      match(['Hid'], ['Gus'], 11, 1),
+      match(['Gone'], ['Dee'], 11, 3),
+      match(['Gone'], ['Eli'], 11, 4),
+      match(['Gone'], ['Fay'], 11, 2),
+      match(['Gone'], ['Gus'], 11, 1),
     ],
     visible: everyone('Ana', 'Ben', 'Cy', 'Dee', 'Eli', 'Fay', 'Gus'),
-    nameOf: names('Ana', 'Ben', 'Cy', 'Dee', 'Eli', 'Fay', 'Gus', 'Hid'),
+    nameOf: names('Ana', 'Ben', 'Cy', 'Dee', 'Eli', 'Fay', 'Gus', 'Gone'),
   })
   check('played the most', board.playedMost, { names: ['Ana', 'Ben', 'Cy'], more: 0, count: 2 },
-    'Hid played 4 but hides their name, so the row goes to the next count — Ana, Ben and Cy on 2, shown as a tie, alphabetically')
+    'Gone played 4 but has closed their account, so the row goes to the next count — Ana, Ben and Cy on 2, shown as a tie, alphabetically')
 }
 
 // ============================================================
@@ -76,13 +76,13 @@ section('met the most people')
     matches: [
       match(['Ana'], ['Ben'], 11, 5),
       match(['Ben', 'Dee'], ['Eli', 'Fay'], 11, 8),
-      match(['Hid'], ['Ben'], 11, 6),
+      match(['Gone'], ['Ben'], 11, 6),
     ],
     visible: everyone('Ana', 'Ben', 'Dee', 'Eli', 'Fay'),
-    nameOf: names('Ana', 'Ben', 'Dee', 'Eli', 'Fay', 'Hid'),
+    nameOf: names('Ana', 'Ben', 'Dee', 'Eli', 'Fay', 'Gone'),
   })
   check('met the most people', board.metMost, { names: ['Ben'], more: 0, count: 5 },
-    'Ben met Ana, Dee, Eli, Fay and Hid; Dee, Eli and Fay met 3 each in one doubles game. A hidden player still counts as someone Ben met — they are just never named')
+    'Ben met Ana, Dee, Eli, Fay and Gone; Dee, Eli and Fay met 3 each in one doubles game. A closed account still counts as someone Ben met — it is just never named')
 }
 
 // ============================================================
@@ -111,18 +111,18 @@ section('match of the month')
     match(['Ana'], ['Ben'], 11, 9),
     match(['Cy'], ['Dee'], 12, 10),
     match(['Ana'], ['Cy'], 10, 9, { endedEarly: true }),
-    match(['Hid'], ['Ben'], 13, 11),
+    match(['Gone'], ['Ben'], 13, 11),
   ]
   const board = buildBoard({
     matches,
     visible: everyone('Ana', 'Ben', 'Cy', 'Dee'),
-    nameOf: names('Ana', 'Ben', 'Cy', 'Dee', 'Hid'),
+    nameOf: names('Ana', 'Ben', 'Cy', 'Dee', 'Gone'),
   })
   check('the closest finished game', board.matchOfTheMonth && {
     teamA: board.matchOfTheMonth.teamA, teamB: board.matchOfTheMonth.teamB,
     score: board.matchOfTheMonth.score,
   }, { teamA: ['Cy'], teamB: ['Dee'], score: { A: 12, B: 10 } },
-  '12-10 beats 11-9 on the same margin because it is the longer game; 10-9 was stopped early so is not a finished game; 13-11 has a player who hides their name, and naming the other three would identify them')
+  '12-10 beats 11-9 on the same margin because it is the longer game; 10-9 was stopped early so is not a finished game; 13-11 has a closed account in it, and naming the other three would identify them')
   check('and why it was picked', board.matchOfTheMonth && {
     outOf: board.matchOfTheMonth.outOf,
     sameMargin: board.matchOfTheMonth.sameMargin,
@@ -253,16 +253,16 @@ section('biggest step up — against their own earlier matches')
     { id: 'Ana', before: { winners: 4, errors: 9, matches: n }, thisMonth: { winners: 9, errors: 9, matches: n } },
     { id: 'Ben', before: { winners: 4, errors: 9, matches: n }, thisMonth: { winners: 9, errors: 9, matches: n } },
     // Bigger again, but hidden.
-    { id: 'Hid', before: { winners: 1, errors: 9, matches: n }, thisMonth: { winners: 19, errors: 9, matches: n } },
+    { id: 'Gone', before: { winners: 1, errors: 9, matches: n }, thisMonth: { winners: 19, errors: 9, matches: n } },
     // Bigger again, but only two matches this month.
     { id: 'Few', before: { winners: 1, errors: 9, matches: n }, thisMonth: { winners: 19, errors: 9, matches: n - 1 } },
   ]
-  const nameOf = names('Edge', 'Ana', 'Ben', 'Hid', 'Few')
+  const nameOf = names('Edge', 'Ana', 'Ben', 'Gone', 'Few')
   const visible = everyone('Edge', 'Ana', 'Ben', 'Few')
 
   const board = buildBoard({ matches: [], visible, nameOf, progress })
   check('the biggest gain, as a tie', board.biggestStepUp, { names: ['Ana', 'Ben'], more: 0 },
-    `Ana and Ben both doubled; Hid gained more but hides their name; Few gained more but played under ${n} matches this month`)
+    `Ana and Ben both doubled; Gone gained more but has closed their account; Few gained more but played under ${n} matches this month`)
 
   const edgeOnly = buildBoard({ matches: [], visible, nameOf, progress: [progress[0]] })
   check(`a gain of exactly ${STEP_UP_MIN_GAIN * 100}% counts`, edgeOnly.biggestStepUp, { names: ['Edge'], more: 0 },

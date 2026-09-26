@@ -419,17 +419,6 @@ export function fetchMatchGame(id, { signal } = {}) {
   return apiFetch(`/player/matches/${encodeURIComponent(id)}/game`, { signal })
 }
 
-/**
- * Shows or hides this player's name on the monthly board. A display
- * setting only -- matches, ratings and everything else are untouched.
- */
-export function setNameVisible(nameVisible) {
-  return apiFetch('/player/me/visibility', {
-    method: 'PUT',
-    body: { nameVisible },
-  }).then((d) => d.nameVisible)
-}
-
 /** Every match this player has played, newest first. */
 export function fetchMatches({ signal } = {}) {
   return apiFetch('/player/matches', { signal }).then((d) => d.matches)

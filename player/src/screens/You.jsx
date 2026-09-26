@@ -22,7 +22,6 @@ import { usePlayerData } from '../lib/PlayerData'
 import {
   linkGoogle,
   setCredentials,
-  setNameVisible,
   unlinkGoogle,
   updateProfile,
 } from '../lib/api'
@@ -509,73 +508,6 @@ function ThemeChoice() {
   )
 }
 
-/**
- * Whether this player's name may appear on the monthly board.
- *
- * Two buttons in the same style as Appearance rather than a switch,
- * because each says in words what it does -- a toggle's "on" has to be
- * guessed. No password: this moves no data and locks nobody out, and a
- * privacy setting that is hard to reach is one people do not use.
- */
-function BoardVisibility() {
-  const { nameVisible, refresh } = usePlayerData()
-  // Only while a change is on its way. The rest of the time the loaded
-  // value is shown directly -- copying it into state once would freeze
-  // whatever it was on the first render, before the data had arrived.
-  const [pending, setPending] = useState(null)
-  const [error, setError] = useState(null)
-  const shown = pending ?? nameVisible
-
-  async function choose(next) {
-    if (next === shown) return
-    setPending(next)
-    setError(null)
-    try {
-      await setNameVisible(next)
-      await refresh()
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setPending(null)
-    }
-  }
-
-  return (
-    <section className="you-section" aria-label="Monthly board">
-      <Head icon="trophy">Monthly board</Head>
-      <p className="you-line">
-        Your name can appear on the board at the top of People.
-      </p>
-      <div className="filter-row" role="group" aria-label="Your name on the board">
-        <button
-          type="button"
-          className={`filter ${shown ? 'filter-active' : ''}`}
-          aria-pressed={shown}
-          onClick={() => choose(true)}
-        >
-          Show my name
-        </button>
-        <button
-          type="button"
-          className={`filter ${!shown ? 'filter-active' : ''}`}
-          aria-pressed={!shown}
-          onClick={() => choose(false)}
-        >
-          Hide my name
-        </button>
-      </div>
-      {error && <p className="error">{error}</p>}
-      <More label="What does hiding do?">
-        <p>
-          It only takes your name off the board. Your matches and rating stay
-          exactly as they are, and you still count in numbers about everyone —
-          just never by name.
-        </p>
-      </More>
-    </section>
-  )
-}
-
 function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
   const joined = joinedLabel(player.claimedAt)
 
@@ -590,8 +522,6 @@ function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
       <ThemeChoice />
 
       <Details player={player} onPlayerChange={onPlayerChange} />
-
-      <BoardVisibility />
 
       <LinkCode onPlayerChange={onPlayerChange} />
 
