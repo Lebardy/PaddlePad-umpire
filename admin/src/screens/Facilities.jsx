@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import PageBoard, { TallyCell } from '../components/PageBoard'
-import { createFacility, fetchFacility, listFacilities } from '../lib/api'
+import { createFacility, listFacilities } from '../lib/api'
 import { navigate } from '../lib/navigation'
 import { Link } from '../lib/router'
 
 /** Facilities: where umpires work and matches are scored. The owner sees and manages every one; a facility admin is sent straight to their own. */
 export default function Facilities({ me }) {
   const [facilities, setFacilities] = useState(null)
-  const [counts, setCounts] = useState({})
   const [error, setError] = useState(null)
   const [name, setName] = useState('')
   const [area, setArea] = useState('')
@@ -30,18 +29,6 @@ export default function Facilities({ me }) {
   // go straight there rather than showing a one-row table.
   useEffect(() => {
     if (me.role !== 'owner' && facilities && facilities.length > 0) navigate(`/facilities/${facilities[0].id}`, { replace: true })
-  }, [me.role, facilities])
-
-  // The list route carries no counts of its own, so the owner's table
-  // reads each facility's admins and umpires from its own detail page.
-  useEffect(() => {
-    if (me.role !== 'owner' || !facilities || facilities.length === 0) return
-    let live = true
-    Promise.all(facilities.map((facility) => fetchFacility(facility.id)
-      .then((data) => [facility.id, { admins: data.admins.length, umpires: data.umpires.length }])))
-      .then((pairs) => { if (live) setCounts(Object.fromEntries(pairs)) })
-      .catch(() => {})
-    return () => { live = false }
   }, [me.role, facilities])
 
   async function handleCreate(event) {
@@ -137,8 +124,9 @@ export default function Facilities({ me }) {
                     <td><Link to={`/facilities/${facility.id}`} className="row-link"><strong>{facility.name}</strong></Link></td>
                     <td>{facility.area ?? '—'}</td>
                     <td>{facility.feeText}</td>
-                    <td className="col-when">{counts[facility.id]?.umpires ?? '–'}</td>
-                    <td className="col-when">{counts[facility.id]?.admins ?? '–'}</td>
+                    {/* Counted by the list route itself: one request for the whole table. */}
+                    <td className="col-when">{facility.umpireCount ?? '–'}</td>
+                    <td className="col-when">{facility.adminCount ?? '–'}</td>
                   </tr>
                 ))}
               </tbody>
