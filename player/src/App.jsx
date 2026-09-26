@@ -7,6 +7,7 @@ import People from './screens/People'
 import PersonDetail from './screens/PersonDetail'
 import Rating from './screens/Rating'
 import BoardMatch from './screens/BoardMatch'
+import FacilityPage from './screens/FacilityPage'
 import You from './screens/You'
 import EmptyState from './components/EmptyState'
 import ErrorState from './components/ErrorState'
@@ -93,6 +94,7 @@ function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
   const matchRoute = matchPath('/matches/:id', path)
   const personRoute = matchPath('/people/:name', path)
   const boardMatchRoute = matchPath('/board/match/:id', path)
+  const placeRoute = matchPath('/places/:id', path)
 
   let screen
   if (path === '/')
@@ -103,6 +105,7 @@ function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
   else if (path === '/people') screen = <People />
   else if (personRoute) screen = <PersonDetail name={personRoute.name} />
   else if (boardMatchRoute) screen = <BoardMatch id={boardMatchRoute.id} />
+  else if (placeRoute) screen = <FacilityPage id={placeRoute.id} />
   else if (path === '/you')
     screen = (
       <You

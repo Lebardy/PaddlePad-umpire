@@ -23,6 +23,8 @@ import { isUuid, normalizePlayerName, playerNameError } from '../validate.js'
 import { readGame } from '../drama.js'
 import { getRallyRatings, invalidateRallyRatings } from '../rally-rating-store.js'
 import { rallyRatingFor } from '../rally-rating.js'
+import { findFacility, listFacilities } from '../facility-store.js'
+import { playerFacilityPage, playerFacilitySummary } from '../facility-rules.js'
 
 const router = Router()
 
@@ -571,6 +573,20 @@ router.post('/link', async (req, res) => {
 router.get('/matches', async (req, res) => {
   const ratings = await getRallyRatings(query)
   res.json({ matches: await getPlayerMatches(query, req.player.id, ratings) })
+})
+
+/** Every place to play on PaddlePad, by name, for the People tab. */
+router.get('/facilities', async (req, res) => {
+  const rows = await listFacilities(query, { all: true })
+  res.json({ facilities: rows.map(playerFacilitySummary) })
+})
+
+/** One place to play: what it is, where, when it's open and what it costs. */
+router.get('/facilities/:id', async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such place' })
+  const row = await findFacility(query, req.params.id)
+  if (!row) return res.status(404).json({ error: 'No such place' })
+  res.json({ facility: playerFacilityPage(row) })
 })
 
 export default router

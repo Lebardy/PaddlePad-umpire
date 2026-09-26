@@ -462,6 +462,7 @@
 .rating > .section-head,
 .recent > .section-head,
 .board > .section-head,
+.places > .section-head,
 .trend > .trend-head,
 .detail-shape > .board-match-head {
   display: flex;
@@ -1463,6 +1464,76 @@ a.highlight:active,
 .pr-value { font-size: 3.2rem; font-weight: 900; color: var(--lamp); text-shadow: 0 0 18px var(--lamp-glow); }
 .pr-note { font-size: 0.85rem; color: var(--board-muted); }
 .person-detail .match-list { margin-top: 0; }
+
+/* ============ Places to play ============ */
+
+.places { margin-block: 1.5rem; }
+.place-list {
+  background: var(--surface);
+  margin-inline: calc(var(--gutter) * -1);
+  border-block: 1px solid var(--border);
+}
+.place-list li + li { border-top: 1px solid var(--border); }
+.place-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 44px;
+  padding: 0.75rem var(--gutter);
+  color: inherit;
+  text-decoration: none;
+}
+.place-row:active { background: var(--surface-sunken); }
+.place-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.place-name { font-weight: 600; font-size: 1.02rem; overflow-wrap: anywhere; }
+.place-area { font-size: 0.88rem; color: var(--text-secondary); }
+
+/* A logo sits on white in both themes: many are dark lettering on a
+   see-through background and would vanish on the dark one. */
+.place-logo {
+  /* Flex, not grid: in a grid a picture's 100% height doesn't resolve,
+     so a tall logo would overflow the tile and be cut off. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+.place-logo img { width: 100%; height: 100%; object-fit: contain; padding: 8%; box-sizing: border-box; }
+.place-logo-sm { width: 3rem; height: 3rem; }
+.place-logo-lg { width: 7rem; height: 7rem; }
+/* Initials stand in at the same size as the logo tile they replace. */
+.place-initials.avatar-lg { width: 7rem; height: 7rem; font-size: 2.6rem; }
+
+.place-head { display: grid; justify-items: start; gap: 0.6rem; margin-bottom: 1.2rem; }
+.place-head h1 { margin: 0.3rem 0 0; font-size: clamp(2rem, 9vw, 2.6rem); line-height: 1; }
+.place-where { margin: 0; color: var(--text-secondary); }
+.place-facts { display: grid; gap: 0.6rem; margin: 0 0 1rem; }
+.place-facts div { display: grid; gap: 0.1rem; }
+.place-facts dt {
+  font-family: var(--label);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.place-facts dd { margin: 0; font-size: 1.05rem; }
+.place-map {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-family: var(--label);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--primary);
+  text-decoration: none;
+}
+.place-details { color: var(--text-secondary); white-space: pre-line; }
 
 /* ============ Avatar ============ */
 
