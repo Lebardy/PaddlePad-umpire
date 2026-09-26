@@ -283,7 +283,8 @@ section('admin emails')
 
 section('new action names')
 {
-  for (const name of ['admin.signed_out_others', 'admin.backup_codes_created', 'admin.backup_code_used']) {
+  for (const name of ['admin.signed_out_others', 'admin.backup_codes_created', 'admin.backup_code_used',
+    'facility.logo_changed', 'facility.logo_removed']) {
     check(`${name} is an action`, rules.ACTIONS.includes(name), true)
   }
 }

@@ -4,9 +4,12 @@ import { requireAdminAccount } from '../auth.js'
 import { recordActivity } from '../admin-activity.js'
 import {
   changedFacilityColumns, facilityColumns, facilityFilterFor, facilityPayload, mayCreateFacility, mayManageFacility,
-  readFacility,
+  readFacility, readLogoUpload,
 } from '../facility-rules.js'
-import { createFacility, facilityPeople, facilityPeopleCounts, findFacility, listFacilities, lockFacility, updateFacility } from '../facility-store.js'
+import {
+  createFacility, facilityPeople, facilityPeopleCounts, findFacility, listFacilities, lockFacility, removeFacilityLogo,
+  saveFacilityLogo, updateFacility,
+} from '../facility-store.js'
 import { isUuid } from '../validate.js'
 
 // Facilities: where umpires work. The owner sees and manages every one;
@@ -123,6 +126,59 @@ router.patch('/:id', async (req, res) => {
     res.json({ facility: facilityPayload(facility) })
   } catch (error) {
     if (error.code === '23505') return res.status(409).json({ error: 'A facility with that name already exists' })
+    sendRefusal(res, error)
+  }
+})
+
+/**
+ * A facility's logo: the same admins who may edit its details may
+ * change it. The picture was shrunk in the browser; readLogoUpload
+ * checks it again here. The facility row is locked so a rename in
+ * flight can't leave the activity entry naming the old name.
+ */
+router.put('/:id/logo', async (req, res) => {
+  if (!isUuid(req.params.id) || !mayManageFacility(req.admin, req.params.id)) {
+    return res.status(404).json({ error: 'No such facility' })
+  }
+  const read = readLogoUpload(req.body)
+  if (read.error) return res.status(400).json({ error: read.error })
+  try {
+    const facility = await withTransaction(async (client) => {
+      const before = await lockFacility(client, req.params.id)
+      if (!before) throw refusal(404, 'No such facility')
+      await saveFacilityLogo(client, before.id, read.values, req.admin.id)
+      await recordActivity(client, {
+        adminId: req.admin.id, action: 'facility.logo_changed', targetType: 'facility', targetId: before.id,
+        summary: `Changed the logo for ${before.name}`, facilityId: before.id,
+      })
+      return findFacility((sql, params) => client.query(sql, params), before.id)
+    })
+    res.json({ facility: facilityPayload(facility) })
+  } catch (error) {
+    sendRefusal(res, error)
+  }
+})
+
+router.delete('/:id/logo', async (req, res) => {
+  if (!isUuid(req.params.id) || !mayManageFacility(req.admin, req.params.id)) {
+    return res.status(404).json({ error: 'No such facility' })
+  }
+  try {
+    const facility = await withTransaction(async (client) => {
+      const before = await lockFacility(client, req.params.id)
+      if (!before) throw refusal(404, 'No such facility')
+      // Removing a logo that is already gone changes nothing, so it
+      // writes no activity entry either.
+      if (await removeFacilityLogo(client, before.id)) {
+        await recordActivity(client, {
+          adminId: req.admin.id, action: 'facility.logo_removed', targetType: 'facility', targetId: before.id,
+          summary: `Removed the logo for ${before.name}`, facilityId: before.id,
+        })
+      }
+      return findFacility((sql, params) => client.query(sql, params), before.id)
+    })
+    res.json({ facility: facilityPayload(facility) })
+  } catch (error) {
     sendRefusal(res, error)
   }
 })

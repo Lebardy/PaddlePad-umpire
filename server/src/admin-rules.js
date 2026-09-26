@@ -43,6 +43,8 @@ export const ACTIONS = [
   'umpire.moved',
   'facility.created',
   'facility.updated',
+  'facility.logo_changed',
+  'facility.logo_removed',
   'match.looks_fine',
   'match.voided',
   'match.restored',
