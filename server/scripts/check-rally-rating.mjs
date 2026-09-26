@@ -239,9 +239,9 @@ section('What a player is sent')
   )
   const rich = rateHistory(many).get(A1)
   const often = mostOften(rich)
-  check('with enough rallies it names the commonest wins and mistakes',
+  check('with enough rallies it names the commonest win and mistake',
     [often.won.map((g) => g.ending), often.lost.map((c) => c.ending)],
-    [['putaway', 'lob'], ['net', 'kitchen']],
+    [['putaway'], ['net']],
     'Two put-aways a match against one lob; two nets a match against one kitchen fault.')
   const table = rallyRatingFor(rateHistory(many), A1, { forRatingScreen: true }).breakdown
   const row = (ending) => table.find((r) => r.ending === ending)
@@ -265,8 +265,16 @@ section('What a player is sent')
   const counted = rateHistory([...regulars, againstNewcomer, later]).get(A1)
   check('mistakes are ranked by how often, not by points',
     mostOften(counted).lost.map((e) => [e.ending, e.rallies, e.points < 0]),
-    [['net', 3, false], ['out', 2, true]],
+    [['net', 3, false]],
     'The sentence says "the most": three nets that cost nothing still happened more than two outs.')
+
+  const tied = rateHistory(Array.from({ length: 6 }, () =>
+    match([rally(A1, 'putaway'), rally(A1, 'lob'), rally(A1, 'drop_winner'), rally(A1, 'net'), rally(A1, 'out')]),
+  )).get(A1)
+  check('endings tied for the most all come back, none singled out',
+    [mostOften(tied).won.map((e) => e.rallies), mostOften(tied).lost.map((e) => e.rallies)],
+    [[6, 6, 6], [6, 6]],
+    'Calling one of several equals "the most" would not be true; the screen decides how many to name.')
 }
 
 section('Early estimate')

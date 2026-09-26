@@ -3,8 +3,9 @@
 //
 // Two short lists -- won with a shot, lost with a mistake -- in everyday
 // words, largest first, each with a bar scaled to its own list. Under
-// them, one sentence per list naming the ending they had most often, with
-// its count and, once they are rated, what it did to their points; before
+// them, one sentence per list naming the ending they had most often (or
+// the two tied for it; three or more are left to the list), with its
+// count and, once they are rated, what it did to their points; before
 // then no points appear.
 //
 // Only rallies this player ended themselves: a partner's shots describe
@@ -12,7 +13,7 @@
 // so the match screen can fall back to the older away/at-the-net bar.
 // ============================================================
 
-import { endingPhrase } from '../lib/endingWords'
+import { endingPhrase, namedLeaders } from '../lib/endingWords'
 
 function EndingList({ title, rows, className }) {
   if (rows.length === 0) return null
@@ -35,15 +36,33 @@ function EndingList({ title, rows, className }) {
   )
 }
 
-// The row with the most rallies; on a tie, the one that moved the points
-// most. Ranked by how often because the sentence says "the most rallies".
-function mostOften(rows) {
-  if (rows.length === 0) return null
-  return rows.reduce((best, row) =>
-    row.rallies > best.rallies ||
-    (row.rallies === best.rallies && Math.abs(row.points ?? 0) > Math.abs(best.points ?? 0))
-      ? row
-      : best)
+// The rows with the most rallies, larger points first. Ranked by how
+// often because the sentence says "the most rallies"; ties all come back
+// so none is singled out, and namedLeaders decides how many to name.
+function leaders(rows) {
+  const most = Math.max(0, ...rows.map((row) => row.rallies))
+  return rows
+    .filter((row) => row.rallies === most)
+    .sort((a, b) => Math.abs(b.points ?? 0) - Math.abs(a.points ?? 0) || a.ending.localeCompare(b.ending))
+}
+
+// "Hitting out and hitting into the net", in bold, starting a sentence
+// unless `lower`. Before a player is rated the sentence starts with "You"
+// instead: "Hard put-away shots was your most common winning shot" fails
+// on every plural phrase.
+function Names({ rows, lower = false }) {
+  return rows.map((row, i) => (
+    <span key={row.ending}>
+      {i > 0 && ' and '}
+      <strong>{i === 0 && !lower ? endingPhrase(row.ending) : endingPhrase(row.ending).toLowerCase()}</strong>
+    </span>
+  ))
+}
+
+// "3, −6", or for two tied, "3 each, −5 together".
+function numbers(rows) {
+  if (rows.length === 1) return `${rows[0].rallies}, ${signed(rows[0].points)}`
+  return `${rows[0].rallies} each, ${signed(rows.reduce((sum, row) => sum + row.points, 0))} together`
 }
 
 function signed(value) {
@@ -58,8 +77,8 @@ function RallyEndings({ rally }) {
   const lost = endings.filter((row) => row.outcome === 'error')
   const rated = endings.some((row) => row.points !== null)
 
-  const earned = mostOften(won)
-  const cost = mostOften(lost)
+  const earned = namedLeaders(leaders(won))
+  const cost = namedLeaders(leaders(lost))
 
   return (
     <div className="endings">
@@ -69,11 +88,11 @@ function RallyEndings({ rally }) {
       {(earned || cost) && (
         <p className="endings-note">
           {cost && (rated
-            ? <><strong>{endingPhrase(cost.ending)}</strong> lost you the most rallies in this match ({cost.rallies}, {signed(cost.points)}).{' '}</>
-            : <><strong>{endingPhrase(cost.ending)}</strong> was your most common mistake.{' '}</>)}
+            ? <><Names rows={cost} /> lost you the most rallies in this match ({numbers(cost)}).{' '}</>
+            : <>You lost the most rallies in this match with <Names rows={cost} lower />.{' '}</>)}
           {earned && (rated
-            ? <><strong>{endingPhrase(earned.ending)}</strong> won you the most ({earned.rallies}, {signed(earned.points)}).</>
-            : <><strong>{endingPhrase(earned.ending)}</strong> was your most common winning shot.</>)}
+            ? <><Names rows={earned} /> won you the most ({numbers(earned)}).</>
+            : <>You won the most with <Names rows={earned} lower />.</>)}
         </p>
       )}
 

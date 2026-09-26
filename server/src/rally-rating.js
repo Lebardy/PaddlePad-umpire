@@ -326,23 +326,28 @@ export function rateHistory(matches, options = {}) {
 export const MOST_OFTEN_MIN_RALLIES = 20
 
 /**
- * The two winning shots and the two mistakes this player ended the most
- * rallies with, and what each did to their points. Ranked by how often,
- * not by points: every rally counts the same, so the two nearly always
- * agree, and where they don't (a rally against a newcomer can move
- * nothing) "the most" should still mean what it says. The numbers are the
- * rating screen's own table rows, so the sentence and the table match.
- * Null until enough rallies carry an ending to say anything.
+ * The winning shots and the mistakes this player ended the most rallies
+ * with -- usually one of each, more when they tie -- and what each did to
+ * their points. Ranked by how often, not by points: every rally counts
+ * the same, so the two nearly always agree, and where they don't (a
+ * rally against a newcomer can move nothing) "the most" should still
+ * mean what it says. Ties come back together, larger points first, so
+ * the screen never calls one of several equals "the most". The numbers
+ * are the rating screen's own table rows, so the sentence and the table
+ * match. Null until enough rallies carry an ending to say anything.
  */
 export function mostOften(rating) {
   if (!rating || rating.detailedRallies < MOST_OFTEN_MIN_RALLIES) return null
   const rows = wholeBreakdown(rating).filter((row) => row.kind === 'ending')
-  const top = (outcome, sign) => rows
-    .filter((row) => rallyEnding(row.ending)?.outcome === outcome)
-    .sort((a, b) => b.rallies - a.rallies || sign * (b.points - a.points) || a.ending.localeCompare(b.ending))
-    .slice(0, 2)
-    .map(({ ending, rallies, points }) => ({ ending, rallies, points }))
-  return { won: top('winner', 1), lost: top('error', -1) }
+  const leaders = (outcome, sign) => {
+    const mine = rows.filter((row) => rallyEnding(row.ending)?.outcome === outcome)
+    const most = Math.max(0, ...mine.map((row) => row.rallies))
+    return mine
+      .filter((row) => row.rallies === most)
+      .sort((a, b) => sign * (b.points - a.points) || a.ending.localeCompare(b.ending))
+      .map(({ ending, rallies, points }) => ({ ending, rallies, points }))
+  }
+  return { won: leaders('winner', 1), lost: leaders('error', -1) }
 }
 
 /**
