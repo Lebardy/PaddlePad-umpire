@@ -38,6 +38,7 @@ from pipeline.feature_engineering import (
     prepare_playstyle_features,
     residualize_playstyle_features,
     scale_playstyle_features,
+    extract_playstyle_components,
 )
 from pipeline.clustering import (
     prepare_clustering_data,
@@ -501,9 +502,28 @@ def run_pipeline(gated_df, rally_points=None):
         prepare_playstyle_features(adjusted)
     )
 
-    playstyle_cluster_data = skill_clustered[
-        ["player_id", "skill_cluster", "skill_group", "skill_score"]
-    ].merge(scaled_playstyle, on="player_id", how="inner", validate="one_to_one")
+    # The unsupervised feature extraction step. The thirteen measurements,
+    # already corrected for skill and standardised, are boiled down with
+    # PCA to the few scores that carry at least 80% of their spread, and
+    # the style K-Means below runs on those. Fitted once on everyone, not
+    # per group, so a score means the same thing in every group. Names are
+    # still read from the thirteen measurements, kept alongside.
+    #
+    # Tested before it went in, with the pass rule written first, against
+    # the pipeline without it: on the simulated pool it found the hidden
+    # net-play habit about as well (0.34 against 0.36, run-to-run spread
+    # 0.08) and let about as little ability into the styles (0.16 against
+    # 0.13, spread 0.08); on 151 real players from the pklmart dataset its
+    # groups held together as well when players were resampled (0.68
+    # against 0.68).
+    components, _, spread_kept = extract_playstyle_components(scaled_playstyle)
+    component_columns = [c for c in components.columns if c != "player_id"]
+
+    playstyle_cluster_data = (
+        skill_clustered[["player_id", "skill_cluster", "skill_group", "skill_score"]]
+        .merge(scaled_playstyle, on="player_id", how="inner", validate="one_to_one")
+        .merge(components, on="player_id", how="inner", validate="one_to_one")
+    )
 
     # THE FIX.
     #
@@ -539,10 +559,11 @@ def run_pipeline(gated_df, rally_points=None):
 
         group_data, best_k, _ = test_playstyle_k_values(
             playstyle_cluster_data, group, k_min=2, k_max=5,
-            random_state=RANDOM_STATE,
+            random_state=RANDOM_STATE, features=component_columns,
         )
         clustered, _, _ = cluster_playstyles(
-            group_data, best_k, random_state=RANDOM_STATE
+            group_data, best_k, random_state=RANDOM_STATE,
+            features=component_columns,
         )
         # traits_out collects what each name was actually built from --
         # which measurement chose each word, which way it pointed, how
@@ -621,6 +642,13 @@ def run_pipeline(gated_df, rally_points=None):
         "residualisedBy": residualise_column,
         "skillK": int(best_skill_k),
         "groupsTooSmallToCluster": unclustered,
+        # What the style K-Means actually saw. Recorded for the same
+        # reason as residualisedBy: it changes what the archetypes mean.
+        "styleExtraction": {
+            "method": "pca",
+            "components": len(component_columns),
+            "spreadKept": round(spread_kept, 4),
+        },
     }
     return final, evidence, parts, games, report
 

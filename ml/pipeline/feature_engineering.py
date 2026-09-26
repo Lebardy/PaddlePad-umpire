@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 
 
 # ============================================================
@@ -675,4 +676,90 @@ def scale_playstyle_features(
     return (
         scaled,
         scaler
+    )
+
+
+# ============================================================
+# EXTRACT PLAYSTYLE COMPONENTS (UNSUPERVISED)
+# ============================================================
+
+PLAYSTYLE_COMPONENT_SHARE = 0.80
+
+
+def extract_playstyle_components(
+    scaled_playstyle_features,
+    min_share=PLAYSTYLE_COMPONENT_SHARE
+):
+    """
+    Boil the standardized playstyle features down to a few
+    summary scores with PCA, fitted once on every player.
+
+    Keeps the fewest components that together explain at
+    least `min_share` of the spread. The second-level
+    K-Means clusters on these scores (see the `features`
+    argument of clustering.test_playstyle_k_values); the
+    archetype names are still read from the features
+    themselves.
+
+    Fitted on everyone rather than per skill group, so a
+    score means the same thing in every group.
+
+    Returns:
+        components  DataFrame: player_id, pc_1 .. pc_n,
+                    in the input's row order
+        pca         the fitted PCA, n components
+        share       the share of the spread they explain
+    """
+
+    player_ids = (
+        scaled_playstyle_features[
+            "player_id"
+        ]
+        .reset_index(
+            drop=True
+        )
+    )
+
+    X = scaled_playstyle_features[
+        PLAYSTYLE_FEATURES
+    ].to_numpy()
+
+    cumulative = np.cumsum(
+        PCA()
+        .fit(X)
+        .explained_variance_ratio_
+    )
+
+    n_components = min(
+        int(
+            np.searchsorted(
+                cumulative,
+                min_share
+            )
+        ) + 1,
+        len(cumulative)
+    )
+
+    pca = PCA(
+        n_components=n_components
+    )
+
+    components = pd.DataFrame(
+        pca.fit_transform(X),
+        columns=[
+            f"pc_{i + 1}"
+            for i in range(n_components)
+        ]
+    )
+
+    components.insert(
+        0,
+        "player_id",
+        player_ids
+    )
+
+    return (
+        components,
+        pca,
+        float(cumulative[n_components - 1])
     )

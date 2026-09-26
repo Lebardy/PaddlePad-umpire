@@ -21,6 +21,15 @@ sys.path.insert(0, str(HERE))
 
 from pipeline.player_profiles import aggregate_player_profiles
 from pipeline.skill_model import build_skill_model
+from pipeline.clustering import (
+    PLAYSTYLE_CLUSTERING_FEATURES,
+    cluster_playstyles,
+    test_playstyle_k_values,
+)
+from pipeline.feature_engineering import (
+    PLAYSTYLE_FEATURES,
+    extract_playstyle_components,
+)
 from run import (
     EVIDENCE_COLUMNS,
     SCORE_PARTS,
@@ -31,6 +40,8 @@ from run import (
     run_pipeline,
     to_payload,
 )
+
+import run as driver
 
 GATE = {"minMatchesPerPlayer": 5, "minPlayers": 3, "recommendedPlayers": 40}
 
@@ -130,6 +141,12 @@ check("everyone has a skill group", final["skill_group"].notna().all())
 check("archetypes were produced",
       final["playstyle_archetype"].notna().any(),
       str(structure))
+extraction = structure.get("styleExtraction") or {}
+check("the run says the styles were found on boiled-down scores",
+      extraction.get("method") == "pca", str(extraction))
+check("and how many components carried how much of the spread",
+      extraction.get("components", 0) >= 1 and extraction.get("spreadKept", 0) >= 0.80,
+      str(extraction))
 print(f"       groups found: {structure['skillGroups']}")
 
 # THE REGRESSION THIS FILE EXISTS FOR.
@@ -219,6 +236,106 @@ try:
     check("a rated player with no rally points is refused", False, "it published")
 except RuntimeError as error:
     check("a rated player with no rally points is refused", "no rally points" in str(error), str(error))
+
+
+print("\nstyle K-Means on chosen columns")
+
+# Twenty players whose two extra columns split them cleanly in half, while
+# the thirteen measurements are noise that splits them some other way.
+# Pointed at the extra columns, the style K-Means has to find the halves.
+column_rng = np.random.default_rng(11)
+halves = np.repeat([0, 1], 10)
+columns_frame = pd.DataFrame(
+    column_rng.normal(size=(20, len(PLAYSTYLE_CLUSTERING_FEATURES))),
+    columns=PLAYSTYLE_CLUSTERING_FEATURES,
+)
+columns_frame.insert(0, "player_id", [f"p{i}" for i in range(20)])
+columns_frame["skill_group"] = "Everyone"
+columns_frame["pc_1"] = np.where(halves == 0, -5.0, 5.0) + column_rng.normal(scale=0.1, size=20)
+columns_frame["pc_2"] = column_rng.normal(scale=0.1, size=20)
+
+chosen_data, chosen_k, _ = test_playstyle_k_values(
+    columns_frame, "Everyone", features=["pc_1", "pc_2"])
+by_columns, _, _ = cluster_playstyles(chosen_data, chosen_k, features=["pc_1", "pc_2"])
+by_default, _, _ = cluster_playstyles(chosen_data, 2)
+by_measurements, _, _ = cluster_playstyles(chosen_data, 2, features=PLAYSTYLE_CLUSTERING_FEATURES)
+
+check("pointed at other columns, the style K-Means picks the split they show",
+      chosen_k == 2, f"k={chosen_k}")
+check("and puts each half in a style of its own",
+      by_columns["playstyle_cluster"].nunique() == 2
+      and by_columns.groupby(halves)["playstyle_cluster"].nunique().max() == 1,
+      str(by_columns["playstyle_cluster"].tolist()))
+check("left alone, it still clusters on the thirteen measurements",
+      (by_default["playstyle_cluster"] == by_measurements["playstyle_cluster"]).all())
+
+
+print("\nboil-down step")
+
+# Thirteen measurements where twelve move together and one moves on its
+# own: the first component carries about twelve thirteenths of the spread
+# (about 0.92), so 80% needs one component and 97% needs two.
+spread_rng = np.random.default_rng(5)
+shared = spread_rng.normal(size=40)
+measurements = np.column_stack(
+    [shared + spread_rng.normal(scale=0.01, size=40) for _ in range(12)]
+    + [spread_rng.normal(size=40)]
+)
+measurements = (measurements - measurements.mean(axis=0)) / measurements.std(axis=0)
+boil_frame = pd.DataFrame(measurements, columns=PLAYSTYLE_FEATURES)
+boil_frame.insert(0, "player_id", [f"p{i}" for i in range(40)])
+
+one_kept, _, one_share = extract_playstyle_components(boil_frame)
+two_kept, _, two_share = extract_playstyle_components(boil_frame, min_share=0.97)
+check("the boil-down keeps the fewest components that reach 80% of the spread",
+      list(one_kept.columns) == ["player_id", "pc_1"] and one_share >= 0.80,
+      f"{list(one_kept.columns)}, {one_share:.3f}")
+check("asking for more of the spread keeps more components",
+      list(two_kept.columns) == ["player_id", "pc_1", "pc_2"] and two_share >= 0.97,
+      f"{list(two_kept.columns)}, {two_share:.3f}")
+check("every player keeps their place and gets a score",
+      one_kept["player_id"].tolist() == boil_frame["player_id"].tolist()
+      and np.isfinite(two_kept[["pc_1", "pc_2"]].to_numpy()).all())
+
+
+print("\nthe driver clusters styles on the boiled-down scores")
+
+# Replace the boil-down with one planted score that splits players by
+# alternate rows. If the style K-Means really runs on the scores, every
+# style inside a skill group is one side of that split; if it ran on the
+# thirteen measurements instead, the planted split would not show.
+planted_side = {}
+
+
+def planted_components(scaled):
+    side = np.arange(len(scaled)) % 2
+    planted_side.update(zip(scaled["player_id"], side))
+    jitter = np.random.default_rng(3).normal(scale=0.01, size=len(scaled))
+    planted = pd.DataFrame({"player_id": scaled["player_id"].to_numpy(),
+                            "pc_1": np.where(side == 0, -10.0, 10.0) + jitter})
+    return planted, None, 1.0
+
+
+real_extract = getattr(driver, "extract_playstyle_components", None)
+driver.extract_playstyle_components = planted_components
+try:
+    planted_final, _, _, _, _ = run_pipeline(gated)
+finally:
+    driver.extract_playstyle_components = real_extract
+
+clustered_rows = planted_final[planted_final["playstyle_cluster"].notna()]
+mixed_groups = [rows for _, rows in clustered_rows.groupby("skill_group")
+                if rows["player_id"].map(planted_side).nunique() == 2]
+check("the style groups follow the boiled-down scores, not the raw measurements",
+      bool(mixed_groups) and all(
+          rows["playstyle_cluster"].nunique() == 2
+          and rows.groupby(rows["player_id"].map(planted_side))["playstyle_cluster"].nunique().max() == 1
+          for rows in mixed_groups),
+      str([rows.groupby(rows["player_id"].map(planted_side))["playstyle_cluster"].unique().tolist()
+           for rows in mixed_groups]))
+check("and the styles still get names",
+      clustered_rows["playstyle_archetype"].notna().all(),
+      str(clustered_rows["playstyle_archetype"].unique().tolist()))
 
 
 print("\npayload")
