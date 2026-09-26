@@ -26,6 +26,10 @@ from pipeline.clustering import (
     cluster_playstyles,
     test_playstyle_k_values,
 )
+from pipeline.feature_engineering import (
+    PLAYSTYLE_FEATURES,
+    extract_playstyle_components,
+)
 from run import (
     EVIDENCE_COLUMNS,
     SCORE_PARTS,
@@ -256,6 +260,34 @@ check("and puts each half in a style of its own",
       str(by_columns["playstyle_cluster"].tolist()))
 check("left alone, it still clusters on the thirteen measurements",
       (by_default["playstyle_cluster"] == by_measurements["playstyle_cluster"]).all())
+
+
+print("\nboil-down step")
+
+# Thirteen measurements where twelve move together and one moves on its
+# own: the first component carries about twelve thirteenths of the spread
+# (about 0.92), so 80% needs one component and 97% needs two.
+spread_rng = np.random.default_rng(5)
+shared = spread_rng.normal(size=40)
+measurements = np.column_stack(
+    [shared + spread_rng.normal(scale=0.01, size=40) for _ in range(12)]
+    + [spread_rng.normal(size=40)]
+)
+measurements = (measurements - measurements.mean(axis=0)) / measurements.std(axis=0)
+boil_frame = pd.DataFrame(measurements, columns=PLAYSTYLE_FEATURES)
+boil_frame.insert(0, "player_id", [f"p{i}" for i in range(40)])
+
+one_kept, _, one_share = extract_playstyle_components(boil_frame)
+two_kept, _, two_share = extract_playstyle_components(boil_frame, min_share=0.97)
+check("the boil-down keeps the fewest components that reach 80% of the spread",
+      list(one_kept.columns) == ["player_id", "pc_1"] and one_share >= 0.80,
+      f"{list(one_kept.columns)}, {one_share:.3f}")
+check("asking for more of the spread keeps more components",
+      list(two_kept.columns) == ["player_id", "pc_1", "pc_2"] and two_share >= 0.97,
+      f"{list(two_kept.columns)}, {two_share:.3f}")
+check("every player keeps their place and gets a score",
+      one_kept["player_id"].tolist() == boil_frame["player_id"].tolist()
+      and np.isfinite(two_kept[["pc_1", "pc_2"]].to_numpy()).all())
 
 
 print("\npayload")

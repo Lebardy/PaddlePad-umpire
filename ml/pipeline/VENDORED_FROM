@@ -1,2 +1,2 @@
-b835927e657eafd59e9585d86b1129e75beb912a
-2026-09-26 Let the playstyle K-Means cluster on chosen columns
+04336fdb89367ed322f0623ed6cc5136f9a12149
+2026-09-26 Boil the playstyle features down with PCA before the second K-Means
