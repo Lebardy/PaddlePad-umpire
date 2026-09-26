@@ -624,6 +624,26 @@ section {
 }
 .session-ended-tag { margin-left: 0; }
 
+/* Ending and reopening a night are real actions, so they look like
+   buttons -- outlined, so neither competes with the filled New match
+   button below, and never red: ending a session deletes nothing (voiding
+   is the destructive one). Blue ends; green reopens, since reopening
+   leads back into scoring. Tall enough to hit on a tablet. */
+.session-btn {
+  min-height: 2.75rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--radius-sm);
+  border: 2px solid currentColor;
+  font-size: 0.98rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.session-btn.end { color: var(--accent); background: var(--accent-soft); }
+.session-btn.reopen { color: var(--primary); background: var(--primary-soft); }
+.session-btn:hover { filter: brightness(0.95); }
+.session-btn:active { transform: translateY(1px); }
+
 .matches .new-match-btn { margin-bottom: 0.75rem; font-size: 1.1rem; padding: 1rem; }
 
 .roster li {

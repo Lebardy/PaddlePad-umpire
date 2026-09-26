@@ -102,15 +102,15 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
             <>
               <span className="session-ended-tag">Ended</span>
               <button
-                className="link-btn"
+                className="session-btn reopen"
                 onClick={() => setSessionEnded(sessionId, false)}
               >
-                Reopen
+                Reopen session
               </button>
             </>
           ) : (
             <button
-              className="link-btn"
+              className="session-btn end"
               onClick={() => {
                 if (
                   inProgressCount > 0 &&
