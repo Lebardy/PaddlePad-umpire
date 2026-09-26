@@ -24,3 +24,10 @@ const PHRASES = {
 export function endingPhrase(key) {
   return PHRASES[key] ?? 'Other rallies'
 }
+
+// The endings a sentence may call "the most": one clear leader, or two
+// tied for it. Three or more tied are left for the list beside the
+// sentence to show; naming them all would read as a list, not an answer.
+export function namedLeaders(leaders) {
+  return leaders && leaders.length >= 1 && leaders.length <= 2 ? leaders : null
+}

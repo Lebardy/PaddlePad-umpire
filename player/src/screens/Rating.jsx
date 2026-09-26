@@ -40,7 +40,7 @@ import { useEffect, useState } from 'react'
 import { fetchStanding } from '../lib/api'
 import { usePlayerData } from '../lib/PlayerData'
 import { navigate } from '../lib/router'
-import { endingPhrase } from '../lib/endingWords'
+import { endingPhrase, namedLeaders } from '../lib/endingWords'
 import { styleName } from '../lib/styleName'
 import { faultsToWorkOn } from '../lib/faultTips'
 import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
@@ -183,6 +183,24 @@ function countWords(row) {
   return `${row.rallies} ${row.rallies === 1 ? 'rally' : 'rallies'}`
 }
 
+// One or two endings tied for the most, in bold: "hitting out and
+// hitting into the net".
+function LeaderNames({ leaders }) {
+  return leaders.map((row, i) => (
+    <span key={row.ending}>
+      {i > 0 && ' and '}
+      <strong>{endingPhrase(row.ending).toLowerCase()}</strong>
+    </span>
+  ))
+}
+
+// "24 rallies, +31", or for two tied, "13 rallies each, +20 together".
+function leaderNumbers(leaders) {
+  if (leaders.length === 1) return `${countWords(leaders[0])}, ${signed(leaders[0].points)}`
+  const together = leaders.reduce((sum, row) => sum + row.points, 0)
+  return `${countWords(leaders[0])} each, ${signed(together)} together`
+}
+
 /**
  * A row with a bar growing left (lost points) or right (gained points)
  * from a centre line. The same scale the old score's parts used, so the
@@ -213,7 +231,8 @@ function PointsArm({ points, widest, label }) {
  * with the one-line answer and the total still showing while it is shut.
  */
 function Score({ rallyRating }) {
-  const moved = rallyRating.movedMost
+  const won = namedLeaders(rallyRating.mostOften?.won)
+  const lost = namedLeaders(rallyRating.mostOften?.lost)
   const rows = [...(rallyRating.breakdown ?? [])].sort((a, b) => b.points - a.points)
   const widest = Math.max(...rows.map((row) => Math.abs(row.points)), 0)
   const total = rallyRating.points - 1500
@@ -230,16 +249,12 @@ function Score({ rallyRating }) {
               <p className="step-line">
                 {/* The table's answer in words, only once there are enough
                     rallies with an ending to call it a habit. */}
-                {moved && (moved.gained[0] || moved.cost[0]) && (
+                {(won || lost) && (
                   <>
-                    Of the rallies you ended,{' '}
-                    {moved.gained[0] && (
-                      <><strong>{endingPhrase(moved.gained[0].ending).toLowerCase()}</strong> earned you the most</>
-                    )}
-                    {moved.gained[0] && moved.cost[0] && '; '}
-                    {moved.cost[0] && (
-                      <><strong>{endingPhrase(moved.cost[0].ending).toLowerCase()}</strong> cost you the most</>
-                    )}
+                    Of the rallies you ended, you{' '}
+                    {won && <>won the most with <LeaderNames leaders={won} /> ({leaderNumbers(won)})</>}
+                    {won && lost && ' and '}
+                    {lost && <>lost the most with <LeaderNames leaders={lost} /> ({leaderNumbers(lost)})</>}
                     .{' '}
                   </>
                 )}
@@ -320,11 +335,11 @@ function Score({ rallyRating }) {
  * practise. It needs no nightly run, so it shows for any rated player.
  *
  * Waits for the same 20 rallies with an ending that "What's moving it"
- * waits for before naming a habit (movedMost is null until then): a tip
+ * waits for before naming a habit (mostOften is null until then): a tip
  * aimed at two unlucky rallies would be advice about nothing.
  */
 function WorkOn({ rallyRating }) {
-  const enough = Boolean(rallyRating.movedMost)
+  const enough = Boolean(rallyRating.mostOften)
   const faults = enough ? faultsToWorkOn(rallyRating.breakdown) : []
 
   return (

@@ -16,10 +16,10 @@ import {
   DEFAULT_K,
   MATCH_REWARD,
   MIN_MATCHES,
-  MOVED_MOST_MIN_RALLIES,
+  MOST_OFTEN_MIN_RALLIES,
   START_POINTS,
   expectedWin,
-  movedMost,
+  mostOften,
   rallyRatingFor,
   rallyMatchFor,
   rateHistory,
@@ -220,7 +220,7 @@ section('What a player is sent')
   check('the response carries exactly the agreed fields',
     Object.keys(rated).sort(),
     ['earlyEstimate', 'matches', 'points', 'rallies', 'recentChange', 'state', 'trend', 'winChanceVsStart'],
-    'Nothing about anyone else, and no movedMost unless asked for.')
+    'Nothing about anyone else, and no mostOften unless asked for.')
   check('winChanceVsStart is a whole percentage against a 1500 player',
     rated.winChanceVsStart, Math.round(expectedWin(rateHistory(five).get(A1).rawPoints, START_POINTS) * 100),
     'This is the "54 of every 100 rallies" sentence.')
@@ -228,24 +228,53 @@ section('What a player is sent')
     rallyRatingFor(rateHistory(five), randomUUID()), { state: 'not_enough_matches', have: 0, need: MIN_MATCHES },
     'A brand new player has no matches yet.')
 
-  check('movedMost is withheld under 20 rallies with an ending',
-    movedMost(rateHistory(five).get(A1)), null,
+  check('mostOften is withheld under 20 rallies with an ending',
+    mostOften(rateHistory(five).get(A1)), null,
     'Naming a habit from five rallies would be guessing.')
+  check('the threshold is the one the rating screen names',
+    MOST_OFTEN_MIN_RALLIES, 20, '"Tips appear once 20 of your rallies have been scored with how they ended."')
 
   const many = Array.from({ length: 6 }, () =>
     match([rally(A1, 'putaway'), rally(A1, 'putaway'), rally(A1, 'lob'), rally(A1, 'net'), rally(A1, 'net'), rally(A1, 'kitchen')]),
   )
   const rich = rateHistory(many).get(A1)
-  const moved = movedMost(rich)
-  check('with enough rallies it names the top gains and costs',
-    [moved.gained.map((g) => g.ending), moved.cost.map((c) => c.ending)],
-    [['putaway', 'lob'], ['net', 'kitchen']],
-    'Two put-aways a match earned more than one lob; two nets a match cost more than one kitchen fault.')
-  check('points in movedMost are whole numbers',
-    moved.gained.every((g) => Number.isInteger(g.points)), true, 'Players never see decimals.')
-  check('the rating screen response includes movedMost and the breakdown',
-    ['movedMost', 'breakdown'].every((key) => key in rallyRatingFor(rateHistory(many), A1, { forRatingScreen: true })), true,
+  const often = mostOften(rich)
+  check('with enough rallies it names the commonest win and mistake',
+    [often.won.map((g) => g.ending), often.lost.map((c) => c.ending)],
+    [['putaway'], ['net']],
+    'Two put-aways a match against one lob; two nets a match against one kitchen fault.')
+  const table = rallyRatingFor(rateHistory(many), A1, { forRatingScreen: true }).breakdown
+  const row = (ending) => table.find((r) => r.ending === ending)
+  check('its rallies and points are the table\'s own rows',
+    [...often.won, ...often.lost].map((e) => [e.rallies, e.points]),
+    [...often.won, ...often.lost].map((e) => [row(e.ending).rallies, row(e.ending).points]),
+    'The sentence sits above that table; a point out between them would read as a mistake.')
+  check('points in mostOften are whole numbers',
+    often.won.every((g) => Number.isInteger(g.points)), true, 'Players never see decimals.')
+  check('the rating screen response includes mostOften and the breakdown',
+    ['mostOften', 'breakdown'].every((key) => key in rallyRatingFor(rateHistory(many), A1, { forRatingScreen: true })), true,
     'Only the rating screen needs them; the overview card stays small.')
+
+  // Five matches against B1 make both regulars; a first game against C1
+  // then counts for nothing for A1, so three nets there cost A1 nothing,
+  // while two outs against B1 cost full points.
+  const C1 = randomUUID()
+  const regulars = Array.from({ length: 5 }, () => match(Array.from({ length: 5 }, () => rally(A1, 'putaway')), { doubles: false }))
+  const againstNewcomer = game([A1], [C1], [rally(A1, 'net'), rally(A1, 'net'), rally(A1, 'net')])
+  const later = match([rally(A1, 'out'), rally(A1, 'out')], { doubles: false })
+  const counted = rateHistory([...regulars, againstNewcomer, later]).get(A1)
+  check('mistakes are ranked by how often, not by points',
+    mostOften(counted).lost.map((e) => [e.ending, e.rallies, e.points < 0]),
+    [['net', 3, false]],
+    'The sentence says "the most": three nets that cost nothing still happened more than two outs.')
+
+  const tied = rateHistory(Array.from({ length: 6 }, () =>
+    match([rally(A1, 'putaway'), rally(A1, 'lob'), rally(A1, 'drop_winner'), rally(A1, 'net'), rally(A1, 'out')]),
+  )).get(A1)
+  check('endings tied for the most all come back, none singled out',
+    [mostOften(tied).won.map((e) => e.rallies), mostOften(tied).lost.map((e) => e.rallies)],
+    [[6, 6, 6], [6, 6]],
+    'Calling one of several equals "the most" would not be true; the screen decides how many to name.')
 }
 
 section('Early estimate')
