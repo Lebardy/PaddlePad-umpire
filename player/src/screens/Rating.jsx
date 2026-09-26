@@ -42,81 +42,12 @@ import { usePlayerData } from '../lib/PlayerData'
 import { navigate } from '../lib/router'
 import { endingPhrase, namedLeaders } from '../lib/endingWords'
 import { styleName } from '../lib/styleName'
+import { MEASURES, aboutYou, hiddenStyleNote, styleShareLine, verdictSubject, verdictWay } from '../lib/styleProof'
 import { faultsToWorkOn } from '../lib/faultTips'
 import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
 import More from '../components/More'
 import Collapsible from '../components/Collapsible'
 
-/**
- * Each measurement in everyday words, with how to read its number.
- *
- * The feature names belong to the model; a player should never meet
- * `winner_rate_std`. The spread features are said as how much something
- * changes from match to match.
- */
-// `as` says how its number reads:
-//   percent        a share, shown as 19%
-//   ratio          shown as 0.85
-//   swing-percent  how much a share changes from match to match (the
-//                  spread of a proportion), shown as ±12%
-//   swing-per10    how much a per-minute count changes from match to
-//                  match, shown per 10 minutes as ±0.9 -- ten minutes is
-//                  roughly a game, a length people already think in
-//
-// `says(way)` finishes "Compared with your group, players with your
-// style …" for a style that sits higher or lower than its group.
-const MEASURES = {
-  drop_efficiency_mean: {
-    label: 'drop shots landing', as: 'percent', better: 'higher',
-    says: (way) => `land their drop shots ${way === 'higher' ? 'more' : 'less'} often`,
-  },
-  error_to_winner_ratio: {
-    label: 'mistakes per winning shot', as: 'ratio', better: 'lower',
-    says: (way) => `make ${way === 'higher' ? 'more' : 'fewer'} mistakes for every winning shot`,
-  },
-  // The share of a player's finishes (winners and mistakes) that were
-  // winners: how cleanly they finish, not how often they attack.
-  aggression_std: {
-    label: 'change in how many of your finishes are winners, match to match', as: 'swing-percent', better: 'neither',
-    says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how many of their finishes are winners`,
-  },
-  drop_efficiency_std: {
-    label: 'change in drops landing, match to match', as: 'swing-percent', better: 'neither',
-    says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how well their drops land`,
-  },
-  winner_rate_std: {
-    label: 'change in winning shots per 10 min, match to match', as: 'swing-per10', better: 'neither',
-    says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how many winning shots they hit`,
-  },
-  general_error_rate_std: {
-    label: 'change in mistakes per 10 min, match to match', as: 'swing-per10', better: 'neither',
-    says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how many mistakes they make`,
-  },
-  dink_error_rate_std: {
-    label: 'change in net mistakes per 10 min, match to match', as: 'swing-per10', better: 'neither',
-    says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how many mistakes they make at the net`,
-  },
-  drop_usage_rate: {
-    label: 'third shots that are drops', as: 'percent', better: 'neither',
-    says: (way) => `use drops for ${way === 'higher' ? 'more' : 'fewer'} of their third shots`,
-  },
-  drop_preference_rate_mean: {
-    label: 'drops rather than drives', as: 'percent', better: 'neither',
-    says: (way) => `choose drops over drives ${way === 'higher' ? 'more' : 'less'} often`,
-  },
-  drop_preference_rate_std: {
-    label: 'change in choosing drops, match to match', as: 'swing-percent', better: 'neither',
-    says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in choosing drops over drives`,
-  },
-  net_game_preference_rate_mean: {
-    label: 'points won at the net', as: 'percent', better: 'neither',
-    says: (way) => `win ${way === 'higher' ? 'more' : 'fewer'} of their points at the net`,
-  },
-  net_game_preference_rate_std: {
-    label: 'change in points won at the net, match to match', as: 'swing-percent', better: 'neither',
-    says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how many points they win at the net`,
-  },
-}
 
 // Said only where there IS a direction. Most of these measurements are
 // style rather than quality -- the model works playstyles out
@@ -427,7 +358,10 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
   // Said as a direction, never a size. On staging the style's number
   // pointed the word's way for all 124 words, but most gaps were small,
   // and "about the same as" beside the word read as a contradiction.
-  const styleWay = hasStyle && row.style !== row.group ? (row.style > row.group ? 'higher' : 'lower') : null
+  // A style of one is the player, so the sentence is about them; a style
+  // of two has no average to point with (see lib/styleProof.js).
+  const styleSize = proof?.styleSize
+  const styleWay = verdictWay(row, styleSize)
 
   return (
     <>
@@ -462,7 +396,8 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
 
       {withVerdict && word && row.you !== null && styleWay && measure.says && (
         <p className="proof-verdict">
-          Compared with your group, players with your style {measure.says(styleWay)} —
+          Compared with your group, {verdictSubject(styleSize)}{' '}
+          {styleSize === 1 ? aboutYou(measure.says(styleWay)) : measure.says(styleWay)} —
           that&rsquo;s why it&rsquo;s called {word}.
         </p>
       )}
@@ -486,7 +421,7 @@ function ComparedWith({ band, styleSize }) {
     <>
       <p className="step-line">
         Compared with the <strong>{band.size} players</strong> closest to your
-        level{styleSize ? <> — {styleSize} of them, you included, share your style</> : ''}.
+        level{styleShareLine(styleSize) ? <> — {styleShareLine(styleSize)}</> : ''}.
       </p>
       <More label="Who are they?">
         <p>
@@ -496,7 +431,7 @@ function ComparedWith({ band, styleSize }) {
         </p>
         <p>
           Styles are then worked out inside each group, so a word like
-          &ldquo;Patient&rdquo; means patient for players at your level, not
+          &ldquo;Steady&rdquo; means steady for players at your level, not
           compared with everyone. Your rally points don&rsquo;t decide which
           group you&rsquo;re in.
         </p>
@@ -562,6 +497,10 @@ function Playstyle({ standing, number }) {
           ),
         )}
       </ul>
+
+      {hiddenStyleNote(proof.styleSize) && (
+        <p className="step-line">{hiddenStyleNote(proof.styleSize)}</p>
+      )}
 
       <More label="How this was worked out">
         <p>
