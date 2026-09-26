@@ -125,7 +125,7 @@ export default function AccountActions({ kind, person, me, onChanged, extraActio
         {extraActions?.(confirming, setConfirming)}
 
         {me.role === 'owner' && person.status !== 'closed' && !closing && (
-          <button type="button" className="btn-danger btn-small" onClick={() => setClosing(true)}>Close</button>
+          <button type="button" className="btn-danger btn-small" onClick={() => setClosing(true)}>Close account</button>
         )}
       </div>
 
