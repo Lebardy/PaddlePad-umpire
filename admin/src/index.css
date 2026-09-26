@@ -694,3 +694,19 @@ tr.is-voided .reason { opacity: 0.6; }
 .all-clear::before { content: ''; width: 0.8rem; height: 0.8rem; border-radius: 2px; background: var(--win-lamp); box-shadow: 0 0 8px var(--win-lamp); flex: none; }
 .all-clear strong { font-family: var(--display); font-weight: 800; font-size: 1.3rem; text-transform: uppercase; }
 .all-clear span { color: var(--text-muted); }
+
+/* --- Facility logos: a white tile in both themes, or initials --- */
+.fac-logo {
+  display: inline-grid; place-items: center; flex: none; overflow: hidden;
+  background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.fac-logo img { width: 100%; height: 100%; object-fit: contain; padding: 8%; box-sizing: border-box; }
+.fac-logo.is-initials {
+  background: var(--surface-sunken); color: var(--text-secondary);
+  font-family: var(--display); font-weight: 800; text-transform: uppercase;
+}
+.fac-logo-lg { width: 96px; height: 96px; font-size: 2rem; }
+.fac-logo-sm { width: 32px; height: 32px; font-size: 0.8rem; }
+.logo-editor { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
+.logo-actions { display: grid; gap: 0.4rem; }
+.fac-name-cell { display: inline-flex; align-items: center; gap: 0.6rem; }
