@@ -94,6 +94,10 @@ function RatingLine({ view, compact = false, label }) {
   const padTop = 12
   const padBottom = view.ticks === 'days' ? 38 : 24
   const padSide = 8
+  // The 1,500 label gets a margin of its own at the right, level with its
+  // dashed line, so the rating line stops short of it and can never run
+  // through it.
+  const padRight = startLine ? 40 : padSide
 
   const values = points.map((point) => point.value)
   const low = Math.min(...values, ...(startLine ? [START] : []))
@@ -101,7 +105,7 @@ function RatingLine({ view, compact = false, label }) {
   const span = Math.max(high - low, MIN_SPAN)
   const floor = (high + low) / 2 - span / 2
   const last = points.length - 1
-  const x = (i) => padSide + (i * (WIDTH - padSide * 2)) / Math.max(1, last)
+  const x = (i) => padSide + (i * (WIDTH - padSide - padRight)) / Math.max(1, last)
   const y = (value) => padTop + ((floor + span - value) / span) * (height - padTop - padBottom)
 
   const line = points.map((point, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)} ${y(point.value).toFixed(1)}`).join(' ')
@@ -114,8 +118,8 @@ function RatingLine({ view, compact = false, label }) {
       <path className="rl-area" d={area} />
       {startLine && (
         <>
-          <line className="rl-start" x1="0" x2={WIDTH} y1={startY} y2={startY} />
-          <text className="rl-start-label" x={WIDTH} y={startY > baseline - 14 ? startY - 5 : startY + 13} textAnchor="end">
+          <line className="rl-start" x1="0" x2={WIDTH - padRight + 6} y1={startY} y2={startY} />
+          <text className="rl-start-label" x={WIDTH} y={startY} dy="0.35em" textAnchor="end">
             1,500
           </text>
         </>
