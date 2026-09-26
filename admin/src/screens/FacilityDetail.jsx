@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import PageBoard from '../components/PageBoard'
+import PanelTabs from '../components/PanelTabs'
 import StatusTag from '../components/StatusTag'
 import { fetchFacility, updateFacility } from '../lib/api'
 import { navigate } from '../lib/navigation'
 import { Link } from '../lib/router'
 
-/** One facility's page: its details, who works there, and an edit form for any of its admins. */
+/** One facility's page: its details (with an edit form for any of its admins), then who works there, in tabs. */
 export default function FacilityDetail({ id, me }) {
   // One result per id: whichever of facility / notFound / error came back.
   // Comparing its id to the current prop (rather than resetting state
@@ -16,6 +17,7 @@ export default function FacilityDetail({ id, me }) {
   const [fields, setFields] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
+  const [peopleTab, setPeopleTab] = useState('umpires')
 
   useEffect(() => {
     let live = true
@@ -91,6 +93,10 @@ export default function FacilityDetail({ id, me }) {
     )
   }
 
+  const peopleTabs = [
+    { id: 'umpires', label: 'Umpires', count: result.umpires.length },
+    { id: 'admins', label: 'Admins', count: result.admins.length },
+  ]
   const intro = [facility.area, facility.feeText, facility.openingHours].filter(Boolean).join(' · ')
 
   return (
@@ -155,30 +161,8 @@ export default function FacilityDetail({ id, me }) {
         </div>
 
         <div>
-          <h2 className="section-title">Admins</h2>
-          {result.admins.length === 0 ? (
-            <p className="empty">No admins yet.</p>
-          ) : (
-            <div className="table-wrap">
-              <table className="table">
-                <thead><tr><th>Name</th><th>Email</th><th>Status</th></tr></thead>
-                <tbody>
-                  {result.admins.map((admin) => (
-                    <tr key={admin.id}>
-                      <td><strong>{admin.name}</strong></td>
-                      <td>{admin.email}</td>
-                      <td><span className={`tag ${admin.active ? 'tag-on' : 'tag-off'}`}>{admin.active ? 'On' : 'Off'}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        <div>
-          <h2 className="section-title">Umpires</h2>
-          {result.umpires.length === 0 ? (
+          <PanelTabs label="Who works here" tabs={peopleTabs} current={peopleTab} onChange={setPeopleTab} />
+          {peopleTab === 'umpires' && (result.umpires.length === 0 ? (
             <p className="empty">No umpires yet.</p>
           ) : (
             <div className="table-wrap">
@@ -195,7 +179,25 @@ export default function FacilityDetail({ id, me }) {
                 </tbody>
               </table>
             </div>
-          )}
+          ))}
+          {peopleTab === 'admins' && (result.admins.length === 0 ? (
+            <p className="empty">No admins yet.</p>
+          ) : (
+            <div className="table-wrap">
+              <table className="table">
+                <thead><tr><th>Name</th><th>Email</th><th>Status</th></tr></thead>
+                <tbody>
+                  {result.admins.map((admin) => (
+                    <tr key={admin.id}>
+                      <td><strong>{admin.name}</strong></td>
+                      <td>{admin.email}</td>
+                      <td><span className={`tag ${admin.active ? 'tag-on' : 'tag-off'}`}>{admin.active ? 'On' : 'Off'}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
         </div>
       </div>
     </section>

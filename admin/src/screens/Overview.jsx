@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import CloseSessionDialog from '../components/CloseSessionDialog'
-import DuplicatePlayers from '../components/DuplicatePlayers'
 import FacilityPicker from '../components/FacilityPicker'
 import LiveBoard from '../components/LiveBoard'
 import MergeDialog from '../components/MergeDialog'
@@ -157,8 +156,15 @@ export default function Overview({ me, facilityLabel }) {
                 <Totals totals={data.totals} isOwner={isOwner} facilityName={data.facilityName} />
               </aside>
             </div>
-            <WorthALook warnings={data.warnings} leftOpen={data.leftOpen} isOwner={showFacility} now={now} actions={warningActions} />
-            {data.duplicates && <DuplicatePlayers pairs={data.duplicates} now={now} actions={duplicateActions} />}
+            <WorthALook
+              warnings={data.warnings}
+              leftOpen={data.leftOpen}
+              duplicates={data.duplicates}
+              showFacility={showFacility}
+              now={now}
+              actions={warningActions}
+              duplicateActions={duplicateActions}
+            />
           </>
         )}
       </div>

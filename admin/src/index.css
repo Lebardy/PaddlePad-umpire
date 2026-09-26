@@ -330,14 +330,22 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .form-ok::before { content: ''; width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--status-good); flex: none; }
 .hint { color: var(--text-muted); font-size: 0.9rem; margin: 0; }
 
-/* --- People: the tabs between Players and Umpires --- */
-.subtabs { display: flex; gap: 0.5rem; }
-.subtabs a {
+/* --- Tabs: between pages (links) and inside a page (buttons) --- */
+.subtabs { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.subtabs a, .subtabs button {
+  display: inline-flex; align-items: center; gap: 0.5rem;
   padding: 0.5rem 1.1rem; border-radius: var(--radius-sm); border: 1.5px solid var(--border);
-  background: var(--surface); color: var(--text-secondary); text-decoration: none; font-weight: 600;
+  background: var(--surface); color: var(--text-secondary); text-decoration: none; font-weight: 600; cursor: pointer;
 }
-.subtabs a:hover { border-color: var(--primary); color: var(--primary); }
-.subtabs a[aria-current='page'] { background: var(--button); color: var(--button-ink); border-color: var(--button); }
+.subtabs a:hover, .subtabs button:hover { border-color: var(--primary); color: var(--primary); }
+.subtabs a[aria-current='page'], .subtabs button[aria-selected='true'] { background: var(--button); color: var(--button-ink); border-color: var(--button); }
+.tab-count {
+  min-width: 1.5rem; padding: 0 0.35rem; border-radius: 3px; text-align: center;
+  background: var(--surface-sunken); color: var(--text); font-variant-numeric: tabular-nums; font-size: 0.88rem;
+}
+.tab-count.is-zero { color: var(--text-muted); }
+.subtabs button[aria-selected='true'] .tab-count { background: rgba(255, 255, 255, 0.2); color: inherit; }
+.subtabs + .table-wrap, .subtabs + .all-clear { margin-top: 0.75rem; }
 
 /* --- Tables --- */
 .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
