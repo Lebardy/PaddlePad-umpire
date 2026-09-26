@@ -306,12 +306,13 @@ function PointByPoint({ id, match }) {
   useEffect(() => {
     const controller = new AbortController()
     fetchMatchGame(id, { signal: controller.signal })
-      .then((data) => setLoaded({ id, game: data.game }))
+      .then((data) => setLoaded({ id, game: data.game, points: data.points }))
       .catch(() => {})
     return () => controller.abort()
   }, [id])
 
   const game = loaded?.id === id ? loaded.game : null
+  const points = loaded?.id === id ? loaded.points : null
   if (!game || game.moments.length === 0) return null
 
   const theirs = match.opponents.join(' & ')
@@ -321,6 +322,7 @@ function PointByPoint({ id, match }) {
       <MomentumRibbon
         moments={game.moments}
         path={game.path}
+        points={points}
         // The reading is told from this player's side, so "winners"
         // here means their team whether they won or lost.
         asShown={({ winners, losers }) => `${winners}–${losers}`}

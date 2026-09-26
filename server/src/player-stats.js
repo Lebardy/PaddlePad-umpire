@@ -164,6 +164,28 @@ export async function getPlayerMatches(query, playerId, ratings = null) {
  * what they want to see is the scoring.
  */
 export function scoreProgression(row, events, team) {
+  return scoringRallies(row, events).map(({ score }) =>
+    team === 'A' ? score.A - score.B : score.B - score.A,
+  )
+}
+
+/**
+ * How each point was won and who did it, one entry per point -- lined
+ * up with scoreProgression's margins, since both come from the same
+ * replay. `how` is 'winner' (the hitter's side scored) or 'mistake' (the
+ * other side scored); `ending` is the rally-endings.js key, or null for
+ * a rally logged before endings were recorded; `by` is the player id.
+ */
+export function pointEndings(row, events) {
+  return scoringRallies(row, events).map(({ event }) => ({
+    how: event.outcome === 'winner' ? 'winner' : 'mistake',
+    ending: event.detail ?? null,
+    by: event.actingPlayerId,
+  }))
+}
+
+/** Every rally that put a point on the board, with the score after it. */
+function scoringRallies(row, events) {
   const base = {
     teamA: row.team_a,
     teamB: row.team_b,
@@ -175,7 +197,7 @@ export function scoreProgression(row, events, team) {
     pointTarget: row.point_target,
   }
 
-  const margins = []
+  const points = []
   let previous = 0
   const replay = []
 
@@ -188,12 +210,10 @@ export function scoreProgression(row, events, team) {
     if (total === previous) continue // a side-out, not a point
     previous = total
 
-    margins.push(
-      team === 'A' ? state.score.A - state.score.B : state.score.B - state.score.A,
-    )
+    points.push({ event, score: { ...state.score } })
   }
 
-  return margins
+  return points
 }
 
 /**

@@ -11,6 +11,7 @@ import {
   getClubStanding,
   getPlayerMatches,
   getRatingState,
+  pointEndings,
   scoreProgression,
   summarisePlayer,
 } from '../player-stats.js'
@@ -173,7 +174,21 @@ router.get('/matches/:id/game', async (req, res) => {
   const team = row.team_a.includes(req.player.id) ? 'A' : 'B'
   const margins = scoreProgression(row, log, team)
 
-  res.json({ margins, game: readGame(margins, row.point_target) })
+  // How each point was won and who did it, for the tap on each box --
+  // the same points as `margins`, in the same order.
+  const { rows: people } = await query(
+    'SELECT id, name FROM players WHERE id = ANY($1::uuid[])',
+    [[...row.team_a, ...row.team_b]],
+  )
+  const nameOf = new Map(people.map((p) => [p.id, p.name]))
+  const points = pointEndings(row, log).map(({ how, ending, by }) => ({
+    how,
+    ending,
+    by: nameOf.get(by) ?? null,
+    byYou: by === req.player.id,
+  }))
+
+  res.json({ margins, game: readGame(margins, row.point_target), points })
 })
 
 /**
