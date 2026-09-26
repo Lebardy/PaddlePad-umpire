@@ -80,6 +80,8 @@ const ACTION_LABELS = {
   'umpire.moved': 'Moved an umpire',
   'facility.created': 'Made a facility',
   'facility.updated': 'Updated a facility',
+  'facility.logo_changed': 'Changed a facility logo',
+  'facility.logo_removed': 'Removed a facility logo',
   'match.looks_fine': 'Marked a match as fine',
   'match.voided': 'Voided a match',
   'match.restored': 'Undid a void',

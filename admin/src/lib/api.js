@@ -188,6 +188,15 @@ export const listFacilities = () => apiFetch('/admin/facilities').then((d) => d.
 export const fetchFacility = (id) => apiFetch(`/admin/facilities/${id}`)
 export const createFacility = (fields) => post('/admin/facilities', fields).then((d) => d.facility)
 export const updateFacility = (id, fields) => apiFetch(`/admin/facilities/${id}`, { method: 'PATCH', body: fields }).then((d) => d.facility)
+export const uploadFacilityLogo = (id, logo) =>
+  apiFetch(`/admin/facilities/${id}/logo`, { method: 'PUT', body: logo }).then((d) => d.facility)
+export const removeFacilityLogo = (id) =>
+  apiFetch(`/admin/facilities/${id}/logo`, { method: 'DELETE' }).then((d) => d.facility)
+
+/** Where an <img> loads a facility's logo from, or null when it has none. */
+export function logoSrc(logoUrl, { small = false } = {}) {
+  return logoUrl ? `${API_URL}${logoUrl}${small ? '&size=small' : ''}` : null
+}
 
 // Activity
 

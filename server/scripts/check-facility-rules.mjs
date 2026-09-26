@@ -132,7 +132,7 @@ section('what the site sees')
     hourly_fee_centavos: 15000, details: null, created_at: '2026-09-19T00:00:00Z', updated_at: '2026-09-19T00:00:00Z',
   }), {
     id: 'f1', name: 'Court Nine', area: 'Dumaguete', locationUrl: null, openingHours: null,
-    hourlyFeeCentavos: 15000, feeText: '₱150 per hour', details: null,
+    hourlyFeeCentavos: 15000, feeText: '₱150 per hour', details: null, logoUrl: null,
     createdAt: '2026-09-19T00:00:00Z', updatedAt: '2026-09-19T00:00:00Z',
   })
   check('the starting facility name', rules.STARTING_FACILITY_NAME, 'Starting facility')
@@ -228,6 +228,19 @@ section('every umpire route stays scoped to its facility')
     scopeCallCount(matchesRoute), 12)
   check('matches.js actually uses every umpireScope result it computes',
     scopeUseCount(matchesRoute), 12)
+}
+
+section('logo addresses')
+{
+  const at = new Date('2026-09-27T01:02:03.004Z')
+  check('no logo, no address', rules.logoPath('f1', null), null)
+  check('the address carries when the logo last changed',
+    rules.logoPath('f1', at), `/logos/f1?v=${at.getTime()}`)
+  check('a string time works too', rules.logoPath('f1', at.toISOString()), `/logos/f1?v=${at.getTime()}`)
+  check('a facility without a logo has no logoUrl',
+    rules.facilityPayload({ id: 'f1', name: 'A', logo_updated_at: null }).logoUrl, null)
+  check('a facility with a logo has its versioned address',
+    rules.facilityPayload({ id: 'f1', name: 'A', logo_updated_at: at }).logoUrl, `/logos/f1?v=${at.getTime()}`)
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

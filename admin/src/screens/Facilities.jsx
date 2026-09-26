@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import FacilityLogo from '../components/FacilityLogo'
 import PageBoard, { TallyCell } from '../components/PageBoard'
 import { createFacility, listFacilities } from '../lib/api'
 import { navigate } from '../lib/navigation'
@@ -121,7 +122,12 @@ export default function Facilities({ me }) {
               <tbody>
                 {facilities.map((facility) => (
                   <tr key={facility.id} className="row-clickable" onClick={() => navigate(`/facilities/${facility.id}`)}>
-                    <td><Link to={`/facilities/${facility.id}`} className="row-link"><strong>{facility.name}</strong></Link></td>
+                    <td>
+                      <span className="fac-name-cell">
+                        <FacilityLogo name={facility.name} logoUrl={facility.logoUrl} size="sm" />
+                        <Link to={`/facilities/${facility.id}`} className="row-link"><strong>{facility.name}</strong></Link>
+                      </span>
+                    </td>
                     <td>{facility.area ?? '—'}</td>
                     <td>{facility.feeText}</td>
                     {/* Counted by the list route itself: one request for the whole table. */}

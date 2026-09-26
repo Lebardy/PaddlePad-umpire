@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import PageBoard from '../components/PageBoard'
+import LogoEditor from '../components/LogoEditor'
 import PanelTabs from '../components/PanelTabs'
 import StatusTag from '../components/StatusTag'
 import { fetchFacility, updateFacility } from '../lib/api'
@@ -121,6 +122,10 @@ export default function FacilityDetail({ id, me }) {
 
         <div>
           <h2 className="section-title">Details</h2>
+          <LogoEditor
+            facility={facility}
+            onChange={(updated) => setResult((current) => ({ ...current, facility: updated }))}
+          />
           {!editing && (facility.details ? <p>{facility.details}</p> : <p className="hint">No extra details yet.</p>)}
           {!editing && <button type="button" className="btn-quiet btn-small" onClick={startEdit}>Edit details</button>}
 

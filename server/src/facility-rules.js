@@ -180,6 +180,16 @@ export function umpireScope(facilityId, params, column) {
   return `${column} = $${params.length}::uuid`
 }
 
+/**
+ * The address a facility's logo is served at, or null without one. The
+ * `v` stamp is when the logo last changed, so the long cache on that
+ * address never shows an old logo after a new one is uploaded.
+ */
+export function logoPath(facilityId, logoUpdatedAt) {
+  if (!logoUpdatedAt) return null
+  return `/logos/${facilityId}?v=${new Date(logoUpdatedAt).getTime()}`
+}
+
 export function facilityPayload(row) {
   return {
     id: row.id,
@@ -190,7 +200,48 @@ export function facilityPayload(row) {
     hourlyFeeCentavos: row.hourly_fee_centavos ?? null,
     feeText: feeText(row.hourly_fee_centavos ?? null),
     details: row.details ?? null,
+    logoUrl: logoPath(row.id, row.logo_updated_at ?? null),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
+}
+
+// ---- Facility logos ----
+
+export const LOGO_TYPES = ['image/webp', 'image/png', 'image/jpeg']
+export const LOGO_FULL_MAX_BYTES = 300 * 1024
+export const LOGO_SMALL_MAX_BYTES = 60 * 1024
+
+// How each allowed kind of picture starts. Checked on the bytes, not the
+// label: a renamed text file says "image/png" as readily as a real one.
+const LOGO_SIGNATURES = {
+  'image/png': (b) => b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+  'image/jpeg': (b) => b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
+  'image/webp': (b) => b.length >= 12 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP',
+}
+
+function readDataUrl(value) {
+  const match = /^data:(image\/[a-z]+);base64,([A-Za-z0-9+/]+={0,2})$/.exec(String(value ?? ''))
+  return match ? { mimeType: match[1], bytes: Buffer.from(match[2], 'base64') } : null
+}
+
+/**
+ * A logo upload, `{ full, small }` as base64 data addresses, both the
+ * same allowed kind of picture and each under its size cap. Returns
+ * `{ values: { mimeType, full, small } }` with the decoded bytes, or
+ * `{ error }` in words an admin can act on.
+ */
+export function readLogoUpload(body = {}) {
+  const full = readDataUrl(body?.full)
+  const small = readDataUrl(body?.small)
+  if (!full || !small) return { error: "That file isn't a picture" }
+  if (full.mimeType !== small.mimeType || !LOGO_TYPES.includes(full.mimeType)) {
+    return { error: 'Use a PNG, JPEG or WebP picture' }
+  }
+  const looksRight = LOGO_SIGNATURES[full.mimeType]
+  if (!looksRight(full.bytes) || !looksRight(small.bytes)) return { error: "That file isn't a picture" }
+  if (full.bytes.length > LOGO_FULL_MAX_BYTES || small.bytes.length > LOGO_SMALL_MAX_BYTES) {
+    return { error: 'That picture is too large' }
+  }
+  return { values: { mimeType: full.mimeType, full: full.bytes, small: small.bytes } }
 }

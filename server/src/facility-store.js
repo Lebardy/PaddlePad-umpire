@@ -8,8 +8,11 @@
 import { personStatus } from './people-rules.js'
 import { facilityColumns } from './facility-rules.js'
 
+// logo_updated_at comes from facility_logos, so the picture bytes never
+// ride along with a facility row -- only when its logo last changed.
 const FACILITY_COLUMNS =
-  'id, name, area, location_url, opening_hours, hourly_fee_centavos, details, created_by, created_at, updated_at'
+  'id, name, area, location_url, opening_hours, hourly_fee_centavos, details, created_by, created_at, updated_at, ' +
+  '(SELECT l.updated_at FROM facility_logos l WHERE l.facility_id = facilities.id) AS logo_updated_at'
 
 /**
  * Every facility for a facility-rules.js `facilityFilterFor()` result:
@@ -125,4 +128,37 @@ export async function facilityPeople(queryFn, id) {
       status: personStatus({ pausedAt: row.paused_at, closedAt: row.closed_at }),
     })),
   }
+}
+
+/**
+ * Saves a facility's logo, replacing any it had, inside the caller's
+ * transaction. Returns when it was saved.
+ */
+export async function saveFacilityLogo(db, facilityId, { mimeType, full, small }, adminId) {
+  const { rows } = await db.query(
+    `INSERT INTO facility_logos (facility_id, full_image, small_image, mime_type, updated_by, updated_at)
+     VALUES ($1, $2, $3, $4, $5, now())
+     ON CONFLICT (facility_id) DO UPDATE
+       SET full_image = EXCLUDED.full_image, small_image = EXCLUDED.small_image,
+           mime_type = EXCLUDED.mime_type, updated_by = EXCLUDED.updated_by, updated_at = now()
+     RETURNING updated_at`,
+    [facilityId, full, small, mimeType, adminId ?? null],
+  )
+  return rows[0].updated_at
+}
+
+/** Removes a facility's logo. True when there was one to remove. */
+export async function removeFacilityLogo(db, facilityId) {
+  const { rowCount } = await db.query('DELETE FROM facility_logos WHERE facility_id = $1', [facilityId])
+  return rowCount > 0
+}
+
+/** One size of a facility's logo with its type, or null without one. */
+export async function readFacilityLogo(queryFn, facilityId, size) {
+  const column = size === 'small' ? 'small_image' : 'full_image'
+  const { rows } = await queryFn(
+    `SELECT ${column} AS bytes, mime_type, updated_at FROM facility_logos WHERE facility_id = $1`,
+    [facilityId],
+  )
+  return rows[0] ?? null
 }
