@@ -18,14 +18,14 @@ import { navigate } from '../lib/router'
 
 const FILTERS = [
   { key: 'week', label: 'Week', span: 'Over the last 7 days', none: 'No matches in the last 7 days.' },
-  { key: 'month', label: 'Month', span: 'Over the last 30 days', none: 'No matches in the last 30 days.' },
+  { key: 'month', label: 'Month', span: 'Since your first match' },
   { key: 'all', label: 'All', span: 'Since your first match' },
 ]
 
 const STEP_WORDS = {
   day: 'Each step is a day you played.',
+  month: 'Each step is a month you played, all its matches together.',
   match: 'Each step is a match.',
-  week: 'Each step is a week you played.',
 }
 
 function BackLink() {

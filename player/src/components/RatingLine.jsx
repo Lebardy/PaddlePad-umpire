@@ -14,7 +14,7 @@
 // ============================================================
 
 import { formatDate } from '../lib/format'
-import { START, changeClass, monthStarts, signed } from '../lib/ratingGraph'
+import { START, changeClass, signed } from '../lib/ratingGraph'
 
 const WIDTH = 340
 // Nothing under this many PPR fills the height: a two-point wobble
@@ -55,12 +55,26 @@ function Ticks({ view, x, height }) {
     )
   }
 
+  // Each month played: its name (with the year when that changes, or
+  // isn't this one), and under it the month's change. The start is 1,500
+  // before the first match, so it has no label of its own.
   if (ticks === 'months') {
-    return spaced(monthStarts(points), x).map((i) => (
-      <text key={i} className="rl-tick" x={x(i)} y={height - 4} textAnchor={anchor(i)}>
-        {points[i].at.toLocaleDateString(undefined, { month: 'short' })}
-      </text>
-    ))
+    const steps = points.map((_, i) => i).slice(1)
+    return spaced(steps, x).map((i, n, kept) => {
+      const at = points[i].at
+      const previous = n > 0 ? points[kept[n - 1]].at : null
+      const withYear = previous ? previous.getFullYear() !== at.getFullYear() : at.getFullYear() !== new Date().getFullYear()
+      return (
+        <g key={i}>
+          <text className="rl-tick" x={x(i)} y={height - 18} textAnchor={anchor(i)}>
+            {at.toLocaleDateString(undefined, withYear ? { month: 'short', year: 'numeric' } : { month: 'short' })}
+          </text>
+          <text className={`rl-change ${changeClass(points[i].change)}`} x={x(i)} y={height - 4} textAnchor={anchor(i)}>
+            {signed(points[i].change)}
+          </text>
+        </g>
+      )
+    })
   }
 
   // Each day played: its date, and under it how that day changed things.
@@ -92,7 +106,7 @@ function RatingLine({ view, compact = false, label }) {
   const { points, startLine } = view
   const height = compact ? 124 : 196
   const padTop = 12
-  const padBottom = view.ticks === 'days' ? 38 : 24
+  const padBottom = view.ticks === 'ends' ? 24 : 38
   const padSide = 8
   // The 1,500 label gets a margin of its own at the right, level with its
   // dashed line, so the rating line stops short of it and can never run

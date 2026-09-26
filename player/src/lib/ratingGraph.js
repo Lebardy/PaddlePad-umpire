@@ -6,9 +6,10 @@
 // headline, the high and the low off the line AS DRAWN -- so the words
 // above the graph and the symbols on it can never disagree.
 //
-// Every line starts from where the player stood when its span began
-// (seven days ago, thirty days ago, or 1,500 before their first match),
-// so even one day played is a line of two points, never a lone dot.
+// Week steps by day played, Month by calendar month played, All by
+// match. Every line starts from where the player stood when its span
+// began (seven days ago, or 1,500 before their first match), so even one
+// step played is a line of two points, never a lone dot.
 //
 // Days, weeks and months are the reader's own, in their local time: a
 // match at 11pm belongs to the day they played it.
@@ -16,10 +17,6 @@
 
 export const START = 1500
 const DAY = 86_400_000
-
-// Up to this many matches, All draws one step per match; beyond it, one
-// per week played. Every match on a long history "looks like a mess".
-export const ALL_BY_MATCH_UP_TO = 20
 
 /** "+6", "−4" or "0", with a true minus sign. */
 export const signed = (n) => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0')
@@ -35,11 +32,7 @@ export function changeWords({ change, words }) {
 }
 
 const localDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-const localWeek = (date) => {
-  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  day.setDate(day.getDate() - ((day.getDay() + 6) % 7))
-  return day.getTime()
-}
+const localMonth = (date) => date.getFullYear() * 12 + date.getMonth()
 
 /**
  * The PPR at the end of each group of matches, oldest first. `keyOf`
@@ -115,20 +108,42 @@ export function weekView(lastWeek, now = Date.now()) {
   return { ...spanView(lastWeek, 7, now), ticks: 'days' }
 }
 
+/** "September", or "December 2025" when it isn't this year. */
+function monthWords(date) {
+  return date.getFullYear() === new Date().getFullYear()
+    ? date.toLocaleDateString(undefined, { month: 'long' })
+    : date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+}
+
+/**
+ * Month by month since the first match: 1,500 before it, then where each
+ * month they played closed, so a step is every match of that month
+ * combined. A month with no match is not a step. The headline is the
+ * latest month's change.
+ */
+function monthView(matches) {
+  const points = withChanges([{ value: START, at: new Date(matches[0].at) }, ...closeOfEach(matches, localMonth)])
+  const latest = points[points.length - 1]
+  return {
+    points,
+    ...extremes(points),
+    headline: { change: latest.change, words: `in ${monthWords(latest.at)}` },
+    step: 'month',
+    ticks: 'months',
+    startLine: true,
+  }
+}
+
 /**
  * Everything since the first match: 1,500 before it, then one step per
- * match, or per week played on a long history. The headline counts up
- * from their lowest, so a player who dropped and worked their way back
- * sees the whole climb; it counts from the first match instead when
- * the lowest was the start or is where they are now.
+ * match. The headline counts up from their lowest, so a player who
+ * dropped and worked their way back sees the whole climb; it counts from
+ * the first match instead when the lowest was the start or is where
+ * they are now.
  */
 function allView(matches) {
-  const byWeek = matches.length > ALL_BY_MATCH_UP_TO
   const startedAt = new Date(matches[0].at)
-  const steps = byWeek
-    ? closeOfEach(matches, localWeek)
-    : matches.map((match) => ({ value: match.points, at: new Date(match.at) }))
-  const points = [{ value: START, at: startedAt }, ...steps]
+  const points = [{ value: START, at: startedAt }, ...matches.map((match) => ({ value: match.points, at: new Date(match.at) }))]
   const last = points.length - 1
   const lowAt = points.map((point) => point.value).lastIndexOf(Math.min(...points.map((point) => point.value)))
   const fromLowest = lowAt !== 0 && lowAt !== last
@@ -139,7 +154,7 @@ function allView(matches) {
     headline: fromLowest
       ? { change: now - points[lowAt].value, words: 'since your lowest' }
       : { change: now - START, words: 'since your first match' },
-    step: byWeek ? 'week' : 'match',
+    step: 'match',
     ticks: 'ends',
     startedAt,
     startLine: true,
@@ -149,18 +164,6 @@ function allView(matches) {
 /** What the graph page draws for one filter. `matches` is the whole history, oldest first. */
 export function graphView(matches, filter, now = Date.now()) {
   if (filter === 'all') return allView(matches)
-  const days = filter === 'week' ? 7 : 30
-  const view = spanView(splitAt(matches, now - days * DAY), days, now)
-  return { ...view, ticks: filter === 'week' ? 'days' : 'months' }
-}
-
-/**
- * Which steps start a new month on the Month view: the first step, and
- * each one whose month differs from the step before. Only month names
- * go under that graph.
- */
-export function monthStarts(points) {
-  return points.flatMap((point, i) =>
-    i === 0 || point.at.getMonth() !== points[i - 1].at.getMonth() ? [i] : [],
-  )
+  if (filter === 'month') return monthView(matches)
+  return { ...spanView(splitAt(matches, now - 7 * DAY), 7, now), ticks: 'days' }
 }
