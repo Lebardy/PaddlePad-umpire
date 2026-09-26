@@ -41,6 +41,8 @@ from run import (
     to_payload,
 )
 
+import run as driver
+
 GATE = {"minMatchesPerPlayer": 5, "minPlayers": 3, "recommendedPlayers": 40}
 
 passed = 0
@@ -139,6 +141,12 @@ check("everyone has a skill group", final["skill_group"].notna().all())
 check("archetypes were produced",
       final["playstyle_archetype"].notna().any(),
       str(structure))
+extraction = structure.get("styleExtraction") or {}
+check("the run says the styles were found on boiled-down scores",
+      extraction.get("method") == "pca", str(extraction))
+check("and how many components carried how much of the spread",
+      extraction.get("components", 0) >= 1 and extraction.get("spreadKept", 0) >= 0.80,
+      str(extraction))
 print(f"       groups found: {structure['skillGroups']}")
 
 # THE REGRESSION THIS FILE EXISTS FOR.
@@ -288,6 +296,46 @@ check("asking for more of the spread keeps more components",
 check("every player keeps their place and gets a score",
       one_kept["player_id"].tolist() == boil_frame["player_id"].tolist()
       and np.isfinite(two_kept[["pc_1", "pc_2"]].to_numpy()).all())
+
+
+print("\nthe driver clusters styles on the boiled-down scores")
+
+# Replace the boil-down with one planted score that splits players by
+# alternate rows. If the style K-Means really runs on the scores, every
+# style inside a skill group is one side of that split; if it ran on the
+# thirteen measurements instead, the planted split would not show.
+planted_side = {}
+
+
+def planted_components(scaled):
+    side = np.arange(len(scaled)) % 2
+    planted_side.update(zip(scaled["player_id"], side))
+    jitter = np.random.default_rng(3).normal(scale=0.01, size=len(scaled))
+    planted = pd.DataFrame({"player_id": scaled["player_id"].to_numpy(),
+                            "pc_1": np.where(side == 0, -10.0, 10.0) + jitter})
+    return planted, None, 1.0
+
+
+real_extract = getattr(driver, "extract_playstyle_components", None)
+driver.extract_playstyle_components = planted_components
+try:
+    planted_final, _, _, _, _ = run_pipeline(gated)
+finally:
+    driver.extract_playstyle_components = real_extract
+
+clustered_rows = planted_final[planted_final["playstyle_cluster"].notna()]
+mixed_groups = [rows for _, rows in clustered_rows.groupby("skill_group")
+                if rows["player_id"].map(planted_side).nunique() == 2]
+check("the style groups follow the boiled-down scores, not the raw measurements",
+      bool(mixed_groups) and all(
+          rows["playstyle_cluster"].nunique() == 2
+          and rows.groupby(rows["player_id"].map(planted_side))["playstyle_cluster"].nunique().max() == 1
+          for rows in mixed_groups),
+      str([rows.groupby(rows["player_id"].map(planted_side))["playstyle_cluster"].unique().tolist()
+           for rows in mixed_groups]))
+check("and the styles still get names",
+      clustered_rows["playstyle_archetype"].notna().all(),
+      str(clustered_rows["playstyle_archetype"].unique().tolist()))
 
 
 print("\npayload")
