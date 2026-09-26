@@ -22,6 +22,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import requests
 
@@ -400,8 +401,10 @@ def name_skill_groups(skill_clustered, rally_points):
     needs to know who is better: the naming here, and the residualising
     at Level 2.
 
-    Returns the labelled frame, the group names from lowest to highest,
-    and which number named them.
+    Returns the labelled frame, the group names from lowest to highest
+    (None when the groups were given neutral letters), which number
+    named them ("skill_score", "rally_points" or "neutral"), and the gap
+    between each neighbouring pair of groups (see group_gaps).
     """
     if rally_points is None:
         ranked = skill_clustered
@@ -422,15 +425,72 @@ def name_skill_groups(skill_clustered, rally_points):
 
     labels = interpret_skill_clusters(ranked, rank_by=source)
     order = ranked.groupby("skill_cluster")[source].mean().sort_values().index
+    gaps = []
+    if source == "rally_points":
+        gaps = group_gaps(ranked, order)
+        if not all(gap["clear"] for gap in gaps):
+            labels = neutral_group_names(ranked)
+            source = "neutral"
     # `ranked` rather than the frame that came in, so the rally points
     # column travels on to Level 2, which now subtracts them from the
     # playstyle features. When there are none, the two frames are the
     # same object and nothing is added.
     return (
         apply_skill_cluster_labels(ranked, labels),
-        [labels[cluster] for cluster in order],
+        None if source == "neutral" else [labels[cluster] for cluster in order],
         source,
+        [{"lower": labels[lower], "upper": labels[upper], **rest}
+         for gap in gaps
+         for lower, upper, rest in [(gap["lowerCluster"], gap["upperCluster"],
+                                     {k: v for k, v in gap.items() if not k.endswith("Cluster")})]],
     )
+
+
+def group_gaps(ranked, order):
+    """
+    Whether each skill group sits clearly above the one below it on
+    rally points: the gap between their averages must be more than twice
+    its standard error (the spread a gap that size could show by chance).
+
+    The groups themselves come from K-Means and are real enough (on the
+    pklmart games they differ in DUPR far beyond chance), but which is
+    HIGHER can only be read from the rating, and a rating can only
+    compare players linked by games. pklmart's players mostly stay in
+    their own level, the pools average the same, and its two groups
+    came out 0.03 points apart -- named by a coin flip, and backwards
+    against DUPR. A group of one player has no spread to judge a gap
+    by, so it is never clear.
+    """
+    points = ranked.groupby("skill_cluster")["rally_points"]
+    means, variances, sizes = points.mean(), points.var(), points.size()
+    gaps = []
+    for lower, upper in zip(order, order[1:]):
+        gap = float(means[upper] - means[lower])
+        if sizes[lower] < 2 or sizes[upper] < 2:
+            needed = float("inf")
+        else:
+            needed = 2 * float(np.sqrt(variances[lower] / sizes[lower] + variances[upper] / sizes[upper]))
+        gaps.append({
+            "lowerCluster": lower,
+            "upperCluster": upper,
+            "lowerMean": round(float(means[lower]), 1),
+            "upperMean": round(float(means[upper]), 1),
+            "gap": round(gap, 1),
+            "needed": None if needed == float("inf") else round(needed, 1),
+            "clear": bool(gap > needed),
+        })
+    return gaps
+
+
+def neutral_group_names(ranked):
+    """
+    Letters that say nothing about level: Group A for the biggest group,
+    then by size (cluster number on a tie), so the letters cannot quietly
+    follow the points the order was too unclear to name by.
+    """
+    sizes = ranked.groupby("skill_cluster").size()
+    by_size = sorted(sizes.index, key=lambda cluster: (-sizes[cluster], cluster))
+    return {cluster: f"Group {chr(ord('A') + i)}" for i, cluster in enumerate(by_size)}
 
 
 def run_pipeline(gated_df, rally_points=None):
@@ -463,7 +523,7 @@ def run_pipeline(gated_df, rally_points=None):
     skill_clustered, _ = cluster_skill_groups(
         clustering_data, best_skill_k, random_state=RANDOM_STATE
     )
-    skill_clustered, group_order, group_names_from = name_skill_groups(
+    skill_clustered, group_order, group_names_from, group_gaps_found = name_skill_groups(
         skill_clustered, rally_points
     )
 
@@ -632,10 +692,12 @@ def run_pipeline(gated_df, rally_points=None):
 
     report = {
         "skillGroups": groups,
-        # Lowest to highest. The app orders its ladder by this, so the
-        # rungs always agree with the names the groups were given.
+        # Lowest to highest, or None when the rally points could not
+        # clearly order the groups and they were given neutral letters
+        # instead ("neutral" below). The gaps say why, for each pair.
         "groupOrder": group_order,
         "groupNamesFrom": group_names_from,
+        "groupGaps": group_gaps_found,
         # Which number was subtracted from the playstyle features before
         # Level 2. Recorded because it changes what the archetypes mean,
         # and a run published months apart should say which it was.
