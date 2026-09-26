@@ -3,9 +3,9 @@
 //
 // Every counted rally is a small contest. The side that won it takes
 // points from the side that lost it -- more when the winners were the
-// weaker side -- weighted by how the rally ended. The player who ended
-// the rally takes three quarters of their side's share, their partner a
-// quarter; the other side splits theirs evenly.
+// weaker side -- and every rally counts the same, however it ended. The
+// player who ended the rally takes three quarters of their side's share,
+// their partner a quarter; the other side splits theirs evenly.
 //
 // Separate from the ML pipeline's skill_score on purpose. That score is
 // part of the thesis's K-Means pipeline (it names the skill clusters and
@@ -16,6 +16,14 @@
 // reward scaled by how unlikely the win was, and the losing side gives
 // up the same.
 //
+// A match against a newcomer counts for less for everyone else, until
+// the newcomer has MIN_MATCHES matches behind them: the app cannot know
+// yet whether they are far better or worse than the start, and a
+// regular should not pay for that. DUPR treats unrated players the same
+// way. A newcomer's own points always move in full. So points are no
+// longer only moved between players: a newcomer can gain what a regular
+// does not lose.
+//
 // Pure: matches in, ratings out. Recomputed from the whole history
 // rather than patched, so voiding a match or undoing a rally can never
 // leave stale points behind.
@@ -23,7 +31,7 @@
 
 import { DEFAULT_POINT_TARGET, deriveMatchState } from './pickleball.js'
 import { gameWinChance } from './game-chance.js'
-import { RALLY_ENDINGS, rallyEnding } from './rally-endings.js'
+import { rallyEnding } from './rally-endings.js'
 
 export const START_POINTS = 1500
 export const DEFAULT_K = 4
@@ -32,6 +40,14 @@ export const ACTOR_SHARE = 0.75
 export const MIN_MATCHES = 5
 export const TREND_MATCHES = 10
 export const RECENT_MATCHES = 5
+
+// A rating from fewer counted matches than this is shown to the player
+// as an early estimate. A judgment call, not a measured threshold: no
+// data can pin it down yet (decided 2026-09-26). It counts matches
+// played only, not who they were against: early on many small groups
+// only play each other, and a label nearly everyone carries means
+// nothing.
+export const EARLY_ESTIMATE_MATCHES = 10
 
 // The most a side can gain by winning a match, reached only by beating a
 // side they had no chance against: the side's reward is MATCH_REWARD
@@ -44,42 +60,6 @@ export const RECENT_MATCHES = 5
 // (0.839 with none), and the favourite won 19/24 (79%). The worst
 // winner's loss moved from −13 with no reward to −15 with it.
 export const MATCH_REWARD = 16
-
-// How much each ending moves. A first guess, agreed before any real
-// match carried endings: self-inflicted faults weigh more, faults that
-// are often forced or are bookkeeping weigh less. Revisit with real data.
-export const ENDING_WEIGHTS = {
-  ace: 1,
-  putaway: 1,
-  passing: 1,
-  lob: 1,
-  drop_winner: 1,
-  dink_winner: 1,
-  other_winner: 0.75,
-  out: 1,
-  net: 1,
-  dink_error: 1,
-  kitchen: 1.25,
-  service: 1.25,
-  foot_fault: 1.25,
-  two_bounce: 1.25,
-  net_touch: 0.5,
-  hit_by_ball: 0.5,
-  wrong_position: 0.5,
-  other_fault: 0.75,
-}
-
-for (const ending of RALLY_ENDINGS) {
-  if (typeof ENDING_WEIGHTS[ending.key] !== 'number') {
-    throw new Error(`rally-rating: no weight for ending ${ending.key}`)
-  }
-}
-
-/** A rally's weight. No detail (a rally from before endings) weighs 1. */
-export function endingWeight(detail) {
-  if (detail === undefined || detail === null) return 1
-  return ENDING_WEIGHTS[detail] ?? 1
-}
 
 /** The chance a side rated `ratingFor` wins a rally against `ratingAgainst`. */
 export function expectedWin(ratingFor, ratingAgainst, scale = DEFAULT_SCALE) {
@@ -133,20 +113,27 @@ function byWhenEnded(a, b) {
  * `matches` must already be the ones that count: completed and not voided.
  *
  * `options.onRally`, if given, is called once per counted rally with
- * `{ expected, weight }` -- the pre-rally chance the side that actually
- * won the rally was expected to (the same value the points update uses)
- * and that rally's ending weight. Lets callers (tuning scripts) score
- * per-rally predictions without duplicating the model.
+ * `{ expected }` -- the pre-rally chance the side that actually won the
+ * rally was expected to (the same value the points update uses). Lets
+ * callers (tuning scripts) score per-rally predictions without
+ * duplicating the model.
  *
  * `options.matchReward` sets the size of the match reward applied after
  * each match with a winner; defaults to MATCH_REWARD. 0 turns the
  * reward off and gives the ratings from before it existed.
+ *
+ * `options.newcomerProtection` (default true) scales every change a
+ * match makes to an established player -- one with MIN_MATCHES or more
+ * earlier matches -- by min(n, MIN_MATCHES) / MIN_MATCHES, where n is
+ * the fewest earlier matches among the OTHER players on court. false
+ * counts every match in full for everyone, as before the protection.
  */
 export function rateHistory(matches, options = {}) {
   const k = options.k ?? DEFAULT_K
   const scale = options.scale ?? DEFAULT_SCALE
   const actorShare = options.actorShare ?? ACTOR_SHARE
   const matchReward = options.matchReward ?? MATCH_REWARD
+  const newcomerProtection = options.newcomerProtection ?? true
 
   const players = new Map()
   const player = (id) => {
@@ -197,6 +184,17 @@ export function rateHistory(matches, options = {}) {
         result: null,
       }
     }
+    // How much this match counts for each player, from what the replay
+    // knew before it: in full for a newcomer; for everyone else by the
+    // least-known other player on court -- nothing on a newcomer's first
+    // match, a fifth more for each match they already have.
+    const counts = new Map()
+    for (const id of everyone) {
+      const leastKnown = Math.min(...everyone.filter((other) => other !== id).map((other) => player(other).matches))
+      counts.set(id, !newcomerProtection || player(id).matches < MIN_MATCHES
+        ? 1
+        : Math.min(leastKnown, MIN_MATCHES) / MIN_MATCHES)
+    }
     const { foldedEvents, winner } = deriveMatchState(match)
 
     for (const event of match.events.slice(0, foldedEvents)) {
@@ -209,24 +207,31 @@ export function rateHistory(matches, options = {}) {
       const winners = actorSideWon ? actorSide : otherSide
       const losers = actorSideWon ? otherSide : actorSide
 
-      const weight = endingWeight(event.detail)
       const expected = expectedWin(average(winners), average(losers), scale)
-      options.onRally?.({ expected, weight })
+      options.onRally?.({ expected })
 
-      const stake = k * weight * (1 - expected)
+      // The same for every rally, however it ended. Hand-picked weights
+      // per ending were dropped on 2026-09-26: none of the real games
+      // available record the app's endings, so they could never be
+      // tested.
+      const stake = k * (1 - expected)
       const actorSideChange = actorSideWon ? stake : -stake
 
       // Worked out in full before anything is applied, so every share is
-      // based on the points everyone had before this rally.
+      // based on the points everyone had before this rally. Each share is
+      // scaled by how much the match counts for that player BEFORE it is
+      // recorded anywhere, so the ledger, the match screen and the endings
+      // all show what was actually applied.
       const changes = new Map()
+      const give = (id, change) => changes.set(id, change * counts.get(id))
       if (actorSide.length === 1) {
-        changes.set(event.actingPlayerId, actorSideChange)
+        give(event.actingPlayerId, actorSideChange)
       } else {
         const partner = actorSide.find((id) => id !== event.actingPlayerId)
-        changes.set(event.actingPlayerId, actorSideChange * actorShare)
-        changes.set(partner, actorSideChange * (1 - actorShare))
+        give(event.actingPlayerId, actorSideChange * actorShare)
+        give(partner, actorSideChange * (1 - actorShare))
       }
-      for (const id of otherSide) changes.set(id, -actorSideChange / otherSide.length)
+      for (const id of otherSide) give(id, -actorSideChange / otherSide.length)
 
       for (const [id, change] of changes) {
         const p = player(id)
@@ -262,7 +267,8 @@ export function rateHistory(matches, options = {}) {
     // The match reward, after every rally. Worked out from each side's
     // average points BEFORE the match, like the expectation words, and
     // shared equally within a side: winning is a team result, so the
-    // three-quarters share for whoever ended a rally does not apply.
+    // three-quarters share for whoever ended a rally does not apply. Scaled
+    // for each player like their rallies.
     if (matchReward > 0 && winner) {
       const chanceA = gameWinChance(expectedWin(averageA, averageB, scale), {
         doubles: match.teamA.length === 2,
@@ -271,7 +277,7 @@ export function rateHistory(matches, options = {}) {
       })
       const sideA = matchReward * (winner === 'A' ? 1 - chanceA : -chanceA)
       for (const id of everyone) {
-        const share = onA.has(id) ? sideA / match.teamA.length : -sideA / match.teamB.length
+        const share = (onA.has(id) ? sideA / match.teamA.length : -sideA / match.teamB.length) * counts.get(id)
         const p = player(id)
         p.points += share
         const entry = (p.ledger.match_result ??= { matches: 0, points: 0 })
@@ -377,6 +383,7 @@ export function rallyRatingFor(ratings, playerId, { forRatingScreen = false } = 
     rallies: rating.rallies,
     matches: rating.matches,
     winChanceVsStart: Math.round(expectedWin(rating.rawPoints, START_POINTS) * 100),
+    earlyEstimate: rating.matches < EARLY_ESTIMATE_MATCHES,
   }
   if (forRatingScreen) {
     response.movedMost = movedMost(rating)

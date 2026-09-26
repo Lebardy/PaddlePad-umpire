@@ -291,6 +291,11 @@ function Score({ rallyRating }) {
           beating one you were expected to beat.
         </p>
         <p>
+          A game against someone new to PaddlePad counts for less for everyone
+          else, until they have played five matches. So losing to a newcomer can
+          cost you less than they gain, or nothing at all in their first game.
+        </p>
+        <p>
           The rally counts in points too when someone else ends it: your
           partner&rsquo;s shots and mistakes move your points a little, and your
           opponents&rsquo; winning shots and mistakes move them too. That is why

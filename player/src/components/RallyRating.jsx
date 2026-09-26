@@ -17,13 +17,23 @@ function changeLine(change) {
   return 'Level over your last 5 matches'
 }
 
-/** The points and their anchors, shared with the rating screen. */
+/**
+ * The points and their anchors, shared with the rating screen. Under ten
+ * matches the points are marked as an early estimate, in words only: no
+ * counts and no reliability figure.
+ */
 export function RallyPointsHeadline({ rallyRating }) {
   return (
     <>
       <p className="points-figure">
         {rallyRating.points.toLocaleString()} <span className="points-unit">points</span>
       </p>
+      {rallyRating.earlyEstimate && (
+        <p className="points-early">
+          <span className="points-early-tag">Early estimate</span>{' '}
+          Based on only a few games so far. It will settle as you play more, and against more people.
+        </p>
+      )}
       <p className={`points-change ${rallyRating.recentChange > 0 ? 'is-up' : rallyRating.recentChange < 0 ? 'is-down' : ''}`}>
         {changeLine(rallyRating.recentChange)}
       </p>
