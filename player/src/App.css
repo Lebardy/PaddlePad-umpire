@@ -1897,6 +1897,16 @@ a.highlight:active,
   padding: 0 0.4rem;
   margin-right: 0.15rem;
 }
+/* A full stop read aloud but not shown, so screen readers pause between
+   the tag and its sentence instead of running them together. */
+.points-early-stop {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .points-change {
   font-family: var(--label);
   font-size: 1.05rem;

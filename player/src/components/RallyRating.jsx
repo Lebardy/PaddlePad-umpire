@@ -30,7 +30,7 @@ export function RallyPointsHeadline({ rallyRating }) {
       </p>
       {rallyRating.earlyEstimate && (
         <p className="points-early">
-          <span className="points-early-tag">Early estimate</span>{' '}
+          <span className="points-early-tag">Early estimate<span className="points-early-stop">.</span></span>{' '}
           Based on only a few games so far. It will settle as you play more, and against more people.
         </p>
       )}
