@@ -255,8 +255,8 @@ function MatchDetail({ id }) {
         </div>
 
         <ul className="fact-chips" aria-label="Totals">
-          <li className="chip">{winners} winning shots</li>
-          <li className="chip">{errors} mistakes</li>
+          <li className="chip">{winners} {winners === 1 ? 'winning shot' : 'winning shots'}</li>
+          <li className="chip">{errors} {errors === 1 ? 'mistake' : 'mistakes'}</li>
           {stats.drive_attempts > 0 && (
             <li className="chip">{stats.drive_attempts} drives</li>
           )}
