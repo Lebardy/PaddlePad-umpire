@@ -21,6 +21,7 @@ import adminActivityRoutes from './routes/admin-activity.js'
 import adminFacilitiesRoutes from './routes/admin-facilities.js'
 import adminOverviewRoutes from './routes/admin-overview.js'
 import { adminPlayersRoutes, adminUmpiresRoutes } from './routes/admin-people.js'
+import logoRoutes from './routes/logos.js'
 
 const app = express()
 
@@ -171,6 +172,11 @@ app.use('/internal', rateLimit({ max: 20, windowMs: 60_000 }))
 // guessing surfaces, so they get login-grade limits; the parent limit
 // below is the ceiling on everything under /admin, nested paths
 // included (see the note on /auth/google above).
+// Logos are pictures on a page: a list of facilities asks for one per
+// row, so they get a generous limit of their own rather than spending
+// /admin's 120 a minute (see the Facilities "countdown" fix).
+app.use('/logos', rateLimit({ max: 600, windowMs: 60_000 }))
+
 app.use('/admin/auth/login', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/admin/auth/backup-code', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/admin/auth/google', rateLimit({ max: 10, windowMs: 60_000 }))
@@ -194,6 +200,7 @@ app.use('/admin/facilities', adminFacilitiesRoutes)
 app.use('/admin/overview', adminOverviewRoutes)
 app.use('/admin/players', adminPlayersRoutes)
 app.use('/admin/umpires', adminUmpiresRoutes)
+app.use('/logos', logoRoutes)
 
 // Express 5 forwards rejected promises from async handlers here, so
 // route handlers don't each need their own try/catch.
