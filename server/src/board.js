@@ -159,7 +159,8 @@ function usualFor(match, history, typical) {
  * @param {object} input
  * @param {Array<{id, teamA, teamB, score: {A,B}, endedAt, endedEarly}>} input.matches
  *   this month's finished, un-voided matches
- * @param {Set<string>} input.visible players who may be named
+ * @param {Set<string>} input.visible players who may be named: everyone
+ *   but a closed account
  * @param {Map<string,string>} input.nameOf id -> display name
  * @param {Array<{id, thisMonth: {winners, errors, matches}, before: {winners, errors, matches}}>} input.progress
  *   per-player totals for "biggest step up"; players outside `visible`
@@ -411,15 +412,13 @@ async function gatherMonth(query) {
 
   const everyone = [...new Set(month.matches.flatMap((m) => [...m.teamA, ...m.teamB]))]
   const { rows: people } = await query(
-    `SELECT id, name, name_visible, deactivated_at
+    `SELECT id, name, deactivated_at
        FROM players WHERE id = ANY($1::uuid[])`,
     [everyone],
   )
   const nameOf = new Map(people.map((p) => [p.id, p.name]))
-  // A closed account is never named, whatever its setting said.
-  const visible = new Set(
-    people.filter((p) => p.name_visible && !p.deactivated_at).map((p) => p.id),
-  )
+  // Everyone on the board is named, except a closed account.
+  const visible = new Set(people.filter((p) => !p.deactivated_at).map((p) => p.id))
 
   // Every finished game these players have ever played, with how clean
   // it was -- what "cleaner than they usually play" is measured against.
@@ -496,8 +495,8 @@ export async function getMonthlyBoard(query) {
  * Returns null unless `matchId` IS the current match of the month. That
  * restriction is the point: an endpoint that told the story of any match
  * id would let a player read games they were not in and that were never
- * on the board -- including ones with a player who hides their name,
- * which the board passes over for exactly that reason.
+ * on the board -- including ones with a closed account in them, which
+ * the board passes over for exactly that reason.
  *
  * What it tells is the GAME, not the people in it: names, the score, and
  * how the lead moved. No one's winning shots, mistakes or drops. Leaving

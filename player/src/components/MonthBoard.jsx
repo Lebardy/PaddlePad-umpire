@@ -14,10 +14,9 @@
 // The whole board resets each month and says when. A top spot that
 // visibly expires is not much of a top spot.
 //
-// Anyone who hides their name is left off entirely, not blanked -- a
-// board that says "Ana & Cy v Dee & someone" tells anyone who was there
-// exactly who "someone" was. The footer says who is shown and how to
-// leave, so the rule is never a surprise.
+// Everyone is named, except a closed account, which is left off
+// entirely rather than blanked -- a board that says "Ana & Cy v Dee &
+// someone" tells anyone who was there exactly who "someone" was.
 // ============================================================
 
 import { useEffect, useState } from 'react'
@@ -171,8 +170,8 @@ function MonthBoard() {
 
       <More label="Who appears here?">
         <p>
-          Only players who show their name. You can hide yours on the You tab —
-          it takes your name off this board and changes nothing else.
+          Everyone who played on PaddlePad this month, by name. Only closed
+          accounts are left off.
         </p>
       </More>
     </section>

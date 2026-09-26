@@ -36,9 +36,6 @@ export function PlayerDataProvider({ children }) {
     // The player-facing rally rating: points with anchors, or progress
     // towards five matches.
     rallyRating: null,
-    // Whether this player's name may appear on the monthly board. True
-    // until the server says otherwise, which is the server's default too.
-    nameVisible: true,
     loading: true,
     error: null,
     loadedAt: null,
@@ -72,9 +69,6 @@ export function PlayerDataProvider({ children }) {
           inProgress: me.inProgress ?? 0,
           rating: me.rating ?? null,
           rallyRating: me.rallyRating ?? null,
-          // An older server sends nothing, and nothing means shown -- the
-          // column's default, and what was true before it existed.
-          nameVisible: me.nameVisible ?? true,
           loading: false,
           error: null,
           loadedAt: loadedAtRef.current,
