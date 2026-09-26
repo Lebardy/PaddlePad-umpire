@@ -710,3 +710,9 @@ tr.is-voided .reason { opacity: 0.6; }
 .logo-editor { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
 .logo-actions { display: grid; gap: 0.4rem; }
 .fac-name-cell { display: inline-flex; align-items: center; gap: 0.6rem; }
+/* Beside the logo the buttons read left to right, not pushed to the far
+   edge the way they are in a table row, and a "Take the logo off?"
+   question opens next to them without stretching them taller. */
+.logo-actions .row-actions { justify-content: flex-start; align-items: flex-start; }
+.logo-actions .confirm { justify-items: start; }
+.logo-actions .row-actions > .row-error { text-align: left; }
