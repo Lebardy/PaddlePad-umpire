@@ -69,16 +69,23 @@ def synthetic_logs(num_players=60, matches_per_player=8, seed=7):
     K-Means nothing to find and the test would pass for the wrong reason.
     """
     rng = np.random.default_rng(seed)
+    # Ids get their own fixed stream so every run is identical without
+    # changing the numbers the players themselves are drawn from.
+    id_rng = np.random.default_rng([seed, 1])
+
+    def new_id():
+        return str(uuid.UUID(bytes=id_rng.bytes(16), version=4))
+
     rows = []
     for _ in range(num_players):
-        player = str(uuid.uuid4())
+        player = new_id()
         ability = rng.uniform(0.2, 0.9)
         net_preference = rng.uniform(0.1, 0.8)
         for match in range(matches_per_player):
             drops = int(rng.integers(6, 20))
             rows.append({
                 "player_id": player,
-                "match_id": str(uuid.uuid4()),
+                "match_id": new_id(),
                 "match_number": match + 1,
                 "drop_attempts": drops,
                 "drop_successes": int(rng.binomial(drops, min(ability, 0.95))),
