@@ -2341,16 +2341,20 @@ async function main() {
 
     // --- 1: creating facilities ---
     const facA = await request('/admin/facilities', {
-      method: 'POST', bearer: fOwnerToken, body: { name: nameFacA, hourlyFee: '150' },
+      method: 'POST', bearer: fOwnerToken, body: { name: nameFacA, hourlyFee: '150', umpireFee: '100' },
     })
     check('the owner creates facility A -> 201', facA.status === 201, JSON.stringify(facA.body).slice(0, 120))
     const facilityAId = facA.body.facility?.id
     check("facility A's feeText is ₱150 per hour", facA.body.facility?.feeText === '₱150 per hour',
       String(facA.body.facility?.feeText))
+    check("facility A's umpireFeeText is ₱100 per hour", facA.body.facility?.umpireFeeText === '₱100 per hour',
+      String(facA.body.facility?.umpireFeeText))
 
     const facB = await request('/admin/facilities', { method: 'POST', bearer: fOwnerToken, body: { name: nameFacB } })
     check('the owner creates facility B -> 201', facB.status === 201, JSON.stringify(facB.body).slice(0, 120))
     const facilityBId = facB.body.facility?.id
+    check('facility B has no umpire fee', facB.body.facility?.umpireFeeText === null,
+      String(facB.body.facility?.umpireFeeText))
 
     const dupeFacility = await request('/admin/facilities', {
       method: 'POST', bearer: fOwnerToken, body: { name: nameFacA.toUpperCase() },

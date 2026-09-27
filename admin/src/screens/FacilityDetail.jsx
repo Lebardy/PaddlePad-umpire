@@ -42,6 +42,7 @@ export default function FacilityDetail({ id, me }) {
       locationUrl: facility.locationUrl ?? '',
       openingHours: facility.openingHours ?? '',
       hourlyFee: facility.hourlyFeeCentavos != null ? String(facility.hourlyFeeCentavos / 100) : '',
+      umpireFee: facility.umpireFeeCentavos != null ? String(facility.umpireFeeCentavos / 100) : '',
       details: facility.details ?? '',
     })
     setSaveError(null)
@@ -63,6 +64,7 @@ export default function FacilityDetail({ id, me }) {
         locationUrl: fields.locationUrl.trim(),
         openingHours: fields.openingHours.trim(),
         hourlyFee: fields.hourlyFee.trim(),
+        umpireFee: fields.umpireFee.trim(),
         details: fields.details.trim(),
       })
       setResult((current) => ({ ...current, facility: updated }))
@@ -98,7 +100,12 @@ export default function FacilityDetail({ id, me }) {
     { id: 'umpires', label: 'Umpires', count: result.umpires.length },
     { id: 'admins', label: 'Admins', count: result.admins.length },
   ]
-  const intro = [facility.area, facility.feeText, facility.openingHours].filter(Boolean).join(' · ')
+  const intro = [
+    facility.area,
+    facility.feeText && `Court ${facility.feeText}`,
+    facility.umpireFeeText && `Umpire ${facility.umpireFeeText}`,
+    facility.openingHours,
+  ].filter(Boolean).join(' · ')
 
   return (
     <section>
@@ -148,9 +155,15 @@ export default function FacilityDetail({ id, me }) {
                   <input value={fields.openingHours} maxLength={200} placeholder="e.g. 6 AM – 10 PM"
                     onChange={(e) => setFields({ ...fields, openingHours: e.target.value })} />
                 </label>
-                <label className="field"><span>Fee per hour, in pesos</span>
+                <label className="field"><span>Court fee per hour, in pesos</span>
                   <input inputMode="decimal" value={fields.hourlyFee} placeholder="e.g. 150"
                     onChange={(e) => setFields({ ...fields, hourlyFee: e.target.value })} />
+                </label>
+              </div>
+              <div className="pair">
+                <label className="field"><span>Umpire fee per hour, in pesos</span>
+                  <input inputMode="decimal" value={fields.umpireFee} placeholder="e.g. 100"
+                    onChange={(e) => setFields({ ...fields, umpireFee: e.target.value })} />
                 </label>
               </div>
               <label className="field"><span>Details</span>
