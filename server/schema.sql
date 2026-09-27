@@ -698,6 +698,11 @@ CREATE TABLE IF NOT EXISTS facility_logos (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- What an umpire costs per hour at this facility, set by its admins and
+-- shown to players beside the court fee. Empty until an admin sets it.
+ALTER TABLE facilities ADD COLUMN IF NOT EXISTS umpire_fee_centavos INTEGER
+    CHECK (umpire_fee_centavos IS NULL OR umpire_fee_centavos >= 0);
+
 ALTER TABLE umpires        ADD COLUMN IF NOT EXISTS facility_id UUID REFERENCES facilities (id);
 ALTER TABLE admins         ADD COLUMN IF NOT EXISTS facility_id UUID REFERENCES facilities (id);
 ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS facility_id UUID REFERENCES facilities (id);
