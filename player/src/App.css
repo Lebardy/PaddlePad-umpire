@@ -902,7 +902,12 @@ a.highlight:active,
   margin: 0.5rem 0 0.2rem;
   overflow: visible;
 }
-.spark-lg { height: 130px; margin: 0.2rem 0 0.5rem; }
+.spark-lg { height: 130px; margin: 0; }
+/* The big line on a match's own screen: room at the left for its "0". */
+.spark-frame { position: relative; margin: 0.2rem 0 0.5rem; padding-left: 1.6rem; }
+.spark-plot { position: relative; }
+/* Its middle line is the dotted .chart-level instead. */
+.spark-lg .spark-base { display: none; }
 .spark-base { stroke: var(--border); stroke-width: 1; }
 .spark-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .spark-line.won { stroke: var(--status-good); }
@@ -910,6 +915,10 @@ a.highlight:active,
 .spark-area { stroke: none; }
 .spark-area.won { fill: var(--status-good-soft); }
 .spark-area.lost { fill: var(--status-critical-soft); }
+.spark-ahead .spark-line { stroke: var(--status-good); }
+.spark-ahead .spark-area { fill: var(--status-good-soft); }
+.spark-behind .spark-line { stroke: var(--status-critical); }
+.spark-behind .spark-area { fill: var(--status-critical-soft); }
 
 /* ============ Matches screen ============ */
 
@@ -1043,7 +1052,8 @@ a.highlight:active,
   align-content: start;
   gap: 0.1rem;
   margin: 0.6rem 0 0.55rem;
-  /* Room for all four lines, so tapping never pushes the boxes down. */
+  /* Room for all three lines and the second wrapping on a phone, so
+     tapping never pushes the boxes down. */
   min-height: 5.6rem;
 }
 .ribbon-hint,
@@ -1071,7 +1081,6 @@ a.highlight:active,
 }
 .ribbon-kind.is-winner { color: var(--status-good); background: var(--status-good-soft); }
 .ribbon-kind.is-mistake { color: var(--status-critical); background: var(--status-critical-soft); }
-.ribbon-how { color: var(--text-secondary); }
 .ribbon-tags { color: var(--text-muted); font-size: 0.88rem; }
 
 .ribbon-blocks {
@@ -1146,8 +1155,10 @@ a.highlight:active,
   margin: 1.4rem 0 1.6rem;
   animation: wipe 600ms ease-out both;
 }
+/* The plot starts in from the left edge, leaving the "0" a margin of
+   its own so the line's first point can never run through it. */
+.mchart-plot { position: relative; height: 100%; margin-left: 1.6rem; }
 .mchart-svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.mchart-base { stroke: var(--border); stroke-width: 1; }
 .mchart-area { fill: var(--series-1); opacity: 0.12; }
 .mchart-line {
   fill: none;
@@ -1186,6 +1197,51 @@ a.highlight:active,
 .mchart-below .mchart-label { top: 100%; margin-top: 0.2rem; }
 .mchart-end .mchart-label { right: 0; }
 .mchart-start .mchart-label { left: 0; }
+
+/* ---- Where level is, and the point picked in the boxes ---- */
+.chart-zero {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  font-family: var(--label);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-muted);
+}
+.chart-level {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  border-top: 2px dotted var(--text-muted);
+  opacity: 0.6;
+  transform: translateY(-1px);
+  pointer-events: none;
+}
+.pmark-column {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--series-1);
+  opacity: 0.16;
+  border-radius: 2px;
+  pointer-events: none;
+  transition: left 160ms ease-out, width 160ms ease-out;
+}
+.pmark-dot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--series-1);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--series-1);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: left 160ms ease-out, top 160ms ease-out;
+}
 
 /* ============ This month on PaddlePad ============ */
 
@@ -2103,6 +2159,13 @@ a.highlight:active,
 @keyframes rl-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes rl-fade { from { opacity: 0; } }
 @keyframes rl-pop { from { transform: scale(0); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .pmark-column,
+  .pmark-dot {
+    transition: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rl-area,
   .rl-line,

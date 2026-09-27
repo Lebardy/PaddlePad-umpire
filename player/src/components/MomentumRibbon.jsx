@@ -10,16 +10,20 @@
 // the score.
 //
 // Tap (or arrow to) any box and the readout above says the full score,
-// who scored, whether it was a winning shot or a mistake, who hit it,
-// and whether it was a moment that mattered: game point, a lead
-// change, the lowest point, the finish. One tab stop for the whole
-// set, not twenty-six: arrow keys move along it, the way a slider does.
+// who did it and how with whether it was a winning shot or a mistake
+// ("Nia Cruz hit a hard put-away", then a green Winning shot), and
+// whether it was a moment that mattered: game point, a lead change,
+// the lowest point, the finish. One tab stop for the whole set, not
+// twenty-six: arrow keys move along it, the way a slider does.
+//
+// The screen holds which box is picked, not the ribbon, so the chart
+// above can light up the same point.
 //
 // The boxes rise in one after another when scrolled to -- once, and
 // not at all for reduced motion.
 // ============================================================
 
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { useInView } from '../lib/motion'
 import { pointKind, pointSentence } from '../lib/pointWords'
 
@@ -44,11 +48,12 @@ function momentsOf(moment, i, { last, lowIndex }) {
  * @param {string} props.winners - names, for the legend and labels
  * @param {string} props.losers
  * @param {number | null} props.lowIndex - the winners' lowest point
+ * @param {number | null} props.selected - the picked box, if any
+ * @param {(i: number) => void} props.onSelect
  */
-function MomentumRibbon({ moments, path, points, asShown, winners, losers, lowIndex }) {
+function MomentumRibbon({ moments, path, points, asShown, winners, losers, lowIndex, selected, onSelect }) {
   const ref = useRef(null)
   const inView = useInView(ref)
-  const [selected, setSelected] = useState(null)
   const buttons = useRef([])
 
   const last = moments.length - 1
@@ -59,7 +64,7 @@ function MomentumRibbon({ moments, path, points, asShown, winners, losers, lowIn
 
   function choose(i) {
     const next = Math.max(0, Math.min(last, i))
-    setSelected(next)
+    onSelect(next)
     buttons.current[next]?.focus()
   }
 
@@ -77,16 +82,17 @@ function MomentumRibbon({ moments, path, points, asShown, winners, losers, lowIn
   if (selected !== null) {
     const moment = moments[selected]
     const point = points?.[selected]
-    const sentence = point ? pointSentence(point) : null
+    // A rally with no player recorded against it can still say which
+    // side took the point.
+    const sentence = (point && pointSentence(point)) ?? `${nameOf(moment.scorer)} scored`
     const tags = momentsOf(moment, selected, context)
     readout = (
       <>
         <span className="ribbon-at">{asShown(path[selected])}</span>
         <span className="ribbon-who">
-          {nameOf(moment.scorer)} scored
+          {sentence}
           {point && <span className={`ribbon-kind is-${point.how}`}>{pointKind(point.how)}</span>}
         </span>
-        {sentence && <span className="ribbon-how">{sentence}</span>}
         {tags.length > 0 && <span className="ribbon-tags">{tags.join(' · ')}</span>}
       </>
     )

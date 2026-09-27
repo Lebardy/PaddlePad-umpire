@@ -115,6 +115,11 @@ function MatchDetail({ id }) {
   const { matches, loading } = usePlayerData()
   const index = matches.findIndex((m) => m.id === id)
   const match = index === -1 ? null : matches[index]
+  // The point picked in the boxes, lit up on the line above them. Kept
+  // with the match it belongs to, so stepping to the next match starts
+  // with nothing picked.
+  const [picked, setPicked] = useState({ id: null, index: null })
+  const selected = picked.id === id ? picked.index : null
 
   if (!match) {
     // While the first load is still running there is nothing to look up
@@ -182,7 +187,7 @@ function MatchDetail({ id }) {
 
       <section className="detail-shape" aria-label="How the match went">
         <h2>How it went</h2>
-        <Sparkline margins={match.progression} won={match.won} size="lg" />
+        <Sparkline margins={match.progression} won={match.won} size="lg" highlight={selected} />
         {story && <p className="detail-story">{story}</p>}
         {(run >= 3 || turn) && (
           <ul className="ichips" aria-label="Moments">
@@ -207,7 +212,12 @@ function MatchDetail({ id }) {
       {/* The same ribbon the match of the month uses, from this player's
           side: their points filled, their opponents' outlined. Fetched
           for this match alone -- see fetchMatchGame. */}
-      <PointByPoint id={match.id} match={match} />
+      <PointByPoint
+        id={match.id}
+        match={match}
+        selected={selected}
+        onSelect={(i) => setPicked({ id, index: i })}
+      />
 
       <section className="detail-stats" aria-label="Your shots in this match">
         <h2>{hasEndings ? 'How your rallies ended' : 'Your shots'}</h2>
@@ -296,7 +306,7 @@ function MatchDetail({ id }) {
  * it fails: the page above it is already complete without this, and an
  * error box for a nice-to-have would be worse than its absence.
  */
-function PointByPoint({ id, match }) {
+function PointByPoint({ id, match, selected, onSelect }) {
   // Kept with the id it belongs to, rather than cleared and refetched:
   // opening the next match from the arrows at the foot of this page
   // swaps the id, and a stale ribbon must not show under a new match.
@@ -328,6 +338,8 @@ function PointByPoint({ id, match }) {
         winners={match.partner ? `You & ${match.partner}` : 'You'}
         losers={theirs}
         lowIndex={game.lowPoint ? game.lowPoint.index : null}
+        selected={selected}
+        onSelect={onSelect}
       />
     </section>
   )
