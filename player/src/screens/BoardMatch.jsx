@@ -135,6 +135,8 @@ function Story({ match }) {
   const scoreA = useCountUp(match.score.A)
   const scoreB = useCountUp(match.score.B)
   const clean = useCountUp(Number.isFinite(match.clean) ? Math.round(match.clean * 100) : NaN)
+  // The point picked in the boxes, lit up on the chart above them.
+  const [selected, setSelected] = useState(null)
 
   const markers = []
   if (game.lowPoint && game.lowPoint.losers - game.lowPoint.winners >= 2) {
@@ -190,7 +192,7 @@ function Story({ match }) {
               <i aria-hidden="true" /> {winners} ahead
             </span>
           </div>
-          <MatchChart margins={margins} markers={markers} />
+          <MatchChart margins={margins} markers={markers} highlight={selected} />
 
           {/* The game in numbers: each one only when it happened. */}
           <ul className="ichips" aria-label="The game in numbers">
@@ -224,6 +226,8 @@ function Story({ match }) {
             winners={winners}
             losers={losers}
             lowIndex={game.lowPoint ? game.lowPoint.index : null}
+            selected={selected}
+            onSelect={setSelected}
           />
         </section>
       )}
