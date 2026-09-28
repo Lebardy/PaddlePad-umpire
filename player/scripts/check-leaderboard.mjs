@@ -24,10 +24,10 @@ check('ordinals', [1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 101, 111].map(ordinal),
   ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd', '101st', '111th'])
 check('a date, Manila time', shortDate('2026-07-11T17:00:00Z'), '12 Jul')
 
-check('a big gap is drawn to scale and labelled', gapBefore(1612, 1587), { px: 27.5, label: '25 PPR gap' })
-check('a small gap has no label', gapBefore(1538, 1529), { px: 9.9, label: null })
-check('a tie has no gap', gapBefore(1538, 1538), { px: 0, label: null })
-check('a huge gap is capped', gapBefore(1800, 1500), { px: 48, label: '300 PPR gap' })
+check('a big gap is drawn to scale and labelled', gapBefore(1648, 1548), { px: 27.5, label: '100 PPR gap' })
+check('a small gap has no label', gapBefore(1652, 1616), { px: 9.9, label: null })
+check('a tie has no gap', gapBefore(1652, 1652), { px: 0, label: null })
+check('a huge gap is capped', gapBefore(2700, 1500), { px: 48, label: '1,200 PPR gap' })
 
 check('on the list, behind one player', standingWords({ state: 'on', place: 17, of: 24, points: 1476, behind: { points: 12, name: 'Dev Reyes', others: 0, place: 16 } }),
   { place: '17th', of: 24, line: '12 PPR behind Dev Reyes in 16th.', sub: null })

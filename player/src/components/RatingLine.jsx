@@ -17,9 +17,9 @@ import { formatDate } from '../lib/format'
 import { START, changeClass, signed } from '../lib/ratingGraph'
 
 const WIDTH = 340
-// Nothing under this many PPR fills the height: a two-point wobble
+// Nothing under this many PPR fills the height: an eight-point wobble
 // drawn floor to ceiling would look like a collapse.
-const MIN_SPAN = 20
+const MIN_SPAN = 80
 // The closest two labels under the graph may sit, in viewBox units.
 const LABEL_ROOM = 30
 
