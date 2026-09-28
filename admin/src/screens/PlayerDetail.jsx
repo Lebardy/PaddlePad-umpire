@@ -5,7 +5,7 @@ import PageBoard, { TallyCell } from '../components/PageBoard'
 import RowConfirm from '../components/RowConfirm'
 import StatusTag from '../components/StatusTag'
 import { fetchPlayer, newClaimCode } from '../lib/api'
-import { formatWhen, lastSignedInText, ratingText, signInMethodsText } from '../lib/format'
+import { formatWhen, lastSignedInText, playstyleText, pprText, signInMethodsText } from '../lib/format'
 import { Link } from '../lib/router'
 
 /** One player's page: their details, their recent matches, and what an admin can do about their account. */
@@ -78,7 +78,8 @@ export default function PlayerDetail({ id, me }) {
         <div className="tally">
           <TallyCell figure={player.matchCount} label="Matches" />
           <TallyCell figure={player.matchesInProgress} label="Live now" />
-          <TallyCell figure={ratingText(player.rating)} label="Rating" variant="text" />
+          <TallyCell figure={pprText(player.ppr)} label="Rating" variant="text" />
+          <TallyCell figure={playstyleText(player.rating)} label="Playstyle" variant="text" />
         </div>
       </PageBoard>
 
