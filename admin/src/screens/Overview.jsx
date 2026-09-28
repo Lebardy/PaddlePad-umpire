@@ -141,15 +141,29 @@ export default function Overview({ me, facilityLabel }) {
       <div className="sheet">
         {error && <p className="form-error" role="alert">{error}</p>}
         {!data && !error && <p className="empty">Loading…</p>}
-        {data && (
+        {data && (data.sessions.length === 0 ? (
+          // A quiet day: nothing is live, so what needs a look comes first
+          // and the totals sit in one row under it.
+          <>
+            <WorthALook
+              warnings={data.warnings}
+              leftOpen={data.leftOpen}
+              duplicates={data.duplicates}
+              showFacility={showFacility}
+              now={now}
+              actions={warningActions}
+              duplicateActions={duplicateActions}
+            />
+            <div className="section-head totals-head"><h2 className="section-title">Totals</h2></div>
+            <Totals totals={data.totals} isOwner={isOwner} facilityName={data.facilityName} row />
+          </>
+        ) : (
           <>
             <div className="sheet-split">
               <div>
                 <div className="section-head"><h2 className="section-title">Right now</h2>
-                  {data.sessions.length > 0 && <span className="section-count">Newest session first</span>}</div>
-                {data.sessions.length === 0
-                  ? <div className="empty-board"><strong>Nothing going on right now</strong><span>No session is open.</span></div>
-                  : data.sessions.map((s) => <SessionCard key={s.id} session={s} showFacility={showFacility} now={now} />)}
+                  <span className="section-count">Newest session first</span></div>
+                {data.sessions.map((s) => <SessionCard key={s.id} session={s} showFacility={showFacility} now={now} />)}
               </div>
               <aside>
                 <div className="section-head"><h2 className="section-title">Totals</h2></div>
@@ -166,7 +180,7 @@ export default function Overview({ me, facilityLabel }) {
               duplicateActions={duplicateActions}
             />
           </>
-        )}
+        ))}
       </div>
 
       {voiding && (

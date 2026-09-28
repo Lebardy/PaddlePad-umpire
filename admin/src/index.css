@@ -612,6 +612,10 @@ td.table-foot { display: table-cell; }
 @keyframes breathe { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .on-air { animation: none; } }
 
+/* A quiet day: one line in place of three giant zeros. */
+.live-board.live-quiet { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 1.25rem; padding: 0.95rem 1.5rem; }
+.live-quiet-note { color: var(--board-muted); }
+
 .overview-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 1rem 2rem; padding: 1.6rem 1.5rem 1.3rem; border-bottom: 1px solid var(--board-rule); }
 .overview-head h1 { margin: 0; font-family: var(--display); font-weight: 900; font-size: 3.4rem; line-height: 0.92; text-transform: uppercase; }
 .overview-head p { margin: 0.6rem 0 0; color: var(--board-muted); }
@@ -660,6 +664,10 @@ td.table-foot { display: table-cell; }
 .total-label { font-family: var(--label); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.92rem; color: var(--text-secondary); }
 .total-figure { font-family: var(--display); font-weight: 900; font-size: 2.2rem; line-height: 1; font-variant-numeric: tabular-nums; }
 .total-new { grid-column: 1 / -1; font-size: 0.88rem; color: var(--text-muted); }
+/* On a quiet day the totals run across the page under Worth a look. */
+.totals-head { margin-top: 2rem; }
+.totals-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
+.totals-row .total + .total { border-top: 0; border-left: 1px solid var(--border); }
 .total-new b { color: var(--status-good); font-weight: 700; }
 :root[data-theme='dark'] .total-new b { color: var(--win-lamp); }
 .total-rating { padding: 0.9rem 1rem; background: var(--board); color: var(--board-ink); }
@@ -688,8 +696,6 @@ tr.is-voided td { color: var(--text-muted); }
 tr.is-voided .reason { opacity: 0.6; }
 
 /* Quiet day: the empty states. */
-.empty-board { display: grid; gap: 0.4rem; padding: 1.4rem 1.25rem; background: var(--surface); border: 1.5px dashed var(--border); border-radius: var(--radius); color: var(--text-secondary); }
-.empty-board strong { font-family: var(--display); font-weight: 800; text-transform: uppercase; font-size: 1.35rem; color: var(--text); line-height: 1; }
 .all-clear { display: flex; align-items: center; gap: 0.8rem; padding: 1.1rem 1.25rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 .all-clear::before { content: ''; width: 0.8rem; height: 0.8rem; border-radius: 2px; background: var(--win-lamp); box-shadow: 0 0 8px var(--win-lamp); flex: none; }
 .all-clear strong { font-family: var(--display); font-weight: 800; font-size: 1.3rem; text-transform: uppercase; }
