@@ -13,6 +13,7 @@ import playerSelfRoutes from './routes/player.js'
 // Service-to-service: the ML pipeline reading match logs and writing
 // back a ratings snapshot. Guarded by a shared key, not by a token.
 import internalRoutes from './routes/internal.js'
+import smokeTidyRoutes from './routes/smoke-tidy.js'
 // Admin site: its own accounts, guarded by the admin token role.
 import adminAuthRoutes from './routes/admin-auth.js'
 import adminAdminsRoutes from './routes/admin-admins.js'
@@ -191,6 +192,9 @@ app.use('/players', playerAdminRoutes)
 app.use('/sessions', sessionRoutes)
 app.use('/matches', matchRoutes)
 app.use('/player', playerSelfRoutes)
+// Staging only: the smoke test removing what it made. Unset anywhere
+// else, so on production the path is simply not there.
+if (process.env.SMOKE_TIDY === 'on') app.use('/internal/smoke-tidy', smokeTidyRoutes)
 app.use('/internal', internalRoutes)
 app.use('/admin/auth', adminAuthRoutes)
 app.use('/admin/admins', adminAdminsRoutes)
