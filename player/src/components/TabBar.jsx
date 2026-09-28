@@ -5,8 +5,9 @@
 // one hand, and the top of a modern phone screen is the hardest place to
 // reach. It is fixed so it survives a long match list.
 //
-// Only shown once a player has matches -- see App.jsx. Four tabs leading
-// to four empty screens is a worse first impression than one honest one.
+// Only shown once a player has matches -- see App.jsx. The tabs leading
+// to empty screens is a worse first impression than one honest one --
+// the Leaderboard only joins them once it is open.
 // ============================================================
 
 import Icon from './Icon'
@@ -16,6 +17,7 @@ const TABS = [
   { to: '/', label: 'Overview', icon: 'overview' },
   { to: '/matches', label: 'Matches', icon: 'matches' },
   { to: '/people', label: 'People', icon: 'people' },
+  { to: '/leaderboard', label: 'Leaderboard', icon: 'trophy', onlyWhenOpen: true },
   { to: '/you', label: 'You', icon: 'you' },
 ]
 
@@ -25,16 +27,15 @@ function isActive(tab, path) {
   // sections of their own, so Overview stays lit while they are open --
   // the same way a match stays under Matches.
   if (tab.to === '/') return path === '/' || path === '/rating' || path === '/rating/graph'
-  // The match of the month opens from the board on People, so People
-  // stays lit while it is open.
-  if (tab.to === '/people' && path.startsWith('/board/')) return true
+  // The match of the month now opens from the Leaderboard.
+  if (tab.to === '/leaderboard' && path.startsWith('/board/')) return true
   return path === tab.to || path.startsWith(`${tab.to}/`)
 }
 
-function TabBar({ path }) {
+function TabBar({ path, showLeaderboard }) {
   return (
     <nav className="tabbar" aria-label="Sections">
-      {TABS.map((tab) => {
+      {TABS.filter((tab) => !tab.onlyWhenOpen || showLeaderboard).map((tab) => {
         const active = isActive(tab, path)
         return (
           <Link

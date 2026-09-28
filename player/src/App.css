@@ -66,6 +66,7 @@
 .you-screen h1,
 .standing h1,
 .graph-page h1,
+.leaderboard-screen h1,
 .not-found h1,
 .gate h1,
 .empty-head h1,
@@ -83,10 +84,12 @@
 .you-screen h1,
 .standing h1,
 .graph-page h1,
+.leaderboard-screen h1,
 .section-head h1 { font-size: clamp(2.4rem, 11vw, 3rem); }
 .people-screen > h1,
 .standing h1,
-.graph-page h1 { margin: 0.25rem 0 1rem; }
+.graph-page h1,
+.leaderboard-screen h1 { margin: 0.25rem 0 1rem; }
 
 /* Every label on the board and in the bands: condensed capitals. */
 .sb-label,
@@ -428,6 +431,7 @@
 .trend,
 .shot-profile,
 .board,
+.month-band,
 .step,
 .detail-shape,
 .detail-stats,
@@ -465,6 +469,7 @@
 .rating > .section-head,
 .recent > .section-head,
 .board > .section-head,
+.month-band > .section-head,
 .places > .section-head,
 .trend > .trend-head,
 .detail-shape > .board-match-head {
@@ -512,6 +517,7 @@
   .trend,
   .shot-profile,
   .board,
+  .month-band,
   .step,
   .detail-shape,
   .detail-stats,
@@ -1270,6 +1276,86 @@ a.highlight:active,
   .board-value { grid-column: 2; }
 }
 
+/* ============ Leaderboard ============ */
+
+.rank-panel { margin: 0 calc(var(--gutter) * -1) 1.25rem; background: var(--surface); border-bottom: 1px solid var(--border); }
+.rank-board { background: var(--board); color: var(--board-ink); padding: 1rem var(--gutter) 0.85rem; border-bottom: 4px solid var(--lamp); }
+.rank-eyebrow { font-family: var(--label); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--board-muted); }
+.rank-place-big { margin: 0; font-family: var(--display); font-weight: 900; font-size: 4.6rem; line-height: 0.9; color: var(--lamp); font-variant-numeric: tabular-nums; }
+.rank-place-big small { font-family: var(--label); font-size: 1.1rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--board-muted); margin-left: 0.3rem; }
+.rank-place-none { color: var(--board-muted); }
+.rank-line { margin: 0.35rem 0 0; font-size: 0.98rem; font-weight: 600; }
+.rank-sub { margin: 0.15rem 0 0; font-size: 0.9rem; color: var(--board-muted); }
+
+.rank-scroll-wrap { position: relative; }
+.rank-scroll-wrap::before,
+.rank-scroll-wrap::after { content: ''; position: absolute; left: 0; right: 0; height: 1.6rem; pointer-events: none; z-index: 2; }
+.rank-scroll-wrap::before { top: 0; background: linear-gradient(var(--surface), transparent); }
+.rank-scroll-wrap::after { bottom: 0; background: linear-gradient(transparent, var(--surface)); }
+.rank-ladder {
+  list-style: none; margin: 0; padding: 0.5rem var(--gutter) 0.6rem;
+  max-height: 22rem; overflow-y: auto; overscroll-behavior: contain; position: relative;
+  /* The rail the places hang on. */
+  background: linear-gradient(var(--border), var(--border)) no-repeat calc(var(--gutter) + 1.55rem - 1px) 0 / 2px 100%;
+}
+.rank-row,
+.month-row {
+  display: grid; grid-template-columns: 2.1rem minmax(0, 1fr) auto; gap: 0.7rem; align-items: center;
+  min-height: 2.9rem; padding: 0.3rem 0.5rem; position: relative;
+}
+.rank-place {
+  font-family: var(--display); font-weight: 900; font-size: 1.15rem; line-height: 1; font-variant-numeric: tabular-nums;
+  width: 2.1rem; height: 2.1rem; display: grid; place-items: center;
+  background: var(--surface); border: 2px solid var(--border); border-radius: 3px; color: var(--text-muted);
+}
+.rank-top .rank-place { border-color: var(--text); color: var(--text); }
+.rank-who { font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
+.rank-who small { display: block; font-weight: 400; font-size: 0.8rem; color: var(--text-muted); }
+.rank-ppr { font-family: var(--display); font-weight: 800; font-size: 1.35rem; line-height: 1; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.rank-ppr small { font-family: var(--label); font-size: 0.72rem; letter-spacing: 0.08em; color: var(--text-muted); margin-left: 0.15rem; }
+.rank-you { background: var(--board); color: var(--board-ink); border-radius: 3px; }
+.rank-you .rank-place { background: var(--lamp); border-color: var(--lamp); color: #15181d; }
+.rank-you .rank-ppr { color: var(--lamp); }
+.rank-you .rank-who small,
+.rank-you .rank-ppr small { color: var(--board-muted); }
+.rank-you-tag {
+  font-family: var(--label); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #15181d; background: var(--lamp); border-radius: 2px; padding: 0 0.3rem; margin-left: 0.35rem; vertical-align: 0.1em;
+}
+.rank-gap { position: relative; }
+.rank-gap span {
+  position: absolute; left: 3.2rem; top: 50%; transform: translateY(-50%); white-space: nowrap;
+  font-family: var(--label); font-weight: 700; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted);
+}
+.rank-foot { font-size: 0.82rem; color: var(--text-muted); margin: 0.3rem 0 0; padding: 0 var(--gutter) 0.9rem; line-height: 1.45; }
+.month-band .rank-foot { padding-inline: 0; }
+
+.month-tabs { display: flex; margin: -1rem calc(var(--gutter) * -1) 0.8rem; padding: 0 calc(var(--gutter) - 0.3rem) 0.4rem; background: var(--board); overflow-x: auto; scrollbar-width: none; }
+.month-tab {
+  flex: none; min-height: 44px; padding: 0.55rem 0.55rem 0.4rem; border: 0; border-bottom: 3px solid transparent; background: transparent;
+  font-family: var(--label); font-size: 0.86rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--board-muted); cursor: pointer;
+}
+.month-tab-on { color: var(--lamp); border-bottom-color: var(--lamp); }
+.month-rows { list-style: none; margin: 0; padding: 0; }
+.month-row + .month-row { border-top: 1px solid var(--border); }
+.month-more,
+.month-empty { color: var(--text-muted); font-size: 0.92rem; margin: 0.5rem 0 0; }
+
+.stepup { list-style: none; margin: 0; padding: 0; }
+.stepup-row { display: grid; grid-template-columns: 1.4rem minmax(0, 1fr) auto; gap: 0.1rem 0.6rem; align-items: center; padding: 0.65rem 0.2rem; }
+.stepup-row + .stepup-row { border-top: 1px solid var(--border); }
+.stepup-icon { grid-row: 1 / span 2; align-self: start; margin-top: 0.1rem; color: var(--primary); }
+.stepup-label { grid-column: 2 / -1; font-family: var(--label); font-weight: 700; font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.stepup-who { grid-column: 2; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
+.stepup-who small { display: block; font-weight: 400; font-size: 0.8rem; color: var(--text-muted); }
+.stepup-empty { grid-column: 2 / -1; font-weight: 400; color: var(--text-muted); }
+.stepup-fig { grid-column: 3; font-family: var(--display); font-weight: 800; font-size: 1.3rem; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+
+.motm { display: grid; gap: 0.2rem; color: inherit; text-decoration: none; padding: 0.2rem 0; }
+.motm-teams { font-weight: 600; line-height: 1.3; }
+.motm-score { font-family: var(--display); font-weight: 900; font-size: 2.2rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.motm-go { color: var(--primary); font-weight: 600; font-size: 0.92rem; }
+
 /* ============ Your rating, in three steps ============ */
 
 .step > .step-head { justify-content: flex-start; }
@@ -1861,10 +1947,11 @@ a.highlight:active,
   color: var(--board-muted);
   text-decoration: none;
   font-family: var(--label);
-  font-size: 0.85rem;
+  font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
   min-height: 3.4rem;
   /* On a wide screen the cells stay a thumb's width, centred under the
      column, rather than stretching across the monitor. */
