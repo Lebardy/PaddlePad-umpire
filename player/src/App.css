@@ -846,9 +846,11 @@
   padding: 0.75rem var(--gutter) 0.5rem;
   background: var(--surface-sunken);
 }
-.night-when { font-family: var(--label); font-size: 0.95rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.night-when { flex: 1 1 auto; min-width: 0; font-family: var(--label); font-size: 0.95rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
 .night-what { display: block; font-family: var(--sans); font-size: 0.85rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--text-muted); }
-.night-squares { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; }
+/* The squares keep to one line and the night's name wraps instead; a
+   long night gets up to half the row before its squares wrap too. */
+.night-squares { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; flex: 0 0 auto; max-width: 55%; }
 .pill-xs { width: 1.15rem; height: 1.15rem; font-size: 0.7rem; }
 
 .mrows li + li { border-top: 1px solid var(--border); }
