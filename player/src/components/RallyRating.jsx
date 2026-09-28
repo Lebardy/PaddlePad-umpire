@@ -125,12 +125,13 @@ function RallyRating({ rallyRating, place = null }) {
       {head}
       <p className="points-figure">
         {rallyRating.points.toLocaleString()} <span className="points-unit">PPR</span>
-        {place && (
-          <span className="points-place">
-            &middot; {ordinal(place.place)} of {place.of} on the Leaderboard
-          </span>
-        )}
       </p>
+      {/* Its own line: beside the big number it wrapped into two. */}
+      {place && (
+        <p className="points-place">
+          {ordinal(place.place)} of {place.of} on the Leaderboard
+        </p>
+      )}
       {rallyRating.earlyEstimate && (
         <p className="points-early">
           <span className="points-early-tag">Early estimate<span className="points-early-stop">.</span></span>{' '}

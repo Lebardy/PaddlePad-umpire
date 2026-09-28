@@ -2119,7 +2119,7 @@
   color: var(--text-muted);
 }
 /* The Overview says the number smaller, with the Leaderboard place
-   beside it when there is one. */
+   under it when there is one. */
 .overview .points-figure { font-size: 2.8rem; }
 .points-place {
   font-family: var(--label);
@@ -2128,7 +2128,7 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-muted);
-  margin-left: 0.35rem;
+  margin: 0.35rem 0 0;
 }
 
 /* One line in place of the Signing in card. */
