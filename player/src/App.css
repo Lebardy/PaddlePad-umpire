@@ -111,8 +111,6 @@
 /* Every figure: tall and heavy, and aligned when figures stack. */
 .sb-figure,
 .stat-value,
-.ms-yours,
-.ms-theirs,
 .ds-yours,
 .ds-theirs,
 .trend-now,
@@ -459,7 +457,6 @@
 .detail-shape > h2,
 .detail-stats > h2,
 .bests > h2,
-.match-list > h2,
 .you-section > h2,
 .you-details > h2,
 .setup-card > h2,
@@ -814,82 +811,90 @@ a.highlight:active,
 
 /* ============ Results table ============ */
 
-.match-list ol { display: flex; flex-direction: column; }
-/* On the overview the band's own strip already says "Recent matches". */
-.recent .match-list > h2 {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+/* ============ Match history: months, nights, slim rows ============ */
+
+.history { padding-bottom: 0; }
+.history ol { list-style: none; margin: 0; padding: 0; }
+
+/* A dark bar per month, the same strip the bands open with; older months
+   fold into it. */
+.month-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: calc(100% + var(--gutter) * 2);
+  margin: 0 calc(var(--gutter) * -1);
+  min-height: 3rem;
+  padding: 0.6rem var(--gutter);
+  border: 0;
+  border-top: 1px solid var(--board-rule);
+  background: var(--board);
+  color: var(--board-ink);
+  text-align: left;
+  cursor: pointer;
 }
-.matches-screen .match-list ol,
-.person-detail .match-list ol { margin-top: -1rem; }
-.recent > .section-head { margin-bottom: 0; }
+.month-bar:first-child { border-top: 0; }
+.month-name { font-family: var(--label); font-size: 1.05rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.month-count { font-family: var(--label); font-size: 0.88rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--board-muted); }
+.month-record { color: var(--lamp); }
+.month-chevron { font-size: 1.4rem; line-height: 1; color: var(--board-muted); transition: transform 0.15s ease; }
+.month-bar[aria-expanded="true"] .month-chevron { transform: rotate(90deg); }
 
-.match + .match { border-top: 1px solid var(--border); }
+.night + .night { border-top: 1px solid var(--border); }
+.night-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin: 0 calc(var(--gutter) * -1);
+  padding: 0.75rem var(--gutter) 0.5rem;
+  background: var(--surface-sunken);
+}
+.night-when { font-family: var(--label); font-size: 0.95rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.night-what { display: block; font-family: var(--sans); font-size: 0.85rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--text-muted); }
+.night-squares { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; }
+.pill-xs { width: 1.15rem; height: 1.15rem; font-size: 0.7rem; }
 
-/* The row is the link, so the whole line is the tap target. */
-.match-link {
+.mrows li + li { border-top: 1px solid var(--border); }
+.mrow {
   display: grid;
-  grid-template-columns: 2.25rem minmax(0, 1fr) auto;
-  gap: 0.85rem;
-  padding: 0.95rem 0;
+  grid-template-columns: 1.75rem minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
+  min-height: 3.25rem;
+  padding: 0.55rem 0;
   color: inherit;
   text-decoration: none;
 }
-.match-link:active { background: var(--surface-sunken); }
+.mrow:active { background: var(--surface-sunken); }
 @media (hover: hover) {
-  .match-link:hover .match-versus { text-decoration: underline; text-underline-offset: 3px; }
+  .mrow:hover .mrow-vs { text-decoration: underline; text-underline-offset: 3px; }
+}
+.mrow-res {
+  display: grid;
+  place-items: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 3px;
+  font-family: var(--label);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.res-won { background: var(--win-lamp); color: var(--win-ink); }
+.res-lost { background: var(--loss-lamp); color: var(--loss-ink); }
+.res-none { background: var(--none-lamp); color: var(--none-ink); }
+.mrow-main { display: flex; flex-direction: column; min-width: 0; }
+.mrow-vs { font-size: 0.97rem; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
+.mrow-sub { font-size: 0.8rem; line-height: 1.3; color: var(--text-muted); overflow-wrap: anywhere; }
+.mrow-score { font-family: var(--display); font-size: 1.45rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
+.mrow-theirs { color: var(--text-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .month-chevron { transition: none; }
 }
 
-/* The lit result letter at the head of the row, as tall as the line it
-   marks rather than the whole row, so a long row doesn't turn into a
-   green column. */
-.result-lamp {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  align-self: start;
-  height: 2.6rem;
-  border-radius: 2px;
-  font-family: var(--display);
-  font-size: 1.45rem;
-  font-weight: 900;
-  line-height: 1;
-}
-.lamp-won { background: var(--win-lamp); color: var(--win-ink); }
-.lamp-lost { background: var(--loss-lamp); color: var(--loss-ink); }
-.lamp-none { background: var(--none-lamp); color: var(--none-ink); }
-
-.match-body { min-width: 0; }
-.match-line {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-.match-versus { font-size: 1.02rem; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
-.match-score {
-  display: flex;
-  align-items: baseline;
-  gap: 0.1rem;
-  flex: none;
-}
-.ms-yours { font-size: 2rem; }
-.ms-dash { color: var(--text-muted); font-family: var(--display); font-size: 1.3rem; }
-.ms-theirs { font-size: 1.45rem; color: var(--text-muted); }
-.match-partner { font-size: 0.9rem; color: var(--text-secondary); overflow-wrap: anywhere; }
-.match-meta { font-size: 0.82rem; color: var(--text-muted); margin-top: 0.15rem; }
-.match-story { font-size: 0.88rem; font-weight: 600; color: var(--text-secondary); }
-.match-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.55rem; }
-.match-chevron {
-  align-self: center;
-  color: var(--text-muted);
-  font-size: 1.6rem;
-  line-height: 1;
-}
+.recent > .section-head { margin-bottom: 0; }
 
 /* ============ Match sparkline ============ */
 
