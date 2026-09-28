@@ -153,6 +153,21 @@ function usualFor(match, history, typical) {
   return { usual: mean(each), basis: known === each.length ? 'players' : 'mixed' }
 }
 
+/** How many matches each player played this month, and how many people they met. */
+export function monthCounts(matches) {
+  const played = new Map()
+  const met = new Map()
+  for (const match of matches) {
+    const everyone = [...match.teamA, ...match.teamB]
+    for (const id of everyone) {
+      played.set(id, (played.get(id) ?? 0) + 1)
+      if (!met.has(id)) met.set(id, new Set())
+      for (const other of everyone) if (other !== id) met.get(id).add(other)
+    }
+  }
+  return { played, met: new Map([...met].map(([id, people]) => [id, people.size])) }
+}
+
 /**
  * What the board says, from plain data.
  *
@@ -170,25 +185,12 @@ function usualFor(match, history, typical) {
  *   its cleanness -- what "cleaner than they usually play" is judged on
  */
 export function buildBoard({ matches, visible, nameOf, progress = [], history = [] }) {
-  // ---- Played the most ----
-  const played = new Map()
-  // ---- Met the most people ----
-  // Partners and opponents alike. Doubles puts three other people on
-  // court and singles one, so a doubles regular will meet more people --
-  // and that is the true thing this row celebrates, not a distortion of
-  // it. It is a count of people, not a measure of play.
-  const met = new Map()
-
-  for (const match of matches) {
-    const everyone = [...match.teamA, ...match.teamB]
-    for (const id of everyone) {
-      played.set(id, (played.get(id) ?? 0) + 1)
-      if (!met.has(id)) met.set(id, new Set())
-      for (const other of everyone) if (other !== id) met.get(id).add(other)
-    }
-  }
-
-  const metCounts = new Map([...met].map(([id, people]) => [id, people.size]))
+  // ---- Played the most, and met the most people ----
+  // Partners and opponents alike, for "met": doubles puts three other
+  // people on court and singles one, so a doubles regular will meet
+  // more people -- and that is the true thing this row celebrates, not
+  // a distortion of it. It is a count of people, not a measure of play.
+  const { played, met: metCounts } = monthCounts(matches)
 
   // ---- Match of the month ----
   // The closest finished game, naming everyone in it, whoever won. A
