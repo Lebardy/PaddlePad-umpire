@@ -199,7 +199,7 @@ function App() {
       <main
         className={`app-main ${
           view.name === 'match' && signedIn ? 'app-main--full' : ''
-        }`}
+        } ${view.name === 'matchSetup' && signedIn ? 'app-main--setup' : ''}`}
       >
         {!signedIn && !authChecked && <p className="empty">Checking sign-in…</p>}
 

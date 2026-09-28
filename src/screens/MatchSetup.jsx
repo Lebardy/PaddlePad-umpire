@@ -198,55 +198,59 @@ function MatchSetup({ sessionId, onBack, onStart }) {
         </section>
       </div>
 
-      {teamA.length === maxPerTeam && teamB.length === maxPerTeam && (
-        <section>
-          <h3>First server</h3>
-          <div className="server-choice">
-            {[...teamA, ...teamB].map((id) => (
-              <button
-                key={id}
-                className={firstServerId === id ? 'active' : ''}
-                onClick={() => {
-                  setFirstServerId(id)
-                  // A different team now receives, so a right-side
-                  // choice made for the old receiving pair is about the
-                  // wrong pair. Re-tapping the same name changes
-                  // nothing and must not throw the answer away.
-                  if (id !== firstServerId) setReceiverRightId('')
-                }}
-              >
-                {playerName(id)}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* Who serves first beside who starts on the right, so the
+          button is still on screen once a doubles match is set. */}
+      <div className="setup-pair">
+        {teamA.length === maxPerTeam && teamB.length === maxPerTeam && (
+          <section>
+            <h3>First server</h3>
+            <div className="server-choice">
+              {[...teamA, ...teamB].map((id) => (
+                <button
+                  key={id}
+                  className={firstServerId === id ? 'active' : ''}
+                  onClick={() => {
+                    setFirstServerId(id)
+                    // A different team now receives, so a right-side
+                    // choice made for the old receiving pair is about the
+                    // wrong pair. Re-tapping the same name changes
+                    // nothing and must not throw the answer away.
+                    if (id !== firstServerId) setReceiverRightId('')
+                  }}
+                >
+                  {playerName(id)}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
-      {/* The one thing the app cannot work out for itself. When the
-          serve goes over, the player on the RIGHT serves -- and since a
-          pair only swaps sides when it scores, everything after that
-          follows from where these two started. */}
-      {isDoubles && firstServerId !== '' && (
-        <section>
-          <h3>Who starts on the right, as they face the net?</h3>
-          <p className="setup-note">
-            {playerName(firstServerId)} does, on the serving side. Say which of
-            the other pair is on the right — their own right, looking across
-            the net. Watching them from behind, that is the one on your left.
-          </p>
-          <div className="server-choice">
-            {receivingTeam.map((id) => (
-              <button
-                key={id}
-                className={receiverRightId === id ? 'active' : ''}
-                onClick={() => setReceiverRightId(id)}
-              >
-                {playerName(id)}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
+        {/* The one thing the app cannot work out for itself. When the
+            serve goes over, the player on the RIGHT serves -- and since a
+            pair only swaps sides when it scores, everything after that
+            follows from where these two started. */}
+        {isDoubles && firstServerId !== '' && (
+          <section>
+            <h3>Who starts on the right, as they face the net?</h3>
+            <p className="setup-note">
+              {playerName(firstServerId)} does, on the serving side. Say which of
+              the other pair is on the right — their own right, looking across
+              the net. Watching them from behind, that is the one on your left.
+            </p>
+            <div className="server-choice">
+              {receivingTeam.map((id) => (
+                <button
+                  key={id}
+                  className={receiverRightId === id ? 'active' : ''}
+                  onClick={() => setReceiverRightId(id)}
+                >
+                  {playerName(id)}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
 
       <button
         className="start-match"
