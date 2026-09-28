@@ -54,10 +54,7 @@ function TrendChart({ points, window: windowSize }) {
         <path className="trend-line" d={line} />
       </svg>
 
-      <p className="trend-caption">
-        Win rate across every {windowSize} matches in a row. The line is
-        halfway up when you win as often as you lose.
-      </p>
+      <p className="trend-caption">Win rate across every {windowSize} matches in a row.</p>
     </section>
   )
 }

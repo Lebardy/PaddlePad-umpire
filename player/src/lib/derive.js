@@ -268,65 +268,45 @@ export function rollingWinRate(matches, window = 5) {
 }
 
 /**
- * Standout single matches, each one a door into the match detail.
+ * "Your best": the biggest win, the biggest comeback and the cleanest
+ * match -- one row of three on the Overview, each one a way into its
+ * match. A tile with nothing to show is left out.
  *
- * Every entry is null when it cannot be computed rather than zero, so
- * the screen can leave it out instead of claiming a best of nothing.
+ * The "most winning shots" cards that stood here counted raw shots, which
+ * had to be split by singles and doubles to be fair and still said less
+ * than the ratio below; the comeback moved in from the Highlights row the
+ * Overview no longer has.
  */
 export function personalBests(matches) {
   if (matches.length === 0) return []
 
-  const withStats = matches.filter((m) => m.stats)
   const winnersIn = (m) => m.stats.clean_winners + m.stats.dink_winners
   const errorsIn = (m) => m.stats.unforced_errors + m.stats.dink_errors
 
   const best = bestWin(matches)
-
-  // A raw count is not comparable between formats. In singles you take
-  // every shot on your side; in doubles you take roughly half. So one
-  // maximum across both would land on a singles match nearly every time
-  // and quietly bury a good doubles one -- the card would really be
-  // saying "your best singles match" while claiming to say more.
-  //
-  // Each format gets its own record instead. A player who only plays one
-  // still sees exactly one card, now correctly labelled.
-  //
-  // The other two entries need no such treatment: a margin is a score,
-  // and games go to the same target either way, while the ratio below
-  // divides the player's share of the shots out of both halves.
-  const mostWinnersIn = (isDoubles) => {
-    const pool = withStats.filter((m) => m.isDoubles === isDoubles)
-    if (pool.length === 0) return null
-    const top = pool.reduce((a, b) => (winnersIn(b) > winnersIn(a) ? b : a))
-    return winnersIn(top) > 0 ? top : null
-  }
-  const winnersCard = (match, format) =>
-    match && {
-      key: `winners-${format}`,
-      label: 'Most winning shots',
-      value: String(winnersIn(match)),
-      detail: `in one ${format} match`,
-      matchId: match.id,
-    }
+  const comeback = biggestComeback(matches)
   // Only matches with at least one error, so this is a real ratio rather
   // than a division by zero dressed up as perfection.
-  const cleanest = withStats.filter((m) => errorsIn(m) > 0)
+  const cleanest = matches.filter((m) => m.stats && errorsIn(m) > 0)
   const bestRatio = cleanest.length
-    ? cleanest.reduce((a, b) =>
-        winnersIn(b) / errorsIn(b) > winnersIn(a) / errorsIn(a) ? b : a,
-      )
+    ? cleanest.reduce((a, b) => (winnersIn(b) / errorsIn(b) > winnersIn(a) / errorsIn(a) ? b : a))
     : null
 
   return [
     best && {
       key: 'margin',
       label: 'Biggest win',
-      value: `${best.yourScore}\u2013${best.theirScore}`,
+      value: `${best.yourScore}–${best.theirScore}`,
       detail: `vs ${(best.opponents ?? []).join(' & ')}`,
       matchId: best.id,
     },
-    winnersCard(mostWinnersIn(false), 'singles'),
-    winnersCard(mostWinnersIn(true), 'doubles'),
+    comeback && {
+      key: 'comeback',
+      label: 'Biggest comeback',
+      value: `${comeback.deficit} down`,
+      detail: `won ${comeback.match.yourScore}–${comeback.match.theirScore}`,
+      matchId: comeback.match.id,
+    },
     bestRatio && {
       key: 'ratio',
       label: 'Cleanest match',

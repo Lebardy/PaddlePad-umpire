@@ -1,9 +1,11 @@
 // ============================================================
-// The PaddlePad Rating card: the player's PPR, what it means, and how
-// the last seven days moved it -- and never a comparison with anyone
-// else. PaddlePad will be a small group for a long time, and a place or
-// percentile jumps every time one person joins or plays. PPR only moves
-// when you do.
+// The PaddlePad Rating: the player's PPR, what it means, and how the
+// last seven days moved it. The Rating screen tells all of it; the
+// Overview's block says the number and one sentence, plus the reader's
+// Leaderboard place -- but only while the Leaderboard is open and they
+// are on it, as a place among the ranked, never a percentile. PaddlePad
+// will be a small group for a long time, and a percentile would jump
+// every time one person joins or plays.
 //
 // "PPR" rather than "points", which already means the points of a game.
 // ============================================================
@@ -11,6 +13,7 @@
 import { formatDate } from '../lib/format'
 import { changeClass, changeWords, weekView } from '../lib/ratingGraph'
 import { Link } from '../lib/router'
+import { ordinal } from '../lib/leaderboard'
 import Meter from './Meter'
 import RatingLine from './RatingLine'
 
@@ -93,13 +96,25 @@ export function RallyProgress({ rallyRating }) {
   )
 }
 
-function RallyRating({ rallyRating }) {
+/**
+ * The Overview's rating block: the number, the Leaderboard place while
+ * the reader is on it, and one sentence -- the rest lives on the Rating
+ * screen, one tap away, instead of being told twice.
+ */
+function RallyRating({ rallyRating, place = null }) {
   if (!rallyRating) return null
+
+  const head = (
+    <div className="section-head">
+      <h2>PaddlePad Rating</h2>
+      <Link className="link" to="/rating">Your rating &rarr;</Link>
+    </div>
+  )
 
   if (rallyRating.state === 'not_enough_matches') {
     return (
       <section className="rating rating-progress" aria-label="PaddlePad Rating">
-        <h2>PaddlePad Rating</h2>
+        {head}
         <RallyProgress rallyRating={rallyRating} />
       </section>
     )
@@ -107,11 +122,25 @@ function RallyRating({ rallyRating }) {
 
   return (
     <section className="rating rating-points" aria-label="PaddlePad Rating">
-      <h2>PaddlePad Rating</h2>
-      <RallyPointsHeadline rallyRating={rallyRating} />
-      <Link className="rating-more" to="/rating">
-        What&rsquo;s moving it &rarr;
-      </Link>
+      {head}
+      <p className="points-figure">
+        {rallyRating.points.toLocaleString()} <span className="points-unit">PPR</span>
+        {place && (
+          <span className="points-place">
+            &middot; {ordinal(place.place)} of {place.of} on the Leaderboard
+          </span>
+        )}
+      </p>
+      {rallyRating.earlyEstimate && (
+        <p className="points-early">
+          <span className="points-early-tag">Early estimate<span className="points-early-stop">.</span></span>{' '}
+          It will settle as you play more.
+        </p>
+      )}
+      <p className="points-anchor">
+        You&rsquo;d win about <strong>{rallyRating.winChanceVsStart} of every 100</strong> rallies against a{' '}
+        {START.toLocaleString()} player.
+      </p>
     </section>
   )
 }

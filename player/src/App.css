@@ -613,6 +613,13 @@ a.highlight:active,
 .highlight-note,
 .best-detail { font-size: 0.82rem; color: var(--text-secondary); overflow-wrap: anywhere; }
 
+/* On the Overview the three bests share one row, however many there
+   are, down to a 320px phone. */
+.bests-list { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.bests-list .best-card { padding: 0.7rem 0.6rem; }
+.bests-list .best-value { font-size: 1.35rem; }
+.bests-list .best-label { font-size: 0.72rem; }
+
 /* ============ Charts: bars and meters ============ */
 
 /* Stacked bar: a thick mark with a surface-coloured gap between
@@ -658,7 +665,7 @@ a.highlight:active,
 
 /* ============ Form trend ============ */
 
-.trend-svg { display: block; width: 100%; height: 96px; overflow: visible; }
+.trend-svg { display: block; width: 100%; height: 64px; overflow: visible; }
 .trend-baseline { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 4; opacity: 0.6; }
 .trend-line {
   fill: none;
@@ -2104,6 +2111,35 @@ a.highlight:active,
   letter-spacing: 0.08em;
   color: var(--text-muted);
 }
+/* The Overview says the number smaller, with the Leaderboard place
+   beside it when there is one. */
+.overview .points-figure { font-size: 2.8rem; }
+.points-place {
+  font-family: var(--label);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-left: 0.35rem;
+}
+
+/* One line in place of the Signing in card. */
+.setup-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  margin: 0 calc(var(--gutter) * -1) 1.25rem;
+  padding: 0.5rem var(--gutter);
+  background: var(--surface-sunken);
+  border-block: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.setup-strip-go { font-family: var(--label); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary); white-space: nowrap; }
 /* Under ten matches the points are an early estimate, and say so right
    under the number. The tag carries a border because the sunken
    surface is barely darker than the card in the dark theme. */
