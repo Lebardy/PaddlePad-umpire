@@ -47,38 +47,42 @@ function FacilityPage({ id }) {
   }
 
   const place = current.facility
+  const figure = (label, value, wide) => (
+    <div className={`place-figure${wide ? ' place-figure-wide' : ''}${value ? '' : ' place-figure-none'}`}>
+      <span className="place-figure-label">{label}</span>
+      <b>{value ?? 'Not listed yet'}</b>
+    </div>
+  )
   return (
     <div className="place-page">
       <BackLink />
-      <header className="place-head">
-        <FacilityLogo name={place.name} logoUrl={place.logoUrl} size="lg" />
-        <h1>{place.name}</h1>
-        {place.area && <p className="place-where">{place.area}</p>}
-      </header>
-
-      {(place.openingHours || place.feeText) && (
-        <dl className="place-facts">
-          {place.openingHours && (
-            <div>
-              <dt>Open</dt>
-              <dd>{place.openingHours}</dd>
-            </div>
-          )}
-          {place.feeText && (
-            <div>
-              <dt>Court fee</dt>
-              <dd>{place.feeText}</dd>
-            </div>
-          )}
-        </dl>
-      )}
+      <section className="place-board">
+        <div className={`place-plate${place.logoUrl ? '' : ' place-plate-bare'}`}>
+          <FacilityLogo name={place.name} logoUrl={place.logoUrl} size="lg" />
+        </div>
+        <div className="place-main">
+          <span className="place-eyebrow">Place to play</span>
+          <h1>{place.name}</h1>
+          {place.area && <p className="place-where">{place.area}</p>}
+        </div>
+        <div className="place-figures">
+          {figure('Open', place.openingHours, true)}
+          {figure('Court fee', place.feeText)}
+          {figure('Umpire fee', place.umpireFeeText)}
+        </div>
+      </section>
 
       {place.locationUrl && (
         <a className="place-map" href={place.locationUrl} target="_blank" rel="noopener noreferrer">
-          Open map &rarr;
+          Open in Maps &rarr;
         </a>
       )}
-      {place.details && <p className="place-details">{place.details}</p>}
+      {place.details && (
+        <section className="place-about">
+          <h2>About this place</h2>
+          <p className="place-details">{place.details}</p>
+        </section>
+      )}
     </div>
   )
 }

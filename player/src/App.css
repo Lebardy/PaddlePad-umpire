@@ -98,7 +98,6 @@
 .best-label,
 .detail-label,
 .pr-label,
-.board-label,
 .people-summary,
 .person-when,
 .result-word,
@@ -430,7 +429,6 @@
 .rating,
 .trend,
 .shot-profile,
-.board,
 .month-band,
 .step,
 .detail-shape,
@@ -468,7 +466,6 @@
 .link-code > h2,
 .rating > .section-head,
 .recent > .section-head,
-.board > .section-head,
 .month-band > .section-head,
 .places > .section-head,
 .trend > .trend-head,
@@ -516,7 +513,6 @@
   .rating,
   .trend,
   .shot-profile,
-  .board,
   .month-band,
   .step,
   .detail-shape,
@@ -549,10 +545,6 @@
   }
   .overview > .scoreboard { margin-top: 0; }
 }
-
-/* A band holding only a sentence (a failed load, say) has no strip to
-   push it down from the top edge. */
-.board > .muted-inline:first-child { display: block; padding-top: 1rem; }
 
 /* With the profile links above it, the empty-state board can't sit
    flush with the top of the screen. */
@@ -1249,33 +1241,6 @@ a.highlight:active,
   transition: left 160ms ease-out, top 160ms ease-out;
 }
 
-/* ============ This month on PaddlePad ============ */
-
-.board-rows { list-style: none; margin: -0.4rem 0 0; padding: 0; }
-.board-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 7.5rem) minmax(0, 1fr);
-  gap: 0.7rem;
-  align-items: start;
-  padding: 0.75rem 0;
-  border-top: 1px solid var(--border);
-}
-.board-row:first-child { border-top: none; }
-.board-icon { color: var(--primary); margin-top: 0.1rem; }
-.board-label { font-size: 0.85rem; letter-spacing: 0.06em; color: var(--text-muted); padding-top: 0.15rem; }
-.board-value { font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
-.board-note { display: block; font-size: 0.85rem; font-weight: 400; color: var(--text-muted); margin-top: 0.1rem; }
-.board-empty { font-weight: 400; color: var(--text-muted); }
-.board-link { color: inherit; text-decoration: none; display: block; }
-.board-link .board-note { color: var(--primary); font-weight: 600; }
-.board-link:hover .board-note { text-decoration: underline; }
-
-@media (max-width: 360px) {
-  .board-row { grid-template-columns: auto minmax(0, 1fr); gap: 0.1rem 0.5rem; }
-  .board-label { grid-column: 2; }
-  .board-value { grid-column: 2; }
-}
-
 /* ============ Leaderboard ============ */
 
 .rank-panel { margin: 0 calc(var(--gutter) * -1) 1.25rem; background: var(--surface); border-bottom: 1px solid var(--border); }
@@ -1612,26 +1577,67 @@ a.highlight:active,
 
 /* ============ Places to play ============ */
 
-.places { margin-block: 1.5rem; }
-.place-list {
-  background: var(--surface);
-  margin-inline: calc(var(--gutter) * -1);
-  border-block: 1px solid var(--border);
+.places { margin-top: 1.75rem; }
+.places > .section-head { margin-bottom: 0; }
+.ticket-rail {
+  list-style: none; margin: 0 calc(var(--gutter) * -1); padding: 0.9rem var(--gutter) 0.4rem;
+  display: flex; gap: 0.7rem; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: var(--gutter); scrollbar-width: none;
 }
-.place-list li + li { border-top: 1px solid var(--border); }
-.place-row {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  min-height: 44px;
-  padding: 0.75rem var(--gutter);
-  color: inherit;
-  text-decoration: none;
+.ticket-rail::-webkit-scrollbar { display: none; }
+.ticket-slot { flex: none; width: 15.5rem; scroll-snap-align: start; display: flex; }
+.ticket-rail-single .ticket-slot { width: 100%; }
+.ticket { display: grid; grid-template-rows: auto 1fr; width: 100%; border-radius: 4px; overflow: hidden; background: var(--board); color: var(--board-ink); text-decoration: none; }
+.ticket:active { filter: brightness(0.94); }
+.ticket-plate { background: #fff; height: 7.2rem; display: grid; place-items: center; }
+.ticket-plate-bare { background: var(--board-raised); }
+.ticket-plate .place-logo-lg { width: 5.6rem; height: 5.6rem; border: 0; }
+.ticket-plate .place-initials.avatar-lg { width: 5.6rem; height: 5.6rem; font-size: 2.6rem; }
+/* The tear line: dashed, with a notch either side, the way a ticket is torn. */
+.ticket-stub { position: relative; display: grid; gap: 0.15rem; align-content: start; padding: 0.75rem 0.9rem 0.85rem; border-top: 2px dashed var(--board-rule); }
+.ticket-stub::before,
+.ticket-stub::after { content: ''; position: absolute; top: -0.55rem; width: 1rem; height: 1rem; border-radius: 50%; background: var(--bg); }
+.ticket-stub::before { left: -0.5rem; }
+.ticket-stub::after { right: -0.5rem; }
+.ticket-name { font-family: var(--display); font-weight: 800; text-transform: uppercase; font-size: 1.45rem; line-height: 1; overflow-wrap: anywhere; }
+.ticket-area { font-size: 0.88rem; color: var(--board-muted); }
+.ticket-facts { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.55rem; }
+.ticket-facts span {
+  font-family: var(--label); font-size: 0.76rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--lamp); border: 1px solid var(--board-rule); border-radius: 2px; padding: 0.05rem 0.4rem;
 }
-.place-row:active { background: var(--surface-sunken); }
-.place-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
-.place-name { font-weight: 600; font-size: 1.02rem; overflow-wrap: anywhere; }
-.place-area { font-size: 0.88rem; color: var(--text-secondary); }
+.ticket-go { margin-top: 0.6rem; font-family: var(--label); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--board-muted); }
+.ticket-dots { display: flex; justify-content: center; gap: 0.35rem; padding-top: 0.2rem; }
+.ticket-dots i { width: 0.45rem; height: 0.45rem; border-radius: 1px; background: var(--border); }
+.ticket-dots i.on { width: 1.1rem; background: var(--text); }
+.ticket-count { text-align: center; margin: 0.2rem 0 0; font-family: var(--label); font-weight: 700; letter-spacing: 0.08em; font-size: 0.85rem; color: var(--text-muted); }
+.ticket-hint { text-align: center; margin: 0.25rem 0 0; font-size: 0.8rem; color: var(--text-muted); }
+
+.place-board { margin: 0.2rem calc(var(--gutter) * -1) 0; background: var(--board); color: var(--board-ink); }
+.place-plate { background: #fff; height: 11rem; display: grid; place-items: center; }
+.place-plate-bare { background: var(--board-raised); }
+.place-plate .place-logo-lg { width: 8.5rem; height: 8.5rem; border: 0; }
+.place-plate .place-initials.avatar-lg { width: 8rem; height: 8rem; font-size: 3.6rem; }
+.place-main { padding: 1rem var(--gutter); border-top: 2px dashed var(--board-rule); }
+.place-eyebrow { font-family: var(--label); font-weight: 700; font-size: 0.82rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--board-muted); }
+.place-main h1 { font-family: var(--display); font-weight: 900; text-transform: uppercase; font-size: clamp(2.4rem, 12vw, 3.2rem); line-height: 0.92; margin: 0.15rem 0 0.35rem; overflow-wrap: anywhere; }
+.place-where { margin: 0; color: var(--board-muted); }
+.place-figures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--board-rule); border-bottom: 4px solid var(--lamp); }
+.place-figure { padding: 0.75rem var(--gutter) 0.85rem; min-width: 0; }
+.place-figure + .place-figure { border-left: 1px solid var(--board-rule); }
+.place-figure-wide { grid-column: 1 / -1; border-bottom: 1px solid var(--board-rule); }
+.place-figure-wide + .place-figure { border-left: 0; }
+.place-figure-label { display: block; font-family: var(--label); font-weight: 700; font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--board-muted); }
+.place-figure b { display: block; margin-top: 0.2rem; font-family: var(--display); font-weight: 800; font-size: 1.55rem; line-height: 1.05; color: var(--lamp); overflow-wrap: anywhere; }
+.place-figure-none b { font-family: var(--sans); font-weight: 500; font-size: 1.05rem; color: var(--board-muted); }
+.place-map {
+  display: flex; align-items: center; justify-content: center; min-height: 3.2rem; margin-top: 1.1rem;
+  background: var(--button); color: var(--button-ink); border-radius: 4px; text-decoration: none;
+  font-family: var(--label); font-weight: 700; font-size: 1.05rem; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.place-map:active { transform: scale(0.97); filter: brightness(0.94); }
+.place-about { margin-top: 1.3rem; }
+.place-about h2 { margin: 0; font-family: var(--label); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.place-details { margin: 0.3rem 0 0; color: var(--text-secondary); line-height: 1.55; white-space: pre-line; }
 
 /* A logo sits on white in both themes: many are dark lettering on a
    see-through background and would vanish on the dark one. */
@@ -1652,33 +1658,6 @@ a.highlight:active,
 .place-logo-lg { width: 7rem; height: 7rem; }
 /* Initials stand in at the same size as the logo tile they replace. */
 .place-initials.avatar-lg { width: 7rem; height: 7rem; font-size: 2.6rem; }
-
-.place-head { display: grid; justify-items: start; gap: 0.6rem; margin-bottom: 1.2rem; }
-.place-head h1 { margin: 0.3rem 0 0; font-size: clamp(2rem, 9vw, 2.6rem); line-height: 1; }
-.place-where { margin: 0; color: var(--text-secondary); }
-.place-facts { display: grid; gap: 0.6rem; margin: 0 0 1rem; }
-.place-facts div { display: grid; gap: 0.1rem; }
-.place-facts dt {
-  font-family: var(--label);
-  font-size: 0.85rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-}
-.place-facts dd { margin: 0; font-size: 1.05rem; }
-.place-map {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  font-family: var(--label);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--primary);
-  text-decoration: none;
-}
-.place-details { color: var(--text-secondary); white-space: pre-line; }
 
 /* ============ Avatar ============ */
 
