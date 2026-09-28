@@ -262,18 +262,21 @@ section('what players see of a facility')
   const at = new Date('2026-09-27T00:00:00Z')
   const row = {
     id: 'f1', name: 'Riverside Courts', area: 'Lahug', location_url: 'https://maps.example/x',
-    opening_hours: '6 AM – 10 PM', hourly_fee_centavos: 15000, details: 'Four courts', created_by: 'a1',
+    opening_hours: '6 AM – 10 PM', hourly_fee_centavos: 15000, umpire_fee_centavos: 10000,
+    details: 'Four courts', created_by: 'a1',
     created_at: at, updated_at: at, logo_updated_at: at,
   }
   check('the list row', rules.playerFacilitySummary(row),
-    { id: 'f1', name: 'Riverside Courts', area: 'Lahug', logoUrl: `/logos/f1?v=${at.getTime()}` })
+    { id: 'f1', name: 'Riverside Courts', area: 'Lahug', logoUrl: `/logos/f1?v=${at.getTime()}`,
+      openingHours: '6 AM – 10 PM', feeText: '₱150 per hour', umpireFeeText: '₱100 per hour' })
   check('the page', rules.playerFacilityPage(row), {
     id: 'f1', name: 'Riverside Courts', area: 'Lahug', openingHours: '6 AM – 10 PM', feeText: '₱150 per hour',
+    umpireFeeText: '₱100 per hour',
     locationUrl: 'https://maps.example/x', details: 'Four courts', logoUrl: `/logos/f1?v=${at.getTime()}`,
   })
   const bare = { id: 'f2', name: 'New Place' }
   check('an empty facility has only its name', rules.playerFacilityPage(bare), {
-    id: 'f2', name: 'New Place', area: null, openingHours: null, feeText: null,
+    id: 'f2', name: 'New Place', area: null, openingHours: null, feeText: null, umpireFeeText: null,
     locationUrl: null, details: null, logoUrl: null,
   })
   check('a free facility says so', rules.playerFacilityPage({ ...bare, hourly_fee_centavos: 0 }).feeText, 'Free')

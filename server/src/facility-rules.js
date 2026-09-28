@@ -258,8 +258,20 @@ export function readLogoUpload(body = {}) {
 // Only what a player can use to find and choose a place to play: never
 // who made it, its admins or its umpires.
 
+// "Fee not set" is for admins; a player page just leaves it out.
+const playerFee = (centavos) => (centavos == null ? null : feeText(centavos))
+
 export function playerFacilitySummary(row) {
-  return { id: row.id, name: row.name, area: row.area ?? null, logoUrl: logoPath(row.id, row.logo_updated_at ?? null) }
+  return {
+    id: row.id,
+    name: row.name,
+    area: row.area ?? null,
+    logoUrl: logoPath(row.id, row.logo_updated_at ?? null),
+    // What a ticket on the People tab shows; the page has the rest.
+    openingHours: row.opening_hours ?? null,
+    feeText: playerFee(row.hourly_fee_centavos),
+    umpireFeeText: playerFee(row.umpire_fee_centavos),
+  }
 }
 
 export function playerFacilityPage(row) {
@@ -268,8 +280,8 @@ export function playerFacilityPage(row) {
     name: row.name,
     area: row.area ?? null,
     openingHours: row.opening_hours ?? null,
-    // "Fee not set" is for admins; a player page just leaves it out.
-    feeText: row.hourly_fee_centavos == null ? null : feeText(row.hourly_fee_centavos),
+    feeText: playerFee(row.hourly_fee_centavos),
+    umpireFeeText: playerFee(row.umpire_fee_centavos),
     locationUrl: row.location_url ?? null,
     details: row.details ?? null,
     logoUrl: logoPath(row.id, row.logo_updated_at ?? null),
