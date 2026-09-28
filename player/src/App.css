@@ -281,6 +281,10 @@
 }
 .filter:first-child,
 .gate-tab:first-child { border-left: 0; }
+/* Until Barlow Condensed arrives the stand-in font is much wider, and a
+   label that may not wrap spills into the next tab. Two lines for that
+   moment instead; the real font fits on one. */
+.gate-tab { white-space: normal; text-wrap: balance; line-height: 1.15; }
 .filter-active,
 .gate-tab[aria-selected='true'] {
   background: var(--button);
@@ -1250,9 +1254,7 @@
 .rank-eyebrow { font-family: var(--label); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--board-muted); }
 .rank-place-big { margin: 0; font-family: var(--display); font-weight: 900; font-size: 4.6rem; line-height: 0.9; color: var(--lamp); font-variant-numeric: tabular-nums; }
 .rank-place-big small { font-family: var(--label); font-size: 1.1rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--board-muted); margin-left: 0.3rem; }
-.rank-place-none { color: var(--board-muted); }
 .rank-line { margin: 0.35rem 0 0; font-size: 0.98rem; font-weight: 600; }
-.rank-sub { margin: 0.15rem 0 0; font-size: 0.9rem; color: var(--board-muted); }
 
 .rank-scroll-wrap { position: relative; }
 .rank-scroll-wrap::before,

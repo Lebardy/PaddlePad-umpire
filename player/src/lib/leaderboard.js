@@ -34,30 +34,15 @@ export function gapBefore(prevPoints, points) {
 
 /** The words on the black board above the ladder. */
 export function standingWords(you) {
-  if (you.state === 'on') {
-    let line = 'Nobody is above you.'
-    if (you.behind) {
-      const { points, name, others, place } = you.behind
-      const tie = others > 0 ? ` and ${others} ${others === 1 ? 'other' : 'others'}` : ''
-      line = `${fmt.format(points)} PPR behind ${name}${tie} in ${ordinal(place)}.`
-    }
-    return { place: ordinal(you.place), of: you.of, line, sub: null }
+  // Off the ranking (too few matches, or away too long): no place to show.
+  if (you.state !== 'on') return null
+  let line = 'Nobody is above you.'
+  if (you.behind) {
+    const { points, name, others, place } = you.behind
+    const tie = others > 0 ? ` and ${others} ${others === 1 ? 'other' : 'others'}` : ''
+    line = `${fmt.format(points)} PPR behind ${name}${tie} in ${ordinal(place)}.`
   }
-  if (you.state === 'needs_matches') {
-    const left = you.need - you.have
-    return {
-      place: null,
-      of: null,
-      line: `${left} more ${left === 1 ? 'match' : 'matches'} and you're on the list.`,
-      sub: `You have ${you.have}; the ranking starts at ${you.need}.`,
-    }
-  }
-  return {
-    place: null,
-    of: null,
-    line: 'Play a match to get back on the list.',
-    sub: you.lastPlayedAt ? `Your last was ${shortDate(you.lastPlayedAt)}.` : null,
-  }
+  return { place: ordinal(you.place), of: you.of, line, sub: null }
 }
 
 // The glide down to your row when the tab opens.

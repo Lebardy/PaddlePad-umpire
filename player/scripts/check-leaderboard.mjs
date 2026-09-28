@@ -36,11 +36,8 @@ check('behind a tie of three', standingWords({ state: 'on', place: 5, of: 40, po
 check('behind a tie of two', standingWords({ state: 'on', place: 3, of: 40, points: 1500, behind: { points: 1, name: 'Ana', others: 1, place: 1 } }).line,
   '1 PPR behind Ana and 1 other in 1st.')
 check('at the top', standingWords({ state: 'on', place: 1, of: 40, points: 1612, behind: null }).line, 'Nobody is above you.')
-check('7 matches', standingWords({ state: 'needs_matches', have: 7, need: 10 }),
-  { place: null, of: null, line: "3 more matches and you're on the list.", sub: 'You have 7; the ranking starts at 10.' })
-check('9 matches', standingWords({ state: 'needs_matches', have: 9, need: 10 }).line, "1 more match and you're on the list.")
-check('away', standingWords({ state: 'away', lastPlayedAt: '2026-07-11T17:00:00Z' }),
-  { place: null, of: null, line: 'Play a match to get back on the list.', sub: 'Your last was 12 Jul.' })
+check('too few matches: no place', standingWords({ state: 'needs_matches', have: 7, need: 10 }), null)
+check('away: no place', standingWords({ state: 'away', lastPlayedAt: '2026-07-11T17:00:00Z' }), null)
 
 check('glide target centres the row', glideTarget(800, 50, 300, 2000), 675)
 check('glide target never goes above the top', glideTarget(40, 50, 300, 2000), 0)

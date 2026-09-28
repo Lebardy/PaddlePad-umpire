@@ -80,19 +80,16 @@ function RankPanel({ ranking, you }) {
 
   return (
     <section className="rank-panel" aria-label="PaddlePad Rating ranking">
-      <div className="rank-board">
-        <span className="rank-eyebrow">Your place · PaddlePad Rating</span>
-        {words.place ? (
+      {words && (
+        <div className="rank-board">
+          <span className="rank-eyebrow">Your place · PaddlePad Rating</span>
           <p className="rank-place-big">
             {words.place}
             <small>of {words.of}</small>
           </p>
-        ) : (
-          <p className="rank-place-big rank-place-none" aria-hidden="true">—</p>
-        )}
-        <p className="rank-line">{words.line}</p>
-        {words.sub && <p className="rank-sub">{words.sub}</p>}
-      </div>
+          <p className="rank-line">{words.line}</p>
+        </div>
+      )}
 
       <div className="rank-scroll-wrap">
         <ol className="rank-ladder" ref={boxRef} tabIndex={0} aria-label="Everyone on the ranking">
