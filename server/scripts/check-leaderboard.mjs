@@ -129,9 +129,9 @@ section('Step up, by category')
   const nameOf = new Map([['ana', 'Ana'], ['ben', 'Ben'], ['cy', 'Cy'], ['dee', 'Dee'], ['few', 'Few'], ['gone', 'Gone']])
   const progress = [
     // PPR +38; shots 1.0 -> 1.8; mistakes 30% -> 22%; wins 1/3 -> 3/3; rallies 50% -> 55%
-    { id: 'ana', before: T(), thisMonth: T({ winners: 18, ownMistakes: 22, won: 3, sideWon: 55 }), pprStart: 1500, pprNow: 1538 },
+    { id: 'ana', before: T(), thisMonth: T({ winners: 18, ownMistakes: 22, won: 3, sideWon: 55 }), pprStart: 1500, pprNow: 1652 },
     // PPR +9 (under 10); shots 1.0 -> 1.1 (under 20%); rallies 50% -> 60%
-    { id: 'ben', before: T(), thisMonth: T({ winners: 11, sideWon: 60 }), pprStart: 1500, pprNow: 1509 },
+    { id: 'ben', before: T(), thisMonth: T({ winners: 11, sideWon: 60 }), pprStart: 1500, pprNow: 1536 },
     // Mistakes 30% -> 22%: ties Ana on the drop, with the same figures
     { id: 'cy', before: T(), thisMonth: T({ ownMistakes: 22 }), pprStart: 1500, pprNow: 1500 },
     // Would win everything, but closed
@@ -140,7 +140,7 @@ section('Step up, by category')
     { id: 'few', before: T({ matches: 2 }), thisMonth: T({ winners: 50, won: 3, sideWon: 90 }), pprStart: 1400, pprNow: 1600 },
   ]
   const leaders = stepUpLeaders(progress, visible, nameOf)
-  check('PPR gained', leaders[0], { key: 'ppr', names: ['Ana'], more: 0, figures: { change: 38 } })
+  check('PPR gained', leaders[0], { key: 'ppr', names: ['Ana'], more: 0, figures: { change: 152 } })
   check('shots per mistake', leaders[1], { key: 'shots', names: ['Ana'], more: 0, figures: { before: 1, now: 1.8 } })
   check('fewer mistakes, tied with the same figures', leaders[2],
     { key: 'mistakes', names: ['Ana', 'Cy'], more: 0, figures: { before: 30, now: 22 } })

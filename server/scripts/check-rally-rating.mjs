@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto'
 import {
   ACTOR_SHARE,
   DEFAULT_K,
+  DEFAULT_SCALE,
   MATCH_REWARD,
   MIN_MATCHES,
   MOST_OFTEN_MIN_RALLIES,
@@ -672,6 +673,38 @@ section('Games against newcomers')
   check('and the rows sent still add up to the points shown',
     sent.breakdown.reduce((s, row) => s + row.points, 0), sent.points - START_POINTS,
     'Whole numbers, exactly, as before the protection.')
+}
+
+
+section('The chess scale is a change of units only')
+{
+  // A history with everything in it: doubles and singles, won matches
+  // and one stopped early, every kind of ending, and a newcomer who
+  // joins after the regulars have their five matches.
+  const [N1] = [randomUUID()]
+  const endings = RALLY_ENDINGS.map((e) => e.key)
+  const history = []
+  for (let i = 0; i < 6; i += 1) {
+    history.push(match(Array.from({ length: 11 }, () => rally(i % 2 ? A2 : A1, 'putaway'))))
+    history.push(match(endings.map((key, j) => rally([A1, A2, B1, B2][(i + j) % 4], key))))
+  }
+  history.push(match(Array.from({ length: 11 }, () => rally(A1, 'putaway')), { doubles: false }))
+  history.push(game([N1, B2], [A1, B1], Array.from({ length: 11 }, (_, j) => rally(j % 3 ? N1 : B2, 'putaway'))))
+  history.push(match([rally(B1, 'out'), rally(A2, 'kitchen')]))
+
+  const now = rateHistory(history)
+  const before = rateHistory(history, { scale: 100, k: 4, matchReward: 16 })
+  check('the scale, the step and the reward are all four times the old ones',
+    [DEFAULT_SCALE, DEFAULT_K, MATCH_REWARD], [400, 16, 64],
+    'Chess (Elo 1978, FIDE) puts 10-to-1 odds at a 400-point gap; PPR used 100.')
+  check('every rating is exactly 1500 + 4 x (the old rating - 1500)',
+    [...before].filter(([id, old]) => !near(now.get(id).rawPoints - START_POINTS, 4 * (old.rawPoints - START_POINTS), 1e-9)).map(([id]) => id),
+    [], 'Scaling the gap, the step and the reward by the same number changes the units and nothing else.')
+  check('every chance the app shows is unchanged',
+    // The old chance, worked out on the old scale it belonged to.
+    [...before].filter(([id, old]) => rallyRatingFor(now, id).state === 'rated'
+      && rallyRatingFor(now, id).winChanceVsStart !== Math.round(expectedWin(old.rawPoints, START_POINTS, 100) * 100)).map(([id]) => id),
+    [], 'Joanna still wins about 55 of every 100 rallies against a 1,500 player.')
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

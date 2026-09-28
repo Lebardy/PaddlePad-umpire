@@ -34,8 +34,17 @@ import { gameWinChance } from './game-chance.js'
 import { rallyEnding } from './rally-endings.js'
 
 export const START_POINTS = 1500
-export const DEFAULT_K = 4
-export const DEFAULT_SCALE = 100
+// The chess scale: a 400-point gap is 10-to-1 odds on a rally, as in
+// Elo's ratings (Elo, The Rating of Chessplayers, Past and Present,
+// 1978) and FIDE's today. Where the middle sits and how far apart
+// ratings spread are free choices; only gaps carry meaning. PPR used a
+// 100-point gap for 10-to-1 until 2026-09-28, which kept everyone within
+// a few dozen points of 1,500 and moved a typical match by about 5. The
+// step and the match reward were multiplied by the same four, so every
+// rating became exactly 1500 + 4 x (old - 1500) and every chance, order
+// and result stayed the same (check-rally-rating.mjs proves it).
+export const DEFAULT_K = 16
+export const DEFAULT_SCALE = 400
 export const ACTOR_SHARE = 0.75
 export const MIN_MATCHES = 5
 export const TREND_MATCHES = 10
@@ -52,14 +61,16 @@ export const EARLY_ESTIMATE_MATCHES = 10
 // The most a side can gain by winning a match, reached only by beating a
 // side they had no chance against: the side's reward is MATCH_REWARD
 // times (1 - their chance of winning the game), and the losers give up
-// the same. Chosen by the owner on 2026-09-14 from
+// the same. 64 on the chess scale is the 16 chosen on the old 100 scale
+// (the figures below were measured at 16, and the behaviour is
+// identical). Chosen by the owner on 2026-09-14 from
 // server/scripts/match-reward-sizes.mjs over staging's 136 matches: at
 // this size 32/263 winners still lost points (46/263 with
 // no reward), the simulated messy partner averaged +2.7 and the
 // carrying partner +15.5, ranking against true ability was 0.802
 // (0.839 with none), and the favourite won 19/24 (79%). The worst
 // winner's loss moved from −13 with no reward to −15 with it.
-export const MATCH_REWARD = 16
+export const MATCH_REWARD = 64
 
 /** The chance a side rated `ratingFor` wins a rally against `ratingAgainst`. */
 export function expectedWin(ratingFor, ratingAgainst, scale = DEFAULT_SCALE) {

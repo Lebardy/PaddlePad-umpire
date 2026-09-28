@@ -26,8 +26,9 @@ export const MONTH_LIST_ROWS = 5
 export const STEP_UP_KEYS = ['ppr', 'shots', 'mistakes', 'winRate', 'rallies']
 
 // Step up minimums: a real change, not a wobble. Judgement calls, like
-// the floors in board.js.
-export const STEP_UP_MIN_PPR = 10
+// the floors in board.js. The PPR one is 40 on the chess scale, the +10
+// it was on the old 100 scale (see rally-rating.js).
+export const STEP_UP_MIN_PPR = 40
 export const STEP_UP_MIN_MISTAKE_DROP = 0.05
 export const STEP_UP_MIN_WIN_RISE = 0.1
 export const STEP_UP_MIN_RALLY_RISE = 0.05

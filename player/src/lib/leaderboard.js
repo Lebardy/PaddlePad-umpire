@@ -17,10 +17,12 @@ export function shortDate(iso) {
 }
 
 // The ladder: rows sit apart by the real PPR gap, to scale, but a single
-// runaway gap can't push everyone else off the screen.
-export const GAP_PX_PER_POINT = 1.1
+// runaway gap can't push everyone else off the screen. Sized for the
+// chess scale (a quarter of the old 1.1px per PPR, and a label from 52
+// PPR rather than 13), so the ladder looks as it did.
+export const GAP_PX_PER_POINT = 0.275
 export const GAP_MAX_PX = 48
-export const GAP_LABEL_MIN = 13
+export const GAP_LABEL_MIN = 52
 
 export function gapBefore(prevPoints, points) {
   const gap = prevPoints - points
