@@ -111,86 +111,92 @@ function MatchSetup({ sessionId, onBack, onStart }) {
       </button>
       <h2>New Match</h2>
 
-      <section>
-        <h3>Format</h3>
-        <div className="format-toggle">
-          <button
-            className={!isDoubles ? 'active' : ''}
-            onClick={() => toggleFormat(false)}
-          >
-            Singles
-          </button>
-          <button
-            className={isDoubles ? 'active' : ''}
-            onClick={() => toggleFormat(true)}
-          >
-            Doubles
-          </button>
-        </div>
-      </section>
-
-      <section>
-        <h3>Play to</h3>
-        <div className="format-toggle">
-          {POINT_TARGETS.map((target) => (
+      {/* On a tablet each pair shares a row, so Start Match is on the
+          first screen instead of one scroll down. */}
+      <div className="setup-pair">
+        <section>
+          <h3>Format</h3>
+          <div className="format-toggle">
             <button
-              key={target}
-              className={pointTarget === target ? 'active' : ''}
-              onClick={() => setPointTarget(target)}
+              className={!isDoubles ? 'active' : ''}
+              onClick={() => toggleFormat(false)}
             >
-              {target}
+              Singles
             </button>
-          ))}
-        </div>
-        <p className="setup-note">
-          Win by 2 whichever you pick, and it can&rsquo;t be changed once
-          the match starts.
-        </p>
-      </section>
+            <button
+              className={isDoubles ? 'active' : ''}
+              onClick={() => toggleFormat(true)}
+            >
+              Doubles
+            </button>
+          </div>
+        </section>
+  
+        <section>
+          <h3>Play to</h3>
+          <div className="format-toggle">
+            {POINT_TARGETS.map((target) => (
+              <button
+                key={target}
+                className={pointTarget === target ? 'active' : ''}
+                onClick={() => setPointTarget(target)}
+              >
+                {target}
+              </button>
+            ))}
+          </div>
+          <p className="setup-note">
+            Win by 2 whichever you pick, and it can&rsquo;t be changed once
+            the match starts.
+          </p>
+        </section>
+      </div>
 
-      <section>
-        <h3>Team A {isDoubles && stackingA ? '· stacking' : ''}</h3>
-        <TeamPicker
-          team={teamA}
-          maxPerTeam={maxPerTeam}
-          playerName={playerName}
-          onRemove={(id) => removeFromTeam('A', id)}
-          onAdd={(id) => addToTeam('A', id)}
-          available={available}
-        />
-        {isDoubles && (
-          <label className="stacking-toggle">
-            <input
-              type="checkbox"
-              checked={stackingA}
-              onChange={(e) => setStackingA(e.target.checked)}
-            />
-            Uses stacking
-          </label>
-        )}
-      </section>
-
-      <section>
-        <h3>Team B {isDoubles && stackingB ? '· stacking' : ''}</h3>
-        <TeamPicker
-          team={teamB}
-          maxPerTeam={maxPerTeam}
-          playerName={playerName}
-          onRemove={(id) => removeFromTeam('B', id)}
-          onAdd={(id) => addToTeam('B', id)}
-          available={available}
-        />
-        {isDoubles && (
-          <label className="stacking-toggle">
-            <input
-              type="checkbox"
-              checked={stackingB}
-              onChange={(e) => setStackingB(e.target.checked)}
-            />
-            Uses stacking
-          </label>
-        )}
-      </section>
+      <div className="setup-pair">
+        <section>
+          <h3>Team A {isDoubles && stackingA ? '· stacking' : ''}</h3>
+          <TeamPicker
+            team={teamA}
+            maxPerTeam={maxPerTeam}
+            playerName={playerName}
+            onRemove={(id) => removeFromTeam('A', id)}
+            onAdd={(id) => addToTeam('A', id)}
+            available={available}
+          />
+          {isDoubles && (
+            <label className="stacking-toggle">
+              <input
+                type="checkbox"
+                checked={stackingA}
+                onChange={(e) => setStackingA(e.target.checked)}
+              />
+              Uses stacking
+            </label>
+          )}
+        </section>
+  
+        <section>
+          <h3>Team B {isDoubles && stackingB ? '· stacking' : ''}</h3>
+          <TeamPicker
+            team={teamB}
+            maxPerTeam={maxPerTeam}
+            playerName={playerName}
+            onRemove={(id) => removeFromTeam('B', id)}
+            onAdd={(id) => addToTeam('B', id)}
+            available={available}
+          />
+          {isDoubles && (
+            <label className="stacking-toggle">
+              <input
+                type="checkbox"
+                checked={stackingB}
+                onChange={(e) => setStackingB(e.target.checked)}
+              />
+              Uses stacking
+            </label>
+          )}
+        </section>
+      </div>
 
       {teamA.length === maxPerTeam && teamB.length === maxPerTeam && (
         <section>
