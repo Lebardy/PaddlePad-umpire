@@ -35,7 +35,7 @@ function BackLink() {
     <button
       type="button"
       className="back-link"
-      onClick={() => (window.history.length > 1 ? window.history.back() : navigate('/people'))}
+      onClick={() => (window.history.length > 1 ? window.history.back() : navigate('/leaderboard'))}
     >
       &larr; Back
     </button>

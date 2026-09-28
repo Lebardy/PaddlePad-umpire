@@ -77,6 +77,11 @@ export function readFacility(body = {}, { partial = false } = {}) {
     if (centavos === undefined) return { error: 'The fee must be an amount in pesos, like 150 or 150.50' }
     values.hourly_fee_centavos = centavos
   }
+  if (has('umpireFee')) {
+    const centavos = pesosToCentavos(body.umpireFee)
+    if (centavos === undefined) return { error: 'The umpire fee must be an amount in pesos, like 100 or 100.50' }
+    values.umpire_fee_centavos = centavos
+  }
   for (const field of TEXT_FIELDS.slice(2)) {
     if (has(field.key)) {
       const text = optionalText(body[field.key])
@@ -88,7 +93,7 @@ export function readFacility(body = {}, { partial = false } = {}) {
 }
 
 /** The only columns a facility create/update may ever set from caller-supplied values. */
-const FACILITY_VALUE_COLUMNS = ['name', 'area', 'location_url', 'opening_hours', 'hourly_fee_centavos', 'details']
+const FACILITY_VALUE_COLUMNS = ['name', 'area', 'location_url', 'opening_hours', 'hourly_fee_centavos', 'umpire_fee_centavos', 'details']
 
 /**
  * Keeps only the fixed, known facility columns present in `values`,
@@ -199,6 +204,9 @@ export function facilityPayload(row) {
     openingHours: row.opening_hours ?? null,
     hourlyFeeCentavos: row.hourly_fee_centavos ?? null,
     feeText: feeText(row.hourly_fee_centavos ?? null),
+    umpireFeeCentavos: row.umpire_fee_centavos ?? null,
+    // Unlike the court fee, an unset umpire fee is simply left out.
+    umpireFeeText: row.umpire_fee_centavos == null ? null : feeText(row.umpire_fee_centavos),
     details: row.details ?? null,
     logoUrl: logoPath(row.id, row.logo_updated_at ?? null),
     createdAt: row.created_at,
@@ -250,8 +258,20 @@ export function readLogoUpload(body = {}) {
 // Only what a player can use to find and choose a place to play: never
 // who made it, its admins or its umpires.
 
+// "Fee not set" is for admins; a player page just leaves it out.
+const playerFee = (centavos) => (centavos == null ? null : feeText(centavos))
+
 export function playerFacilitySummary(row) {
-  return { id: row.id, name: row.name, area: row.area ?? null, logoUrl: logoPath(row.id, row.logo_updated_at ?? null) }
+  return {
+    id: row.id,
+    name: row.name,
+    area: row.area ?? null,
+    logoUrl: logoPath(row.id, row.logo_updated_at ?? null),
+    // What a ticket on the People tab shows; the page has the rest.
+    openingHours: row.opening_hours ?? null,
+    feeText: playerFee(row.hourly_fee_centavos),
+    umpireFeeText: playerFee(row.umpire_fee_centavos),
+  }
 }
 
 export function playerFacilityPage(row) {
@@ -260,8 +280,8 @@ export function playerFacilityPage(row) {
     name: row.name,
     area: row.area ?? null,
     openingHours: row.opening_hours ?? null,
-    // "Fee not set" is for admins; a player page just leaves it out.
-    feeText: row.hourly_fee_centavos == null ? null : feeText(row.hourly_fee_centavos),
+    feeText: playerFee(row.hourly_fee_centavos),
+    umpireFeeText: playerFee(row.umpire_fee_centavos),
     locationUrl: row.location_url ?? null,
     details: row.details ?? null,
     logoUrl: logoPath(row.id, row.logo_updated_at ?? null),

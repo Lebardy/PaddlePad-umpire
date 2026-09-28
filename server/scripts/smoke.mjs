@@ -984,6 +984,17 @@ async function main() {
     check('/player/me carries the rally rating',
       ['rated', 'not_enough_matches'].includes(linkedMe.body.rallyRating?.state),
       JSON.stringify(linkedMe.body.rallyRating ?? null).slice(0, 120))
+    check('/player/me says whether the leaderboard is open',
+      typeof linkedMe.body?.leaderboardOpen === 'boolean', String(linkedMe.body?.leaderboardOpen))
+    const board = await asPlayer('/player/leaderboard', { bearer: linked.body.token })
+    check('/player/leaderboard -> 200', board.status === 200, String(board.status))
+    const lb = board.body?.leaderboard
+    check('a closed leaderboard sends nothing but that it is closed',
+      lb?.open === true || JSON.stringify(lb) === '{"open":false}', JSON.stringify(lb).slice(0, 80))
+    check('an open leaderboard sends no player ids',
+      lb?.open !== true || lb.ranking.every((row) => !('id' in row)), JSON.stringify(lb?.ranking?.[0] ?? null))
+    check('the open flag agrees with the leaderboard', lb?.open === linkedMe.body?.leaderboardOpen,
+      `${lb?.open} vs ${linkedMe.body?.leaderboardOpen}`)
     check('and never another player\'s points',
       !JSON.stringify(linkedMe.body.rallyRating ?? {}).includes('byEnding'),
       'rallyRating is the shaped response, not the raw rating')
@@ -2341,16 +2352,40 @@ async function main() {
 
     // --- 1: creating facilities ---
     const facA = await request('/admin/facilities', {
-      method: 'POST', bearer: fOwnerToken, body: { name: nameFacA, hourlyFee: '150' },
+      method: 'POST', bearer: fOwnerToken, body: { name: nameFacA, hourlyFee: '150', umpireFee: '100' },
     })
     check('the owner creates facility A -> 201', facA.status === 201, JSON.stringify(facA.body).slice(0, 120))
     const facilityAId = facA.body.facility?.id
     check("facility A's feeText is ₱150 per hour", facA.body.facility?.feeText === '₱150 per hour',
       String(facA.body.facility?.feeText))
+    check("facility A's umpireFeeText is ₱100 per hour", facA.body.facility?.umpireFeeText === '₱100 per hour',
+      String(facA.body.facility?.umpireFeeText))
 
     const facB = await request('/admin/facilities', { method: 'POST', bearer: fOwnerToken, body: { name: nameFacB } })
     check('the owner creates facility B -> 201', facB.status === 201, JSON.stringify(facB.body).slice(0, 120))
     const facilityBId = facB.body.facility?.id
+    check('facility B has no umpire fee', facB.body.facility?.umpireFeeText === null,
+      String(facB.body.facility?.umpireFeeText))
+
+    // --- 1b: what a player sees of the places list ---
+    const fPlayer = await asPlayer('/auth/player/register', {
+      method: 'POST',
+      body: {
+        name: `Smoke Facility Reader ${fStamp}`,
+        username: `smk_fac_${fStamp}`.slice(0, 20),
+        password: 'not-a-real-password',
+      },
+    })
+    if (fPlayer.body.player?.id) selfRegistered.push(fPlayer.body.player.id)
+    const playerFacilities = await asPlayer('/player/facilities', { bearer: fPlayer.body.token })
+    const facRows = playerFacilities.body.facilities ?? []
+    check('/player/facilities -> 200 with every key a player needs',
+      playerFacilities.status === 200 && facRows.length > 0 &&
+      facRows.every((r) => ['openingHours', 'feeText', 'umpireFeeText'].every((k) => k in r)),
+      JSON.stringify(facRows[0] ?? null).slice(0, 160))
+    const facARow = facRows.find((r) => r.id === facilityAId)
+    check("facility A's row shows the umpire fee to a player",
+      facARow?.umpireFeeText === '₱100 per hour', String(facARow?.umpireFeeText))
 
     const dupeFacility = await request('/admin/facilities', {
       method: 'POST', bearer: fOwnerToken, body: { name: nameFacA.toUpperCase() },

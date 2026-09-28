@@ -405,9 +405,9 @@ export function fetchRatingHistory({ signal } = {}) {
   return apiFetch('/player/rating/history', { signal }).then((d) => d.history)
 }
 
-/** This month on PaddlePad: the board at the top of People. */
-export function fetchBoard({ signal } = {}) {
-  return apiFetch('/player/board', { signal }).then((d) => d.board)
+/** The Leaderboard tab: the PPR ranking and this month's lists, or { open: false }. */
+export function fetchLeaderboard({ signal } = {}) {
+  return apiFetch('/player/leaderboard', { signal }).then((d) => d.leaderboard)
 }
 
 export function fetchFacilities({ signal } = {}) {

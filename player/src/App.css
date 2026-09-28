@@ -66,6 +66,7 @@
 .you-screen h1,
 .standing h1,
 .graph-page h1,
+.leaderboard-screen h1,
 .not-found h1,
 .gate h1,
 .empty-head h1,
@@ -83,10 +84,12 @@
 .you-screen h1,
 .standing h1,
 .graph-page h1,
+.leaderboard-screen h1,
 .section-head h1 { font-size: clamp(2.4rem, 11vw, 3rem); }
 .people-screen > h1,
 .standing h1,
-.graph-page h1 { margin: 0.25rem 0 1rem; }
+.graph-page h1,
+.leaderboard-screen h1 { margin: 0.25rem 0 1rem; }
 
 /* Every label on the board and in the bands: condensed capitals. */
 .sb-label,
@@ -95,7 +98,6 @@
 .best-label,
 .detail-label,
 .pr-label,
-.board-label,
 .people-summary,
 .person-when,
 .result-word,
@@ -427,7 +429,7 @@
 .rating,
 .trend,
 .shot-profile,
-.board,
+.month-band,
 .step,
 .detail-shape,
 .detail-stats,
@@ -464,7 +466,7 @@
 .link-code > h2,
 .rating > .section-head,
 .recent > .section-head,
-.board > .section-head,
+.month-band > .section-head,
 .places > .section-head,
 .trend > .trend-head,
 .detail-shape > .board-match-head {
@@ -511,7 +513,7 @@
   .rating,
   .trend,
   .shot-profile,
-  .board,
+  .month-band,
   .step,
   .detail-shape,
   .detail-stats,
@@ -543,10 +545,6 @@
   }
   .overview > .scoreboard { margin-top: 0; }
 }
-
-/* A band holding only a sentence (a failed load, say) has no strip to
-   push it down from the top edge. */
-.board > .muted-inline:first-child { display: block; padding-top: 1rem; }
 
 /* With the profile links above it, the empty-state board can't sit
    flush with the top of the screen. */
@@ -1243,32 +1241,85 @@ a.highlight:active,
   transition: left 160ms ease-out, top 160ms ease-out;
 }
 
-/* ============ This month on PaddlePad ============ */
+/* ============ Leaderboard ============ */
 
-.board-rows { list-style: none; margin: -0.4rem 0 0; padding: 0; }
-.board-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 7.5rem) minmax(0, 1fr);
-  gap: 0.7rem;
-  align-items: start;
-  padding: 0.75rem 0;
-  border-top: 1px solid var(--border);
-}
-.board-row:first-child { border-top: none; }
-.board-icon { color: var(--primary); margin-top: 0.1rem; }
-.board-label { font-size: 0.85rem; letter-spacing: 0.06em; color: var(--text-muted); padding-top: 0.15rem; }
-.board-value { font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
-.board-note { display: block; font-size: 0.85rem; font-weight: 400; color: var(--text-muted); margin-top: 0.1rem; }
-.board-empty { font-weight: 400; color: var(--text-muted); }
-.board-link { color: inherit; text-decoration: none; display: block; }
-.board-link .board-note { color: var(--primary); font-weight: 600; }
-.board-link:hover .board-note { text-decoration: underline; }
+.rank-panel { margin: 0 calc(var(--gutter) * -1) 1.25rem; background: var(--surface); border-bottom: 1px solid var(--border); }
+.rank-board { background: var(--board); color: var(--board-ink); padding: 1rem var(--gutter) 0.85rem; border-bottom: 4px solid var(--lamp); }
+.rank-eyebrow { font-family: var(--label); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--board-muted); }
+.rank-place-big { margin: 0; font-family: var(--display); font-weight: 900; font-size: 4.6rem; line-height: 0.9; color: var(--lamp); font-variant-numeric: tabular-nums; }
+.rank-place-big small { font-family: var(--label); font-size: 1.1rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--board-muted); margin-left: 0.3rem; }
+.rank-place-none { color: var(--board-muted); }
+.rank-line { margin: 0.35rem 0 0; font-size: 0.98rem; font-weight: 600; }
+.rank-sub { margin: 0.15rem 0 0; font-size: 0.9rem; color: var(--board-muted); }
 
-@media (max-width: 360px) {
-  .board-row { grid-template-columns: auto minmax(0, 1fr); gap: 0.1rem 0.5rem; }
-  .board-label { grid-column: 2; }
-  .board-value { grid-column: 2; }
+.rank-scroll-wrap { position: relative; }
+.rank-scroll-wrap::before,
+.rank-scroll-wrap::after { content: ''; position: absolute; left: 0; right: 0; height: 1.6rem; pointer-events: none; z-index: 2; }
+.rank-scroll-wrap::before { top: 0; background: linear-gradient(var(--surface), transparent); }
+.rank-scroll-wrap::after { bottom: 0; background: linear-gradient(transparent, var(--surface)); }
+.rank-ladder {
+  list-style: none; margin: 0; padding: 0.5rem var(--gutter) 0.6rem;
+  max-height: 22rem; overflow-y: auto; overscroll-behavior: contain; position: relative;
+  /* The rail the places hang on. */
+  background: linear-gradient(var(--border), var(--border)) no-repeat calc(var(--gutter) + 1.55rem - 1px) 0 / 2px 100%;
 }
+.rank-row,
+.month-row {
+  display: grid; grid-template-columns: 2.1rem minmax(0, 1fr) auto; gap: 0.7rem; align-items: center;
+  min-height: 2.9rem; padding: 0.3rem 0.5rem; position: relative;
+}
+.rank-place {
+  font-family: var(--display); font-weight: 900; font-size: 1.15rem; line-height: 1; font-variant-numeric: tabular-nums;
+  width: 2.1rem; height: 2.1rem; display: grid; place-items: center;
+  background: var(--surface); border: 2px solid var(--border); border-radius: 3px; color: var(--text-muted);
+}
+.rank-top .rank-place { border-color: var(--text); color: var(--text); }
+.rank-who { font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
+.rank-who small { display: block; font-weight: 400; font-size: 0.8rem; color: var(--text-muted); }
+.rank-ppr { font-family: var(--display); font-weight: 800; font-size: 1.35rem; line-height: 1; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.rank-ppr small { font-family: var(--label); font-size: 0.72rem; letter-spacing: 0.08em; color: var(--text-muted); margin-left: 0.15rem; }
+.rank-you { background: var(--board); color: var(--board-ink); border-radius: 3px; }
+.rank-you .rank-place { background: var(--lamp); border-color: var(--lamp); color: #15181d; }
+.rank-you .rank-ppr { color: var(--lamp); }
+.rank-you .rank-who small,
+.rank-you .rank-ppr small { color: var(--board-muted); }
+.rank-you-tag {
+  font-family: var(--label); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #15181d; background: var(--lamp); border-radius: 2px; padding: 0 0.3rem; margin-left: 0.35rem; vertical-align: 0.1em;
+}
+.rank-gap { position: relative; }
+.rank-gap span {
+  position: absolute; left: 3.2rem; top: 50%; transform: translateY(-50%); white-space: nowrap;
+  font-family: var(--label); font-weight: 700; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted);
+}
+.rank-foot { font-size: 0.82rem; color: var(--text-muted); margin: 0.3rem 0 0; padding: 0 var(--gutter) 0.9rem; line-height: 1.45; }
+.month-band .rank-foot { padding-inline: 0; }
+
+.month-tabs { display: flex; margin: -1rem calc(var(--gutter) * -1) 0.8rem; padding: 0 calc(var(--gutter) - 0.3rem) 0.4rem; background: var(--board); overflow-x: auto; scrollbar-width: none; }
+.month-tab {
+  flex: none; min-height: 44px; padding: 0.55rem 0.55rem 0.4rem; border: 0; border-bottom: 3px solid transparent; background: transparent;
+  font-family: var(--label); font-size: 0.86rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--board-muted); cursor: pointer;
+}
+.month-tab-on { color: var(--lamp); border-bottom-color: var(--lamp); }
+.month-rows { list-style: none; margin: 0; padding: 0; }
+.month-row + .month-row { border-top: 1px solid var(--border); }
+.month-more,
+.month-empty { color: var(--text-muted); font-size: 0.92rem; margin: 0.5rem 0 0; }
+
+.stepup { list-style: none; margin: 0; padding: 0; }
+.stepup-row { display: grid; grid-template-columns: 1.4rem minmax(0, 1fr) auto; gap: 0.1rem 0.6rem; align-items: center; padding: 0.65rem 0.2rem; }
+.stepup-row + .stepup-row { border-top: 1px solid var(--border); }
+.stepup-icon { grid-row: 1 / span 2; align-self: start; margin-top: 0.1rem; color: var(--primary); }
+.stepup-label { grid-column: 2 / -1; font-family: var(--label); font-weight: 700; font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.stepup-who { grid-column: 2; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
+.stepup-who small { display: block; font-weight: 400; font-size: 0.8rem; color: var(--text-muted); }
+.stepup-empty { grid-column: 2 / -1; font-weight: 400; color: var(--text-muted); }
+.stepup-fig { grid-column: 3; font-family: var(--display); font-weight: 800; font-size: 1.3rem; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+
+.motm { display: grid; gap: 0.2rem; color: inherit; text-decoration: none; padding: 0.2rem 0; }
+.motm-teams { font-weight: 600; line-height: 1.3; }
+.motm-score { font-family: var(--display); font-weight: 900; font-size: 2.2rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.motm-go { color: var(--primary); font-weight: 600; font-size: 0.92rem; }
 
 /* ============ Your rating, in three steps ============ */
 
@@ -1526,26 +1577,67 @@ a.highlight:active,
 
 /* ============ Places to play ============ */
 
-.places { margin-block: 1.5rem; }
-.place-list {
-  background: var(--surface);
-  margin-inline: calc(var(--gutter) * -1);
-  border-block: 1px solid var(--border);
+.places { margin-top: 1.75rem; }
+.places > .section-head { margin-bottom: 0; }
+.ticket-rail {
+  list-style: none; margin: 0 calc(var(--gutter) * -1); padding: 0.9rem var(--gutter) 0.4rem;
+  display: flex; gap: 0.7rem; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: var(--gutter); scrollbar-width: none;
 }
-.place-list li + li { border-top: 1px solid var(--border); }
-.place-row {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  min-height: 44px;
-  padding: 0.75rem var(--gutter);
-  color: inherit;
-  text-decoration: none;
+.ticket-rail::-webkit-scrollbar { display: none; }
+.ticket-slot { flex: none; width: 15.5rem; scroll-snap-align: start; display: flex; }
+.ticket-rail-single .ticket-slot { width: 100%; }
+.ticket { display: grid; grid-template-rows: auto 1fr; width: 100%; border-radius: 4px; overflow: hidden; background: var(--board); color: var(--board-ink); text-decoration: none; }
+.ticket:active { filter: brightness(0.94); }
+.ticket-plate { background: #fff; height: 7.2rem; display: grid; place-items: center; }
+.ticket-plate-bare { background: var(--board-raised); }
+.ticket-plate .place-logo-lg { width: 5.6rem; height: 5.6rem; border: 0; }
+.ticket-plate .place-initials.avatar-lg { width: 5.6rem; height: 5.6rem; font-size: 2.6rem; }
+/* The tear line: dashed, with a notch either side, the way a ticket is torn. */
+.ticket-stub { position: relative; display: grid; gap: 0.15rem; align-content: start; padding: 0.75rem 0.9rem 0.85rem; border-top: 2px dashed var(--board-rule); }
+.ticket-stub::before,
+.ticket-stub::after { content: ''; position: absolute; top: -0.55rem; width: 1rem; height: 1rem; border-radius: 50%; background: var(--bg); }
+.ticket-stub::before { left: -0.5rem; }
+.ticket-stub::after { right: -0.5rem; }
+.ticket-name { font-family: var(--display); font-weight: 800; text-transform: uppercase; font-size: 1.45rem; line-height: 1; overflow-wrap: anywhere; }
+.ticket-area { font-size: 0.88rem; color: var(--board-muted); }
+.ticket-facts { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.55rem; }
+.ticket-facts span {
+  font-family: var(--label); font-size: 0.76rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--lamp); border: 1px solid var(--board-rule); border-radius: 2px; padding: 0.05rem 0.4rem;
 }
-.place-row:active { background: var(--surface-sunken); }
-.place-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
-.place-name { font-weight: 600; font-size: 1.02rem; overflow-wrap: anywhere; }
-.place-area { font-size: 0.88rem; color: var(--text-secondary); }
+.ticket-go { margin-top: 0.6rem; font-family: var(--label); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--board-muted); }
+.ticket-dots { display: flex; justify-content: center; gap: 0.35rem; padding-top: 0.2rem; }
+.ticket-dots i { width: 0.45rem; height: 0.45rem; border-radius: 1px; background: var(--border); }
+.ticket-dots i.on { width: 1.1rem; background: var(--text); }
+.ticket-count { text-align: center; margin: 0.2rem 0 0; font-family: var(--label); font-weight: 700; letter-spacing: 0.08em; font-size: 0.85rem; color: var(--text-muted); }
+.ticket-hint { text-align: center; margin: 0.25rem 0 0; font-size: 0.8rem; color: var(--text-muted); }
+
+.place-board { margin: 0.2rem calc(var(--gutter) * -1) 0; background: var(--board); color: var(--board-ink); }
+.place-plate { background: #fff; height: 11rem; display: grid; place-items: center; }
+.place-plate-bare { background: var(--board-raised); }
+.place-plate .place-logo-lg { width: 8.5rem; height: 8.5rem; border: 0; }
+.place-plate .place-initials.avatar-lg { width: 8rem; height: 8rem; font-size: 3.6rem; }
+.place-main { padding: 1rem var(--gutter); border-top: 2px dashed var(--board-rule); }
+.place-eyebrow { font-family: var(--label); font-weight: 700; font-size: 0.82rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--board-muted); }
+.place-main h1 { font-family: var(--display); font-weight: 900; text-transform: uppercase; font-size: clamp(2.4rem, 12vw, 3.2rem); line-height: 0.92; margin: 0.15rem 0 0.35rem; overflow-wrap: anywhere; }
+.place-where { margin: 0; color: var(--board-muted); }
+.place-figures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--board-rule); border-bottom: 4px solid var(--lamp); }
+.place-figure { padding: 0.75rem var(--gutter) 0.85rem; min-width: 0; }
+.place-figure + .place-figure { border-left: 1px solid var(--board-rule); }
+.place-figure-wide { grid-column: 1 / -1; border-bottom: 1px solid var(--board-rule); }
+.place-figure-wide + .place-figure { border-left: 0; }
+.place-figure-label { display: block; font-family: var(--label); font-weight: 700; font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--board-muted); }
+.place-figure b { display: block; margin-top: 0.2rem; font-family: var(--display); font-weight: 800; font-size: 1.55rem; line-height: 1.05; color: var(--lamp); overflow-wrap: anywhere; }
+.place-figure-none b { font-family: var(--sans); font-weight: 500; font-size: 1.05rem; color: var(--board-muted); }
+.place-map {
+  display: flex; align-items: center; justify-content: center; min-height: 3.2rem; margin-top: 1.1rem;
+  background: var(--button); color: var(--button-ink); border-radius: 4px; text-decoration: none;
+  font-family: var(--label); font-weight: 700; font-size: 1.05rem; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.place-map:active { transform: scale(0.97); filter: brightness(0.94); }
+.place-about { margin-top: 1.3rem; }
+.place-about h2 { margin: 0; font-family: var(--label); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.place-details { margin: 0.3rem 0 0; color: var(--text-secondary); line-height: 1.55; white-space: pre-line; }
 
 /* A logo sits on white in both themes: many are dark lettering on a
    see-through background and would vanish on the dark one. */
@@ -1566,33 +1658,6 @@ a.highlight:active,
 .place-logo-lg { width: 7rem; height: 7rem; }
 /* Initials stand in at the same size as the logo tile they replace. */
 .place-initials.avatar-lg { width: 7rem; height: 7rem; font-size: 2.6rem; }
-
-.place-head { display: grid; justify-items: start; gap: 0.6rem; margin-bottom: 1.2rem; }
-.place-head h1 { margin: 0.3rem 0 0; font-size: clamp(2rem, 9vw, 2.6rem); line-height: 1; }
-.place-where { margin: 0; color: var(--text-secondary); }
-.place-facts { display: grid; gap: 0.6rem; margin: 0 0 1rem; }
-.place-facts div { display: grid; gap: 0.1rem; }
-.place-facts dt {
-  font-family: var(--label);
-  font-size: 0.85rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-}
-.place-facts dd { margin: 0; font-size: 1.05rem; }
-.place-map {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  font-family: var(--label);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--primary);
-  text-decoration: none;
-}
-.place-details { color: var(--text-secondary); white-space: pre-line; }
 
 /* ============ Avatar ============ */
 
@@ -1861,10 +1926,11 @@ a.highlight:active,
   color: var(--board-muted);
   text-decoration: none;
   font-family: var(--label);
-  font-size: 0.85rem;
+  font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
   min-height: 3.4rem;
   /* On a wide screen the cells stay a thumb's width, centred under the
      column, rather than stretching across the monitor. */

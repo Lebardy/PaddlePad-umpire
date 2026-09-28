@@ -11,7 +11,7 @@ import { facilityColumns } from './facility-rules.js'
 // logo_updated_at comes from facility_logos, so the picture bytes never
 // ride along with a facility row -- only when its logo last changed.
 const FACILITY_COLUMNS =
-  'id, name, area, location_url, opening_hours, hourly_fee_centavos, details, created_by, created_at, updated_at, ' +
+  'id, name, area, location_url, opening_hours, hourly_fee_centavos, umpire_fee_centavos, details, created_by, created_at, updated_at, ' +
   '(SELECT l.updated_at FROM facility_logos l WHERE l.facility_id = facilities.id) AS logo_updated_at'
 
 /**

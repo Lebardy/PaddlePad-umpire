@@ -8,6 +8,7 @@ import PersonDetail from './screens/PersonDetail'
 import Rating from './screens/Rating'
 import RatingGraph from './screens/RatingGraph'
 import BoardMatch from './screens/BoardMatch'
+import Leaderboard from './screens/Leaderboard'
 import FacilityPage from './screens/FacilityPage'
 import You from './screens/You'
 import EmptyState from './components/EmptyState'
@@ -28,6 +29,7 @@ const TITLES = {
   '/': 'PaddlePad',
   '/matches': 'Matches · PaddlePad',
   '/people': 'People · PaddlePad',
+  '/leaderboard': 'Leaderboard · PaddlePad',
   '/you': 'You · PaddlePad',
   '/rating/graph': 'PaddlePad Rating · PaddlePad',
 }
@@ -43,7 +45,7 @@ const TITLES = {
  */
 function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
   const path = useRoute()
-  const { summary, loading, error, refresh, matches } = usePlayerData()
+  const { summary, loading, error, refresh, matches, leaderboardOpen } = usePlayerData()
 
   useEffect(() => {
     document.title = TITLES[path] ?? 'PaddlePad'
@@ -107,6 +109,7 @@ function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
   else if (matchRoute) screen = <MatchDetail id={matchRoute.id} />
   else if (path === '/people') screen = <People />
   else if (personRoute) screen = <PersonDetail name={personRoute.name} />
+  else if (path === '/leaderboard') screen = leaderboardOpen ? <Leaderboard /> : <GoHome />
   else if (boardMatchRoute) screen = <BoardMatch id={boardMatchRoute.id} />
   else if (placeRoute) screen = <FacilityPage id={placeRoute.id} />
   else if (path === '/you')
@@ -129,7 +132,7 @@ function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
         {error && <p className="stale-note">Couldn&rsquo;t refresh just now.</p>}
         {screen}
       </div>
-      <TabBar path={path} />
+      <TabBar path={path} showLeaderboard={leaderboardOpen} />
     </>
   )
 }
@@ -159,6 +162,14 @@ function EmptyStateScreen({ player, onSignOut, onPlayerChange }) {
       )}
     </>
   )
+}
+
+/** The leaderboard isn't open yet: back to the Overview rather than an empty page. */
+function GoHome() {
+  useEffect(() => {
+    navigate('/', { replace: true })
+  }, [])
+  return null
 }
 
 function NotFound() {

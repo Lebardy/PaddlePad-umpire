@@ -153,6 +153,21 @@ function usualFor(match, history, typical) {
   return { usual: mean(each), basis: known === each.length ? 'players' : 'mixed' }
 }
 
+/** How many matches each player played this month, and how many people they met. */
+export function monthCounts(matches) {
+  const played = new Map()
+  const met = new Map()
+  for (const match of matches) {
+    const everyone = [...match.teamA, ...match.teamB]
+    for (const id of everyone) {
+      played.set(id, (played.get(id) ?? 0) + 1)
+      if (!met.has(id)) met.set(id, new Set())
+      for (const other of everyone) if (other !== id) met.get(id).add(other)
+    }
+  }
+  return { played, met: new Map([...met].map(([id, people]) => [id, people.size])) }
+}
+
 /**
  * What the board says, from plain data.
  *
@@ -170,25 +185,12 @@ function usualFor(match, history, typical) {
  *   its cleanness -- what "cleaner than they usually play" is judged on
  */
 export function buildBoard({ matches, visible, nameOf, progress = [], history = [] }) {
-  // ---- Played the most ----
-  const played = new Map()
-  // ---- Met the most people ----
-  // Partners and opponents alike. Doubles puts three other people on
-  // court and singles one, so a doubles regular will meet more people --
-  // and that is the true thing this row celebrates, not a distortion of
-  // it. It is a count of people, not a measure of play.
-  const met = new Map()
-
-  for (const match of matches) {
-    const everyone = [...match.teamA, ...match.teamB]
-    for (const id of everyone) {
-      played.set(id, (played.get(id) ?? 0) + 1)
-      if (!met.has(id)) met.set(id, new Set())
-      for (const other of everyone) if (other !== id) met.get(id).add(other)
-    }
-  }
-
-  const metCounts = new Map([...met].map(([id, people]) => [id, people.size]))
+  // ---- Played the most, and met the most people ----
+  // Partners and opponents alike, for "met": doubles puts three other
+  // people on court and singles one, so a doubles regular will meet
+  // more people -- and that is the true thing this row celebrates, not
+  // a distortion of it. It is a count of people, not a measure of play.
+  const { played, met: metCounts } = monthCounts(matches)
 
   // ---- Match of the month ----
   // The closest finished game, naming everyone in it, whoever won. A
@@ -309,15 +311,22 @@ export function buildBoard({ matches, visible, nameOf, progress = [], history = 
   }
 }
 
-/** Sums one player's winning shots and mistakes over some matches. */
-function totalsOf(playerMatches) {
-  let winners = 0
-  let errors = 0
+/** One player's totals over some of their matches, for Step up. */
+export function totalsOf(playerMatches) {
+  const totals = { matches: 0, winners: 0, errors: 0, rallies: 0, sideWon: 0, ownMistakes: 0, won: 0, decided: 0 }
   for (const m of playerMatches) {
-    winners += m.stats.clean_winners + m.stats.dink_winners
-    errors += m.stats.unforced_errors + m.stats.dink_errors
+    totals.matches += 1
+    totals.winners += m.stats.clean_winners + m.stats.dink_winners
+    totals.errors += m.stats.unforced_errors + m.stats.dink_errors
+    totals.rallies += m.rallyCounts?.rallies ?? 0
+    totals.sideWon += m.rallyCounts?.sideWon ?? 0
+    totals.ownMistakes += m.rallyCounts?.ownMistakes ?? 0
+    if (m.won !== null && m.won !== undefined) {
+      totals.decided += 1
+      if (m.won) totals.won += 1
+    }
   }
-  return { winners, errors, matches: playerMatches.length }
+  return totals
 }
 
 /**
@@ -329,7 +338,7 @@ function totalsOf(playerMatches) {
  * candidate's whole history, which the match page has no use for and
  * should not pay for.
  */
-async function gatherMonth(query) {
+export async function gatherMonth(query) {
   const { rows: bounds } = await query(
     `SELECT date_trunc('month', now() AT TIME ZONE $1) AT TIME ZONE $1 AS start_at,
             (date_trunc('month', now() AT TIME ZONE $1) + interval '1 month')
@@ -450,29 +459,20 @@ async function gatherMonth(query) {
   return { ...month, visible, nameOf, history }
 }
 
-/**
- * The board for the current month, gathered from the database.
- *
- * Returns the month it covers and the day it resets, so the app can say
- * both -- a hierarchy that visibly expires is not much of a hierarchy.
- */
-export async function getMonthlyBoard(query) {
-  const month = await gatherMonth(query)
-  const { matches, visible, nameOf, monthStart, resetsOn, startAt } = month
-
+/** Before and this month, for every visible player with enough matches this month. */
+export async function gatherProgress(query, month) {
   // Only players who could qualify are looked up in full. Their whole
   // history is needed for "before", which is why this is not one query
   // over everyone.
   const monthCount = new Map()
-  for (const m of matches) {
+  for (const m of month.matches) {
     for (const id of [...m.teamA, ...m.teamB]) monthCount.set(id, (monthCount.get(id) ?? 0) + 1)
   }
   const candidates = [...monthCount]
-    .filter(([id, n]) => visible.has(id) && n >= STEP_UP_MIN_MATCHES)
+    .filter(([id, n]) => month.visible.has(id) && n >= STEP_UP_MIN_MATCHES)
     .map(([id]) => id)
-
+  const start = new Date(month.startAt)
   const progress = []
-  const start = new Date(startAt)
   for (const id of candidates) {
     const history = await getPlayerMatches(query, id)
     progress.push({
@@ -481,7 +481,19 @@ export async function getMonthlyBoard(query) {
       before: totalsOf(history.filter((m) => new Date(m.endedAt) < start)),
     })
   }
+  return progress
+}
 
+/**
+ * The board for the current month, gathered from the database.
+ *
+ * Returns the month it covers and the day it resets, so the app can say
+ * both -- a hierarchy that visibly expires is not much of a hierarchy.
+ */
+export async function getMonthlyBoard(query) {
+  const month = await gatherMonth(query)
+  const progress = await gatherProgress(query, month)
+  const { matches, visible, nameOf, monthStart, resetsOn } = month
   return {
     monthStart,
     resetsOn,

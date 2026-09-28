@@ -37,7 +37,8 @@ const FIELD_LABELS = {
   area: 'area',
   location_url: 'map link',
   opening_hours: 'opening hours',
-  hourly_fee_centavos: 'fee',
+  hourly_fee_centavos: 'court fee',
+  umpire_fee_centavos: 'umpire fee',
   details: 'details',
 }
 

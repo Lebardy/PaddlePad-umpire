@@ -36,6 +36,8 @@ export function PlayerDataProvider({ children }) {
     // The player-facing rally rating: points with anchors, or progress
     // towards five matches.
     rallyRating: null,
+    // Whether the Leaderboard tab exists yet; from /player/me.
+    leaderboardOpen: false,
     loading: true,
     error: null,
     loadedAt: null,
@@ -69,6 +71,7 @@ export function PlayerDataProvider({ children }) {
           inProgress: me.inProgress ?? 0,
           rating: me.rating ?? null,
           rallyRating: me.rallyRating ?? null,
+          leaderboardOpen: me.leaderboardOpen === true,
           loading: false,
           error: null,
           loadedAt: loadedAtRef.current,
@@ -93,6 +96,7 @@ export function PlayerDataProvider({ children }) {
           matches: quiet ? s.matches : [],
           rating: quiet ? s.rating : null,
           rallyRating: quiet ? s.rallyRating : null,
+          leaderboardOpen: quiet ? s.leaderboardOpen : false,
         }))
       } finally {
         inFlightRef.current = null

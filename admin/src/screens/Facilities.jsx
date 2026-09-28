@@ -14,6 +14,7 @@ export default function Facilities({ me }) {
   const [locationUrl, setLocationUrl] = useState('')
   const [openingHours, setOpeningHours] = useState('')
   const [hourlyFee, setHourlyFee] = useState('')
+  const [umpireFee, setUmpireFee] = useState('')
   const [details, setDetails] = useState('')
   const [busy, setBusy] = useState(false)
   const [formError, setFormError] = useState(null)
@@ -43,6 +44,7 @@ export default function Facilities({ me }) {
         locationUrl: locationUrl.trim() || undefined,
         openingHours: openingHours.trim() || undefined,
         hourlyFee: hourlyFee.trim() || undefined,
+        umpireFee: umpireFee.trim() || undefined,
         details: details.trim() || undefined,
       })
       navigate(`/facilities/${facility.id}`)
@@ -92,8 +94,12 @@ export default function Facilities({ me }) {
             <input value={openingHours} maxLength={200} placeholder="e.g. 6 AM – 10 PM" onChange={(e) => setOpeningHours(e.target.value)} />
           </label>
           <label className="field">
-            <span>Fee per hour, in pesos (optional)</span>
+            <span>Court fee per hour, in pesos (optional)</span>
             <input inputMode="decimal" value={hourlyFee} onChange={(e) => setHourlyFee(e.target.value)} placeholder="e.g. 150" />
+          </label>
+          <label className="field">
+            <span>Umpire fee per hour, in pesos (optional)</span>
+            <input inputMode="decimal" value={umpireFee} onChange={(e) => setUmpireFee(e.target.value)} placeholder="e.g. 100" />
           </label>
           <label className="field grow">
             <span>Details (optional)</span>
@@ -114,7 +120,7 @@ export default function Facilities({ me }) {
                 <tr>
                   <th>Name</th>
                   <th>Area</th>
-                  <th>Fee</th>
+                  <th>Fees</th>
                   <th className="col-when">Umpires</th>
                   <th className="col-when">Admins</th>
                 </tr>
@@ -129,7 +135,10 @@ export default function Facilities({ me }) {
                       </span>
                     </td>
                     <td>{facility.area ?? '—'}</td>
-                    <td>{facility.feeText}</td>
+                    <td>
+                      {facility.feeText}
+                      {facility.umpireFeeText && <span className="cell-sub">Umpire {facility.umpireFeeText}</span>}
+                    </td>
                     {/* Counted by the list route itself: one request for the whole table. */}
                     <td className="col-when">{facility.umpireCount ?? '–'}</td>
                     <td className="col-when">{facility.adminCount ?? '–'}</td>

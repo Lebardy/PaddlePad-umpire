@@ -41,16 +41,16 @@ section('reading facility details')
 {
   const ok = rules.readFacility({
     name: '  Court Nine  ', area: ' Dumaguete ', locationUrl: 'https://maps.app.goo.gl/abc',
-    openingHours: 'Mon–Sat 6am–10pm', hourlyFee: '150', details: '  Four courts.  ',
+    openingHours: 'Mon–Sat 6am–10pm', hourlyFee: '150', umpireFee: '100', details: '  Four courts.  ',
   })
   check('a full facility is read and trimmed', ok, { values: {
     name: 'Court Nine', area: 'Dumaguete', location_url: 'https://maps.app.goo.gl/abc',
-    opening_hours: 'Mon–Sat 6am–10pm', hourly_fee_centavos: 15000, details: 'Four courts.',
+    opening_hours: 'Mon–Sat 6am–10pm', hourly_fee_centavos: 15000, umpire_fee_centavos: 10000, details: 'Four courts.',
   } })
   check('a name is required when creating', rules.readFacility({ name: '  ' }), { error: 'A facility needs a name (up to 80 characters)' })
   check('a long name is refused', rules.readFacility({ name: 'x'.repeat(81) }), { error: 'A facility needs a name (up to 80 characters)' })
   check('empty optional text becomes nothing', rules.readFacility({ name: 'A', area: '  ', details: '' }).values,
-    { name: 'A', area: null, location_url: null, opening_hours: null, hourly_fee_centavos: null, details: null })
+    { name: 'A', area: null, location_url: null, opening_hours: null, hourly_fee_centavos: null, umpire_fee_centavos: null, details: null })
   check('a link must be https', rules.readFacility({ name: 'A', locationUrl: 'http://maps.example.com' }), { error: 'The map link must start with https://' })
   check('an over-long link gets its own message, not the https one',
     rules.readFacility({ name: 'A', locationUrl: `https://example.com/${'x'.repeat(490)}` }),
@@ -59,7 +59,13 @@ section('reading facility details')
   check('long opening hours are refused', rules.readFacility({ name: 'A', openingHours: 'x'.repeat(201) }), { error: 'Opening hours can be up to 200 characters' })
   check('long details are refused', rules.readFacility({ name: 'A', details: 'x'.repeat(1001) }), { error: 'Details can be up to 1000 characters' })
   check('a bad fee is refused', rules.readFacility({ name: 'A', hourlyFee: '-1' }), { error: 'The fee must be an amount in pesos, like 150 or 150.50' })
+  check('a bad umpire fee is refused', rules.readFacility({ name: 'A', umpireFee: 'abc' }),
+    { error: 'The umpire fee must be an amount in pesos, like 100 or 100.50' })
   check('a partial change reads only what was sent', rules.readFacility({ hourlyFee: '200' }, { partial: true }), { values: { hourly_fee_centavos: 20000 } })
+  check('a partial change can set only the umpire fee', rules.readFacility({ umpireFee: '0' }, { partial: true }),
+    { values: { umpire_fee_centavos: 0 } })
+  check('clearing the umpire fee', rules.readFacility({ umpireFee: '' }, { partial: true }),
+    { values: { umpire_fee_centavos: null } })
   check('a partial change can clear the link', rules.readFacility({ locationUrl: '' }, { partial: true }), { values: { location_url: null } })
   check('a partial change still checks the name', rules.readFacility({ name: '' }, { partial: true }), { error: 'A facility needs a name (up to 80 characters)' })
 }
@@ -67,8 +73,8 @@ section('reading facility details')
 section('which columns a write may touch')
 {
   check('every allowed column passes through', rules.facilityColumns({
-    name: 'A', area: 'B', location_url: 'C', opening_hours: 'D', hourly_fee_centavos: 100, details: 'E',
-  }), ['name', 'area', 'location_url', 'opening_hours', 'hourly_fee_centavos', 'details'])
+    name: 'A', area: 'B', location_url: 'C', opening_hours: 'D', hourly_fee_centavos: 100, umpire_fee_centavos: 50, details: 'E',
+  }), ['name', 'area', 'location_url', 'opening_hours', 'hourly_fee_centavos', 'umpire_fee_centavos', 'details'])
   check('an unknown column is dropped', rules.facilityColumns({ name: 'A', created_by: 'x', id: 'y' }), ['name'])
   check('a raw body with only unknown keys yields nothing', rules.facilityColumns({ role: 'owner', facility_id: 'f1' }), [])
   check('no values at all yields nothing', rules.facilityColumns({}), [])
@@ -91,6 +97,9 @@ section('which columns an edit actually changed')
     ['name', 'details'])
   check('clearing an optional field to null counts as a change',
     rules.changedFacilityColumns(before, { ...before, area: null }), ['area'])
+  check('an umpire fee change is noticed',
+    rules.changedFacilityColumns({ ...before, umpire_fee_centavos: null }, { ...before, umpire_fee_centavos: 10000 }),
+    ['umpire_fee_centavos'])
 }
 
 section('who may do what')
@@ -127,14 +136,19 @@ section('which facility a request is scoped to')
 
 section('what the site sees')
 {
-  check('a facility as the site sees it', rules.facilityPayload({
+  const payloadRow = {
     id: 'f1', name: 'Court Nine', area: 'Dumaguete', location_url: null, opening_hours: null,
-    hourly_fee_centavos: 15000, details: null, created_at: '2026-09-19T00:00:00Z', updated_at: '2026-09-19T00:00:00Z',
-  }), {
+    hourly_fee_centavos: 15000, umpire_fee_centavos: 10000, details: null,
+    created_at: '2026-09-19T00:00:00Z', updated_at: '2026-09-19T00:00:00Z',
+  }
+  check('a facility as the site sees it', rules.facilityPayload(payloadRow), {
     id: 'f1', name: 'Court Nine', area: 'Dumaguete', locationUrl: null, openingHours: null,
-    hourlyFeeCentavos: 15000, feeText: '₱150 per hour', details: null, logoUrl: null,
+    hourlyFeeCentavos: 15000, feeText: '₱150 per hour',
+    umpireFeeCentavos: 10000, umpireFeeText: '₱100 per hour', details: null, logoUrl: null,
     createdAt: '2026-09-19T00:00:00Z', updatedAt: '2026-09-19T00:00:00Z',
   })
+  check('no umpire fee reads as nothing, not "Fee not set"',
+    rules.facilityPayload({ ...payloadRow, umpire_fee_centavos: null }).umpireFeeText, null)
   check('the starting facility name', rules.STARTING_FACILITY_NAME, 'Starting facility')
 }
 
@@ -248,18 +262,21 @@ section('what players see of a facility')
   const at = new Date('2026-09-27T00:00:00Z')
   const row = {
     id: 'f1', name: 'Riverside Courts', area: 'Lahug', location_url: 'https://maps.example/x',
-    opening_hours: '6 AM – 10 PM', hourly_fee_centavos: 15000, details: 'Four courts', created_by: 'a1',
+    opening_hours: '6 AM – 10 PM', hourly_fee_centavos: 15000, umpire_fee_centavos: 10000,
+    details: 'Four courts', created_by: 'a1',
     created_at: at, updated_at: at, logo_updated_at: at,
   }
   check('the list row', rules.playerFacilitySummary(row),
-    { id: 'f1', name: 'Riverside Courts', area: 'Lahug', logoUrl: `/logos/f1?v=${at.getTime()}` })
+    { id: 'f1', name: 'Riverside Courts', area: 'Lahug', logoUrl: `/logos/f1?v=${at.getTime()}`,
+      openingHours: '6 AM – 10 PM', feeText: '₱150 per hour', umpireFeeText: '₱100 per hour' })
   check('the page', rules.playerFacilityPage(row), {
     id: 'f1', name: 'Riverside Courts', area: 'Lahug', openingHours: '6 AM – 10 PM', feeText: '₱150 per hour',
+    umpireFeeText: '₱100 per hour',
     locationUrl: 'https://maps.example/x', details: 'Four courts', logoUrl: `/logos/f1?v=${at.getTime()}`,
   })
   const bare = { id: 'f2', name: 'New Place' }
   check('an empty facility has only its name', rules.playerFacilityPage(bare), {
-    id: 'f2', name: 'New Place', area: null, openingHours: null, feeText: null,
+    id: 'f2', name: 'New Place', area: null, openingHours: null, feeText: null, umpireFeeText: null,
     locationUrl: null, details: null, logoUrl: null,
   })
   check('a free facility says so', rules.playerFacilityPage({ ...bare, hourly_fee_centavos: 0 }).feeText, 'Free')

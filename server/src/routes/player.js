@@ -22,6 +22,7 @@ import { getMatchOfTheMonthStory, getMonthlyBoard } from '../board.js'
 import { isUuid, normalizePlayerName, playerNameError } from '../validate.js'
 import { readGame } from '../drama.js'
 import { getRallyRatings, invalidateRallyRatings } from '../rally-rating-store.js'
+import { getLeaderboard, getLeaderboardOpen } from '../leaderboard-store.js'
 import { rallyRatingFor, ratingHistoryFor } from '../rally-rating.js'
 import { findFacility, listFacilities } from '../facility-store.js'
 import { playerFacilityPage, playerFacilitySummary } from '../facility-rules.js'
@@ -29,9 +30,11 @@ import { playerFacilityPage, playerFacilitySummary } from '../facility-rules.js'
 const router = Router()
 
 // Every route here is scoped to the token's own player. A player can
-// read their own history and nothing else -- there is deliberately no
-// way to look up another player, browse the club, or reach anything an
-// umpire can do.
+// read their own history and nothing else, with one sanctioned
+// exception: GET /leaderboard, which names every ranked player alongside
+// their PPR and match count. There is still deliberately no way to look
+// up one player by name, browse everyone on PaddlePad, or reach anything
+// an umpire can do.
 //
 // requireActivePlayer runs on all of them because a player token lasts
 // 30 days: a closed account has to stop working the moment it is
@@ -74,6 +77,9 @@ router.get('/me', async (req, res) => {
   // The player-facing rating, rally by rally. The ML snapshot above stays
   // for the group and playstyle steps.
   const rallyRating = rallyRatingFor(await getRallyRatings(query), req.player.id)
+  // Whether the Leaderboard tab exists yet, so the tab bar knows at
+  // launch and never flickers from four tabs to five.
+  const leaderboardOpen = await getLeaderboardOpen(query)
 
   res.json({
     player: profileOf(rows[0]),
@@ -85,6 +91,7 @@ router.get('/me', async (req, res) => {
     // reason there isn't one yet. Never a bare null.
     rating,
     rallyRating,
+    leaderboardOpen,
   })
 })
 
@@ -145,6 +152,16 @@ router.get('/board/match/:id', async (req, res) => {
   const story = await getMatchOfTheMonthStory(query, req.params.id)
   if (!story) return res.status(404).json({ error: 'That is not this month\'s match of the month' })
   res.json({ match: story })
+})
+
+/**
+ * The Leaderboard tab: the PPR ranking, where this player stands, and
+ * this month's lists -- or only "not open yet" until enough players
+ * qualify, with no names in it. /board stays for installed copies of
+ * the app that have not updated yet.
+ */
+router.get('/leaderboard', async (req, res) => {
+  res.json({ leaderboard: await getLeaderboard(query, req.player.id) })
 })
 
 /**
