@@ -18,7 +18,7 @@ function Row({ row }) {
     <li className={`rank-row${row.place <= 3 ? ' rank-top' : ''}${row.you ? ' rank-you' : ''}`}>
       <span className="rank-place">{row.place}</span>
       <span className="rank-who">
-        {row.you ? 'You' : row.name}
+        {row.name}
         {row.you && <span className="rank-you-tag">You</span>}
         <small>{row.matches} matches</small>
       </span>
