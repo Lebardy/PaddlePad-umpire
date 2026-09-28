@@ -12,6 +12,10 @@
 // staging's owner; each run adds one throwaway admin and switches it
 // off at the end. Production is never given test admins.
 //
+// On staging (SMOKE_TIDY=on there) the last section removes everything
+// the run made -- umpires, admins, places, players and nights -- so
+// staging keeps only the data someone meant to put there.
+//
 // The six assertions that matter are the sync design's correctness
 // argument, and they are why this file is kept rather than thrown away:
 //
@@ -52,6 +56,37 @@ let token = null
 // Player rows this run creates that no umpire owns -- see the note at
 // the point they are registered.
 const selfRegistered = []
+
+// Everything else this run makes, by id, so the last section can remove
+// it again on staging. Noted as responses go past, like openSessions
+// below, so a section added later is covered without being told.
+const made = { umpireIds: new Set(), adminIds: new Set(), facilityIds: new Set(), playerIds: new Set(), inviteCodes: new Set() }
+const MADE_BY = {
+  '/auth/register': ['umpireIds', (json) => json?.umpire?.id],
+  '/admin/admins': ['adminIds', (json) => json?.admin?.id],
+  '/admin/facilities': ['facilityIds', (json) => json?.facility?.id],
+  '/players': ['playerIds', (json) => json?.player?.id],
+  '/auth/player/register': ['playerIds', (json) => json?.player?.id],
+  '/admin/invites': ['inviteCodes', (json) => json?.invite?.code],
+}
+
+function noteMade(path, method, status, json) {
+  // Any sign-in as the smoke owner, however it was completed.
+  if (path.startsWith('/admin/auth/') && json?.admin?.email &&
+      json.admin.email.toLowerCase() === (process.env.SMOKE_OWNER_EMAIL ?? '').toLowerCase()) {
+    smokeOwnerId = json.admin.id
+  }
+  if (method !== 'POST' || status !== 201 || !MADE_BY[path]) return
+  const [key, read] = MADE_BY[path]
+  const value = read(json)
+  if (value) made[key].add(value)
+}
+
+// The umpire this run signs in as. It exists for the smoke test alone,
+// so the nights and players it makes go in the tidy too.
+let smokeUmpireId = null
+// The admin it signs in as; its own activity lines go, the account stays.
+let smokeOwnerId = null
 
 // Sessions this run has opened and not closed again. Every run used to
 // leave its nights open behind it, and the admin Overview's "worth a
@@ -179,6 +214,7 @@ async function request(path, { method = 'GET', body, bearer, raw = false } = {})
       json = { raw: text }
     }
     noteSession(path, method, body, bearer, response.status, json)
+    noteMade(path, method, response.status, json)
     return { status: response.status, body: json }
   }
 }
@@ -246,6 +282,7 @@ async function main() {
     })
     check('login -> 200', login.status === 200, JSON.stringify(login.body))
     token = login.body.token
+    smokeUmpireId = login.body.umpire?.id ?? null
   }
   if (!token) {
     console.log('\ncannot continue without a token')
@@ -3145,11 +3182,30 @@ async function main() {
   check('every session this run opened is closed again',
     stillOpen.length === 0, stillOpen.join(', '))
 
-  if (selfRegistered.length > 0) {
-    console.log(
-      `\nself-registered players left behind (no umpire owns them):\n` +
-        `  node scripts/cleanup-test-data.mjs 'smoke.%@example.com' ${selfRegistered.join(',')}`,
-    )
+  // ============================================================
+  section('tidy — remove what this run made (staging only)')
+  // ============================================================
+  // Staging turns this route on with SMOKE_TIDY=on; production does not
+  // have it. Without it, every run left its umpires, admins, places,
+  // players and nights behind, and staging filled up with them.
+  if (/staging|localhost|127\.0\.0\.1/.test(API) && process.env.SMOKE_INTERNAL_KEY) {
+    const tidy = await fetch(`${API}/internal/smoke-tidy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-key': process.env.SMOKE_INTERNAL_KEY },
+      body: JSON.stringify({
+        umpireIds: [...made.umpireIds],
+        adminIds: [...made.adminIds],
+        facilityIds: [...made.facilityIds],
+        playerIds: [...made.playerIds, ...selfRegistered],
+        inviteCodes: [...made.inviteCodes],
+        nightsOf: smokeUmpireId,
+        activityOf: smokeOwnerId,
+      }),
+    })
+    const removed = await tidy.json().catch(() => ({}))
+    check('what this run made is removed again -> 200', tidy.status === 200,
+      tidy.status === 404 ? 'SMOKE_TIDY is not on for this server' : JSON.stringify(removed).slice(0, 120))
+    if (tidy.status === 200) console.log(`  ...  removed ${JSON.stringify(removed.removed)}`)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
