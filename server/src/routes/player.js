@@ -30,9 +30,11 @@ import { playerFacilityPage, playerFacilitySummary } from '../facility-rules.js'
 const router = Router()
 
 // Every route here is scoped to the token's own player. A player can
-// read their own history and nothing else -- there is deliberately no
-// way to look up another player, browse the club, or reach anything an
-// umpire can do.
+// read their own history and nothing else, with one sanctioned
+// exception: GET /leaderboard, which names every ranked player alongside
+// their PPR and match count. There is still deliberately no way to look
+// up one player by name, browse everyone on PaddlePad, or reach anything
+// an umpire can do.
 //
 // requireActivePlayer runs on all of them because a player token lasts
 // 30 days: a closed account has to stop working the moment it is
