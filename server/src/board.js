@@ -309,15 +309,22 @@ export function buildBoard({ matches, visible, nameOf, progress = [], history = 
   }
 }
 
-/** Sums one player's winning shots and mistakes over some matches. */
-function totalsOf(playerMatches) {
-  let winners = 0
-  let errors = 0
+/** One player's totals over some of their matches, for Step up. */
+export function totalsOf(playerMatches) {
+  const totals = { matches: 0, winners: 0, errors: 0, rallies: 0, sideWon: 0, ownMistakes: 0, won: 0, decided: 0 }
   for (const m of playerMatches) {
-    winners += m.stats.clean_winners + m.stats.dink_winners
-    errors += m.stats.unforced_errors + m.stats.dink_errors
+    totals.matches += 1
+    totals.winners += m.stats.clean_winners + m.stats.dink_winners
+    totals.errors += m.stats.unforced_errors + m.stats.dink_errors
+    totals.rallies += m.rallyCounts?.rallies ?? 0
+    totals.sideWon += m.rallyCounts?.sideWon ?? 0
+    totals.ownMistakes += m.rallyCounts?.ownMistakes ?? 0
+    if (m.won !== null && m.won !== undefined) {
+      totals.decided += 1
+      if (m.won) totals.won += 1
+    }
   }
-  return { winners, errors, matches: playerMatches.length }
+  return totals
 }
 
 /**
@@ -329,7 +336,7 @@ function totalsOf(playerMatches) {
  * candidate's whole history, which the match page has no use for and
  * should not pay for.
  */
-async function gatherMonth(query) {
+export async function gatherMonth(query) {
   const { rows: bounds } = await query(
     `SELECT date_trunc('month', now() AT TIME ZONE $1) AT TIME ZONE $1 AS start_at,
             (date_trunc('month', now() AT TIME ZONE $1) + interval '1 month')
@@ -450,29 +457,20 @@ async function gatherMonth(query) {
   return { ...month, visible, nameOf, history }
 }
 
-/**
- * The board for the current month, gathered from the database.
- *
- * Returns the month it covers and the day it resets, so the app can say
- * both -- a hierarchy that visibly expires is not much of a hierarchy.
- */
-export async function getMonthlyBoard(query) {
-  const month = await gatherMonth(query)
-  const { matches, visible, nameOf, monthStart, resetsOn, startAt } = month
-
+/** Before and this month, for every visible player with enough matches this month. */
+export async function gatherProgress(query, month) {
   // Only players who could qualify are looked up in full. Their whole
   // history is needed for "before", which is why this is not one query
   // over everyone.
   const monthCount = new Map()
-  for (const m of matches) {
+  for (const m of month.matches) {
     for (const id of [...m.teamA, ...m.teamB]) monthCount.set(id, (monthCount.get(id) ?? 0) + 1)
   }
   const candidates = [...monthCount]
-    .filter(([id, n]) => visible.has(id) && n >= STEP_UP_MIN_MATCHES)
+    .filter(([id, n]) => month.visible.has(id) && n >= STEP_UP_MIN_MATCHES)
     .map(([id]) => id)
-
+  const start = new Date(month.startAt)
   const progress = []
-  const start = new Date(startAt)
   for (const id of candidates) {
     const history = await getPlayerMatches(query, id)
     progress.push({
@@ -481,7 +479,19 @@ export async function getMonthlyBoard(query) {
       before: totalsOf(history.filter((m) => new Date(m.endedAt) < start)),
     })
   }
+  return progress
+}
 
+/**
+ * The board for the current month, gathered from the database.
+ *
+ * Returns the month it covers and the day it resets, so the app can say
+ * both -- a hierarchy that visibly expires is not much of a hierarchy.
+ */
+export async function getMonthlyBoard(query) {
+  const month = await gatherMonth(query)
+  const progress = await gatherProgress(query, month)
+  const { matches, visible, nameOf, monthStart, resetsOn } = month
   return {
     monthStart,
     resetsOn,

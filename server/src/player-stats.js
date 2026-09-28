@@ -142,6 +142,7 @@ export async function getPlayerMatches(query, playerId, ratings = null) {
       usedStacking: team === 'A' ? row.stacking_a : row.stacking_b,
       stats: derived.stats[playerId],
       progression,
+      rallyCounts: rallyCounts(row.team_a, row.team_b, eventsByMatch.get(row.id) ?? [], playerId),
       // What this match did to this player's rally points, the
       // expectation in words, and how the rallies they ended ended.
       // Null when the caller passed no ratings, or the replay did not
@@ -182,6 +183,28 @@ export function pointEndings(row, events) {
     ending: event.detail ?? null,
     by: event.actingPlayerId,
   }))
+}
+
+/**
+ * How one player's rallies went in one match: how many were played, how
+ * many their side won, and how many ended with their own mistake.
+ *
+ * Shares of these, not raw counts, are what the monthly Step up compares,
+ * so a singles player and a doubles player are measured the same way.
+ */
+export function rallyCounts(teamA, teamB, events, playerId) {
+  const own = teamA.includes(playerId) ? teamA : teamB
+  let rallies = 0
+  let sideWon = 0
+  let ownMistakes = 0
+  for (const event of events) {
+    if (event.type !== 'rally') continue
+    rallies += 1
+    const actorOnOwnSide = own.includes(event.actingPlayerId)
+    if (event.outcome === 'winner' ? actorOnOwnSide : !actorOnOwnSide) sideWon += 1
+    if (event.outcome !== 'winner' && event.actingPlayerId === playerId) ownMistakes += 1
+  }
+  return { rallies, sideWon, ownMistakes }
 }
 
 /** Every rally that put a point on the board, with the score after it. */
