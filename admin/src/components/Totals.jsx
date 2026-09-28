@@ -7,10 +7,10 @@ function newLine(n, word) {
 }
 
 /** The right column: players, matches, sessions, umpires, and when ratings last ran. */
-export default function Totals({ totals, facilityName }) {
+export default function Totals({ totals, facilityName, row = false }) {
   return (
     <>
-      <div className="totals">
+      <div className={row ? 'totals totals-row' : 'totals'}>
         <div className="total">
           <span className="total-label">Players</span>
           <span className="total-figure">{totals.players.count.toLocaleString()}</span>
