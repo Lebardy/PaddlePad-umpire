@@ -7,7 +7,7 @@
 
 import {
   EXPIRY_CHOICES, actionLabel, agoText, clockText, confirmNameMatches, countWord, dayHeading, facilityLabel,
-  formatWhen, inviteStatusText, lastSignedInText, madeByText, ratingText, signInMethods, signInMethodsText,
+  formatWhen, inviteStatusText, lastSignedInText, madeByText, playstyleText, pprText, signInMethods, signInMethodsText,
   statusLabel, timeOfDay,
 } from '../src/lib/format.js'
 
@@ -66,12 +66,17 @@ check('active status', statusLabel('active'), 'Active')
 check('paused status', statusLabel('paused'), 'Paused')
 check('closed status', statusLabel('closed'), 'Closed')
 
-check('rated with a playstyle', ratingText({ state: 'rated', skillScore: 62, playstyle: 'Baseliner' }), '62 · Baseliner')
-check('rated with no playstyle yet', ratingText({ state: 'rated', skillScore: 62, playstyle: null }), '62')
-check('not enough of their own matches', ratingText({ state: 'not_enough_matches', have: 2, need: 5 }), 'Not rated yet: 2 of 5 matches')
-check('not enough players in the pool', ratingText({ state: 'not_enough_players', have: 4, need: 8 }), 'Not rated yet: waiting for more players (4 of 8)')
-check('qualified, waiting for the nightly run', ratingText({ state: 'pending' }), 'Rated at the next nightly run')
-check('unrated falls back', ratingText({ state: 'unrated' }), 'Not rated yet')
+check('the rating is the PPR the player sees', pprText({ state: 'rated', points: 1538 }), '1,538 PPR')
+check('no PPR before five matches', pprText({ state: 'not_enough_matches', have: 2, need: 5 }), 'Not rated yet: 2 of 5 matches')
+check('no PPR sent at all', pprText(null), 'Not rated yet')
+
+check('the playstyle without its group word', playstyleText({ state: 'rated', playstyle: 'Group A Clean Reliable Dropper', skillGroup: 'Group A' }), 'Clean Reliable Dropper')
+check('a level word is dropped the same way', playstyleText({ state: 'rated', playstyle: 'Advanced Baseliner', skillGroup: 'Higher-Performance' }), 'Baseliner')
+check('rated with no playstyle yet', playstyleText({ state: 'rated', playstyle: null, skillGroup: 'Group A' }), 'Not worked out yet')
+check('not enough of their own matches', playstyleText({ state: 'not_enough_matches', have: 2, need: 5 }), 'Not yet: 2 of 5 matches')
+check('not enough players in the pool', playstyleText({ state: 'not_enough_players', have: 4, need: 8 }), 'Not yet: waiting for more players (4 of 8)')
+check('qualified, waiting for the nightly run', playstyleText({ state: 'pending' }), 'At the next nightly run')
+check('unrated falls back', playstyleText({ state: 'unrated' }), 'Not worked out yet')
 
 check('an exact typed name matches', confirmNameMatches('Ana Reyes', 'Ana Reyes'), true)
 check('matching ignores case and outer spaces', confirmNameMatches('  ana reyes  ', 'Ana Reyes'), true)

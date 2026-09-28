@@ -170,15 +170,38 @@ export function confirmNameMatches(typed, name) {
   return clean !== '' && clean === String(name ?? '').trim().toLowerCase()
 }
 
-export function ratingText(rating) {
-  if (!rating) return 'Not rated yet'
-  if (rating.state === 'rated') {
-    return rating.playstyle ? `${rating.skillScore} · ${rating.playstyle}` : `${rating.skillScore}`
-  }
-  if (rating.state === 'not_enough_matches') return `Not rated yet: ${rating.have} of ${rating.need} matches`
-  if (rating.state === 'not_enough_players') {
-    return `Not rated yet: waiting for more players (${rating.have} of ${rating.need})`
-  }
-  if (rating.state === 'pending') return 'Rated at the next nightly run'
+/**
+ * The rating an admin sees is the one the player sees: their PaddlePad
+ * Rating (PPR), worked out rally by rally. The old 0-100 skill score
+ * from the nightly model stood here until 2026-09-28; it is not shown
+ * to players any more, so an admin reading it would be reading a number
+ * nobody else sees.
+ */
+export function pprText(ppr) {
+  if (ppr?.state === 'rated') return `${ppr.points.toLocaleString('en-US')} PPR`
+  if (ppr?.state === 'not_enough_matches') return `Not rated yet: ${ppr.have} of ${ppr.need} matches`
   return 'Not rated yet'
+}
+
+// The pipeline starts every style name with a word for the skill group
+// it was found in ("Group A", "Advanced"); the player app drops it, so
+// this does too (player/src/lib/styleName.js, the same rule).
+const GROUP_WORDS = {
+  'Developing / Lower-Performance': 'Developing',
+  'Higher-Performance': 'Advanced',
+}
+
+function withoutGroupWord(name, group) {
+  if (!name || !group) return name
+  const prefix = `${GROUP_WORDS[group] ?? group.replace('-Performance', '').replace('Performance Group', 'Group')} `
+  return name.startsWith(prefix) ? name.slice(prefix.length) : name
+}
+
+/** The playstyle from the nightly run, or why there isn't one yet. */
+export function playstyleText(rating) {
+  if (rating?.state === 'rated') return withoutGroupWord(rating.playstyle, rating.skillGroup) || 'Not worked out yet'
+  if (rating?.state === 'not_enough_matches') return `Not yet: ${rating.have} of ${rating.need} matches`
+  if (rating?.state === 'not_enough_players') return `Not yet: waiting for more players (${rating.have} of ${rating.need})`
+  if (rating?.state === 'pending') return 'At the next nightly run'
+  return 'Not worked out yet'
 }

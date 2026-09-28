@@ -6,6 +6,8 @@
 import { PEOPLE_PAGE_SIZE, likePattern, makeCursor, playerListItem, readCursor, umpireListItem } from './people-rules.js'
 import { countMatchesInProgress, getPlayerMatches, getRatingState } from './player-stats.js'
 import { deriveMatchState, eventFromRow } from './pickleball.js'
+import { getRallyRatings } from './rally-rating-store.js'
+import { rallyRatingFor } from './rally-rating.js'
 
 const PLAYER_COLUMNS = `p.id, p.name, p.username, p.password_hash, p.google_sub, p.google_email,
   p.claim_code, p.claimed_at, p.created_at, p.last_signed_in_at,
@@ -118,11 +120,13 @@ const RECENT = 20
 export async function playerDetail(queryFn, row) {
   const matches = await getPlayerMatches(queryFn, row.id)
   const recent = matches.slice(0, RECENT)
-  const [matchesInProgress, rating, scoredBy] = await Promise.all([
+  const [matchesInProgress, rating, scoredBy, rallyRatings] = await Promise.all([
     countMatchesInProgress(queryFn, row.id),
     getRatingState(queryFn, row.id, matches.length),
     scoringUmpireNames(queryFn, recent),
+    getRallyRatings(queryFn),
   ])
+  const ppr = rallyRatingFor(rallyRatings, row.id)
   return {
     ...playerListItem(row),
     googleEmail: row.google_email ?? null,
@@ -138,6 +142,11 @@ export async function playerDetail(queryFn, row) {
       scoredBy: scoredBy.get(m.id) ?? 'Unknown',
     })),
     matchesInProgress,
+    // The PPR the player sees; `rating` below is the nightly run's
+    // playstyle, which the admin page shows beside it.
+    ppr: ppr.state === 'rated'
+      ? { state: 'rated', points: ppr.points }
+      : { state: ppr.state, have: ppr.have, need: ppr.need },
     rating: rating.state === 'rated'
       ? { state: 'rated', skillScore: rating.skillScore, playstyle: rating.playstyleArchetype, skillGroup: rating.skillGroup, fromMatches: rating.fromMatches, computedAt: rating.computedAt }
       : rating,
