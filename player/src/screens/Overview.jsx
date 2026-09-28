@@ -1,88 +1,96 @@
 // ============================================================
-// The landing screen: who you are, how you're doing, what's notable.
+// The landing screen: how am I doing lately?
 //
-// Most of what follows is a raw count or a simple ratio taken straight
-// from what the umpire tapped, and needs no population to be true.
-//
-// The skill rating is the player's own rally points. It renders its own
-// progress until five matches are in rather than a number that would be
-// confidently wrong, and never compares the player with anyone else --
-// see RallyRating for the reasoning.
+// The board at the top answers it; below it, only what nothing else
+// shows in the same way -- the rating in one line, the last night you
+// played, your form and your best. Anything another screen explains in
+// full is a line here that links to it, rather than a second copy.
 // ============================================================
 
+import { useEffect, useState } from 'react'
 import { Link } from '../lib/router'
 import { usePlayerData } from '../lib/PlayerData'
+import { fetchLeaderboard } from '../lib/api'
 import { personalBests, rollingWinRate } from '../lib/derive'
+import { groupMatches } from '../lib/nights'
 import Hero from '../components/Hero'
 import StatGrid from '../components/StatGrid'
-import ShotProfile from '../components/ShotProfile'
-import Highlights from '../components/Highlights'
-import MatchList from '../components/MatchList'
 import PersonalBests from '../components/PersonalBests'
 import TrendChart from '../components/TrendChart'
 import RallyRating from '../components/RallyRating'
 import LiveNote from '../components/LiveNote'
-import { SetupCard } from '../components/SetupSignIn'
+import { NightBlock } from '../components/MatchList'
+import { SetupStrip } from '../components/SetupSignIn'
 
 const TREND_WINDOW = 5
-const RECENT_COUNT = 5
 
-function Overview({ player, onPlayerChange }) {
-  const { summary, matches, inProgress, rallyRating } = usePlayerData()
+/**
+ * The reader's Leaderboard place, only while the Leaderboard is open. One
+ * request, made only then; a slow or failed one just leaves the place off.
+ */
+function useLeaderboardPlace(open) {
+  const [place, setPlace] = useState(null)
+  useEffect(() => {
+    if (!open) return undefined
+    const controller = new AbortController()
+    fetchLeaderboard({ signal: controller.signal })
+      .then((board) => {
+        setPlace(board.open && board.you?.state === 'on' ? { place: board.you.place, of: board.you.of } : null)
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [open])
+  return open ? place : null
+}
+
+function LastNight({ matches }) {
+  const night = groupMatches(matches)[0]?.nights?.[0]
+  if (!night) return null
+  return (
+    <section className="recent" aria-label="Your last night">
+      <div className="section-head">
+        <h2>Your last night</h2>
+        <Link className="link" to="/matches">All {matches.length} matches &rarr;</Link>
+      </div>
+      <NightBlock night={night} />
+    </section>
+  )
+}
+
+function Overview({ player }) {
+  const { summary, matches, inProgress, rallyRating, leaderboardOpen } = usePlayerData()
   const trend = rollingWinRate(matches, TREND_WINDOW)
   const bests = personalBests(matches)
-  const recent = matches.slice(0, RECENT_COUNT)
+  const place = useLeaderboardPlace(leaderboardOpen)
 
   return (
     <div className="overview">
-      {/* The headline statistics hang off the bottom of the scoreboard
-          rather than sitting in tiles of their own below it. */}
       <Hero player={player} summary={summary} matches={matches}>
         <StatGrid summary={summary} />
       </Hero>
 
       {inProgress > 0 && <LiveNote count={inProgress} />}
 
-      {/* Renders itself away once a username exists. Sits here, above
-          the stats, because a player who dismissed the pop-up has no
-          other reason to go looking for it. */}
-      <SetupCard player={player} onPlayerChange={onPlayerChange} />
+      <SetupStrip player={player} />
 
-      <RallyRating rallyRating={rallyRating} />
+      <RallyRating rallyRating={rallyRating} place={place} />
+
+      <LastNight matches={matches} />
 
       {trend.length >= 2 ? (
         <TrendChart points={trend} window={TREND_WINDOW} />
       ) : (
         // Said plainly rather than drawn from too little data. A line
-        // through three matches is three coin flips, and inviting
-        // someone to read improvement into that is worse than waiting.
+        // through three matches is three coin flips.
         <section className="trend trend-early" aria-label="Recent form">
           <h2>Form</h2>
           <p className="muted-inline">
-            Your form line appears once you&rsquo;ve played{' '}
-            {TREND_WINDOW + 1} matches — before that it&rsquo;s too few games to
-            show a trend honestly.
+            Your form line appears once you&rsquo;ve played {TREND_WINDOW + 1} matches.
           </p>
         </section>
       )}
 
-      <ShotProfile summary={summary} />
-      <Highlights matches={matches} />
       {bests.length > 0 && <PersonalBests bests={bests} />}
-
-      <section className="recent">
-        <div className="section-head">
-          <h2>Recent matches</h2>
-          {matches.length > RECENT_COUNT && (
-            <Link className="link" to="/matches">
-              See all {matches.length}
-            </Link>
-          )}
-        </div>
-        {/* Truncated here on purpose: the full list has its own screen,
-            and an overview that ends in forty rows is not an overview. */}
-        <MatchList matches={recent} />
-      </section>
     </div>
   )
 }

@@ -94,7 +94,6 @@
 /* Every label on the board and in the bands: condensed capitals. */
 .sb-label,
 .stat-label,
-.highlight-label,
 .best-label,
 .detail-label,
 .pr-label,
@@ -111,15 +110,12 @@
 /* Every figure: tall and heavy, and aligned when figures stack. */
 .sb-figure,
 .stat-value,
-.ms-yours,
-.ms-theirs,
 .ds-yours,
 .ds-theirs,
 .trend-now,
 .rating-number,
 .step-value,
 .best-value,
-.highlight-value,
 .pr-value,
 .meter-value,
 .board-match-score {
@@ -428,7 +424,6 @@
 
 .rating,
 .trend,
-.shot-profile,
 .month-band,
 .step,
 .detail-shape,
@@ -454,12 +449,10 @@
    heading with something beside it -- becomes the strip. */
 .rating > h2,
 .trend > h2,
-.shot-profile > h2,
 .step > .step-head,
 .detail-shape > h2,
 .detail-stats > h2,
 .bests > h2,
-.match-list > h2,
 .you-section > h2,
 .you-details > h2,
 .setup-card > h2,
@@ -512,7 +505,6 @@
   .empty-head,
   .rating,
   .trend,
-  .shot-profile,
   .month-band,
   .step,
   .detail-shape,
@@ -581,9 +573,8 @@
   50% { opacity: 0.35; }
 }
 
-/* Highlight and personal-best cells: a ruled grid, like the board's
-   stat row but on paper. */
-.highlights,
+/* Personal-best cells: a ruled grid, like the board's stat row but
+   on paper. */
 .bests-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
@@ -593,8 +584,6 @@
   border-radius: var(--radius-sm);
   overflow: hidden;
 }
-.highlights { margin-bottom: 1.25rem; }
-.highlight,
 .best-card {
   display: flex;
   flex-direction: column;
@@ -607,14 +596,17 @@
 }
 .bests-list li { display: flex; }
 .best-card { flex: 1; }
-a.highlight:active,
 .best-card:active { background: var(--surface-sunken); }
-.highlight-label,
 .best-label { font-size: 0.8rem; letter-spacing: 0.08em; color: var(--text-muted); }
-.highlight-value,
 .best-value { font-size: 1.6rem; line-height: 1.05; overflow-wrap: anywhere; }
-.highlight-note,
 .best-detail { font-size: 0.82rem; color: var(--text-secondary); overflow-wrap: anywhere; }
+
+/* On the Overview the three bests share one row, however many there
+   are, down to a 320px phone. */
+.bests-list { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.bests-list .best-card { padding: 0.7rem 0.6rem; }
+.bests-list .best-value { font-size: 1.35rem; }
+.bests-list .best-label { font-size: 0.72rem; }
 
 /* ============ Charts: bars and meters ============ */
 
@@ -661,7 +653,7 @@ a.highlight:active,
 
 /* ============ Form trend ============ */
 
-.trend-svg { display: block; width: 100%; height: 96px; overflow: visible; }
+.trend-svg { display: block; width: 100%; height: 64px; overflow: visible; }
 .trend-baseline { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 4; opacity: 0.6; }
 .trend-line {
   fill: none;
@@ -814,82 +806,92 @@ a.highlight:active,
 
 /* ============ Results table ============ */
 
-.match-list ol { display: flex; flex-direction: column; }
-/* On the overview the band's own strip already says "Recent matches". */
-.recent .match-list > h2 {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+/* ============ Match history: months, nights, slim rows ============ */
+
+.history { padding-bottom: 0; }
+.history ol { list-style: none; margin: 0; padding: 0; }
+
+/* A dark bar per month, the same strip the bands open with; older months
+   fold into it. */
+.month-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: calc(100% + var(--gutter) * 2);
+  margin: 0 calc(var(--gutter) * -1);
+  min-height: 3rem;
+  padding: 0.6rem var(--gutter);
+  border: 0;
+  border-top: 1px solid var(--board-rule);
+  background: var(--board);
+  color: var(--board-ink);
+  text-align: left;
+  cursor: pointer;
 }
-.matches-screen .match-list ol,
-.person-detail .match-list ol { margin-top: -1rem; }
-.recent > .section-head { margin-bottom: 0; }
+.month-bar:first-child { border-top: 0; }
+.month-name { font-family: var(--label); font-size: 1.05rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.month-count { font-family: var(--label); font-size: 0.88rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--board-muted); }
+.month-record { color: var(--lamp); }
+.month-chevron { font-size: 1.4rem; line-height: 1; color: var(--board-muted); transition: transform 0.15s ease; }
+.month-bar[aria-expanded="true"] .month-chevron { transform: rotate(90deg); }
 
-.match + .match { border-top: 1px solid var(--border); }
+.night + .night { border-top: 1px solid var(--border); }
+.night-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin: 0 calc(var(--gutter) * -1);
+  padding: 0.75rem var(--gutter) 0.5rem;
+  background: var(--surface-sunken);
+}
+.night-when { flex: 1 1 auto; min-width: 0; font-family: var(--label); font-size: 0.95rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.night-what { display: block; font-family: var(--sans); font-size: 0.85rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--text-muted); }
+/* The squares keep to one line and the night's name wraps instead; a
+   long night gets up to half the row before its squares wrap too. */
+.night-squares { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; flex: 0 0 auto; max-width: 55%; }
+.pill-xs { width: 1.15rem; height: 1.15rem; font-size: 0.7rem; }
 
-/* The row is the link, so the whole line is the tap target. */
-.match-link {
+.mrows li + li { border-top: 1px solid var(--border); }
+.mrow {
   display: grid;
-  grid-template-columns: 2.25rem minmax(0, 1fr) auto;
-  gap: 0.85rem;
-  padding: 0.95rem 0;
+  grid-template-columns: 1.75rem minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
+  min-height: 3.25rem;
+  padding: 0.55rem 0;
   color: inherit;
   text-decoration: none;
 }
-.match-link:active { background: var(--surface-sunken); }
+.mrow:active { background: var(--surface-sunken); }
 @media (hover: hover) {
-  .match-link:hover .match-versus { text-decoration: underline; text-underline-offset: 3px; }
+  .mrow:hover .mrow-vs { text-decoration: underline; text-underline-offset: 3px; }
+}
+.mrow-res {
+  display: grid;
+  place-items: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 3px;
+  font-family: var(--label);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.res-won { background: var(--win-lamp); color: var(--win-ink); }
+.res-lost { background: var(--loss-lamp); color: var(--loss-ink); }
+.res-none { background: var(--none-lamp); color: var(--none-ink); }
+.mrow-main { display: flex; flex-direction: column; min-width: 0; }
+.mrow-vs { font-size: 0.97rem; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
+.mrow-sub { font-size: 0.8rem; line-height: 1.3; color: var(--text-muted); overflow-wrap: anywhere; }
+.mrow-score { font-family: var(--display); font-size: 1.45rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
+.mrow-theirs { color: var(--text-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .month-chevron { transition: none; }
 }
 
-/* The lit result letter at the head of the row, as tall as the line it
-   marks rather than the whole row, so a long row doesn't turn into a
-   green column. */
-.result-lamp {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  align-self: start;
-  height: 2.6rem;
-  border-radius: 2px;
-  font-family: var(--display);
-  font-size: 1.45rem;
-  font-weight: 900;
-  line-height: 1;
-}
-.lamp-won { background: var(--win-lamp); color: var(--win-ink); }
-.lamp-lost { background: var(--loss-lamp); color: var(--loss-ink); }
-.lamp-none { background: var(--none-lamp); color: var(--none-ink); }
-
-.match-body { min-width: 0; }
-.match-line {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-.match-versus { font-size: 1.02rem; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
-.match-score {
-  display: flex;
-  align-items: baseline;
-  gap: 0.1rem;
-  flex: none;
-}
-.ms-yours { font-size: 2rem; }
-.ms-dash { color: var(--text-muted); font-family: var(--display); font-size: 1.3rem; }
-.ms-theirs { font-size: 1.45rem; color: var(--text-muted); }
-.match-partner { font-size: 0.9rem; color: var(--text-secondary); overflow-wrap: anywhere; }
-.match-meta { font-size: 0.82rem; color: var(--text-muted); margin-top: 0.15rem; }
-.match-story { font-size: 0.88rem; font-weight: 600; color: var(--text-secondary); }
-.match-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.55rem; }
-.match-chevron {
-  align-self: center;
-  color: var(--text-muted);
-  font-size: 1.6rem;
-  line-height: 1;
-}
+.recent > .section-head { margin-bottom: 0; }
 
 /* ============ Match sparkline ============ */
 
@@ -1550,20 +1552,39 @@ a.highlight:active,
 }
 .person-list li + li { border-top: 1px solid var(--border); }
 .person-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.8rem;
-  padding: 0.85rem var(--gutter);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3.5rem;
+  padding: 0.55rem var(--gutter);
   color: inherit;
   text-decoration: none;
 }
 .person-row:active { background: var(--surface-sunken); }
-.person-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.25rem; }
-.person-line { display: flex; align-items: baseline; gap: 0.5rem; }
-.person-name { flex: 1; font-weight: 600; font-size: 1.02rem; overflow-wrap: anywhere; }
-.person-when { font-size: 0.8rem; letter-spacing: 0.06em; color: var(--text-muted); white-space: nowrap; }
-.person-roles { font-size: 0.88rem; color: var(--text-secondary); }
-.person-form { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.15rem; }
+.person-main { display: flex; flex-direction: column; min-width: 0; }
+.person-name { font-weight: 600; font-size: 0.98rem; line-height: 1.25; overflow-wrap: anywhere; }
+.person-roles { font-size: 0.8rem; color: var(--text-muted); }
+.person-side { display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; }
+.person-when { font-size: 0.75rem; letter-spacing: 0.06em; color: var(--text-muted); white-space: nowrap; }
+.person-form { display: flex; gap: 2px; list-style: none; margin: 0; padding: 0; }
+
+/* Appears with "Show all" once the list is long. 1rem stops iOS zooming
+   in on focus. */
+.people-find {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  margin: 0 0 0.75rem;
+  padding: 0 0.75rem;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.people-none { margin: 1rem 0; }
 
 .person-head { padding: 1.1rem var(--gutter) 1.2rem; }
 .person-head h1 { font-size: clamp(2.2rem, 10vw, 2.8rem); margin: 0.7rem 0 0.9rem; }
@@ -2099,6 +2120,35 @@ a.highlight:active,
   letter-spacing: 0.08em;
   color: var(--text-muted);
 }
+/* The Overview says the number smaller, with the Leaderboard place
+   under it when there is one. */
+.overview .points-figure { font-size: 2.8rem; }
+.points-place {
+  font-family: var(--label);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0.35rem 0 0;
+}
+
+/* One line in place of the Signing in card. */
+.setup-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  margin: 0 calc(var(--gutter) * -1) 1.25rem;
+  padding: 0.5rem var(--gutter);
+  background: var(--surface-sunken);
+  border-block: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.setup-strip-go { font-family: var(--label); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary); white-space: nowrap; }
 /* Under ten matches the points are an early estimate, and say so right
    under the number. The tag carries a border because the sunken
    surface is barely darker than the card in the dark theme. */

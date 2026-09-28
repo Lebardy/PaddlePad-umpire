@@ -42,11 +42,12 @@ import { usePlayerData } from '../lib/PlayerData'
 import { navigate } from '../lib/router'
 import { endingPhrase, namedLeaders } from '../lib/endingWords'
 import { styleName } from '../lib/styleName'
-import { MEASURES, aboutYou, hiddenStyleNote, styleShareLine, verdictSubject, verdictWay } from '../lib/styleProof'
+import { MEASURES, hiddenStyleNote, styleShareLine, traitLine } from '../lib/styleProof'
 import { faultsToWorkOn } from '../lib/faultTips'
 import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
 import More from '../components/More'
 import Collapsible from '../components/Collapsible'
+import ShotProfile from '../components/ShotProfile'
 
 
 // Said only where there IS a direction. Most of these measurements are
@@ -172,25 +173,23 @@ function Score({ rallyRating }) {
 
       {rows.length > 0 && (
         <div className="moving">
-          <Collapsible
-            title="What’s moving it"
-            summary={
-              <p className="step-line">
-                {/* The table's answer in words, only once there are enough
-                    rallies with an ending to call it a habit. */}
-                {(won || lost) && (
-                  <>
-                    Of the rallies you ended, you{' '}
-                    {won && <>won the most with <LeaderNames leaders={won} /> ({leaderNumbers(won)})</>}
-                    {won && lost && ' and '}
-                    {lost && <>lost the most with <LeaderNames leaders={lost} /> ({leaderNumbers(lost)})</>}
-                    .{' '}
-                  </>
-                )}
-                Everything below comes to <strong>{signed(total)}</strong>.
-              </p>
-            }
-          >
+          {/* Fully folded: the page has four steps now, so closed it is one
+              line, and the sentence opens with the table it sums up. */}
+          <Collapsible title="What’s moving it">
+            <p className="step-line">
+              {/* The table's answer in words, only once there are enough
+                  rallies with an ending to call it a habit. */}
+              {(won || lost) && (
+                <>
+                  Of the rallies you ended, you{' '}
+                  {won && <>won the most with <LeaderNames leaders={won} /> ({leaderNumbers(won)})</>}
+                  {won && lost && ' and '}
+                  {lost && <>lost the most with <LeaderNames leaders={lost} /> ({leaderNumbers(lost)})</>}
+                  .{' '}
+                </>
+              )}
+              Everything below comes to <strong>{signed(total)}</strong>.
+            </p>
             <ul className="parts-list" aria-label="Where your PPR came from">
               {rows.map((row, i) => {
                 const label = row.ending ? endingPhrase(row.ending) : LEDGER_WORDS[row.kind]
@@ -355,13 +354,11 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
   // comparing its own bars and nothing else.
   const widest = Math.max(...bars.map((b) => Math.abs(b.value ?? 0)), 0.0001)
 
-  // Said as a direction, never a size. On staging the style's number
-  // pointed the word's way for all 124 words, but most gaps were small,
-  // and "about the same as" beside the word read as a contradiction.
-  // A style of one is the player, so the sentence is about them; a style
-  // of two has no average to point with (see lib/styleProof.js).
-  const styleSize = proof?.styleSize
-  const styleWay = verdictWay(row, styleSize)
+  // One short line, said as a direction, never a size: on staging the
+  // style's number pointed the word's way for all 124 words, but most
+  // gaps were small. No line when the numbers can't point (a style of two
+  // has no average; see lib/styleProof.js).
+  const line = traitLine(row, proof?.styleSize)
 
   return (
     <>
@@ -394,13 +391,7 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
         </ul>
       )}
 
-      {withVerdict && word && row.you !== null && styleWay && measure.says && (
-        <p className="proof-verdict">
-          Compared with your group, {verdictSubject(styleSize)}{' '}
-          {styleSize === 1 ? aboutYou(measure.says(styleWay)) : measure.says(styleWay)} —
-          that&rsquo;s why it&rsquo;s called {word}.
-        </p>
-      )}
+      {withVerdict && word && row.you !== null && line && <p className="proof-verdict">{line}</p>}
     </>
   )
 }
@@ -520,7 +511,7 @@ function Playstyle({ standing, number }) {
 }
 
 function Rating() {
-  const { rating, rallyRating } = usePlayerData()
+  const { rating, rallyRating, summary } = usePlayerData()
   const [standing, setStanding] = useState(null)
   const [error, setError] = useState(null)
 
@@ -564,6 +555,15 @@ function Rating() {
       {/* Third after the two rally cards; second when the player is not
           rated on points yet but the nightly run has a style for them. */}
       {mlRated && <Playstyle standing={standing} number={rally?.state === 'rated' ? 3 : 2} />}
+
+      {/* Moved here from the Overview: where your points come from sits
+          beside the playstyle that already talks about drops. Numbered
+          after whatever steps came before it. */}
+      {standing && rally && summary && (
+        <Step number={(rally.state === 'rated' ? 2 : 1) + (mlRated ? 1 : 0) + 1} title="How you win points">
+          <ShotProfile summary={summary} />
+        </Step>
+      )}
     </div>
   )
 }

@@ -72,7 +72,7 @@ function PersonDetail({ name }) {
         </ul>
       </header>
 
-      <MatchList matches={all} />
+      <MatchList matches={all} nights={false} />
     </div>
   )
 }

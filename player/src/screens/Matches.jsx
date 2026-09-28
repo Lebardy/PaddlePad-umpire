@@ -118,7 +118,9 @@ function Matches() {
       {shown.length === 0 ? (
         <p className="muted">{emptyMessage(playsBoth ? format : 'all', result)}</p>
       ) : (
-        <MatchList matches={shown} />
+        // While a filter is on, a night's record would count only the
+        // matches the filter left, so nights give way to dated rows.
+        <MatchList matches={shown} nights={!filtering} />
       )}
     </div>
   )

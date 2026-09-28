@@ -1,88 +1,110 @@
-import Sparkline from './Sparkline'
+// ============================================================
+// A player's matches, newest first, as slim rows under month bars --
+// and on the Matches tab, under the night they were played.
+//
+// Each row is one line of who and the score, and one small line of
+// everything else. The graph, the number chips and the match number
+// live on the match's own page, which every row opens; repeating them on
+// every row is what made this list seven screens long.
+//
+// The newest month is open and older ones fold, so getting back to July
+// is one tap rather than a long scroll.
+// ============================================================
+
+import { useId, useState } from 'react'
 import { Link } from '../lib/router'
-import { matchStory } from '../lib/story'
-import { formatDate } from '../lib/format'
+import { groupMatches, matchLine } from '../lib/nights'
 
-/**
- * A player's matches, newest first, written entirely from their side --
- * their score first, won or lost from their point of view, and everyone
- * else by name. The server sends it that way, so nothing here needs to
- * work out which team they were on.
- */
-function MatchList({ matches }) {
+const resultOf = (match) => (match.won === null ? 'none' : match.won ? 'won' : 'lost')
+const letterOf = (match) => (match.won === null ? '–' : match.won ? 'W' : 'L')
+
+function MatchRow({ match, dated }) {
+  const result = resultOf(match)
   return (
-    <section className="match-list" aria-label="Match history">
-      <h2>Every match</h2>
-      <ol>
-        {matches.map((match) => {
-          const winners = match.stats.clean_winners + match.stats.dink_winners
-          const errors = match.stats.unforced_errors + match.stats.dink_errors
-          const result =
-            match.won === null ? 'none' : match.won ? 'won' : 'lost'
-          const story = matchStory(match.progression, match.won, match.pointTarget)
+    <li>
+      <Link className="mrow" to={`/matches/${match.id}`}>
+        {/* The letter carries the result; the colour only reinforces it. */}
+        <span className={`mrow-res res-${result}`}>{letterOf(match)}</span>
+        <span className="mrow-main">
+          <span className="mrow-vs">{(match.opponents ?? []).join(' & ')}</span>
+          <span className="mrow-sub">{matchLine(match, { dated })}</span>
+        </span>
+        <span className="mrow-score" aria-label={`${match.yourScore} to ${match.theirScore}`}>
+          {match.yourScore}
+          <span className="mrow-theirs">&ndash;{match.theirScore}</span>
+        </span>
+      </Link>
+    </li>
+  )
+}
 
-          return (
-            <li key={match.id} className={`match ${result}`}>
-              {/* The whole row is the target. A row that shows a match
-                  but cannot open it is the thing that made this app feel
-                  like a page rather than an app. */}
-              <Link className="match-link" to={`/matches/${match.id}`}>
-              {/* The result as a lit letter down the row's left edge, the
-                  way a results board marks each line. The letter carries
-                  it; the colour only reinforces it. */}
-              <span className={`result-lamp lamp-${result}`}>
-                {result === 'won' ? 'W' : result === 'lost' ? 'L' : '–'}
-              </span>
-
-              <div className="match-body">
-                <div className="match-line">
-                  <p className="match-versus">
-                    {match.opponents.join(' & ')}
-                  </p>
-                  <p className="match-score">
-                    <span className="ms-yours">{match.yourScore}</span>
-                    <span className="ms-dash">–</span>
-                    <span className="ms-theirs">{match.theirScore}</span>
-                  </p>
-                </div>
-                {match.partner && (
-                  <p className="match-partner">with {match.partner}</p>
-                )}
-                <p className="match-meta">
-                  {formatDate(match.endedAt)} · {match.sessionName}
-                  {/* Only when it wasn't the usual 11, so a 15-13 score
-                      doesn't read as a game that ran unusually long. */}
-                  {match.pointTarget && match.pointTarget !== 11
-                    ? ` · to ${match.pointTarget}`
-                    : ''}
-                  {match.endedEarly && ' · stopped early'}
-                </p>
-
-                {/* The shape of the game, and the one thing worth
-                    saying about it. Both come from the same score
-                    margins, so neither costs an extra request. */}
-                <Sparkline margins={match.progression} won={match.won} />
-                {story && <p className="match-story">{story}</p>}
-
-                <div className="match-chips">
-                  {/* Spelled out rather than "3W / 2E": on a row that
-                      already says won or lost, a bare W reads as a win. */}
-                  <span className="chip">{winners} {winners === 1 ? 'winning shot' : 'winning shots'}</span>
-                  <span className="chip">{errors} {errors === 1 ? 'mistake' : 'mistakes'}</span>
-                  {match.stats.drop_attempts > 0 && (
-                    <span className="chip">
-                      {match.stats.drop_successes}/{match.stats.drop_attempts} drops
-                    </span>
-                  )}
-                  <span className="chip chip-quiet">#{match.matchNumber}</span>
-                </div>
-              </div>
-              <span className="match-chevron" aria-hidden="true">&rsaquo;</span>
-              </Link>
-            </li>
-          )
-        })}
+/** One night: its date, name and record, then its matches. */
+export function NightBlock({ night }) {
+  return (
+    <div className="night">
+      <div className="night-head">
+        <span className="night-when">
+          {night.label}
+          <span className="night-what">
+            {night.sessionName ? `${night.sessionName} · ` : ''}
+            {night.record}
+          </span>
+        </span>
+        {/* Oldest to newest, left to right, as a run of results reads. */}
+        <ol className="night-squares" aria-label="Results that night, oldest first">
+          {[...night.matches].reverse().map((match) => (
+            <li key={match.id} className={`pill pill-xs pill-${resultOf(match)}`}>{letterOf(match)}</li>
+          ))}
+        </ol>
+      </div>
+      <ol className="mrows">
+        {night.matches.map((match) => <MatchRow key={match.id} match={match} dated={false} />)}
       </ol>
+    </div>
+  )
+}
+
+function Month({ month, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen)
+  const bodyId = useId()
+  const count = month.matches.length
+  return (
+    <>
+      <button
+        type="button"
+        className="month-bar"
+        aria-expanded={open}
+        aria-controls={bodyId}
+        onClick={() => setOpen((was) => !was)}
+      >
+        <span>
+          <span className="month-name">{month.label}</span>{' '}
+          <span className="month-count">
+            {count} {count === 1 ? 'match' : 'matches'} &middot; <span className="month-record">{month.record}</span>
+          </span>
+        </span>
+        <span className="month-chevron" aria-hidden="true">&rsaquo;</span>
+      </button>
+      <div id={bodyId} hidden={!open}>
+        {month.nights ? (
+          month.nights.map((night) => <NightBlock key={night.key} night={night} />)
+        ) : (
+          <ol className="mrows">
+            {month.matches.map((match) => <MatchRow key={match.id} match={match} dated />)}
+          </ol>
+        )}
+      </div>
+    </>
+  )
+}
+
+function MatchList({ matches, nights = true }) {
+  const months = groupMatches(matches, { nights })
+  return (
+    <section className="match-list history" aria-label="Match history">
+      {months.map((month, i) => (
+        <Month key={month.key} month={month} defaultOpen={i === 0} />
+      ))}
     </section>
   )
 }

@@ -1,5 +1,8 @@
 /**
- * How this player finishes points, and how they play the third shot.
+ * How this player finishes points, and how they play the third shot --
+ * step 4 of the Rating screen, which gives it its heading. It moved there
+ * from the Overview. "Drop over drive" did not come with it: the Dropper
+ * bar in the playstyle step already shows how often they choose the drop.
  *
  * Two forms, chosen by what each piece of data is doing:
  *
@@ -37,7 +40,6 @@ const MIN_LINKED = 10
 
 function ShotProfile({ summary }) {
   const winnerTotal = summary.cleanWinners + summary.dinkWinners
-  const thirdShots = summary.dropAttempts + summary.driveAttempts
   // Both or neither: the whole point is the comparison, and one of the
   // two alone invites reading it as good or bad on its own.
   const bothKnown =
@@ -47,9 +49,7 @@ function ShotProfile({ summary }) {
     summary.driveConversion !== undefined
 
   return (
-    <section className="shot-profile" aria-label="Shot profile">
-      <h2>How you win points</h2>
-
+    <>
       {winnerTotal > 0 ? (
         <StackedBar
           total={winnerTotal}
@@ -69,15 +69,6 @@ function ShotProfile({ summary }) {
           caption={
             summary.dropAttempts > 0
               ? `${summary.dropSuccesses} of ${summary.dropAttempts} third-shot drops`
-              : 'No third shots logged yet'
-          }
-        />
-        <Meter
-          label="Drop over drive"
-          value={summary.dropPreference}
-          caption={
-            thirdShots > 0
-              ? `You chose the drop ${summary.dropAttempts} of ${thirdShots} times`
               : 'No third shots logged yet'
           }
         />
@@ -109,7 +100,7 @@ function ShotProfile({ summary }) {
           against the point they were played in.
         </p>
       )}
-    </section>
+    </>
   )
 }
 

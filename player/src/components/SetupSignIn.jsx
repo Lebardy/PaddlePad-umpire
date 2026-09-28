@@ -26,6 +26,7 @@ import { useEffect, useRef, useState } from 'react'
 import { dismissSetup, isSetupDismissed, setCredentials } from '../lib/api'
 import { suggestUsername } from '../lib/username'
 import { canReturnUnaided } from '../lib/account'
+import { Link } from '../lib/router'
 
 /**
  * The fields themselves, shared by the pop-up and the card so the two
@@ -179,5 +180,19 @@ export function SetupCard({ player, onPlayerChange }) {
         </button>
       )}
     </section>
+  )
+}
+
+/**
+ * One line on the Overview until the player can come back without a
+ * code. The form itself lives on You, so this only points there.
+ */
+export function SetupStrip({ player }) {
+  if (canReturnUnaided(player)) return null
+  return (
+    <Link className="setup-strip" to="/you">
+      <span>You sign in with a code each time.</span>
+      <span className="setup-strip-go">Set up &rarr;</span>
+    </Link>
   )
 }

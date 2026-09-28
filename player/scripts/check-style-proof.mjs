@@ -15,6 +15,7 @@ import {
   aboutYou,
   hiddenStyleNote,
   styleShareLine,
+  traitLine,
   verdictSubject,
   verdictWay,
 } from '../src/lib/styleProof.js'
@@ -65,6 +66,26 @@ console.log('\nthe note under a style of two')
 check('only a style of two gets it', [hiddenStyleNote(1), hiddenStyleNote(3)], [null, null])
 check('and it says why', hiddenStyleNote(2),
   'Your style has just 2 players, so its average isn’t shown: it would give away the other player’s numbers.')
+
+console.log('\nthe one line under each trait')
+const row = (feature, style, group, you = style) => ({ feature, you, style, group, direction: style > group ? 'above' : 'below' })
+check('fewer mistakes, a style of several', traitLine(row('error_to_winner_ratio', 0.89, 1.09), 19),
+  'Your style makes fewer mistakes per winning shot than your group.')
+check('fewer mistakes, a style of one', traitLine({ ...row('error_to_winner_ratio', null, 1.09, 0.8), direction: 'below' }, 1),
+  'You make fewer mistakes per winning shot than your group.')
+check('drops that change less', traitLine(row('drop_efficiency_std', 0.32, 0.34), 19),
+  'Your style’s drops change less from match to match than your group’s.')
+check('picks the drop more often', traitLine(row('drop_preference_rate_mean', 0.55, 0.49), 19),
+  'Your style picks the drop over the drive more often than your group.')
+check('no line when there is no way to point', traitLine(row('drop_preference_rate_mean', null, 0.49, 0.6), 2), null)
+check('no line for an unknown measure', traitLine(row('made_up', 0.5, 0.4), 5), null)
+const every = Object.keys(MEASURES).flatMap((feature) => ['higher', 'lower'].flatMap((way) => [false, true].map((you) => [feature, way, you, MEASURES[feature].short?.(way, you)])))
+check('every measure has a line both ways, for a style and for you', every.filter(([, , , text]) => typeof text !== 'string'), [])
+check('every line is one sentence ending in a full stop', every.filter(([, , , text]) => !/^[A-Z][^.]*\.$/.test(text)), [])
+check('every line compares with the group', every.filter(([, , , text]) => !/than your group(’s)?\.$/.test(text)), [])
+check('lines about you never say "your style"', every.filter(([, , you, text]) => you && /your style/i.test(text)), [])
+check('lines about a style never say "you "', every.filter(([, , you, text]) => !you && /\byou\b/i.test(text)), [])
+check('short enough for about two lines on a phone', every.filter(([, , , text]) => text.length > 95).map(([f, w, y, t]) => `${f}/${w}/${y}: ${t.length}`), [])
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
