@@ -849,6 +849,24 @@ section {
 }
 .stacking-toggle input { width: 1.1rem; height: 1.1rem; }
 
+/* Match setup on a tablet: format beside play-to, Team A beside Team B,
+   so Start Match is on the first screen in either orientation. The page
+   also takes the tablet's width, since each team lists every player
+   tonight and a narrow column wraps those names into many rows. */
+@media (min-width: 700px) {
+  .app-main--setup { max-width: 1060px; }
+  .setup-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 1.25rem;
+    align-items: start;
+  }
+  .setup-pair section { margin-bottom: 1.1rem; }
+  /* Two names a row, so none breaks over two lines in half the width. */
+  .setup-pair .server-choice button { flex-basis: 40%; }
+  .app-main--setup .start-match { margin-top: 0.4rem; }
+}
+
 /* ============ Live match ============ */
 
 /* The score: the two sides of the net as two rows, score on the right

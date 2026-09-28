@@ -111,136 +111,146 @@ function MatchSetup({ sessionId, onBack, onStart }) {
       </button>
       <h2>New Match</h2>
 
-      <section>
-        <h3>Format</h3>
-        <div className="format-toggle">
-          <button
-            className={!isDoubles ? 'active' : ''}
-            onClick={() => toggleFormat(false)}
-          >
-            Singles
-          </button>
-          <button
-            className={isDoubles ? 'active' : ''}
-            onClick={() => toggleFormat(true)}
-          >
-            Doubles
-          </button>
-        </div>
-      </section>
-
-      <section>
-        <h3>Play to</h3>
-        <div className="format-toggle">
-          {POINT_TARGETS.map((target) => (
+      {/* On a tablet each pair shares a row, so Start Match is on the
+          first screen instead of one scroll down. */}
+      <div className="setup-pair">
+        <section>
+          <h3>Format</h3>
+          <div className="format-toggle">
             <button
-              key={target}
-              className={pointTarget === target ? 'active' : ''}
-              onClick={() => setPointTarget(target)}
+              className={!isDoubles ? 'active' : ''}
+              onClick={() => toggleFormat(false)}
             >
-              {target}
+              Singles
             </button>
-          ))}
-        </div>
-        <p className="setup-note">
-          Win by 2 whichever you pick, and it can&rsquo;t be changed once
-          the match starts.
-        </p>
-      </section>
-
-      <section>
-        <h3>Team A {isDoubles && stackingA ? '· stacking' : ''}</h3>
-        <TeamPicker
-          team={teamA}
-          maxPerTeam={maxPerTeam}
-          playerName={playerName}
-          onRemove={(id) => removeFromTeam('A', id)}
-          onAdd={(id) => addToTeam('A', id)}
-          available={available}
-        />
-        {isDoubles && (
-          <label className="stacking-toggle">
-            <input
-              type="checkbox"
-              checked={stackingA}
-              onChange={(e) => setStackingA(e.target.checked)}
-            />
-            Uses stacking
-          </label>
-        )}
-      </section>
-
-      <section>
-        <h3>Team B {isDoubles && stackingB ? '· stacking' : ''}</h3>
-        <TeamPicker
-          team={teamB}
-          maxPerTeam={maxPerTeam}
-          playerName={playerName}
-          onRemove={(id) => removeFromTeam('B', id)}
-          onAdd={(id) => addToTeam('B', id)}
-          available={available}
-        />
-        {isDoubles && (
-          <label className="stacking-toggle">
-            <input
-              type="checkbox"
-              checked={stackingB}
-              onChange={(e) => setStackingB(e.target.checked)}
-            />
-            Uses stacking
-          </label>
-        )}
-      </section>
-
-      {teamA.length === maxPerTeam && teamB.length === maxPerTeam && (
+            <button
+              className={isDoubles ? 'active' : ''}
+              onClick={() => toggleFormat(true)}
+            >
+              Doubles
+            </button>
+          </div>
+        </section>
+  
         <section>
-          <h3>First server</h3>
-          <div className="server-choice">
-            {[...teamA, ...teamB].map((id) => (
+          <h3>Play to</h3>
+          <div className="format-toggle">
+            {POINT_TARGETS.map((target) => (
               <button
-                key={id}
-                className={firstServerId === id ? 'active' : ''}
-                onClick={() => {
-                  setFirstServerId(id)
-                  // A different team now receives, so a right-side
-                  // choice made for the old receiving pair is about the
-                  // wrong pair. Re-tapping the same name changes
-                  // nothing and must not throw the answer away.
-                  if (id !== firstServerId) setReceiverRightId('')
-                }}
+                key={target}
+                className={pointTarget === target ? 'active' : ''}
+                onClick={() => setPointTarget(target)}
               >
-                {playerName(id)}
+                {target}
               </button>
             ))}
           </div>
-        </section>
-      )}
-
-      {/* The one thing the app cannot work out for itself. When the
-          serve goes over, the player on the RIGHT serves -- and since a
-          pair only swaps sides when it scores, everything after that
-          follows from where these two started. */}
-      {isDoubles && firstServerId !== '' && (
-        <section>
-          <h3>Who starts on the right, as they face the net?</h3>
           <p className="setup-note">
-            {playerName(firstServerId)} does, on the serving side. Say which of
-            the other pair is on the right — their own right, looking across
-            the net. Watching them from behind, that is the one on your left.
+            Win by 2 whichever you pick, and it can&rsquo;t be changed once
+            the match starts.
           </p>
-          <div className="server-choice">
-            {receivingTeam.map((id) => (
-              <button
-                key={id}
-                className={receiverRightId === id ? 'active' : ''}
-                onClick={() => setReceiverRightId(id)}
-              >
-                {playerName(id)}
-              </button>
-            ))}
-          </div>
         </section>
-      )}
+      </div>
+
+      <div className="setup-pair">
+        <section>
+          <h3>Team A {isDoubles && stackingA ? '· stacking' : ''}</h3>
+          <TeamPicker
+            team={teamA}
+            maxPerTeam={maxPerTeam}
+            playerName={playerName}
+            onRemove={(id) => removeFromTeam('A', id)}
+            onAdd={(id) => addToTeam('A', id)}
+            available={available}
+          />
+          {isDoubles && (
+            <label className="stacking-toggle">
+              <input
+                type="checkbox"
+                checked={stackingA}
+                onChange={(e) => setStackingA(e.target.checked)}
+              />
+              Uses stacking
+            </label>
+          )}
+        </section>
+  
+        <section>
+          <h3>Team B {isDoubles && stackingB ? '· stacking' : ''}</h3>
+          <TeamPicker
+            team={teamB}
+            maxPerTeam={maxPerTeam}
+            playerName={playerName}
+            onRemove={(id) => removeFromTeam('B', id)}
+            onAdd={(id) => addToTeam('B', id)}
+            available={available}
+          />
+          {isDoubles && (
+            <label className="stacking-toggle">
+              <input
+                type="checkbox"
+                checked={stackingB}
+                onChange={(e) => setStackingB(e.target.checked)}
+              />
+              Uses stacking
+            </label>
+          )}
+        </section>
+      </div>
+
+      {/* Who serves first beside who starts on the right, so the
+          button is still on screen once a doubles match is set. */}
+      <div className="setup-pair">
+        {teamA.length === maxPerTeam && teamB.length === maxPerTeam && (
+          <section>
+            <h3>First server</h3>
+            <div className="server-choice">
+              {[...teamA, ...teamB].map((id) => (
+                <button
+                  key={id}
+                  className={firstServerId === id ? 'active' : ''}
+                  onClick={() => {
+                    setFirstServerId(id)
+                    // A different team now receives, so a right-side
+                    // choice made for the old receiving pair is about the
+                    // wrong pair. Re-tapping the same name changes
+                    // nothing and must not throw the answer away.
+                    if (id !== firstServerId) setReceiverRightId('')
+                  }}
+                >
+                  {playerName(id)}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* The one thing the app cannot work out for itself. When the
+            serve goes over, the player on the RIGHT serves -- and since a
+            pair only swaps sides when it scores, everything after that
+            follows from where these two started. */}
+        {isDoubles && firstServerId !== '' && (
+          <section>
+            <h3>Who starts on the right, as they face the net?</h3>
+            <p className="setup-note">
+              {playerName(firstServerId)} does, on the serving side. Say which of
+              the other pair is on the right — their own right, looking across
+              the net. Watching them from behind, that is the one on your left.
+            </p>
+            <div className="server-choice">
+              {receivingTeam.map((id) => (
+                <button
+                  key={id}
+                  className={receiverRightId === id ? 'active' : ''}
+                  onClick={() => setReceiverRightId(id)}
+                >
+                  {playerName(id)}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
 
       <button
         className="start-match"
