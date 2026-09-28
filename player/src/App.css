@@ -426,7 +426,6 @@
 
 .rating,
 .trend,
-.shot-profile,
 .month-band,
 .step,
 .detail-shape,
@@ -452,7 +451,6 @@
    heading with something beside it -- becomes the strip. */
 .rating > h2,
 .trend > h2,
-.shot-profile > h2,
 .step > .step-head,
 .detail-shape > h2,
 .detail-stats > h2,
@@ -509,7 +507,6 @@
   .empty-head,
   .rating,
   .trend,
-  .shot-profile,
   .month-band,
   .step,
   .detail-shape,

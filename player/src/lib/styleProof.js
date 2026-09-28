@@ -29,56 +29,75 @@
 //
 // `says(way)` finishes "Compared with your group, players with your
 // style …" for a style that sits higher or lower than its group.
+// `short(way, you)` is the one line under a trait: the style (or, for a
+// style of one, the player) against their group, in a sentence short
+// enough to read at a glance. `way` is 'higher' or 'lower'.
+const more = (way, a, b) => (way === 'higher' ? a : b)
+const swing = (styleThing, yourThing, verb) => (way, you) =>
+  `${you ? yourThing : styleThing} ${verb} ${more(way, 'more', 'less')} from match to match than your group’s.`
+
 export const MEASURES = {
   drop_efficiency_mean: {
     label: 'drop shots landing', as: 'percent', better: 'higher',
     says: (way) => `land their drop shots ${way === 'higher' ? 'more' : 'less'} often`,
+    short: (way, you) => `${you ? 'You land your' : 'Your style lands its'} drops ${more(way, 'more', 'less')} often than your group.`,
   },
   error_to_winner_ratio: {
     label: 'mistakes per winning shot', as: 'ratio', better: 'lower',
     says: (way) => `make ${way === 'higher' ? 'more' : 'fewer'} mistakes for every winning shot`,
+    short: (way, you) => `${you ? 'You make' : 'Your style makes'} ${more(way, 'more', 'fewer')} mistakes per winning shot than your group.`,
   },
   // The share of a player's finishes (winners and mistakes) that were
   // winners: how cleanly they finish, not how often they attack.
   aggression_std: {
     label: 'change in how many of your finishes are winners, match to match', as: 'swing-percent', better: 'neither',
     says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how many of their finishes are winners`,
+    short: swing('Your style’s share of winning finishes', 'Your share of winning finishes', 'changes'),
   },
   drop_efficiency_std: {
     label: 'change in drops landing, match to match', as: 'swing-percent', better: 'neither',
     says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how well their drops land`,
+    short: swing('Your style’s drops', 'Your drops', 'change'),
   },
   winner_rate_std: {
     label: 'change in winning shots per 10 min, match to match', as: 'swing-per10', better: 'neither',
     says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how many winning shots they hit`,
+    short: swing('Your style’s winning shots', 'Your winning shots', 'change'),
   },
   general_error_rate_std: {
     label: 'change in mistakes per 10 min, match to match', as: 'swing-per10', better: 'neither',
     says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how many mistakes they make`,
+    short: swing('Your style’s mistakes', 'Your mistakes', 'change'),
   },
   dink_error_rate_std: {
     label: 'change in net mistakes per 10 min, match to match', as: 'swing-per10', better: 'neither',
     says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how many mistakes they make at the net`,
+    short: swing('Your style’s mistakes at the net', 'Your mistakes at the net', 'change'),
   },
   drop_usage_rate: {
     label: 'third shots that are drops', as: 'percent', better: 'neither',
     says: (way) => `use drops for ${way === 'higher' ? 'more' : 'fewer'} of their third shots`,
+    short: (way, you) => `${you ? 'You use' : 'Your style uses'} the drop for ${more(way, 'more', 'fewer')} third shots than your group.`,
   },
   drop_preference_rate_mean: {
     label: 'drops rather than drives', as: 'percent', better: 'neither',
     says: (way) => `choose drops over drives ${way === 'higher' ? 'more' : 'less'} often`,
+    short: (way, you) => `${you ? 'You pick' : 'Your style picks'} the drop over the drive ${more(way, 'more', 'less')} often than your group.`,
   },
   drop_preference_rate_std: {
     label: 'change in choosing drops, match to match', as: 'swing-percent', better: 'neither',
     says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in choosing drops over drives`,
+    short: swing('Your style’s choice between drop and drive', 'Your choice between drop and drive', 'changes'),
   },
   net_game_preference_rate_mean: {
     label: 'points won at the net', as: 'percent', better: 'neither',
     says: (way) => `win ${way === 'higher' ? 'more' : 'fewer'} of their points at the net`,
+    short: (way, you) => `${you ? 'You win' : 'Your style wins'} ${more(way, 'more', 'fewer')} of ${you ? 'your' : 'its'} points at the net than your group.`,
   },
   net_game_preference_rate_std: {
     label: 'change in points won at the net, match to match', as: 'swing-percent', better: 'neither',
     says: (way) => `change ${way === 'higher' ? 'more' : 'less'} from match to match in how many points they win at the net`,
+    short: swing('Your style’s points at the net', 'Your points at the net', 'change'),
   },
 }
 
@@ -130,4 +149,15 @@ export function hiddenStyleNote(styleSize) {
   return styleSize === 2
     ? 'Your style has just 2 players, so its average isn’t shown: it would give away the other player’s numbers.'
     : null
+}
+
+/**
+ * The one line under a trait, or null when no sentence should be shown
+ * (the same rule as before: `verdictWay`).
+ */
+export function traitLine(row, styleSize) {
+  const measure = MEASURES[row.feature]
+  const way = verdictWay(row, styleSize)
+  if (!measure?.short || !way) return null
+  return measure.short(way, styleSize === 1)
 }
