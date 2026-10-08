@@ -6,8 +6,9 @@ that starts, runs and exits -- Railway cron services are expected to
 exit, and this one never does, so a cronSchedule set on it would look
 configured and quietly do nothing. Production now has that service,
 `ml-cron`, and runs this web service with PADDLEPAD_SCHEDULE=off. The
-thread is what staging still uses, and was the only option while the
-free plan capped the project at five services.
+thread was the only option while the free plan capped the project at
+five services. Staging ran it until 2026-10-08 and now has it off too,
+so the web service can sleep; its runs are started by hand.
 
 Where the schedule does live in a thread here: Two things make that
 safe enough to rely on:
@@ -20,9 +21,9 @@ safe enough to rely on:
   - It shares the run lock with POST /run, so a manual trigger during
     the scheduled run cannot start a second one in this process.
 
-What it cannot survive is the container not running. That is fine while
-sleepApplication is off, and would silently stop being fine if it were
-ever turned on -- which is why the deployment notes call that out.
+What it cannot survive is the container not running. sleepApplication
+is on in both environments now, so switching the thread back on means
+switching that off first -- the deployment notes call that out.
 """
 
 import os
