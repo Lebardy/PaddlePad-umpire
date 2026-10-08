@@ -636,6 +636,23 @@ async function main() {
   })
   check('the taking-over device can now push', afterTakeover.status === 200)
 
+  section('an id or date the server cannot read is refused, not a server error')
+  // The umpire app retries any 5xx for ever and holds everything queued
+  // behind it, so a request that can never succeed has to answer 4xx.
+  const notAnId = await call('/matches/not-an-id')
+  check('a match address that is not an id -> 400', notAnId.status === 400, String(notAnId.status))
+  const noSessionId = await call('/sessions/undefined/end', { method: 'POST', body: { ended: true } })
+  check('ending a session whose id is missing -> 400', noSessionId.status === 400, String(noSessionId.status))
+  const badEndTime = await call(`/matches/${liveMatchId}/log`, {
+    method: 'PUT',
+    body: { deviceId: otherDevice, events: [rally(0, teamB[0])], endedEarly: true, endedEarlyAt: 'not a date' },
+  })
+  check('a log with an end time that is not a date -> 400', badEndTime.status === 400, String(badEndTime.status))
+  const stillLive = await call(`/matches/${liveMatchId}`)
+  check('and the refused log changed nothing',
+    stillLive.body.match?.status === 'in_progress' && stillLive.body.match?.eventCount === 2,
+    `${stillLive.body.match?.status}, ${stillLive.body.match?.eventCount} events`)
+
   section('ASSERTION 6 — the point target is stored and honoured')
   // The whole risk of a per-match target is that it might be ignored on
   // the way in and re-derived against 11 on the way out, which would
