@@ -110,25 +110,32 @@ was built; check what the URL actually serves.
 
 ### The nightly run
 
-It runs at 19:00 UTC — 3am Manila — and where it runs differs by
-environment:
+It runs at 19:00 UTC — 3am Manila — in production only:
 
 | | production | staging |
 |---|---|---|
-| Nightly run | `ml-cron` service (Railway cron) | thread inside `ml` |
-| `PADDLEPAD_SCHEDULE` on `ml` | `off` | unset (on) |
+| Nightly run | `ml-cron` service (Railway cron) | none; `POST /run` by hand |
+| `PADDLEPAD_SCHEDULE` on `ml` | `off` | `off` |
+| `sleepApplication` on `ml` | on | on |
 
 Railway cron services are expected to start, run and **exit**, and `ml`
 is a gunicorn process that never does, so a `cronSchedule` set on it
 would look configured and quietly never fire. That is why the cron is a
-second service. Staging still uses the thread because it was built while
-the free plan capped the project at five services.
+second service.
 
-Two consequences of the thread, for staging, worth knowing:
+Staging used to run the schedule from a thread inside `ml`, built while
+the free plan capped the project at five services. That kept a container
+holding about 160 MB awake all month for a run nobody read, and was the
+largest line on the bill. Since 2026-10-08 the thread is off in both
+environments and `ml` sleeps when idle; a request to `/health` or
+`POST /run` wakes it. Staging snapshots are now only as fresh as the
+last manual run.
+
+Two consequences of the thread, if it is ever switched back on:
 
 - **It only fires while the container is up.** `sleepApplication` must
-  stay **off** for this service. Turning it on would stop the nightly
-  run with nothing reporting a problem.
+  be **off** for that service. Left on, the nightly run would stop with
+  nothing reporting a problem.
 - **It is tied to `--workers 1`** in the `Procfile`. A second worker is a
   second process with its own thread, and both would wake at 3am and
   publish near-identical snapshots.

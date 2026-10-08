@@ -21,7 +21,8 @@ in batches, and the app reads the last published snapshot.
 In production the nightly run is a separate Railway cron service,
 `ml-cron`, which starts `python run.py` and exits; this service only
 answers /health and POST /run there, with PADDLEPAD_SCHEDULE=off.
-Staging still schedules it from a thread here. See scheduler.py.
+Staging has no nightly run: the same setting, and runs started by hand.
+See scheduler.py.
 """
 
 import os
