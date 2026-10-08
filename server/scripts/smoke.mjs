@@ -234,6 +234,15 @@ function asPlayer(path, options = {}) {
 }
 
 const uuid = () => crypto.randomUUID()
+
+/**
+ * Lets the clock move into a later second. An admin token from the SAME
+ * second as a session reset survives it: sessionEnded (admin-rules.js)
+ * compares whole seconds, so that the token handed back with the reset
+ * still works. A check that an OLDER token has ended is therefore only
+ * fair once the reset is sure to land in a later second than that token.
+ */
+const intoALaterSecond = () => new Promise((resolve) => setTimeout(resolve, 1100))
 const DEVICE = `smoke-${uuid().slice(0, 8)}`
 
 /** A rally event won by `playerId`, at sequence `seq`. */
@@ -2150,6 +2159,7 @@ async function main() {
     check('a second sign-in for token B -> 200', loginB.status === 200, String(loginB.status))
     const tokenB = loginB.body.token
 
+    await intoALaterSecond()
     const signedOutWatermark = await newestActivityId('admin.signed_out_others', ownerId, tokenB)
     const signedOut = await request('/admin/auth/me/sign-out-others', { method: 'POST', bearer: tokenB })
     check('sign-out-others with token B -> 200 with a fresh token',
@@ -2178,6 +2188,7 @@ async function main() {
     let restored = false
     try {
       const beforeChangeToken = ownerToken
+      await intoALaterSecond()
       const toTemp = await request('/admin/auth/me/password', {
         method: 'POST', bearer: ownerToken, body: { currentPassword: OWNER_PASSWORD, newPassword: TEMP_PASSWORD },
       })
@@ -2234,13 +2245,9 @@ async function main() {
       hSetup.status === 200 && typeof hSetup.body.token === 'string', redacted(hSetup.body).slice(0, 80))
     let hAdminToken = hSetup.body.token
 
-    // sessionEnded compares whole seconds so a token handed back in the
-    // SAME response as a reset still works (see admin-rules.js). Setup
-    // itself resets sessions and pins this token to that second, so the
-    // switch-off below needs to land in a LATER second, or its own
-    // reset would land in the same one and this token would wrongly
-    // survive it.
-    await new Promise((resolve) => setTimeout(resolve, 1100))
+    // Setup itself resets sessions and pins this token to that second,
+    // so the switch-off below has to land in a later one.
+    await intoALaterSecond()
 
     const hOff = await request(`/admin/admins/${hAdminId}/switch-off`, { method: 'POST', bearer: ownerToken })
     check('the owner switches it off -> 200', hOff.status === 200 && hOff.body.admin?.active === false, String(hOff.status))
@@ -2295,6 +2302,7 @@ async function main() {
     const messyCode = firstCode.toLowerCase().replace('-', '')
     const bcUsedWatermark = await newestActivityId('admin.backup_code_used', ownerId, ownerToken)
     const tokenBeforeBackupUse = ownerToken
+    await intoALaterSecond()
     const bcUse = await request('/admin/auth/backup-code', { method: 'POST', body: { email: OWNER_EMAIL, code: messyCode } })
     check('a lower-cased, dash-less code signs in -> 200, usedBackupCode',
       bcUse.status === 200 && bcUse.body.usedBackupCode === true, redacted(bcUse.body).slice(0, 80))
