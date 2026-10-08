@@ -1070,6 +1070,31 @@ async function main() {
       linkedMe.body.player?.username === `smk_a_${stamp}`.slice(0, 20),
       String(linkedMe.body.player?.username))
 
+    // Ratings are kept in memory and reloaded only when a finished
+    // match changes. These two moments are the ones that must reload.
+    const ratedMatches = (me) => me.body.rallyRating?.matches ?? me.body.rallyRating?.have
+    const ratedBefore = ratedMatches(linkedMe)
+    const oneMoreId = uuid()
+    await call('/matches', {
+      method: 'POST',
+      body: {
+        id: oneMoreId, sessionId, teamA, teamB,
+        stacking: { A: false, B: false },
+        firstServer: { team: 'A', playerId: teamA[0] },
+        startedAt: Date.now(),
+      },
+    })
+    const elevenStraight = Array.from({ length: 11 }, (_, i) => rally(i, teamA[0]))
+    await call(`/matches/${oneMoreId}/log`, { method: 'PUT', body: { deviceId: DEVICE, events: elevenStraight } })
+    const meAfterWin = await asPlayer('/player/me', { bearer: linked.body.token })
+    check('a finished match counts towards the rating at once',
+      ratedMatches(meAfterWin) === ratedBefore + 1, `${ratedBefore} -> ${ratedMatches(meAfterWin)}`)
+    await call(`/matches/${oneMoreId}/log`, { method: 'PUT', body: { deviceId: DEVICE, events: elevenStraight.slice(0, 5) } })
+    const meAfterReopen = await asPlayer('/player/me', { bearer: linked.body.token })
+    check('and stops counting as soon as it is reopened',
+      ratedMatches(meAfterReopen) === ratedBefore, `${ratedBefore} -> ${ratedMatches(meAfterReopen)}`)
+    await call(`/matches/${oneMoreId}`, { method: 'DELETE' })
+
     const takenTwice = await register({
       name: nameA,
       username: `smk_a2_${stamp}`.slice(0, 20),

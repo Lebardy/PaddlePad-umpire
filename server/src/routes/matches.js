@@ -451,9 +451,10 @@ router.put('/:id/log', async (req, res) => {
     )
   })
 
-  // Events, completion and ending early all arrive here, so any of them
-  // can change the rally rating.
-  invalidateRallyRatings()
+  // Only finished matches are rated. The ratings need working out again
+  // when this match was finished before the save or is finished now;
+  // a tap in a match still being played changes none of them.
+  if (row.status === 'completed' || completed) invalidateRallyRatings()
 
   const updatedParams = [req.params.id]
   const updatedScope = umpireScope(req.umpire.facilityId, updatedParams, 'sess.facility_id')
