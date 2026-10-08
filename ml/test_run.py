@@ -615,6 +615,30 @@ check("match counts survive to the payload",
 
 
 
+print("\nthe door to POST /run")
+
+import os
+
+os.environ["INTERNAL_API_KEY"] = "k" * 40
+import service
+
+# The pipeline itself needs the API; only the door in front of it is
+# under test here, so the run is swapped for one that says what it was
+# asked to do.
+service.run = lambda publish=True: {"published": publish}
+door = service.app.test_client()
+
+check("no key is refused", door.post("/run").status_code == 401)
+check("a wrong key is refused",
+      door.post("/run", headers={"x-internal-key": "w" * 40}).status_code == 401)
+check("a key with a letter outside plain English is refused, not a crash",
+      door.post("/run", headers={"x-internal-key": "é" + "k" * 39}).status_code == 401)
+opened = door.post("/run?dry=1", headers={"x-internal-key": "k" * 40})
+check("the right key gets through, and ?dry=1 asks for a dry run",
+      opened.status_code == 200 and opened.get_json() == {"published": False},
+      f"{opened.status_code} {opened.get_data(as_text=True)[:80]}")
+
+
 print("\nscheduler")
 
 import threading

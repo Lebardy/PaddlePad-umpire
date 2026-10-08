@@ -25,6 +25,7 @@ Staging has no nightly run: the same setting, and runs started by hand.
 See scheduler.py.
 """
 
+import hmac
 import os
 import threading
 
@@ -67,7 +68,10 @@ def trigger():
     during a demo than freeing the connection early.
     """
     presented = request.headers.get("x-internal-key", "")
-    if not TRIGGER_KEY or len(TRIGGER_KEY) < 32 or presented != TRIGGER_KEY:
+    # Compared in constant time, and as bytes: compare_digest refuses
+    # text holding a letter outside plain English.
+    same_key = hmac.compare_digest(presented.encode(), TRIGGER_KEY.encode())
+    if not TRIGGER_KEY or len(TRIGGER_KEY) < 32 or not same_key:
         return jsonify(error="Missing or invalid internal key"), 401
 
     if not run_lock.acquire(blocking=False):
