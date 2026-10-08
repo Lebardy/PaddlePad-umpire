@@ -126,8 +126,9 @@ app.use('/auth/me/password', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/auth/me', rateLimit({ max: 30, windowMs: 60_000 }))
 
 // Mistyped player names are the realistic spam vector on an otherwise
-// trusted API, and the export is the only genuinely expensive query.
-app.use('/players', rateLimit({ max: 60, windowMs: 60_000 }))
+// trusted API. Limits count per address and a venue's wifi is ONE
+// address, so this is sized for all its umpires searching at once.
+app.use('/players', rateLimit({ max: 300, windowMs: 60_000 }))
 // A claim code is a bearer credential, so this gets a login-grade limit
 // rather than a read-grade one. 60/min against a code space would be far
 // too generous for something that grants access on its own.
@@ -159,11 +160,13 @@ app.use('/auth/player/google/link', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/auth/player/google/unlink', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/auth/player/google', rateLimit({ max: 10, windowMs: 60_000 }))
 // Takes a claim code, so it is a bearer-credential guessing surface and
-// gets the same login-grade limit /auth/player/claim does -- the 60/min
+// gets the same login-grade limit /auth/player/claim does -- the limit
 // below would be far too generous. Mounted first so it keys its own
 // bucket rather than sharing /player's.
 app.use('/player/link', rateLimit({ max: 10, windowMs: 60_000 }))
-app.use('/player', rateLimit({ max: 60, windowMs: 60_000 }))
+// Sized for a whole venue on one wifi address opening the app in the
+// same minute, a few requests each -- not for one phone.
+app.use('/player', rateLimit({ max: 300, windowMs: 60_000 }))
 // One caller, a handful of calls per run. Tight enough that a leaked
 // key cannot be used to scrape the whole club's match log repeatedly,
 // loose enough for a nightly run plus a few manual triggers in a demo.
