@@ -639,45 +639,6 @@ check("the right key gets through, and ?dry=1 asks for a dry run",
       f"{opened.status_code} {opened.get_data(as_text=True)[:80]}")
 
 
-print("\nscheduler")
-
-import threading
-from datetime import datetime, time as clock, timezone
-
-import scheduler
-
-def at(hour, minute=0):
-    return datetime(2026, 8, 26, hour, minute, tzinfo=timezone.utc)
-
-# The whole reason this computes a target time instead of sleeping 24h:
-# a container that restarts at 18:00 must still fire at 19:00, not at
-# 18:00 the following day.
-check("before the hour, waits until today's run",
-      scheduler.seconds_until_next(clock(19, 0), at(18, 0)) == 3600,
-      str(scheduler.seconds_until_next(clock(19, 0), at(18, 0))))
-check("after the hour, waits until tomorrow's",
-      scheduler.seconds_until_next(clock(19, 0), at(20, 0)) == 23 * 3600,
-      str(scheduler.seconds_until_next(clock(19, 0), at(20, 0))))
-check("exactly on the hour rolls to tomorrow rather than firing twice",
-      scheduler.seconds_until_next(clock(19, 0), at(19, 0)) == 24 * 3600,
-      str(scheduler.seconds_until_next(clock(19, 0), at(19, 0))))
-check("just after midnight still waits for the same clock time",
-      scheduler.seconds_until_next(clock(19, 0), at(0, 30)) == 18.5 * 3600,
-      str(scheduler.seconds_until_next(clock(19, 0), at(0, 30))))
-check("19:00 UTC is 3am in Manila (UTC+8)",
-      (scheduler.RUN_AT_UTC.hour + 8) % 24 == 3, str(scheduler.RUN_AT_UTC))
-
-# Disabled means disabled: no thread, so nothing can fire.
-check("the schedule can be turned off", scheduler.start(None, None, enabled=False) is None)
-
-# A scheduled run must not start while a manual one holds the lock.
-busy = threading.Lock()
-busy.acquire()
-check("a held lock is not acquirable by the scheduler",
-      not busy.acquire(blocking=False))
-busy.release()
-
-
 print(f"\n{passed} passed, {len(failed)} failed")
 for name in failed:
     print(f"  - {name}")

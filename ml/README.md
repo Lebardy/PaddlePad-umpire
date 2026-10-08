@@ -115,7 +115,6 @@ It runs at 19:00 UTC — 3am Manila — in production only:
 | | production | staging |
 |---|---|---|
 | Nightly run | `ml-cron` service (Railway cron) | none; `POST /run` by hand |
-| `PADDLEPAD_SCHEDULE` on `ml` | `off` | `off` |
 | `sleepApplication` on `ml` | on | on |
 
 Railway cron services are expected to start, run and **exit**, and `ml`
@@ -123,32 +122,21 @@ is a gunicorn process that never does, so a `cronSchedule` set on it
 would look configured and quietly never fire. That is why the cron is a
 second service.
 
-Staging used to run the schedule from a thread inside `ml`, built while
-the free plan capped the project at five services. That kept a container
-holding about 160 MB awake all month for a run nobody read, and was the
-largest line on the bill. Since 2026-10-08 the thread is off in both
-environments and `ml` sleeps when idle; a request to `/health` or
-`POST /run` wakes it. Staging snapshots are now only as fresh as the
-last manual run.
+`ml` itself sleeps when idle; a request to `/health` or `POST /run`
+wakes it. Staging snapshots are only as fresh as the last manual run.
 
-Two consequences of the thread, if it is ever switched back on:
+The schedule used to run from a thread inside `ml`, built while the free
+plan capped the project at five services. It kept a container holding
+about 160 MB awake all month and was the largest line on the bill, so it
+was switched off on 2026-10-08 and removed the day after (`git log --
+ml/scheduler.py` has it). The `PADDLEPAD_SCHEDULE` variable it read does
+nothing now and can be deleted from both `ml` services.
 
-- **It only fires while the container is up.** `sleepApplication` must
-  be **off** for that service. Left on, the nightly run would stop with
-  nothing reporting a problem.
-- **It is tied to `--workers 1`** in the `Procfile`. A second worker is a
-  second process with its own thread, and both would wake at 3am and
-  publish near-identical snapshots.
+### Giving an environment its cron service
 
-### Moving an environment to a real cron service
+Done for production on the Hobby plan:
 
-Done for production on the Hobby plan. Two steps, in this order:
-
-1. Set `PADDLEPAD_SCHEDULE=off` on the `ml` service. The thread then
-   never starts, and `POST /run` keeps working. Do this **first**, so
-   there is never a window where both the thread and the new service are
-   scheduled.
-2. Create an `ml-cron` service from this same directory:
+- Create an `ml-cron` service from this same directory:
 
    ```bash
    railway add --service ml-cron     # NOT --variables, see below
