@@ -13,7 +13,7 @@ import {
   signToken,
   verifyPassword,
 } from '../auth.js'
-import { generateInviteCode, normalizeInviteCode } from '../invites.js'
+import { normalizeInviteCode } from '../invites.js'
 import { STARTING_FACILITY_NAME } from '../facility-rules.js'
 import { resolveGoogleProfile } from '../google.js'
 import { PAUSED_MESSAGE, signInRefusal } from '../people-rules.js'
@@ -756,10 +756,12 @@ router.post('/google/disconnect', requireAuth, requireActiveUmpire(query), async
  * credential.
  *
  * It is not the only way in any more -- see /player/register below for
- * the durable one. The code stays valid after claiming, and stays valid
- * after a password is set, which makes an umpire regenerating it the
- * recovery path for a forgotten password. An umpire regenerating it
- * invalidates the old one.
+ * the durable one. The code stays valid after claiming, for as long as
+ * it is the player's ONLY way in. The moment they have a password or a
+ * Google account it is cleared (every route below that sets one says
+ * `claim_code = NULL`), so a code that was read out or sent around
+ * earlier is not left behind as a spare key. A forgotten password is
+ * still recovered with a code: an umpire or admin makes a NEW one.
  */
 router.post('/player/claim', async (req, res) => {
   // Codes get read aloud and typed on phones, so accept any casing or
@@ -934,12 +936,12 @@ router.post('/player/register', async (req, res) => {
       // the same new name at the same moment both pass the check --
       // the same reasoning as POST /players.
       const inserted = await client.query(
-        `INSERT INTO players (name, username, password_hash, claim_code,
+        `INSERT INTO players (name, username, password_hash,
                               claimed_at, registered_at)
-         VALUES ($1, $2, $3, $4, now(), now())
+         VALUES ($1, $2, $3, now(), now())
          ON CONFLICT (lower(name)) DO NOTHING
          RETURNING id, name, claimed_at, username, google_email`,
-        [name, username, password_hash, generateInviteCode()],
+        [name, username, password_hash],
       )
       if (inserted.rowCount === 1) return inserted.rows[0]
 
@@ -965,6 +967,7 @@ router.post('/player/register', async (req, res) => {
         `UPDATE players
             SET username           = $2,
                 password_hash       = $3,
+                claim_code          = NULL,
                 registered_at       = now(),
                 claimed_at          = COALESCE(claimed_at, now()),
                 deactivated_at      = NULL,
@@ -1118,12 +1121,12 @@ router.post('/player/google', async (req, res) => {
       // two people registering the same new name at the same instant
       // both pass the check.
       const inserted = await client.query(
-        `INSERT INTO players (name, google_sub, google_email, claim_code,
+        `INSERT INTO players (name, google_sub, google_email,
                               claimed_at, registered_at)
-         VALUES ($1, $2, $3, $4, now(), now())
+         VALUES ($1, $2, $3, now(), now())
          ON CONFLICT (lower(name)) DO NOTHING
          RETURNING id, name, claimed_at, username, google_email`,
-        [name, profile.sub, profile.email, generateInviteCode()],
+        [name, profile.sub, profile.email],
       )
       if (inserted.rowCount === 1) return inserted.rows[0]
 
@@ -1158,6 +1161,7 @@ router.post('/player/google', async (req, res) => {
         `UPDATE players
             SET google_sub         = $2,
                 google_email       = $3,
+                claim_code         = NULL,
                 registered_at      = COALESCE(registered_at, now()),
                 claimed_at         = COALESCE(claimed_at, now()),
                 deactivated_at     = NULL,
@@ -1258,6 +1262,7 @@ router.post(
         `UPDATE players
             SET google_sub    = $2,
                 google_email  = $3,
+                claim_code    = NULL,
                 registered_at = COALESCE(registered_at, now())
           WHERE id = $1
           RETURNING id, name, claimed_at, username, google_email`,
@@ -1280,14 +1285,14 @@ router.post(
  * Disconnects Google.
  *
  * Refused when it would leave no way back in. An account whose only
- * credential is Google, and whose claim code has been wiped by a
- * previous deletion, would be unreachable the moment this succeeded --
+ * credential is Google has no claim code either (connecting Google
+ * cleared it), so it would be unreachable the moment this succeeded --
  * there is no email here and so no reset link, and the honest answer is
  * to say so rather than to strand someone politely.
  *
- * A claim code IS enough to allow it: an umpire re-minting one is this
- * app's whole recovery path, and unlike a reset email it has a trusted
- * human in the loop.
+ * A claim code IS enough to allow it, when an umpire has made a new one
+ * for them: that is this app's whole recovery path, and unlike a reset
+ * email it has a trusted human in the loop.
  */
 router.post(
   '/player/google/unlink',
@@ -1410,6 +1415,8 @@ router.post(
     if (wantsPassword) {
       values.push(await hashPassword(password))
       sets.push(`password_hash = $${values.length}`)
+      // With a password of their own, the code is no longer a way in.
+      sets.push('claim_code = NULL')
     }
 
     let updated

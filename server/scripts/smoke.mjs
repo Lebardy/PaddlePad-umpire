@@ -1146,14 +1146,26 @@ async function main() {
       asUmpireRoute.status === 403, String(asUmpireRoute.status))
 
     // --- the claim code as the recovery path ---
-    // Deliberately still valid after a password is set: with no email
-    // there is no reset link, so an umpire regenerating the code is how
-    // a locked-out player gets back in.
-    const recovered = await asPlayer('/auth/player/claim', {
+    // A code stops working once its player has their own way in, so one
+    // that was read out or sent around earlier is not a spare key to
+    // the account. With no email there is no reset link: an umpire
+    // making a NEW code is how a locked-out player gets back in.
+    const spentCode = await asPlayer('/auth/player/claim', {
       method: 'POST',
       body: { code: claim.body.claimCode },
     })
-    check('the claim code still works AFTER a password is set (the recovery path)',
+    check('the code used to set up the account no longer signs in -> 404',
+      spentCode.status === 404, String(spentCode.status))
+    const recoveryCode = await call(`/players/${playerA}/claim-code`)
+    check('an umpire asking for that player\'s code now gets a NEW one',
+      recoveryCode.status === 200 && Boolean(recoveryCode.body.claimCode) &&
+        recoveryCode.body.claimCode !== claim.body.claimCode,
+      String(recoveryCode.status))
+    const recovered = await asPlayer('/auth/player/claim', {
+      method: 'POST',
+      body: { code: recoveryCode.body.claimCode },
+    })
+    check('and the new code signs them back in (the recovery path)',
       recovered.status === 200 && recovered.body.player?.id === playerA,
       JSON.stringify(recovered.body).slice(0, 100))
     check('and it reports the username, so no prompt to set up what exists',
@@ -1183,6 +1195,12 @@ async function main() {
       JSON.stringify(setUp.body))
     check('and it works immediately',
       (await login({ username: `smk_e_${stamp}`.slice(0, 20), password: PASSWORD })).status === 200)
+    const echoCodeAfter = await asPlayer('/auth/player/claim', {
+      method: 'POST',
+      body: { code: echoCode.body.claimCode },
+    })
+    check('and the code that opened the session no longer signs in -> 404',
+      echoCodeAfter.status === 404, String(echoCodeAfter.status))
 
     // A phone left unlocked on the profile screen must not be a silent
     // account takeover.
@@ -1510,9 +1528,9 @@ async function main() {
       mine.status === 200 && mine.body.alreadyYours === true,
       JSON.stringify(mine.body).slice(0, 120))
 
-    // A claim code keeps working after its owner sets a password,
-    // because that is the forgotten-password path -- so holding one must
-    // NOT be enough to absorb a real account.
+    // An umpire can make a code for a player who already has an
+    // account, because that is the forgotten-password path -- so
+    // holding one must NOT be enough to absorb a real account.
     const rivalUser = `smk_rival_${stamp3}`.slice(0, 20)
     const rival = await register({
       name: `Smoke Rival ${stamp3}`, username: rivalUser, password: PASSWORD,
@@ -1564,6 +1582,9 @@ async function main() {
 
     const mergedMe = await asPlayer('/player/me', { bearer: mergedToken })
     check('the new token works -> 200', mergedMe.status === 200)
+    const linkCodeAfter = await asPlayer('/auth/player/claim', { method: 'POST', body: { code: spellingCode } })
+    check('and the code that linked them no longer signs in -> 404',
+      linkCodeAfter.status === 404, String(linkCodeAfter.status))
     check('and shows both matches', mergedMe.body.summary?.matches === 2,
       JSON.stringify(mergedMe.body.summary ?? null))
 

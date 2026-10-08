@@ -391,10 +391,10 @@ router.post('/link', async (req, res) => {
       return { status: 200, body: { alreadyYours: true } }
     }
 
-    // A claim code deliberately keeps working after its owner sets a
-    // password, because an umpire re-minting it is the whole
-    // forgotten-password path (see schema.sql). Holding one is
-    // therefore NOT permission to absorb a real account.
+    // A player who already has an account can still be given a code:
+    // an umpire making a new one is the whole forgotten-password path
+    // (see routes/auth.js). Holding one is therefore NOT permission to
+    // absorb a real account.
     //
     // google_sub counts as a real account for exactly the same reason a
     // password does: somebody signs in as this player. Checking only
@@ -552,6 +552,8 @@ router.post('/link', async (req, res) => {
               password_hash  = $3,
               google_sub     = $5,
               google_email   = $6,
+              -- Kept only for an account with no password and no Google.
+              claim_code     = CASE WHEN $3::text IS NULL AND $5::text IS NULL THEN claim_code END,
               registered_at  = COALESCE(registered_at, $4),
               claimed_at     = COALESCE(claimed_at, now()),
               deactivated_at = NULL,
