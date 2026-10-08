@@ -2,8 +2,8 @@
 // ============================================================
 // Is there enough repeat-partnership data for "partner fit" yet?
 //
-//   node server/scripts/check-partner.mjs <match-logs.json>
-//   curl ... /export/match-logs.json | node server/scripts/check-partner.mjs
+//   node server/scripts/partner-fit.mjs <match-logs.json>
+//   curl -H 'x-internal-key: ...' .../internal/match-logs.json | node server/scripts/partner-fit.mjs
 //
 // Idea 7 in player/IDEAS.md wants to say "you play better with Gemma
 // than with Josh, and fairly -- weighted by who you were both up
@@ -43,7 +43,7 @@ try {
   parsed = JSON.parse(readFileSync(source, 'utf8'))
 } catch (error) {
   console.error(`Could not read an export from ${source === 0 ? 'stdin' : source}: ${error.message}`)
-  console.error('Expects the JSON from GET /export/match-logs.json (an object with `rows`).')
+  console.error('Expects the JSON from GET /internal/match-logs.json (an object with `rows`).')
   process.exit(1)
 }
 

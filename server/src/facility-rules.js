@@ -171,9 +171,26 @@ export function mayCreateFacility(admin) { return admin?.role === 'owner' }
 export function mayMove(admin) { return admin?.role === 'owner' }
 
 /**
+ * The SQL condition limiting `column` to what a facilityFilterFor()
+ * result allows. Fails closed: only an explicit `{ all }` opens things
+ * up; `{ id }` restricts to that one facility; `{ none }`, a missing
+ * filter, or any other unrecognised shape all mean nothing matches.
+ * Callers must always pass a real filter -- there is no "everything"
+ * default to fall back on by accident.
+ */
+export function scopeCondition(filter, params, column) {
+  if (filter?.all) return 'TRUE'
+  if (filter?.id) {
+    params.push(filter.id)
+    return `${column} = $${params.length}::uuid`
+  }
+  return 'FALSE'
+}
+
+/**
  * The SQL condition limiting `column` to one umpire's facility.
  *
- * The mirror of overview-store.js's scopeCondition, for the umpire side
+ * The mirror of scopeCondition above, for the umpire side
  * where there is only ever one facility and never "all". An umpire with
  * no facility matches NOTHING rather than everything: on a database old
  * enough to still allow one, the safe reading of "belongs nowhere" is

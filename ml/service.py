@@ -18,19 +18,18 @@ re-run the entire clustering on every page load, and would give slightly
 different answers each time as n_init=20 re-seeds. So the work happens
 in batches, and the app reads the last published snapshot.
 
-In production the nightly run is a separate Railway cron service,
-`ml-cron`, which starts `python run.py` and exits; this service only
-answers /health and POST /run there, with PADDLEPAD_SCHEDULE=off.
-Staging has no nightly run: the same setting, and runs started by hand.
-See scheduler.py.
+The nightly run is a separate Railway cron service, `ml-cron`, which
+starts `python run.py` and exits. This service only answers /health and
+POST /run, so it can sleep between requests. Staging has no nightly
+run; its runs are started by hand.
 """
 
+import hmac
 import os
 import threading
 
 from flask import Flask, jsonify, request
 
-import scheduler
 from run import run
 
 app = Flask(__name__)
@@ -41,12 +40,6 @@ app = Flask(__name__)
 run_lock = threading.Lock()
 
 TRIGGER_KEY = os.environ.get("INTERNAL_API_KEY", "")
-
-# Started at import so it runs under gunicorn, which imports this module
-# rather than executing it. Tied to `--workers 1` in the Procfile: a
-# second worker would be a second process with its own thread, and both
-# would wake at 3am and publish near-identical snapshots.
-scheduler.start(run, run_lock, enabled=scheduler.enabled_from_env())
 
 
 @app.get("/health")
@@ -67,7 +60,10 @@ def trigger():
     during a demo than freeing the connection early.
     """
     presented = request.headers.get("x-internal-key", "")
-    if not TRIGGER_KEY or len(TRIGGER_KEY) < 32 or presented != TRIGGER_KEY:
+    # Compared in constant time, and as bytes: compare_digest refuses
+    # text holding a letter outside plain English.
+    same_key = hmac.compare_digest(presented.encode(), TRIGGER_KEY.encode())
+    if not TRIGGER_KEY or len(TRIGGER_KEY) < 32 or not same_key:
         return jsonify(error="Missing or invalid internal key"), 401
 
     if not run_lock.acquire(blocking=False):

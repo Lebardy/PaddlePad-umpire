@@ -47,7 +47,8 @@ Every statement is idempotent, so there's no separate migration step.
 
 ```bash
 cd server
-pnpm test:serving   # the scoring engine alone; no database, no network
+pnpm test           # every check that needs no database and no network
+pnpm test:serving   # the scoring engine alone, one of those checks
 pnpm test:e2e       # the whole API, against a throwaway Postgres
 ```
 

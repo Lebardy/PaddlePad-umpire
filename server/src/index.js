@@ -126,8 +126,9 @@ app.use('/auth/me/password', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/auth/me', rateLimit({ max: 30, windowMs: 60_000 }))
 
 // Mistyped player names are the realistic spam vector on an otherwise
-// trusted API, and the export is the only genuinely expensive query.
-app.use('/players', rateLimit({ max: 60, windowMs: 60_000 }))
+// trusted API. Limits count per address and a venue's wifi is ONE
+// address, so this is sized for all its umpires searching at once.
+app.use('/players', rateLimit({ max: 300, windowMs: 60_000 }))
 // A claim code is a bearer credential, so this gets a login-grade limit
 // rather than a read-grade one. 60/min against a code space would be far
 // too generous for something that grants access on its own.
@@ -159,11 +160,13 @@ app.use('/auth/player/google/link', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/auth/player/google/unlink', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/auth/player/google', rateLimit({ max: 10, windowMs: 60_000 }))
 // Takes a claim code, so it is a bearer-credential guessing surface and
-// gets the same login-grade limit /auth/player/claim does -- the 60/min
+// gets the same login-grade limit /auth/player/claim does -- the limit
 // below would be far too generous. Mounted first so it keys its own
 // bucket rather than sharing /player's.
 app.use('/player/link', rateLimit({ max: 10, windowMs: 60_000 }))
-app.use('/player', rateLimit({ max: 60, windowMs: 60_000 }))
+// Sized for a whole venue on one wifi address opening the app in the
+// same minute, a few requests each -- not for one phone.
+app.use('/player', rateLimit({ max: 300, windowMs: 60_000 }))
 // One caller, a handful of calls per run. Tight enough that a leaked
 // key cannot be used to scrape the whole club's match log repeatedly,
 // loose enough for a nightly run plus a few manual triggers in a demo.
@@ -206,12 +209,22 @@ app.use('/admin/players', adminPlayersRoutes)
 app.use('/admin/umpires', adminUmpiresRoutes)
 app.use('/logos', logoRoutes)
 
+// An id that is not an id (Postgres code 22P02), or a date that is not
+// a date. Such a request can never succeed, so it must not look like a
+// server fault: the umpire app retries a 5xx for ever and holds
+// everything queued behind it, while a 4xx is set aside.
+const isUnreadableInput = (error) =>
+  error.code === '22P02' || (error instanceof RangeError && error.message === 'Invalid time value')
+
 // Express 5 forwards rejected promises from async handlers here, so
 // route handlers don't each need their own try/catch.
 app.use((error, _req, res, _next) => {
   console.error(error)
-  const status = /Origin not allowed/.test(error.message) ? 403 : 500
-  res.status(status).json({ error: status === 403 ? error.message : 'Server error' })
+  if (/Origin not allowed/.test(error.message)) return res.status(403).json({ error: error.message })
+  if (isUnreadableInput(error)) {
+    return res.status(400).json({ error: 'That request has an id or a date the server cannot read' })
+  }
+  res.status(500).json({ error: 'Server error' })
 })
 
 const port = process.env.PORT ?? 3000

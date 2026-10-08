@@ -234,6 +234,15 @@ function asPlayer(path, options = {}) {
 }
 
 const uuid = () => crypto.randomUUID()
+
+/**
+ * Lets the clock move into a later second. An admin token from the SAME
+ * second as a session reset survives it: sessionEnded (admin-rules.js)
+ * compares whole seconds, so that the token handed back with the reset
+ * still works. A check that an OLDER token has ended is therefore only
+ * fair once the reset is sure to land in a later second than that token.
+ */
+const intoALaterSecond = () => new Promise((resolve) => setTimeout(resolve, 1100))
 const DEVICE = `smoke-${uuid().slice(0, 8)}`
 
 /** A rally event won by `playerId`, at sequence `seq`. */
@@ -635,6 +644,23 @@ async function main() {
     body: { deviceId: otherDevice, events: [rally(0, teamB[0]), rally(1, teamB[0])] },
   })
   check('the taking-over device can now push', afterTakeover.status === 200)
+
+  section('an id or date the server cannot read is refused, not a server error')
+  // The umpire app retries any 5xx for ever and holds everything queued
+  // behind it, so a request that can never succeed has to answer 4xx.
+  const notAnId = await call('/matches/not-an-id')
+  check('a match address that is not an id -> 400', notAnId.status === 400, String(notAnId.status))
+  const noSessionId = await call('/sessions/undefined/end', { method: 'POST', body: { ended: true } })
+  check('ending a session whose id is missing -> 400', noSessionId.status === 400, String(noSessionId.status))
+  const badEndTime = await call(`/matches/${liveMatchId}/log`, {
+    method: 'PUT',
+    body: { deviceId: otherDevice, events: [rally(0, teamB[0])], endedEarly: true, endedEarlyAt: 'not a date' },
+  })
+  check('a log with an end time that is not a date -> 400', badEndTime.status === 400, String(badEndTime.status))
+  const stillLive = await call(`/matches/${liveMatchId}`)
+  check('and the refused log changed nothing',
+    stillLive.body.match?.status === 'in_progress' && stillLive.body.match?.eventCount === 2,
+    `${stillLive.body.match?.status}, ${stillLive.body.match?.eventCount} events`)
 
   section('ASSERTION 6 — the point target is stored and honoured')
   // The whole risk of a per-match target is that it might be ignored on
@@ -1053,6 +1079,31 @@ async function main() {
       linkedMe.body.player?.username === `smk_a_${stamp}`.slice(0, 20),
       String(linkedMe.body.player?.username))
 
+    // Ratings are kept in memory and reloaded only when a finished
+    // match changes. These two moments are the ones that must reload.
+    const ratedMatches = (me) => me.body.rallyRating?.matches ?? me.body.rallyRating?.have
+    const ratedBefore = ratedMatches(linkedMe)
+    const oneMoreId = uuid()
+    await call('/matches', {
+      method: 'POST',
+      body: {
+        id: oneMoreId, sessionId, teamA, teamB,
+        stacking: { A: false, B: false },
+        firstServer: { team: 'A', playerId: teamA[0] },
+        startedAt: Date.now(),
+      },
+    })
+    const elevenStraight = Array.from({ length: 11 }, (_, i) => rally(i, teamA[0]))
+    await call(`/matches/${oneMoreId}/log`, { method: 'PUT', body: { deviceId: DEVICE, events: elevenStraight } })
+    const meAfterWin = await asPlayer('/player/me', { bearer: linked.body.token })
+    check('a finished match counts towards the rating at once',
+      ratedMatches(meAfterWin) === ratedBefore + 1, `${ratedBefore} -> ${ratedMatches(meAfterWin)}`)
+    await call(`/matches/${oneMoreId}/log`, { method: 'PUT', body: { deviceId: DEVICE, events: elevenStraight.slice(0, 5) } })
+    const meAfterReopen = await asPlayer('/player/me', { bearer: linked.body.token })
+    check('and stops counting as soon as it is reopened',
+      ratedMatches(meAfterReopen) === ratedBefore, `${ratedBefore} -> ${ratedMatches(meAfterReopen)}`)
+    await call(`/matches/${oneMoreId}`, { method: 'DELETE' })
+
     const takenTwice = await register({
       name: nameA,
       username: `smk_a2_${stamp}`.slice(0, 20),
@@ -1095,14 +1146,26 @@ async function main() {
       asUmpireRoute.status === 403, String(asUmpireRoute.status))
 
     // --- the claim code as the recovery path ---
-    // Deliberately still valid after a password is set: with no email
-    // there is no reset link, so an umpire regenerating the code is how
-    // a locked-out player gets back in.
-    const recovered = await asPlayer('/auth/player/claim', {
+    // A code stops working once its player has their own way in, so one
+    // that was read out or sent around earlier is not a spare key to
+    // the account. With no email there is no reset link: an umpire
+    // making a NEW code is how a locked-out player gets back in.
+    const spentCode = await asPlayer('/auth/player/claim', {
       method: 'POST',
       body: { code: claim.body.claimCode },
     })
-    check('the claim code still works AFTER a password is set (the recovery path)',
+    check('the code used to set up the account no longer signs in -> 404',
+      spentCode.status === 404, String(spentCode.status))
+    const recoveryCode = await call(`/players/${playerA}/claim-code`)
+    check('an umpire asking for that player\'s code now gets a NEW one',
+      recoveryCode.status === 200 && Boolean(recoveryCode.body.claimCode) &&
+        recoveryCode.body.claimCode !== claim.body.claimCode,
+      String(recoveryCode.status))
+    const recovered = await asPlayer('/auth/player/claim', {
+      method: 'POST',
+      body: { code: recoveryCode.body.claimCode },
+    })
+    check('and the new code signs them back in (the recovery path)',
       recovered.status === 200 && recovered.body.player?.id === playerA,
       JSON.stringify(recovered.body).slice(0, 100))
     check('and it reports the username, so no prompt to set up what exists',
@@ -1132,6 +1195,12 @@ async function main() {
       JSON.stringify(setUp.body))
     check('and it works immediately',
       (await login({ username: `smk_e_${stamp}`.slice(0, 20), password: PASSWORD })).status === 200)
+    const echoCodeAfter = await asPlayer('/auth/player/claim', {
+      method: 'POST',
+      body: { code: echoCode.body.claimCode },
+    })
+    check('and the code that opened the session no longer signs in -> 404',
+      echoCodeAfter.status === 404, String(echoCodeAfter.status))
 
     // A phone left unlocked on the profile screen must not be a silent
     // account takeover.
@@ -1459,9 +1528,9 @@ async function main() {
       mine.status === 200 && mine.body.alreadyYours === true,
       JSON.stringify(mine.body).slice(0, 120))
 
-    // A claim code keeps working after its owner sets a password,
-    // because that is the forgotten-password path -- so holding one must
-    // NOT be enough to absorb a real account.
+    // An umpire can make a code for a player who already has an
+    // account, because that is the forgotten-password path -- so
+    // holding one must NOT be enough to absorb a real account.
     const rivalUser = `smk_rival_${stamp3}`.slice(0, 20)
     const rival = await register({
       name: `Smoke Rival ${stamp3}`, username: rivalUser, password: PASSWORD,
@@ -1513,6 +1582,9 @@ async function main() {
 
     const mergedMe = await asPlayer('/player/me', { bearer: mergedToken })
     check('the new token works -> 200', mergedMe.status === 200)
+    const linkCodeAfter = await asPlayer('/auth/player/claim', { method: 'POST', body: { code: spellingCode } })
+    check('and the code that linked them no longer signs in -> 404',
+      linkCodeAfter.status === 404, String(linkCodeAfter.status))
     check('and shows both matches', mergedMe.body.summary?.matches === 2,
       JSON.stringify(mergedMe.body.summary ?? null))
 
@@ -2108,6 +2180,7 @@ async function main() {
     check('a second sign-in for token B -> 200', loginB.status === 200, String(loginB.status))
     const tokenB = loginB.body.token
 
+    await intoALaterSecond()
     const signedOutWatermark = await newestActivityId('admin.signed_out_others', ownerId, tokenB)
     const signedOut = await request('/admin/auth/me/sign-out-others', { method: 'POST', bearer: tokenB })
     check('sign-out-others with token B -> 200 with a fresh token',
@@ -2136,6 +2209,7 @@ async function main() {
     let restored = false
     try {
       const beforeChangeToken = ownerToken
+      await intoALaterSecond()
       const toTemp = await request('/admin/auth/me/password', {
         method: 'POST', bearer: ownerToken, body: { currentPassword: OWNER_PASSWORD, newPassword: TEMP_PASSWORD },
       })
@@ -2192,13 +2266,9 @@ async function main() {
       hSetup.status === 200 && typeof hSetup.body.token === 'string', redacted(hSetup.body).slice(0, 80))
     let hAdminToken = hSetup.body.token
 
-    // sessionEnded compares whole seconds so a token handed back in the
-    // SAME response as a reset still works (see admin-rules.js). Setup
-    // itself resets sessions and pins this token to that second, so the
-    // switch-off below needs to land in a LATER second, or its own
-    // reset would land in the same one and this token would wrongly
-    // survive it.
-    await new Promise((resolve) => setTimeout(resolve, 1100))
+    // Setup itself resets sessions and pins this token to that second,
+    // so the switch-off below has to land in a later one.
+    await intoALaterSecond()
 
     const hOff = await request(`/admin/admins/${hAdminId}/switch-off`, { method: 'POST', bearer: ownerToken })
     check('the owner switches it off -> 200', hOff.status === 200 && hOff.body.admin?.active === false, String(hOff.status))
@@ -2253,6 +2323,7 @@ async function main() {
     const messyCode = firstCode.toLowerCase().replace('-', '')
     const bcUsedWatermark = await newestActivityId('admin.backup_code_used', ownerId, ownerToken)
     const tokenBeforeBackupUse = ownerToken
+    await intoALaterSecond()
     const bcUse = await request('/admin/auth/backup-code', { method: 'POST', body: { email: OWNER_EMAIL, code: messyCode } })
     check('a lower-cased, dash-less code signs in -> 200, usedBackupCode',
       bcUse.status === 200 && bcUse.body.usedBackupCode === true, redacted(bcUse.body).slice(0, 80))

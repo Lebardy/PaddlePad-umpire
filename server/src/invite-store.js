@@ -2,24 +2,8 @@
 // Invite codes: the only way a new umpire can create an account.
 // ============================================================
 
+import { scopeCondition } from './facility-rules.js'
 import { generateInviteCode } from './invites.js'
-
-/**
- * Turns a facility-rules.js facilityFilterFor() result into a fixed SQL
- * condition. Fails closed: only an explicit `{ all }` opens things up;
- * `{ id }` restricts to that one facility; `{ none }`, a missing
- * filter, or any other unrecognised shape all mean nothing matches.
- * Callers must always pass a real filter -- there is no "everything"
- * default to fall back on by accident.
- */
-function facilityClause(filter, column, params) {
-  if (filter?.all) return 'TRUE'
-  if (filter?.id) {
-    params.push(filter.id)
-    return `${column} = $${params.length}`
-  }
-  return 'FALSE'
-}
 
 /**
  * Every code with its status, newest first, scoped by `filter` (a
@@ -28,7 +12,7 @@ function facilityClause(filter, column, params) {
  */
 export async function listInvites(db, filter) {
   const params = []
-  const where = facilityClause(filter, 'i.facility_id', params)
+  const where = scopeCondition(filter, params, 'i.facility_id')
   const { rows } = await db.query(
     `SELECT i.code,
             i.note,
@@ -76,7 +60,7 @@ export async function createInvite(db, { note, days, createdByAdmin, facilityId 
  */
 export async function cancelInvite(db, code, filter) {
   const params = [code]
-  const where = facilityClause(filter, 'facility_id', params)
+  const where = scopeCondition(filter, params, 'facility_id')
   const { rows } = await db.query(
     `DELETE FROM invites WHERE code = $1 AND used_by IS NULL AND (${where}) RETURNING code, note`,
     params,

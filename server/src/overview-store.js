@@ -6,6 +6,7 @@
 // ============================================================
 
 import { deriveMatchState, eventFromRow } from './pickleball.js'
+import { scopeCondition } from './facility-rules.js'
 import {
   PLAYER_ID_KEYS, WINDOW_DAYS, duplicatePairs, hasSignIn, leftOpenReason, matchReasons, pairKey, sameDayPairs, sharedMatchPairs,
 } from './overview-rules.js'
@@ -13,20 +14,6 @@ import {
 const WEEK = "now() - interval '7 days'"
 
 const toMs = (value) => (value == null ? null : value instanceof Date ? value.getTime() : Date.parse(value))
-
-/**
- * The SQL condition limiting `column` (a sessions.facility_id or
- * umpires.facility_id reference) to a facilityFilterFor() result.
- * `{ none }` or anything unrecognised is FALSE -- fail closed.
- */
-export function scopeCondition(filter, params, column) {
-  if (filter?.all) return 'TRUE'
-  if (filter?.id) {
-    params.push(filter.id)
-    return `${column} = $${params.length}::uuid`
-  }
-  return 'FALSE'
-}
 
 async function eventsFor(queryFn, matchIds) {
   const byMatch = new Map()

@@ -11,6 +11,7 @@ import { isUuid, stackingFromColumns, stackingToColumns } from '../validate.js'
 import { rallyEndingProblem } from '../rally-endings.js'
 import { invalidateRallyRatings } from '../rally-rating-store.js'
 import { umpireScope } from '../facility-rules.js'
+import { LEASE_MINUTES, heldByAnotherDevice } from '../scoring-lease.js'
 
 const router = Router()
 router.use(requireAuth, requireActiveUmpire(query))
@@ -31,15 +32,6 @@ function sendRefusal(res, error) {
 // that; 500 would be a marathon. The cap is a sanity bound on a single
 // request, not a real gameplay limit.
 const MAX_EVENTS = 500
-
-// How long a device keeps the right to score a match before another
-// may take over without forcing.
-//
-// Handover mid-session is the NORMAL case -- one umpire relieves
-// another on a court -- so the lease has to expire. Without it, a
-// phone put in a pocket or one that crashed would lock that court
-// forever with no way back except a database edit.
-const LEASE_MINUTES = 15
 
 const MATCH_SELECT = `
   SELECT m.id, m.session_id, m.team_a, m.team_b,
@@ -351,16 +343,7 @@ router.put('/:id/log', async (req, res) => {
   if (!existing.rows[0]) return res.status(404).json({ error: 'No such match' })
   const row = existing.rows[0]
 
-  // Lease check. A stale lease is takeable without forcing, because
-  // court handover is normal; a live one is not, because that means two
-  // people are scoring the same rallies right now.
-  const leaseAgeMs = row.scoring_claimed_at
-    ? Date.now() - new Date(row.scoring_claimed_at).getTime()
-    : Infinity
-  const leaseHeldByOther =
-    row.scoring_device && row.scoring_device !== deviceId && leaseAgeMs < LEASE_MINUTES * 60_000
-
-  if (leaseHeldByOther) {
+  if (heldByAnotherDevice(row, deviceId)) {
     return res.status(409).json({
       error: 'Another device is scoring this match',
       heldBy: { umpireName: row.recorded_by_name, since: row.scoring_claimed_at },
@@ -468,9 +451,10 @@ router.put('/:id/log', async (req, res) => {
     )
   })
 
-  // Events, completion and ending early all arrive here, so any of them
-  // can change the rally rating.
-  invalidateRallyRatings()
+  // Only finished matches are rated. The ratings need working out again
+  // when this match was finished before the save or is finished now;
+  // a tap in a match still being played changes none of them.
+  if (row.status === 'completed' || completed) invalidateRallyRatings()
 
   const updatedParams = [req.params.id]
   const updatedScope = umpireScope(req.umpire.facilityId, updatedParams, 'sess.facility_id')
