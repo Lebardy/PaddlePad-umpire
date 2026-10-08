@@ -173,6 +173,28 @@ section('an umpire can never be made without a facility')
     authRoute.includes('UPDATE umpires SET facility_id = $2 WHERE id = $1'), false)
 }
 
+section("an admin's facilities, as SQL")
+{
+  {
+    const params = ['some-id']
+    check('one facility becomes a condition on the column',
+      rules.scopeCondition({ id: 'fa' }, params, 'e.facility_id'), 'e.facility_id = $2::uuid')
+    check('and the id is appended to the parameters', params, ['some-id', 'fa'])
+  }
+  {
+    const params = []
+    check('the owner seeing every facility needs no condition',
+      rules.scopeCondition({ all: true }, params, 's.facility_id'), 'TRUE')
+    check('and adds no parameter', params, [])
+  }
+  check('an admin with no facility matches nothing',
+    rules.scopeCondition({ none: true }, [], 's.facility_id'), 'FALSE')
+  check('a missing filter matches nothing, never everything',
+    rules.scopeCondition(undefined, [], 's.facility_id'), 'FALSE')
+  check('neither does a shape it does not know',
+    rules.scopeCondition({ everything: true }, [], 's.facility_id'), 'FALSE')
+}
+
 section("an umpire's own facility, as SQL")
 {
   {

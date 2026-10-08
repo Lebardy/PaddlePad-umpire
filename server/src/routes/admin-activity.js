@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { query } from '../db.js'
 import { requireAdminAccount } from '../auth.js'
 import { ACTIONS } from '../admin-rules.js'
-import { facilityFilterFor } from '../facility-rules.js'
+import { facilityFilterFor, scopeCondition } from '../facility-rules.js'
 import { listFacilities } from '../facility-store.js'
 import { isUuid } from '../validate.js'
 
@@ -23,13 +23,7 @@ router.get('/', async (req, res) => {
   // `{ none }` is its own fixed FALSE condition, never "no filter".
   const filter = facilityFilterFor(req.admin, isUuid(req.query.facilityId) ? req.query.facilityId : null)
   const params = [before, adminId, action]
-  let facilityFilter = 'FALSE' // fail closed: filter.none, or anything unrecognised, sees nothing
-  if (filter.all) {
-    facilityFilter = 'TRUE'
-  } else if (filter.id) {
-    params.push(filter.id)
-    facilityFilter = `e.facility_id = $${params.length}`
-  }
+  const facilityFilter = scopeCondition(filter, params, 'e.facility_id')
   params.push(PAGE + 1)
 
   // One more than a page, to know whether there is an older page.
