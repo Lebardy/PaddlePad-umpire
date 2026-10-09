@@ -526,16 +526,16 @@ function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
         <p className="you-line">
           Your matches, as an umpire recorded them courtside.
         </p>
-        {/* The claim that nothing is compared against anyone else stopped
-            being true when the rating page and the monthly board arrived,
-            so this says where the exceptions are instead -- now behind a
-            tap, because it is an answer to a question, not a greeting. */}
+        {/* Not everything here is a plain count: the rating is worked
+            out, and the Leaderboard ranks people by it. This says so,
+            behind a tap, because it is an answer to a question, not a
+            greeting. */}
         <More label="Where do the numbers come from?">
           <p>
             Most numbers here are plain counts of what was tapped courtside.
-            Two things look further: your PaddlePad Rating, which is worked
-            out rally by rally from every match you play, and the monthly board, which
-            names people for what they did — it never ranks anyone.
+            Your PaddlePad Rating is worked out rally by rally from every
+            match you play. The Leaderboard ranks players by that rating, and
+            its monthly lists name people for what they did that month.
           </p>
         </More>
         {/* Written out rather than a custom install button: the browser
