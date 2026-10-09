@@ -26,7 +26,7 @@ import { THEMES, getThemeChoice, setThemeChoice } from '../lib/theme'
 // and matches carry created_by and there is no deactivation path for an
 // umpire the way there is for a player; and promoting anyone to admin,
 // which schema.sql leaves as a manual UPDATE so control over who can
-// issue invites stays with whoever runs the club.
+// issue invites stays with whoever runs PaddlePad.
 // ============================================================
 
 const VERSION = __APP_VERSION__

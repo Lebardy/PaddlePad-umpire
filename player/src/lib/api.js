@@ -233,7 +233,7 @@ export async function registerPlayer({ name, username, password, code }) {
  * `name` and `code` are absent on the first call and that is the normal
  * case, not a mistake. The server answers a Google account it has never
  * seen with `needsName` -- Google proves an ACCOUNT, never which player
- * on a club roster this is -- and the screen calls this again with the
+ * on the roster this is -- and the screen calls this again with the
  * name typed in, and once more with a claim code if that name turns out
  * to be on the roster already.
  */
@@ -387,7 +387,7 @@ export function fetchMe({ signal } = {}) {
 }
 
 /**
- * Where this player sits in the club, and the size of their group.
+ * Where this player sits among everyone rated, and the size of their group.
  *
  * Its own call rather than part of fetchMe: the overview pays for that
  * one on every launch, and this is only wanted once somebody taps

@@ -4,7 +4,7 @@
 // Everything here is a plain count or ratio over this player's own
 // matches. Nothing needs other players to exist, which is what makes it
 // safe to show from the very first match -- unlike a skill rating,
-// which is scaled against the whole club and would visibly move because
+// which is scaled against every other player and would visibly move because
 // SOMEONE ELSE played.
 // ============================================================
 
@@ -143,7 +143,7 @@ export function peopleTogether(matches) {
 /**
  * The facts that survive a long tail of one-match relationships.
  *
- * This is what replaced a "best partner" win rate. In a club where
+ * This is what replaced a "best partner" win rate. Where
  * partners rotate every match almost nobody reaches three matches with
  * the same person, so a rate was either meaningless or -- once gated to
  * stop it being meaningless -- absent entirely, which is exactly what

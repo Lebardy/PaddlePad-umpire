@@ -216,7 +216,7 @@ function CreatePanel({ onSignedIn }) {
  * Where a Google account nobody recognises has to say who it is.
  *
  * Google has proved an account exists and that this person owns it. It
- * has not said anything about which player on a club roster they are,
+ * has not said anything about which player on the roster they are,
  * and it cannot: the only name it knows is the one on their Google
  * profile, which may be nothing like the name an umpire writes on a
  * scoresheet. So this asks, with Google's version already filled in as

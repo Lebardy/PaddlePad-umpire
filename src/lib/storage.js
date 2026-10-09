@@ -612,7 +612,7 @@ export function migrateLegacyData() {
  *
  * So leaving it behind is not merely untidy: it can undo a deletion,
  * and it hands the next person to use the device a full copy of the
- * club's match history.
+ * match history.
  *
  * The caller is responsible for warning about unsynced work first --
  * see handleSignOut in App.jsx. This function itself is unconditional

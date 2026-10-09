@@ -134,7 +134,7 @@ export function resolve(key) {
 /**
  * Records a failure that is worth retrying, with backoff.
  *
- * Jittered so that a whole club's devices coming back onto the same wifi
+ * Jittered so that a whole venue's devices coming back onto the same wifi
  * don't retry in lockstep.
  */
 export function defer(key, error, delayMs) {
