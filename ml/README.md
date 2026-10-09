@@ -1,6 +1,6 @@
 # The ML service
 
-Turns PaddlePad's match logs into a skill score and a playstyle
+Turns PaddlePad's match logs into a skill group and a playstyle
 archetype for each player, and publishes them back to the API as a
 dated snapshot.
 
@@ -8,7 +8,7 @@ dated snapshot.
 
 ```
 umpire app ──► api (Node) ──► ml (this) ──► api ──► player app
-   taps         match logs     score +        snapshot    rating
+   taps         match logs     group +        snapshot    playstyle
                                archetype
 ```
 
@@ -38,22 +38,21 @@ learns where the clusters sit by looking at every player at once,
 assigns each to the nearest, and keeps nothing -- there is no saved
 model for a new player to be measured against.
 
-And the skill score does not come from K-Means at all. It comes from
-`min_max_normalize`, which places each player between the weakest and
-strongest player *currently present*. It moves when other people play,
-model or no model.
+And before K-Means sees anything, every feature is standardised against
+the players *currently present* (`StandardScaler`). Where a player sits
+moves when other people play, model or no model.
 
-So an endpoint that scored one player on demand would secretly re-run
+So an endpoint that grouped one player on demand would secretly re-run
 the whole clustering on every page load, and would give slightly
 different answers each time as `n_init=20` re-seeds. The work happens in
 batches; the app reads the last published snapshot.
 
 **When to save a model instead:** once the population stops changing
 shape. At a few hundred regular players the clusters are real rather
-than noise, and that is the point to freeze the K-Means model, both
-`StandardScaler`s, and the min/max bounds together as one versioned
-artifact. Freezing only the model would not help — the score would still
-move.
+than noise, and that is the point to freeze the K-Means models, both
+`StandardScaler`s and the PCA together as one versioned artifact.
+Freezing only the models would not help — the scaled features would
+still move.
 
 ## The gate
 
@@ -63,7 +62,7 @@ one definition rather than a copy here that drifts.
 
 | Rule | Why |
 |---|---|
-| A player needs **5+ matches** | At one match there is no spread in any per-match rate, so all seven consistency features are `NaN` filled with `0.0` — which the skill model reads as *flawless consistency* and rewards. Such a player outranks genuine regulars. |
+| A player needs **5+ matches** | At one match there is no spread in any per-match rate, so all seven consistency features are `NaN` filled with `0.0` — which K-Means reads as *flawless consistency*, pulling such a player towards the steadiest regulars on the strength of a single match. |
 | The pool needs **3+ players** | `test_skill_k_values` raises below three. Hard limit, not a preference. |
 | The pool wants **~40 players** | The clustering is two-level and skips any skill group with fewer than three members. Below roughly forty, the archetype half stops being produced. |
 
@@ -178,17 +177,11 @@ rotated. `railway variables --set` prints only the name.
 
 ## Known limitations
 
-Recorded rather than fixed, and both belong in the pipeline's own repo:
+Recorded rather than fixed, and it belongs in the pipeline's own repo:
 
-- **`assign_skill_tier` uses absolute cutoffs on a relative score.**
-  Under 40 Beginner, under 75 Intermediate, 75+ Professional — applied
-  to a score that only says where you sit in the current pool. In a pool
-  of twelve the best player scores 100 and is labelled Professional
-  regardless of how they play. The tier is stored but deliberately never
-  shown to a player.
 - **Mixed point targets read as inconsistency.** Most features are
   per-match rates, so a player whose games mix 11 and 21 shows more
-  spread and is marked down for it, though nothing about their play
+  spread and reads as less consistent, though nothing about their play
   changed. Each run records the format mix in its notes; `run.py` has a
   one-line switch to filter to one target, off by default because right
   now it would discard most of the data.

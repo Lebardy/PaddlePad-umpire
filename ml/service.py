@@ -8,12 +8,12 @@ answer is in the algorithm, not in preference:
 There is no predict() anywhere in the pipeline -- only fit_predict.
 K-Means learns where the clusters sit by looking at every player at
 once, assigns each player to the nearest, and keeps nothing. There is no
-saved model for a new player to be measured against. On top of that the
-skill score itself is not from K-Means at all: min_max_normalize places
-each player between the weakest and strongest player CURRENTLY present,
-so it moves when other people play regardless of any model.
+saved model for a new player to be measured against. On top of that
+every feature is standardised against the players CURRENTLY present
+before K-Means sees it, so where a player sits moves when other people
+play regardless of any model.
 
-An endpoint that scored one player on demand would therefore secretly
+An endpoint that grouped one player on demand would therefore secretly
 re-run the entire clustering on every page load, and would give slightly
 different answers each time as n_init=20 re-seeds. So the work happens
 in batches, and the app reads the last published snapshot.
