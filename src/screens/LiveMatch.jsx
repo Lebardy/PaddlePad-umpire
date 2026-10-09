@@ -90,7 +90,7 @@ function RallyLegend() {
               <p className="rally-legend-head">{title}</p>
               {endings.map((ending) => (
                 <div key={ending.key}>
-                  <dt>{ending.label}</dt>
+                  <dt><Icon name={ending.key} size={18} />{ending.label}</dt>
                   <dd>{ending.help}</dd>
                 </div>
               ))}
@@ -413,6 +413,7 @@ function LiveMatch({ matchId, onBack }) {
                       onClick={handleUndo}
                       disabled={!pending && match.events.length === 0}
                     >
+                      <Icon name="undo" size={18} />
                       {pending ? 'Back' : 'Undo'}
                     </button>
                   </div>
@@ -477,10 +478,13 @@ function LiveMatch({ matchId, onBack }) {
                             className={`ending-btn ${tone}`}
                             onClick={() => pick(ending)}
                           >
-                            {ending.label}
-                            {ending.by === 'server' && (
-                              <span className="ending-auto">server</span>
-                            )}
+                            <Icon name={ending.key} size={26} className="icon-solo" />
+                            <span className="ending-label">
+                              {ending.label}
+                              {ending.by === 'server' && (
+                                <span className="ending-auto">server</span>
+                              )}
+                            </span>
                           </button>
                         ))}
                       </div>
@@ -507,19 +511,19 @@ function LiveMatch({ matchId, onBack }) {
                           className="outcome-btn winner"
                           onClick={() => logThirdShot(id, 'drop', true)}
                         >
-                          Drop &#10003;
+                          <span>Drop <Icon name="check" size={18} className="icon-solo" /></span>
                         </button>
                         <button
                           className="outcome-btn error"
                           onClick={() => logThirdShot(id, 'drop', false)}
                         >
-                          Drop &#10007;
+                          <span>Drop <Icon name="x" size={18} className="icon-solo" /></span>
                         </button>
                         <button
                           className="outcome-btn neutral"
                           onClick={() => logThirdShot(id, 'drive', null)}
                         >
-                          Drive
+                          <span><Icon name="drive" />Drive</span>
                         </button>
                       </div>
                     </div>
@@ -538,9 +542,11 @@ function LiveMatch({ matchId, onBack }) {
               land on them by accident. */}
           <section className="match-controls" aria-label="Match">
             <button className="end-early" onClick={handleEndEarly}>
+              <Icon name="flag" size={18} />
               End match early
             </button>
             <button className="cancel-match" onClick={handleCancel}>
+              <Icon name="x" size={18} />
               Cancel match
             </button>
           </section>

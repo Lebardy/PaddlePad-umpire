@@ -29,6 +29,32 @@ const PATHS = {
   undo: 'M9 7L4 12l5 5M4 12h11a5 5 0 0 1 0 10h-2',
   user: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8',
   x: 'M6 6l12 12M18 6L6 18',
+
+  // How a rally ended, each named by its ending key (server/src/
+  // rally-endings.js): lines are the court, the net or the ground, a
+  // circle is the ball, the rounded block a paddle, the boot a foot.
+  ace: 'M3 8h6M3 12h4M3 16h6M16 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z',
+  putaway: 'M4 20h16M6 4l10 10M16 8v6h-6',
+  passing: 'M7 20V5M3.5 8.5L7 5l3.5 3.5M14.5 8h4A1.5 1.5 0 0 1 20 9.5v5a1.5 1.5 0 0 1-1.5 1.5h-4a1.5 1.5 0 0 1-1.5-1.5v-5A1.5 1.5 0 0 1 14.5 8zM16.5 16v4',
+  lob: 'M3 20h18M12 20v-6M4 17C6 4 18 4 20 17',
+  drop_winner: 'M3 20h18M12 20v-6M3 7c6 0 11 3.5 12.5 9M16.6 15.3a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
+  dink_winner: 'M3 20h18M12 20v-6M7.5 17.5q4.5-9 9 0M18.4 15.8a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6z',
+  other_winner: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM8 12.5l3 3 5-6.5',
+  out: 'M3 13h13V4M19.5 15.2a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6z',
+  net: 'M3 20h18M12 20V8M10.3 8h3.4M7.3 10.9a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6zM2.5 8.5l2 1.4',
+  dink_error: 'M3 20h18M12 20v-8M12 7.4a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6zM4 17c1.2-4.5 3.2-6.6 5.6-7',
+  kitchen: 'M3 4h18v16H3zM7 15.5h8.6a1.2 1.2 0 0 0 1.2-1.2c0-1-.8-1.6-1.9-1.8l-2.2-.4-1-2.1-1.9.8V9.5H7z',
+  service: 'M5.5 9h4A1.5 1.5 0 0 1 11 10.5v5A1.5 1.5 0 0 1 9.5 17h-4A1.5 1.5 0 0 1 4 15.5v-5A1.5 1.5 0 0 1 5.5 9zM7.5 17v4M17.5 3.7a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6z',
+  foot_fault: 'M16 3v18M4 17h14.5a1.5 1.5 0 0 0 1.5-1.5c0-1.5-1.2-2.3-2.8-2.6l-3.2-.6L12.2 9 9.5 10.2V8H4z',
+  two_bounce: 'M4 20h16M3.5 7.5c3 1.5 4.8 6 6 12.5 1.3-5 3.3-8.3 6-9.3M18 7.3a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6z',
+  net_touch: 'M3 20h18M14 20V4M7.1 5h4A1.5 1.5 0 0 1 12.6 6.5v6A1.5 1.5 0 0 1 11.1 14h-4A1.5 1.5 0 0 1 5.6 12.5v-6A1.5 1.5 0 0 1 7.1 5zM9.1 14v4',
+  hit_by_ball: 'M10 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 3 1M19 13.7a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6z',
+  wrong_position: 'M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7',
+  other_fault: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9 9l6 6M15 9l-6 6',
+
+  // The third shot, and a tick for one that landed.
+  drive: 'M3 12h16M14 7l5 5-5 5',
+  check: 'M5 12l5 5 9-10',
 }
 
 function Icon({ name, size = 20, className = '' }) {

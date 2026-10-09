@@ -1690,3 +1690,8 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
 @media (prefers-reduced-motion: reduce) {
   .guide-chevron { transition: none; }
 }
+
+/* Each way a rally can end carries its picture to the left of its name;
+   the button is no taller for it. */
+.ending-btn { flex-direction: row; gap: 0.5rem; }
+.ending-label { display: flex; flex-direction: column; align-items: center; min-width: 0; }

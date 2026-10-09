@@ -120,7 +120,7 @@ function Guide({ onBack }) {
             <dl className="guide-terms">
               {endings.map((ending) => (
                 <div key={ending.key}>
-                  <dt>{ending.label}</dt>
+                  <dt><Icon name={ending.key} size={18} />{ending.label}</dt>
                   <dd>{ending.help}</dd>
                 </div>
               ))}
