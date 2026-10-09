@@ -122,13 +122,12 @@ router.post('/', async (req, res) => {
 })
 
 /**
- * Returns a player's claim code -- the only endpoint that exposes it.
+ * Returns a player's claim code, making one if they have none. The
+ * player types it into the player app to claim their own record and
+ * inherit the history an umpire already logged for them.
  *
- * Codes are minted lazily rather than backfilled, so rows created
- * before the column existed get one on first read instead of needing a
- * migration. Nothing consumes this yet; it is groundwork for letting a
- * player claim their own record (by QR or by typing it) and inherit the
- * history an umpire already logged for them.
+ * Codes are minted lazily rather than backfilled, so a row without one
+ * gets it on first read instead of needing a migration.
  *
  * Refuses a player the OWNER closed from the admin site: that close is
  * meant to be final, so only the owner may reopen it, from
