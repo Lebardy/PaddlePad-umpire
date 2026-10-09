@@ -41,7 +41,6 @@ def create_ml_features(player_profiles):
 
     This function does NOT:
         - scale the features
-        - calculate skill score
         - perform K-Means
     """
 
@@ -538,8 +537,8 @@ def prepare_playstyle_features(
     """
     Prepare descriptive playstyle features.
 
-    Unlike the skill model, playstyle features are not
-    interpreted as inherently good or bad.
+    Unlike the skill-group features, playstyle features
+    are not interpreted as inherently good or bad.
 
     We keep:
         - aggression in its natural direction
@@ -578,12 +577,17 @@ def residualize_playstyle_features(
     playstyle_features_with_skill,
     features_to_residualize=None,
     group_column="skill_group",
-    target_column="skill_score"
+    *,
+    target_column
 ):
     """
     Replace each listed feature with its residual after
     regressing it against `target_column`, fit separately
     within each `group_column` group.
+
+    `target_column` is the column that says how good each
+    player is, and must be named by the caller. PaddlePad
+    passes target_column="rally_points".
 
     This removes the LINEAR relationship between a feature
     and skill so that Level 2 clustering finds style
