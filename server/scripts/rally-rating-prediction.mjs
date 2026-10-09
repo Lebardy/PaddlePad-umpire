@@ -11,8 +11,8 @@
 // (mean per-rally log loss) -- not by holding out a slice of them, which
 // on this little data was too small a sample to pick anything real.
 //
-// Writes server/scripts/.rating-split.json so ml/scripts/
-// skill_score_prediction.py tests the old score on the very same matches.
+// Writes server/scripts/.rating-split.json: which matches built the
+// ratings, which were predicted, and the k and scale that were chosen.
 // ============================================================
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
@@ -142,7 +142,7 @@ writeFileSync(
 )
 
 // Every player's points over the whole history, for
-// ml/scripts/compare_skill_input.py.
+// ml/scripts/playstyle_truth_check.py.
 const allPoints = rateHistory(matches, { k: best.k, scale: best.scale })
 writeFileSync(
   join(here, '.rally-points.json'),
