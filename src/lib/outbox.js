@@ -30,8 +30,6 @@ const DEVICE_KEY = 'paddlepad.deviceId'
 
 const EMPTY = Object.freeze({ order: [], entries: {}, deadLetter: [] })
 
-export const MAX_ATTEMPTS = 8
-
 function load() {
   const value = read(OUTBOX_KEY, EMPTY)
   // Defend against a half-written or hand-edited value; an outbox that
@@ -91,10 +89,6 @@ export function markDirty(kind, entityId) {
 
   const order = existing ? state.order : [...state.order, key]
   save({ ...state, order, entries })
-}
-
-export function getState() {
-  return load()
 }
 
 /**

@@ -135,11 +135,6 @@ export function getMatches() {
   return readJSON(MATCHES_KEY, [])
 }
 
-/** Matches belonging to one session, for the SessionDetail match list. */
-export function getMatchesForSession(sessionId) {
-  return getMatches().filter((m) => m.sessionId === sessionId)
-}
-
 /** A single match by id, or null if it doesn't exist. */
 export function getMatch(matchId) {
   return getMatches().find((m) => m.id === matchId) ?? null

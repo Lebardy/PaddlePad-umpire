@@ -111,11 +111,6 @@ export function emit() {
   })
 }
 
-/** Notifies immediately, for tests and for teardown paths. */
-export function emitSync() {
-  for (const listener of listeners) listener()
-}
-
 // The `storage` event fires only in OTHER tabs, so this covers the
 // case of an umpire with the app open twice; emit() covers this tab.
 // Without it, a second tab would render stale data indefinitely.
