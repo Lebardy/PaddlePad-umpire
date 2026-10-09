@@ -437,23 +437,24 @@ ALTER TABLE match_events ADD CONSTRAINT match_events_type_allowed
 -- ============================================================
 -- ML pipeline results
 --
--- Ratings are stored as immutable SNAPSHOTS, never as a column on
+-- Results are stored as immutable SNAPSHOTS, never as columns on
 -- players, and this is the most important thing to understand about
 -- these two tables.
 --
--- The skill score is entirely POOL-RELATIVE: skill_model.py scores
--- each player by where they sit between the weakest and strongest
--- player currently in the data (min_max_normalize). A player's number
--- therefore moves because OTHER PEOPLE played, without them touching a
--- paddle. If a rating were a column that got overwritten, that movement
--- would be invisible and unexplainable -- someone would open the app,
--- see they had dropped four points, and nothing anywhere could say why.
+-- A skill group and a playstyle are entirely POOL-RELATIVE: the
+-- pipeline standardises every feature against the players currently in
+-- the data, and K-Means groups whoever is there. A player's group or
+-- playstyle can therefore change because OTHER PEOPLE played, without
+-- them touching a paddle. If a result were a column that got
+-- overwritten, that change would be invisible and unexplainable --
+-- someone would open the app, see a different playstyle, and nothing
+-- anywhere could say why.
 --
--- As snapshots, every number carries the moment it was computed and the
--- size of the pool it was computed against. "78, as of 24 August,
--- against 46 players" is a defensible statement; "78" alone is not.
--- It also means a bad run can be discarded without losing the last
--- good one.
+-- As snapshots, every result carries the moment it was computed and the
+-- size of the pool it was computed against. "Net Player, as of 24
+-- August, among 46 players" is a defensible statement; "Net Player"
+-- alone is not. It also means a bad run can be discarded without losing
+-- the last good one.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS rating_runs (
@@ -465,11 +466,11 @@ CREATE TABLE IF NOT EXISTS rating_runs (
     -- a run that never happened.
     status           TEXT NOT NULL DEFAULT 'completed'
                      CHECK (status IN ('completed', 'failed')),
-    -- The pool the scores are relative to. Without these two numbers a
-    -- stored score cannot be interpreted later.
+    -- The pool the results are relative to. Without these two numbers a
+    -- stored result cannot be interpreted later.
     player_count     INTEGER NOT NULL DEFAULT 0,
     match_count      INTEGER NOT NULL DEFAULT 0,
-    -- Which revision of the vendored pipeline produced this. Scores
+    -- Which revision of the vendored pipeline produced this. Results
     -- from different pipeline versions are not comparable.
     pipeline_version TEXT,
     -- Free-form record of the conditions of the run: the point-target
@@ -484,26 +485,18 @@ CREATE INDEX IF NOT EXISTS rating_runs_latest_idx
 CREATE TABLE IF NOT EXISTS player_ratings (
     run_id             UUID NOT NULL REFERENCES rating_runs (id) ON DELETE CASCADE,
     player_id          UUID NOT NULL REFERENCES players (id) ON DELETE CASCADE,
-    -- 0-100, relative to the pool recorded on the run.
-    skill_score        DOUBLE PRECISION NOT NULL,
-    -- Stored but deliberately NOT shown in the player app. assign_skill_tier
-    -- applies absolute cutoffs (40 / 75) to a relative score, so in a small
-    -- pool the best player scores 100 and is labelled "Professional"
-    -- regardless of how they actually play. Keeping the value means the
-    -- problem stays visible in the data rather than being hidden.
-    skill_tier         TEXT,
     -- Level 1 of the clustering: which broad performance band the player
     -- was placed in before playstyles were clustered within it.
     skill_group        TEXT,
     playstyle_cluster  INTEGER,
     playstyle_archetype TEXT,
-    -- The player's own feature values behind the archetype, so a rating
-    -- can be explained rather than merely asserted.
+    -- The player's own feature values behind the archetype, so a
+    -- playstyle can be explained rather than merely asserted.
     evidence           JSONB NOT NULL DEFAULT '{}'::jsonb,
     -- How many matches this player's row was computed from. Below the
     -- gate's floor a player is excluded from the run entirely, so this
     -- is always a qualifying count -- recorded so the app can say what
-    -- the number rests on.
+    -- the result rests on.
     match_count        INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (run_id, player_id)
 );
@@ -520,20 +513,13 @@ CREATE TABLE IF NOT EXISTS player_ratings (
 -- says so rather than inventing a reason.
 ALTER TABLE player_ratings ADD COLUMN IF NOT EXISTS playstyle_traits JSONB;
 
--- The four measurements the skill score is a weighted sum of, each with
--- the player's own value and the points it contributed. Where
--- `evidence` explains the ARCHETYPE, this explains the NUMBER: the four
--- add up to skill_score exactly, and the pipeline refuses to publish a
--- run where they do not. Null for runs published before it sent them.
-ALTER TABLE player_ratings ADD COLUMN IF NOT EXISTS score_parts JSONB;
-
--- Every game this player played in the run, scored on the pool's own
--- 0-100 scale: [{"matchId": ..., "score": ...}]. Their rating is the
--- AVERAGE of these, exactly -- min-max scaling and a weighted sum are
--- both affine, so the mean of the scores is the score of the means.
--- The pipeline refuses to publish a run where that stops holding.
--- Null for runs published before it sent them.
-ALTER TABLE player_ratings ADD COLUMN IF NOT EXISTS game_scores JSONB;
+-- Four columns that are not part of this table. These statements take
+-- them out of a database that has them and do nothing to one that does
+-- not.
+ALTER TABLE player_ratings DROP COLUMN IF EXISTS skill_score;
+ALTER TABLE player_ratings DROP COLUMN IF EXISTS skill_tier;
+ALTER TABLE player_ratings DROP COLUMN IF EXISTS score_parts;
+ALTER TABLE player_ratings DROP COLUMN IF EXISTS game_scores;
 
 CREATE INDEX IF NOT EXISTS player_ratings_player_idx
     ON player_ratings (player_id);

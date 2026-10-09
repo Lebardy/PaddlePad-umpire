@@ -7,10 +7,10 @@
 // player who ended the rally takes three quarters of their side's share,
 // their partner a quarter; the other side splits theirs evenly.
 //
-// Separate from the ML pipeline's skill_score on purpose. That score is
-// part of the thesis's K-Means pipeline (it names the skill clusters and
-// residualises the playstyle features) and stays exactly as it is; this
-// is the number players see.
+// This is the number players see, and the only measure of how good
+// someone is. The nightly K-Means pipeline reads the same points for the
+// two things that need to know who is better: naming its skill groups
+// and taking ability out of the playstyle features.
 //
 // After each match with a winner, the winning side also gains a match
 // reward scaled by how unlikely the win was, and the losing side gives

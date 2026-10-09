@@ -148,7 +148,7 @@ export async function playerDetail(queryFn, row) {
       ? { state: 'rated', points: ppr.points }
       : { state: ppr.state, have: ppr.have, need: ppr.need },
     rating: rating.state === 'rated'
-      ? { state: 'rated', skillScore: rating.skillScore, playstyle: rating.playstyleArchetype, skillGroup: rating.skillGroup, fromMatches: rating.fromMatches, computedAt: rating.computedAt }
+      ? { state: 'rated', playstyle: rating.playstyleArchetype, skillGroup: rating.skillGroup, fromMatches: rating.fromMatches, computedAt: rating.computedAt }
       : rating,
   }
 }

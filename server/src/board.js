@@ -14,12 +14,9 @@
 //   thinks of someone else, and a public board is the worst place to
 //   start.
 //
-//   "Most improved" by rating would be wrong in a way nobody could see.
-//   The skill score is graded on a curve -- relative to whoever has
-//   played -- so it rises when weaker players join, and the row could
-//   crown someone who had not played at all. "Biggest step up" below
-//   compares a player only with their own earlier matches, which no one
-//   else's games can move.
+//   "Most improved" by rating. "Biggest step up" below compares a
+//   player only with their own earlier matches, which no one else's
+//   games can move.
 //
 // Split in two on purpose. getMonthlyBoard gathers rows from the
 // database; buildBoard decides what the board says, from plain data,
@@ -262,8 +259,8 @@ export function buildBoard({ matches, visible, nameOf, progress = [], history = 
         // The share of rallies that ended with a winning shot, for the
         // whole game, and what these players usually manage -- the reason
         // it was eligible at all. Never broken down by person.
-        // Rounded at the source, as the skill score is, so the page is
-        // never handed 0.4000000000000001 for what it shows as 40%. The
+        // Rounded at the source, so the page is never handed
+        // 0.4000000000000001 for what it shows as 40%. The
         // eligibility test above compares the unrounded values.
         clean: Number.isFinite(best.clean) ? roundShare(best.clean) : null,
         usualClean: Number.isFinite(best.usual) ? roundShare(best.usual) : null,

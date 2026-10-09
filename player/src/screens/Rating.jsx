@@ -1,12 +1,7 @@
 // ============================================================
 // Your rating: your own points, then the two things the model did.
 //
-// This page used to show a score, a spread, and a "group" named in
-// words of the app's own invention, with no hint of what the group was
-// for -- while the playstyle, the interesting half, sat on the overview
-// as a bare label. It read as unrelated to the pipeline it came from.
-//
-// So it now runs in order:
+// It runs in order:
 //
 //   1  the player's rally points, and every kind of rally moving them --
 //      worked out rally by rally in the API, never compared with anyone
@@ -14,18 +9,13 @@
 //   3  how they play: a playstyle found among the players closest to
 //      their level, each word proven with numbers
 //
-// Step 1 used to be the pipeline's 0-100 score, placed among everyone
-// rated. That score moved when other people played; points do not. It
-// shows whenever the player has five matches, whether or not the
-// nightly run has rated them, and so does step 2. Step 3 still needs
-// that run.
+// Step 1 shows whenever the player has five matches, whether or not
+// the nightly run has rated them, and so does step 2. Step 3 needs that
+// run.
 //
-// A separate step about the player's skill group (a ladder, and what
-// separated them from the group above) sat between the two. It supported
-// the old score and confused more than it explained, so the group is now
-// one line inside the playstyle step -- the only place it matters. The
-// pipeline's label for the group ("Group 3") is dropped from style names
-// for the same reason; see lib/styleName.js.
+// The player's skill group is one line inside the playstyle step -- the
+// only place it matters. The pipeline's label for the group ("Group 3")
+// is dropped from style names for the same reason; see lib/styleName.js.
 //
 // Each word in the style name shows this player's own number, the
 // average of players with their style and their group's average, with
@@ -133,8 +123,8 @@ function leaderNumbers(leaders) {
 
 /**
  * A row with a bar growing left (lost points) or right (gained points)
- * from a centre line. The same scale the old score's parts used, so the
- * longest arm is the thing that moved the number most.
+ * from a centre line. Every row shares one scale, so the longest arm is
+ * the thing that moved the number most.
  */
 function PointsArm({ points, widest, label }) {
   const reach = widest > 0 ? Math.min(1, Math.abs(points) / widest) : 0
@@ -399,11 +389,8 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
 /**
  * Step 3: how the player plays, with the numbers that chose its words.
  *
- * This used to be step 3, after a step of its own about the player's
- * skill group -- a ladder of groups and what separated them from the one
- * above, built to support the old 0-100 score. With that score gone the
- * group's only job for a player is to say who their style is compared
- * with, so it is said here, in one line, where it is used.
+ * The skill group's only job for a player is to say who their style is
+ * compared with, so it is said here, in one line, where it is used.
  */
 /** Who the style is compared with, and what that group is, on a tap. */
 function ComparedWith({ band, styleSize }) {

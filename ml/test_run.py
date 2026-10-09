@@ -19,8 +19,6 @@ import pandas as pd
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from pipeline.player_profiles import aggregate_player_profiles
-from pipeline.skill_model import build_skill_model
 from pipeline.clustering import (
     PLAYSTYLE_CLUSTERING_FEATURES,
     TRAIT_DESCRIPTORS,
@@ -35,10 +33,7 @@ from pipeline.feature_engineering import (
 )
 from run import (
     EVIDENCE_COLUMNS,
-    SCORE_PARTS,
-    build_game_scores,
     name_skill_groups,
-    per_match_features,
     NotEnoughData,
     apply_gate,
     run_pipeline,
@@ -104,6 +99,20 @@ def synthetic_logs(num_players=60, matches_per_player=8, seed=7):
     return pd.DataFrame(rows)
 
 
+def synthetic_points(logs):
+    """
+    Rally points for every player in the logs, as /internal/match-logs.json
+    sends them: player id to points.
+
+    Built from the share of a player's drops that landed, which follows
+    the ability the logs were drawn from, so better players hold more
+    points -- from 1000 for no drop landed to 2000 for every one.
+    """
+    totals = logs.groupby("player_id")[["drop_successes", "drop_attempts"]].sum()
+    share = totals["drop_successes"] / totals["drop_attempts"]
+    return {player: 1000.0 + 1000.0 * float(value) for player, value in share.items()}
+
+
 print("\ngate")
 
 logs = synthetic_logs(num_players=60, matches_per_player=8)
@@ -112,10 +121,10 @@ check("a healthy pool passes the gate untouched", len(gated) == len(logs))
 check("nobody is held back when everyone qualifies", report["playersHeldBack"] == 0,
       str(report))
 
-# One player with four matches: below the floor, so excluded entirely
-# rather than rated from arithmetic that cannot describe them. At one
-# match all seven consistency features would be NaN -> 0.0, which the
-# skill model reads as flawless consistency and rewards.
+# Five players with four matches each: below the floor, so excluded
+# entirely rather than grouped from arithmetic that cannot describe
+# them. At one match all seven consistency features would be NaN -> 0.0,
+# which K-Means reads as flawless consistency.
 thin = synthetic_logs(num_players=5, matches_per_player=4, seed=3)
 mixed = pd.concat([logs, thin], ignore_index=True)
 gated_mixed, mixed_report = apply_gate(mixed, GATE)
@@ -142,12 +151,12 @@ check("the point-target mix is recorded", report["pointTargetMix"] == {"11": len
 
 print("\npipeline")
 
-final, evidence, parts, games, structure = run_pipeline(gated)
+points = synthetic_points(gated)
+final, evidence, structure = run_pipeline(gated, points)
 check("every player who went in came out",
       set(final["player_id"]) == set(gated["player_id"].unique()),
       f"{len(final)} out of {gated['player_id'].nunique()}")
 check("no player appears twice", not final["player_id"].duplicated().any())
-check("everyone has a skill score", final["skill_score"].notna().all())
 check("everyone has a skill group", final["skill_group"].notna().all())
 check("archetypes were produced",
       final["playstyle_archetype"].notna().any(),
@@ -180,7 +189,8 @@ else:
     for seed in range(1, 40):
         probe = synthetic_logs(num_players=60, matches_per_player=8, seed=seed)
         probe_gated, _ = apply_gate(probe, GATE)
-        probe_final, _, _, _, probe_structure = run_pipeline(probe_gated)
+        probe_final, _, probe_structure = run_pipeline(
+            probe_gated, synthetic_points(probe_gated))
         if len(probe_structure["skillGroups"]) >= 3:
             check("a three-group run keeps everyone (the bug the driver fixes)",
                   set(probe_final["player_id"]) == set(probe_gated["player_id"].unique()),
@@ -195,53 +205,50 @@ else:
 
 print("\ngroup names")
 
-check("without rally points the old score names the groups",
-      structure["groupNamesFrom"] == "skill_score", structure["groupNamesFrom"])
+check("rally points name the groups",
+      structure["groupNamesFrom"] == "rally_points", structure["groupNamesFrom"])
 check("the group order lists every group once",
       sorted(structure["groupOrder"]) == sorted(structure["skillGroups"]),
       str(structure["groupOrder"]))
-
-# Points that run exactly against the old score, so any naming taken
-# from them must come out reversed.
-score_by_player = final.set_index("player_id")["skill_score"]
-reversed_points = {pid: 3000.0 - float(score) for pid, score in score_by_player.items()}
-by_points, _, _, _, points_structure = run_pipeline(gated, reversed_points)
-both = final.merge(by_points, on="player_id", suffixes=("_score", "_points"))
-
-check("rally points name the groups when given",
-      points_structure["groupNamesFrom"] == "rally_points", points_structure["groupNamesFrom"])
-check("the same people are grouped together either way",
-      both.groupby("skill_group_score")["skill_group_points"].nunique().max() == 1
-      and both.groupby("skill_group_points")["skill_group_score"].nunique().max() == 1)
-means = both.groupby("skill_group_points")["skill_score_points"].mean()
-point_means = [float((3000.0 - means[name])) for name in points_structure["groupOrder"]]
+group_points = final["player_id"].map(points).groupby(final["skill_group"]).mean()
+point_means = [float(group_points[name]) for name in structure["groupOrder"]]
 check("the group order runs from fewest to most rally points",
       point_means == sorted(point_means), str(point_means))
+
+# The same points turned upside down, so any naming taken from them
+# must come out reversed.
+reversed_points = {pid: 3000.0 - value for pid, value in points.items()}
+by_reversed, _, reversed_structure = run_pipeline(gated, reversed_points)
+both = final.merge(by_reversed, on="player_id", suffixes=("_plain", "_reversed"))
+
+check("reversed points still name the groups",
+      reversed_structure["groupNamesFrom"] == "rally_points",
+      reversed_structure["groupNamesFrom"])
+# K-Means never sees the points, so who is grouped with whom cannot
+# move with them.
+check("the skill clusters are the same whatever the points say",
+      (both["skill_cluster_plain"] == both["skill_cluster_reversed"]).all())
+check("the same people are grouped together either way",
+      both.groupby("skill_group_plain")["skill_group_reversed"].nunique().max() == 1
+      and both.groupby("skill_group_reversed")["skill_group_plain"].nunique().max() == 1)
 if len(structure["groupOrder"]) > 1:
-    check("points running against the score reverse the order",
-          [both.loc[both["skill_group_points"] == name, "skill_group_score"].iloc[0]
-           for name in points_structure["groupOrder"]] == list(reversed(structure["groupOrder"])),
-          f"{structure['groupOrder']} vs {points_structure['groupOrder']}")
-check("the skill score itself is untouched",
-      (both["skill_score_score"] == both["skill_score_points"]).all())
+    check("reversed points reverse the order",
+          [both.loc[both["skill_group_reversed"] == name, "skill_group_plain"].iloc[0]
+           for name in reversed_structure["groupOrder"]] == list(reversed(structure["groupOrder"])),
+          f"{structure['groupOrder']} vs {reversed_structure['groupOrder']}")
 
-# This used to assert that playstyles clustered identically either way,
-# because rally points only named the groups. They now also replace the
-# old score as the thing subtracted from the playstyle features, so the
-# archetypes are EXPECTED to differ -- that is the point of the change,
-# not a regression. What still has to hold is that the two levels stay
-# independent: K-Means never sees either number, so who is grouped with
-# whom cannot move (checked above), and the run has to say which number
-# it corrected against.
-check("without rally points the playstyles are corrected against the old score",
-      structure["residualisedBy"] == "skill_score", structure["residualisedBy"])
-check("rally points correct the playstyles when given",
-      points_structure["residualisedBy"] == "rally_points", points_structure["residualisedBy"])
+# The points are also what is subtracted from the playstyle features, so
+# the archetypes of the two runs may differ. What has to hold is that
+# the run says what it corrected against, and that nobody is lost.
+check("the playstyles are corrected against rally points",
+      structure["residualisedBy"] == "rally_points"
+      and reversed_structure["residualisedBy"] == "rally_points",
+      f"{structure['residualisedBy']} {reversed_structure['residualisedBy']}")
 check("every player still comes out either way",
-      len(both) == final["player_id"].nunique() == by_points["player_id"].nunique(),
-      f"{len(both)} vs {final['player_id'].nunique()} vs {by_points['player_id'].nunique()}")
+      len(both) == final["player_id"].nunique() == by_reversed["player_id"].nunique(),
+      f"{len(both)} vs {final['player_id'].nunique()} vs {by_reversed['player_id'].nunique()}")
 
-missing_one = dict(list(reversed_points.items())[1:])
+missing_one = dict(list(points.items())[1:])
 try:
     run_pipeline(gated, missing_one)
     check("a rated player with no rally points is refused", False, "it published")
@@ -259,7 +266,7 @@ def named(points_by_cluster, seed=5):
     for cluster, values in points_by_cluster.items():
         for i, value in enumerate(values):
             pid = f"c{cluster}-{i}"
-            rows.append({"player_id": pid, "skill_cluster": cluster, "skill_score": 50.0})
+            rows.append({"player_id": pid, "skill_cluster": cluster})
             points[pid] = float(value)
     labelled, order, source, gaps = name_skill_groups(pd.DataFrame(rows), points)
     names = labelled.groupby("skill_cluster")["skill_group"].first().to_dict()
@@ -290,16 +297,6 @@ names, order, source, gaps = named({0: spread(1300), 1: spread(1500), 2: spread(
 check("one unclear gap among clear ones makes every group neutral",
       source == "neutral" and sorted(names.values()) == ["Group A", "Group B", "Group C"]
       and [g["clear"] for g in gaps] == [True, False], f"{names} {[g['clear'] for g in gaps]}")
-
-names, order, source, gaps = named({0: spread(1300), 1: spread(1600)})
-labelled_no_points, order_no_points, source_no_points, gaps_no_points = name_skill_groups(
-    pd.DataFrame([{"player_id": "a", "skill_cluster": 0, "skill_score": 10.0},
-                  {"player_id": "b", "skill_cluster": 1, "skill_score": 90.0}]), None)
-check("without rally points the old score still names the groups, with no gaps to judge",
-      source_no_points == "skill_score" and gaps_no_points == []
-      and order_no_points == ["Developing / Lower-Performance", "Higher-Performance"],
-      f"{source_no_points} {order_no_points} {gaps_no_points}")
-
 
 print("\nstyle K-Means on chosen columns")
 
@@ -401,7 +398,7 @@ def planted_components(scaled):
 real_extract = getattr(driver, "extract_playstyle_components", None)
 driver.extract_playstyle_components = planted_components
 try:
-    planted_final, _, _, _, _ = run_pipeline(gated)
+    planted_final, _, _ = run_pipeline(gated, points)
 finally:
     driver.extract_playstyle_components = real_extract
 
@@ -467,10 +464,13 @@ check("a style set apart only where there is no word gets none",
 
 print("\npayload")
 
-payload = to_payload(final, evidence, parts, games, report, structure, len(gated))
+payload = to_payload(final, evidence, report, structure, len(gated))
 check("one rating per player", len(payload["ratings"]) == final["player_id"].nunique())
-check("scores are plain floats", all(isinstance(r["skillScore"], float)
-                                     for r in payload["ratings"]))
+check("a rating carries the group, the playstyle and what is behind it, and nothing else",
+      all(set(r) == {"playerId", "skillGroup", "playstyleCluster", "playstyleArchetype",
+                     "playstyleTraits", "evidence", "matchCount"}
+          for r in payload["ratings"]),
+      str(sorted(payload["ratings"][0])))
 # Asserted as a COUNT, not as "no NaNs". The first version of this file
 # only checked for NaN, which an empty dict satisfies perfectly -- and
 # evidence was in fact empty for every player, because the raw features
@@ -514,97 +514,6 @@ check("a group too small to cluster has no traits either",
           for r in payload["ratings"] if not r["playstyleArchetype"]))
 print("       names this run produced: "
       + "; ".join(sorted({r["playstyleArchetype"] for r in named})))
-
-# ---- what the score is made of ----------------------------------
-#
-# The page built on this tells a player which of four things is lifting
-# their rating and which is holding it down. That claim is only true if
-# the four parts ARE the score rather than four numbers shown near it,
-# so the arithmetic is asserted here and the run refuses to publish when
-# it stops holding (see run.build_score_parts).
-rated = payload["ratings"]
-check("every player carries all four parts of their score",
-      all(set(r["scoreParts"]) == {key for key, *_ in SCORE_PARTS} for r in rated),
-      str(sorted(rated[0]["scoreParts"])))
-check("the four parts add up to the score itself",
-      all(abs(sum(part["points"] for part in r["scoreParts"].values())
-              - r["skillScore"]) < 0.05
-          for r in rated),
-      str([(round(sum(p["points"] for p in r["scoreParts"].values()), 2), r["skillScore"])
-           for r in rated[:3]]))
-check("no part can be worth more than its share of 100",
-      all(0 <= part["points"] <= part["max"] + 0.01
-          for r in rated for part in r["scoreParts"].values()),
-      str([(k, p["points"], p["max"]) for k, p in rated[0]["scoreParts"].items()]))
-check("the shares themselves add to 100",
-      abs(sum(part["max"] for part in rated[0]["scoreParts"].values()) - 100) < 0.01,
-      str({k: p["max"] for k, p in rated[0]["scoreParts"].items()}))
-# Someone has to be at each end: min-max normalization gives the pool's
-# best on a measurement full marks for it and the pool's worst none. The
-# app says so rather than letting a player read 25/25 as perfection.
-check("the pool's best and worst on a part really do sit at the ends",
-      any(part["points"] >= part["max"] - 0.01
-          for r in rated for part in r["scoreParts"].values())
-      and any(part["points"] <= 0.01
-              for r in rated for part in r["scoreParts"].values()))
-check("parts carry the player's own measurement, not just points",
-      all(isinstance(part["value"], float) for r in rated
-          for part in r["scoreParts"].values()),
-      str(rated[0]["scoreParts"]))
-check("drops landing is a proportion and the rates are per minute",
-      rated[0]["scoreParts"]["dropsLanding"]["unit"] == "proportion"
-      and rated[0]["scoreParts"]["winningShots"]["unit"] == "per_minute")
-
-# ---- every game, on the rating's own scale ----------------------
-#
-# The page built on this tells a player their rating IS the average of
-# these games, not a summary of them. That is only true while the
-# scoring stays a weighted sum of min-max scaled means -- both affine,
-# so the average of the scores equals the score of the averages exactly
-# -- and while per_match_features agrees with the pipeline's own
-# per-match block. Either breaking shows up here first.
-check("every player carries a score for every game they played",
-      all(len(r["gameScores"]) == r["matchCount"] for r in rated),
-      str([(len(r["gameScores"]), r["matchCount"]) for r in rated[:3]]))
-check("a player's games average back to their rating, exactly",
-      all(abs(sum(g["score"] for g in r["gameScores"]) / len(r["gameScores"])
-              - r["skillScore"]) < 0.05
-          for r in rated),
-      str([(round(sum(g["score"] for g in r["gameScores"]) / len(r["gameScores"]), 2),
-            r["skillScore"]) for r in rated[:3]]))
-check("each game names the match it was played in",
-      all(isinstance(g["matchId"], str) and g["matchId"] for r in rated
-          for g in r["gameScores"]))
-widest_player = max(
-    max(g["score"] for g in r["gameScores"]) - min(g["score"] for g in r["gameScores"])
-    for r in rated
-)
-whole_pool = max(r["skillScore"] for r in rated) - min(r["skillScore"] for r in rated)
-check("one player's games swing across much of the whole pool's range",
-      widest_player > whole_pool / 2,
-      f"widest player {widest_player:.1f} vs whole pool {whole_pool:.1f} -- one game "
-      "is a small sample, and the page has to say so rather than present a best "
-      "game as a second rating")
-
-# The drift guard is the point of the invariant, so prove it fires
-# rather than trusting that it would.
-# `final` carries scaled columns under the feature names, so the
-# profiles are rebuilt here rather than reused -- the same trap the
-# driver documents at run_pipeline.
-profiles = build_skill_model(aggregate_player_profiles(gated))
-tampered = gated.copy()
-tampered["clean_winners"] = tampered["clean_winners"] + 3
-try:
-    build_game_scores(tampered, profiles)
-    check("per-match arithmetic that drifts from the pipeline is refused",
-          False, "it was accepted")
-except RuntimeError:
-    check("per-match arithmetic that drifts from the pipeline is refused", True)
-
-check("one match in, one row of four measurements out",
-      list(per_match_features(gated.head(1)).columns)
-      == [column for _key, column, _wk, _lower in SCORE_PARTS],
-      str(list(per_match_features(gated.head(1)).columns)))
 
 check("the run records the conditions it ran under",
       payload["notes"]["gate"]["playersQualifying"] == 60,

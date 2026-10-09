@@ -87,8 +87,8 @@ router.get('/me', async (req, res) => {
     // Lets the empty state say "being scored right now" rather than the
     // flatly discouraging "no matches".
     inProgress,
-    // Either a score with the pool it was measured against, or the
-    // reason there isn't one yet. Never a bare null.
+    // Either the latest run's group and playstyle with the pool they
+    // were found in, or the reason there are none yet. Never a bare null.
     rating,
     rallyRating,
     leaderboardOpen,

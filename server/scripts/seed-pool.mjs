@@ -20,7 +20,7 @@
 // Each seeded player gets a hidden ability and a hidden style, and every
 // rally is resolved through the real scoring engine. So stronger players
 // genuinely win more rather than being labelled as stronger -- which
-// means the pipeline's skill scores can be checked against the abilities
+// means the pipeline's skill groups can be checked against the abilities
 // they were generated from, instead of only checked for being
 // well-formed.
 // ============================================================

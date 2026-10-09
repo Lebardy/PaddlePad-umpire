@@ -51,27 +51,27 @@ PLAYSTYLE_CLUSTERING_FEATURES = [
 # ============================================================
 
 def prepare_clustering_data(
-    skill_profiles,
+    player_profiles,
     scaled_features
 ):
     """
-    Combine player information with the standardized
+    Combine the player ids with the standardized
     behavioral feature representation.
 
-    The skill score is kept for comparison only.
-    It is NOT used to create the skill clusters.
+    The features are everything K-Means is given to
+    create the skill clusters.
     """
 
-    skills = skill_profiles.copy()
+    players = player_profiles.copy()
     features = scaled_features.copy()
 
     # --------------------------------------------------------
     # Validate IDs
     # --------------------------------------------------------
 
-    if "player_id" not in skills.columns:
+    if "player_id" not in players.columns:
         raise ValueError(
-            "skill_profiles must contain 'player_id'."
+            "player_profiles must contain 'player_id'."
         )
 
     if "player_id" not in features.columns:
@@ -99,10 +99,9 @@ def prepare_clustering_data(
     # Select columns
     # --------------------------------------------------------
 
-    skill_data = skills[
+    player_data = players[
         [
-            "player_id",
-            "skill_score"
+            "player_id"
         ]
     ].copy()
 
@@ -117,7 +116,7 @@ def prepare_clustering_data(
     # Merge
     # --------------------------------------------------------
 
-    combined = skill_data.merge(
+    combined = player_data.merge(
         feature_data,
         on="player_id",
         how="inner",
@@ -128,10 +127,10 @@ def prepare_clustering_data(
     # Validate merge
     # --------------------------------------------------------
 
-    if len(combined) != len(skill_data):
+    if len(combined) != len(player_data):
         raise ValueError(
             "Some players were lost when combining "
-            "skill data and clustering features."
+            "player ids and clustering features."
         )
 
     return combined
@@ -187,7 +186,6 @@ def print_clustering_samples(
 
     columns = [
         "player_id",
-        "skill_score",
         *CLUSTERING_FEATURES
     ]
 
@@ -315,8 +313,8 @@ def cluster_skill_groups(
         Cluster 1
         Cluster 2
 
-    We intentionally DO NOT call them Beginner,
-    Intermediate, or Professional yet.
+    We intentionally DO NOT name them yet. See
+    interpret_skill_clusters.
     """
 
     X = clustering_data[
@@ -495,11 +493,6 @@ def print_skill_cluster_profiles(
         )
 
         print(
-            f"  Average skill score: "
-            f"{cluster_players['skill_score'].mean():.2f}"
-        )
-
-        print(
             "\n  Typical performance:"
         )
 
@@ -563,7 +556,7 @@ def print_skill_cluster_profiles(
 
 def interpret_skill_clusters(
     skill_clustered,
-    rank_by="skill_score"
+    rank_by
 ):
     """
     Assign human-readable names to the discovered
@@ -588,12 +581,10 @@ def interpret_skill_clusters(
     the app from how every rally ended and who ended
     it. On a synthetic pool whose players had a hidden
     true ability, group numbers ranked by rally points
-    followed that ability far more closely than group
-    numbers ranked by skill_score (Spearman 0.81
-    against 0.17, over ten K-Means random starts).
+    followed that ability closely (Spearman 0.81 over
+    ten K-Means random starts).
 
-    skill_score stays the default so these files still
-    run on their own, and it is still what
+    The same column is what
     residualize_playstyle_features removes from the
     playstyle features.
     """
@@ -739,18 +730,6 @@ def print_skill_group_summary(
             players=(
                 "player_id",
                 "count"
-            ),
-            average_skill_score=(
-                "skill_score",
-                "mean"
-            ),
-            minimum_skill_score=(
-                "skill_score",
-                "min"
-            ),
-            maximum_skill_score=(
-                "skill_score",
-                "max"
             )
         )
         .reset_index()
@@ -771,18 +750,6 @@ def print_skill_group_summary(
         print(
             f"  Players: "
             f"{int(row['players'])}"
-        )
-
-        print(
-            f"  Average skill score: "
-            f"{row['average_skill_score']:.2f}"
-        )
-
-        print(
-            f"  Skill score range: "
-            f"{row['minimum_skill_score']:.2f} "
-            f"to "
-            f"{row['maximum_skill_score']:.2f}"
         )
 
 # ============================================================
@@ -987,7 +954,7 @@ def print_playstyle_cluster_profiles(
 
     Several features (see
     feature_engineering.FEATURES_TO_RESIDUALIZE) are
-    residualized against skill_score BEFORE they are fed to
+    residualized against skill BEFORE they are fed to
     K-Means, so the cluster ASSIGNMENTS reflect skill-adjusted
     style. But the values displayed here are plain averages of
     each player's original, un-adjusted stats -- deliberately,
@@ -1047,11 +1014,6 @@ def print_playstyle_cluster_profiles(
         print(
             f"  Players: "
             f"{len(players)}"
-        )
-
-        print(
-            f"  Average skill score: "
-            f"{players['skill_score'].mean():.2f}"
         )
 
         print(
@@ -1462,7 +1424,7 @@ def get_playstyle_centroids(
 
     This intentionally does NOT reconstruct centroids from the
     K-Means input space via scaler.inverse_transform: several
-    playstyle features are residualized against skill_score
+    playstyle features are residualized against skill
     before clustering (see
     feature_engineering.residualize_playstyle_features), so
     their scaled/residual values are small deltas around zero,
@@ -2082,11 +2044,6 @@ def print_playstyle_archetype_summary(
             f"{len(players)}"
         )
 
-        print(
-            f"  Average skill score: "
-            f"{players['skill_score'].mean():.2f}"
-        )
-
 
 def print_playstyle_evidence(
     clustered_data,
@@ -2190,7 +2147,6 @@ def build_final_player_profiles(
     The final result contains:
 
         player_id
-        skill_score
         skill_group
         skill_cluster
         playstyle_cluster
@@ -2208,7 +2164,6 @@ def build_final_player_profiles(
             developing_playstyles[
                 [
                     "player_id",
-                    "skill_score",
                     "skill_group",
                     "skill_cluster",
                     "playstyle_cluster",
@@ -2219,7 +2174,6 @@ def build_final_player_profiles(
             higher_playstyles[
                 [
                     "player_id",
-                    "skill_score",
                     "skill_group",
                     "skill_cluster",
                     "playstyle_cluster",
@@ -2343,7 +2297,6 @@ def print_final_player_profiles(
     Display the final PaddlePad player profiles.
 
     Shows:
-        - Skill score
         - Discovered skill group
         - Playstyle cluster
         - Playstyle archetype
@@ -2352,7 +2305,6 @@ def print_final_player_profiles(
 
     columns = [
         "player_id",
-        "skill_score",
         "skill_group",
         "skill_cluster",
         "playstyle_cluster",

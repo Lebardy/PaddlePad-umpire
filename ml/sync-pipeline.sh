@@ -15,7 +15,7 @@ set -euo pipefail
 SOURCE="${1:-$HOME/skul/PaddlePad}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-for f in player_profiles.py skill_model.py feature_engineering.py clustering.py; do
+for f in player_profiles.py feature_engineering.py clustering.py; do
     cp "$SOURCE/$f" "$HERE/pipeline/$f"
 done
 
