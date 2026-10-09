@@ -74,26 +74,20 @@ function ShotProfile({ summary }) {
         />
       </div>
 
-      <h3 className="shot-ask">Which one actually wins you the point?</h3>
+      <h3 className="shot-ask">Which wins you the point?</h3>
       {bothKnown ? (
-        <>
-          <div className="meters">
-            <Meter
-              label="You won the point after a drop"
-              value={summary.dropConversion}
-              caption={`${summary.dropRalliesWon} of ${summary.dropRallies} rallies`}
-            />
-            <Meter
-              label="After a drive"
-              value={summary.driveConversion}
-              caption={`${summary.driveRalliesWon} of ${summary.driveRallies} rallies`}
-            />
-          </div>
-          <p className="shot-note">
-            Different question from the one above: a drop can land beautifully
-            and still lose the rally.
-          </p>
-        </>
+        <div className="meters">
+          <Meter
+            label="After a drop"
+            value={summary.dropConversion}
+            caption={`${summary.dropRalliesWon} of ${summary.dropRallies} rallies`}
+          />
+          <Meter
+            label="After a drive"
+            value={summary.driveConversion}
+            caption={`${summary.driveRalliesWon} of ${summary.driveRallies} rallies`}
+          />
+        </div>
       ) : (
         <p className="muted-inline">
           Not enough yet — this needs at least {MIN_LINKED} of each, logged

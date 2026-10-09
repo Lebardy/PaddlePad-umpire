@@ -12,9 +12,9 @@ import { STEP_UP_WORDS, namesList, shortDate, stepUpFigure } from '../lib/leader
 import Icon from './Icon'
 
 const TABS = [
-  ['played', 'Played most'],
-  ['met', 'Met most'],
-  ['step', 'Step up'],
+  ['played', 'Played most', 'flame'],
+  ['met', 'Met most', 'people'],
+  ['step', 'Step up', 'trendUp'],
 ]
 
 function resetLabel(resetsOn) {
@@ -40,7 +40,7 @@ function CountList({ list, unit }) {
       </ol>
       {list.moreTied > 0 && (
         <p className="month-more">
-          and {list.moreTied} more with {list.moreCount} {unit(list.moreCount)} each
+          +{list.moreTied} more with {list.moreCount} each
         </p>
       )}
     </>
@@ -73,7 +73,7 @@ function StepUp({ leaders, monthStart }) {
           )
         })}
       </ul>
-      <p className="rank-foot">Compared with their own earlier matches, never with anyone else&rsquo;s.</p>
+      <p className="rank-foot">Against their own earlier matches only.</p>
     </>
   )
 }
@@ -87,11 +87,11 @@ function MonthLists({ month }) {
     <>
       <section className="month-band" aria-label="This month on PaddlePad">
         <div className="section-head">
-          <h2>This month</h2>
+          <h2><Icon name="calendar" size={17} className="head-icon" />This month</h2>
           <span className="chip chip-quiet">Resets {resetLabel(month.resetsOn)}</span>
         </div>
         <div className="month-tabs" role="tablist" aria-label="Which list">
-          {TABS.map(([key, label]) => (
+          {TABS.map(([key, label, icon]) => (
             <button
               key={key}
               type="button"
@@ -100,6 +100,7 @@ function MonthLists({ month }) {
               className={`month-tab${tab === key ? ' month-tab-on' : ''}`}
               onClick={() => setTab(key)}
             >
+              <Icon name={icon} size={15} />
               {label}
             </button>
           ))}
@@ -113,7 +114,7 @@ function MonthLists({ month }) {
 
       <section className="month-band" aria-label="Match of the month">
         <div className="section-head">
-          <h2>Match of the month</h2>
+          <h2><Icon name="trophy" size={17} className="head-icon" />Match of the month</h2>
         </div>
         {best ? (
           <Link

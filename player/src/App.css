@@ -97,7 +97,6 @@
 .best-label,
 .detail-label,
 .pr-label,
-.people-summary,
 .person-when,
 .result-word,
 .board-match-eyebrow {
@@ -282,6 +281,9 @@
    label that may not wrap spills into the next tab. Two lines for that
    moment instead; the real font fits on one. */
 .gate-tab { white-space: normal; text-wrap: balance; line-height: 1.15; }
+/* Each way in carries its icon above its words. */
+.gate-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3rem; padding-block: 0.65rem 0.55rem; }
+.gate-tab svg { flex: none; }
 .filter-active,
 .gate-tab[aria-selected='true'] {
   background: var(--button);
@@ -371,6 +373,7 @@
 .streak-lost { color: var(--status-critical); font-weight: 700; }
 .scoreboard .streak-won { color: var(--win-lamp); }
 .scoreboard .streak-lost { color: var(--loss-lamp); }
+.sb-caption svg { vertical-align: -0.14em; margin-right: 0.2rem; }
 
 /* The headline statistics, as the board's lower row of cells. The rules
    between cells are the board showing through a 1px gap. */
@@ -392,7 +395,8 @@
   background: var(--board);
 }
 .stat-value { font-size: 2.3rem; color: var(--board-ink); }
-.stat-label { font-size: 0.85rem; letter-spacing: 0.06em; color: var(--board-ink); margin-top: 0.2rem; }
+.stat-label { display: flex; align-items: flex-start; gap: 0.35rem; font-size: 0.85rem; letter-spacing: 0.06em; color: var(--board-ink); margin-top: 0.2rem; }
+.stat-label svg { flex: none; margin-top: 0.12em; color: var(--board-muted); }
 .stat-note { font-size: 0.8rem; color: var(--board-muted); line-height: 1.35; }
 
 .sb-form {
@@ -650,7 +654,6 @@
   padding-top: 1rem;
   border-top: 1px solid var(--border);
 }
-.shot-note { font-size: 0.84rem; color: var(--text-muted); line-height: 1.5; margin-top: 0.6rem; }
 
 /* ============ Form trend ============ */
 
@@ -692,6 +695,7 @@
   white-space: nowrap;
 }
 .chip-quiet { color: var(--text-muted); font-weight: 600; }
+.chip svg { flex: none; color: var(--text-muted); }
 
 .ichips {
   list-style: none;
@@ -789,7 +793,7 @@
 .month-name { font-family: var(--label); font-size: 1.05rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
 .month-count { font-family: var(--label); font-size: 0.88rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--board-muted); }
 .month-record { color: var(--lamp); }
-.month-chevron { font-size: 1.4rem; line-height: 1; color: var(--board-muted); transition: transform 0.15s ease; }
+.month-chevron { flex: none; color: var(--board-muted); transition: transform 0.15s ease; }
 .month-bar[aria-expanded="true"] .month-chevron { transform: rotate(90deg); }
 
 .night + .night { border-top: 1px solid var(--border); }
@@ -1202,8 +1206,11 @@
 /* ============ Leaderboard ============ */
 
 .rank-panel { margin: 0 calc(var(--gutter) * -1) 1.25rem; background: var(--surface); border-bottom: 1px solid var(--border); }
+/* A panel like the bands under it once there is room around the column. */
+@media (min-width: 640px) {
+  .rank-panel { margin-inline: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+}
 .rank-board { background: var(--board); color: var(--board-ink); padding: 1rem var(--gutter) 0.85rem; border-bottom: 4px solid var(--lamp); }
-.rank-eyebrow { font-family: var(--label); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--board-muted); }
 .rank-place-big { margin: 0; font-family: var(--display); font-weight: 900; font-size: 4.6rem; line-height: 0.9; color: var(--lamp); font-variant-numeric: tabular-nums; }
 .rank-place-big small { font-family: var(--label); font-size: 1.1rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--board-muted); margin-left: 0.3rem; }
 .rank-line { margin: 0.35rem 0 0; font-size: 0.98rem; font-weight: 600; }
@@ -1255,7 +1262,9 @@
 .month-tab {
   flex: none; min-height: 44px; padding: 0.55rem 0.55rem 0.4rem; border: 0; border-bottom: 3px solid transparent; background: transparent;
   font-family: var(--label); font-size: 0.86rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--board-muted); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 0.35rem;
 }
+.month-tab svg { flex: none; }
 .month-tab-on { color: var(--lamp); border-bottom-color: var(--lamp); }
 .month-rows { list-style: none; margin: 0; padding: 0; }
 .month-row + .month-row { border-top: 1px solid var(--border); }
@@ -1387,11 +1396,22 @@
 .proof-bars li.is-you .proof-fill { background: var(--series-1); }
 .proof-number { font-size: 0.84rem; font-variant-numeric: tabular-nums; text-align: right; color: var(--text-muted); }
 .proof-bars li.is-you .proof-number { color: var(--text); font-weight: 700; }
-.proof-verdict { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin-top: 0.5rem; }
+.proof-verdict { display: flex; align-items: center; gap: 0.3rem; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin-top: 0.5rem; }
+.proof-verdict svg { flex: none; }
 
 /* ============ People ============ */
 
-.people-summary { font-size: 0.9rem; color: var(--text-muted); margin: 0 0 0.75rem; }
+/* Who you have played, as a strip of three lit figures. */
+.people-facts {
+  list-style: none; padding: 0; margin: 0 calc(var(--gutter) * -1);
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+  background: var(--board); color: var(--board-ink); border-bottom: 4px solid var(--lamp);
+}
+.people-facts li { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 0.4rem; row-gap: 0.15rem; padding: 0.75rem 0.5rem 0.8rem var(--gutter); }
+.people-facts li + li { border-left: 1px solid var(--board-rule); padding-left: 0.75rem; }
+.people-facts svg { color: var(--board-muted); }
+.people-facts b { font-family: var(--display); font-weight: 900; font-size: clamp(1.5rem, 7vw, 1.9rem); line-height: 1; color: var(--lamp); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.people-facts span { grid-column: 1 / -1; font-family: var(--label); font-weight: 700; font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--board-muted); }
 
 /* A results table of people. */
 .person-list {
@@ -1400,6 +1420,12 @@
   background: var(--surface);
   margin-inline: calc(var(--gutter) * -1);
   border-block: 1px solid var(--border);
+}
+/* Inside the column once there is room around it; the list's own rule
+   above would otherwise keep it running into the margin. */
+@media (min-width: 640px) {
+  .people-facts { margin-inline: 0; margin-bottom: 1.25rem; border-radius: var(--radius) var(--radius) 0 0; overflow: hidden; }
+  .person-list { margin-inline: 0; }
 }
 .person-list li + li { border-top: 1px solid var(--border); }
 .person-row {
@@ -1442,7 +1468,7 @@
 .person-records { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); border-top: 1px solid var(--board-rule); }
 .person-records li { display: flex; flex-direction: column; gap: 0.1rem; padding-top: 0.75rem; }
 .person-records li + li { border-left: 1px solid var(--board-rule); padding-left: var(--gutter); }
-.pr-label { font-size: 0.85rem; color: var(--board-muted); }
+.pr-label { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; color: var(--board-muted); }
 .pr-value { font-size: 3.2rem; font-weight: 900; color: var(--lamp); text-shadow: 0 0 18px var(--lamp-glow); }
 .pr-note { font-size: 0.85rem; color: var(--board-muted); }
 .person-detail .match-list { margin-top: 0; }
@@ -1476,13 +1502,14 @@
 .ticket-facts span {
   font-family: var(--label); font-size: 0.76rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--lamp); border: 1px solid var(--board-rule); border-radius: 2px; padding: 0.05rem 0.4rem;
+  display: inline-flex; align-items: center; gap: 0.3rem;
 }
+.ticket-facts svg { flex: none; color: var(--board-muted); }
 .ticket-go { margin-top: 0.6rem; font-family: var(--label); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--board-muted); }
 .ticket-dots { display: flex; justify-content: center; gap: 0.35rem; padding-top: 0.2rem; }
 .ticket-dots i { width: 0.45rem; height: 0.45rem; border-radius: 1px; background: var(--border); }
 .ticket-dots i.on { width: 1.1rem; background: var(--text); }
 .ticket-count { text-align: center; margin: 0.2rem 0 0; font-family: var(--label); font-weight: 700; letter-spacing: 0.08em; font-size: 0.85rem; color: var(--text-muted); }
-.ticket-hint { text-align: center; margin: 0.25rem 0 0; font-size: 0.8rem; color: var(--text-muted); }
 
 .place-board { margin: 0.2rem calc(var(--gutter) * -1) 0; background: var(--board); color: var(--board-ink); }
 .place-plate { background: #fff; height: 11rem; display: grid; place-items: center; }
@@ -1490,7 +1517,6 @@
 .place-plate .place-logo-lg { width: 8.5rem; height: 8.5rem; border: 0; }
 .place-plate .place-initials.avatar-lg { width: 8rem; height: 8rem; font-size: 3.6rem; }
 .place-main { padding: 1rem var(--gutter); border-top: 2px dashed var(--board-rule); }
-.place-eyebrow { font-family: var(--label); font-weight: 700; font-size: 0.82rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--board-muted); }
 .place-main h1 { font-family: var(--display); font-weight: 900; text-transform: uppercase; font-size: clamp(2.4rem, 12vw, 3.2rem); line-height: 0.92; margin: 0.15rem 0 0.35rem; overflow-wrap: anywhere; }
 .place-where { margin: 0; color: var(--board-muted); }
 .place-figures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--board-rule); border-bottom: 4px solid var(--lamp); }
@@ -1498,11 +1524,11 @@
 .place-figure + .place-figure { border-left: 1px solid var(--board-rule); }
 .place-figure-wide { grid-column: 1 / -1; border-bottom: 1px solid var(--board-rule); }
 .place-figure-wide + .place-figure { border-left: 0; }
-.place-figure-label { display: block; font-family: var(--label); font-weight: 700; font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--board-muted); }
+.place-figure-label { display: flex; align-items: center; gap: 0.35rem; font-family: var(--label); font-weight: 700; font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--board-muted); }
 .place-figure b { display: block; margin-top: 0.2rem; font-family: var(--display); font-weight: 800; font-size: 1.55rem; line-height: 1.05; color: var(--lamp); overflow-wrap: anywhere; }
 .place-figure-none b { font-family: var(--sans); font-weight: 500; font-size: 1.05rem; color: var(--board-muted); }
 .place-map {
-  display: flex; align-items: center; justify-content: center; min-height: 3.2rem; margin-top: 1.1rem;
+  display: flex; align-items: center; justify-content: center; gap: 0.45rem; min-height: 3.2rem; margin-top: 1.1rem;
   background: var(--button); color: var(--button-ink); border-radius: 4px; text-decoration: none;
   font-family: var(--label); font-weight: 700; font-size: 1.05rem; letter-spacing: 0.1em; text-transform: uppercase;
 }
@@ -1562,6 +1588,12 @@
 .you-section > .you-head,
 .you-details > .you-head { gap: 0.5rem; justify-content: flex-start; }
 .you-head svg { color: var(--lamp); flex: none; }
+/* An icon opening any other band's heading. */
+.head-icon { color: var(--lamp); flex: none; vertical-align: -0.16em; margin-right: 0.45rem; }
+.bests > h2,
+.link-code > h2,
+.trend-early > h2 { justify-content: flex-start; gap: 0; }
+.link-code > h2 svg { color: var(--lamp); flex: none; margin-right: 0.5rem; }
 .you-section p,
 .you-line { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.55; margin: 0 0 0.7rem; }
 .you-section .filter-row { margin-bottom: 0; }
@@ -1998,6 +2030,8 @@
   font-size: 0.9rem;
   text-decoration: none;
 }
+.setup-strip-what { display: inline-flex; align-items: center; gap: 0.4rem; }
+.setup-strip-what svg { flex: none; color: var(--text-muted); }
 .setup-strip-go { font-family: var(--label); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary); white-space: nowrap; }
 /* Under ten matches the points are an early estimate, and say so right
    under the number. The tag carries a border because the sunken
@@ -2042,7 +2076,12 @@
   letter-spacing: 0.05em;
   color: var(--text-secondary);
   margin-top: 0.3rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
+.points-change svg,
+.match-points svg { flex: none; stroke-width: 2.6; }
 .points-change.is-up { color: var(--status-good); }
 .points-change.is-down { color: var(--status-critical); }
 .points-anchor {
@@ -2320,6 +2359,9 @@
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
   color: var(--board-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 /* The board is dark in both themes, so the board's own lamps, not the
    page's status colours, which are too dim on it in the light theme. */
@@ -2344,7 +2386,13 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   margin-bottom: 0.45rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
+.endings-head svg { flex: none; stroke-width: 2.6; }
+.is-won .endings-head svg { color: var(--status-good); }
+.is-lost .endings-head svg { color: var(--status-critical); }
 .endings-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.35rem; }
 .endings-row {
   display: grid;
@@ -2358,6 +2406,11 @@
 .is-won .endings-fill { background: var(--status-good); }
 .is-lost .endings-fill { background: var(--status-critical); }
 .endings-count { font-size: 0.92rem; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
-.endings-note { font-size: 0.95rem; line-height: 1.5; color: var(--text-secondary); }
-.endings-note strong { color: var(--text); }
+.endings-leads { display: grid; gap: 0.35rem; }
+.endings-lead { display: flex; align-items: flex-start; gap: 0.4rem; font-size: 0.95rem; line-height: 1.45; color: var(--text-secondary); }
+.endings-lead svg { flex: none; margin-top: 0.2em; stroke-width: 2.6; }
+.endings-lead.is-won svg { color: var(--status-good); }
+.endings-lead.is-lost svg { color: var(--status-critical); }
+.endings-lead strong { color: var(--text); }
+.endings-nums { white-space: nowrap; }
 .endings-untagged { font-size: 0.85rem; color: var(--text-muted); }

@@ -1,3 +1,5 @@
+import Icon from './Icon'
+
 function percent(value) {
   return value === null || value === undefined ? '—' : `${Math.round(value * 100)}%`
 }
@@ -14,13 +16,14 @@ function percent(value) {
  */
 function StatGrid({ summary }) {
   const tiles = [
-    { label: 'Win rate', value: percent(summary.winRate), note: `${summary.wins} of ${summary.wins + summary.losses}` },
+    { icon: 'trophy', label: 'Win rate', value: percent(summary.winRate), note: `${summary.wins} of ${summary.wins + summary.losses}` },
     // "Winners" and "errors" are how tennis commentary talks, not how
     // anyone at a court does -- and neither word says the number counts
     // SHOTS, which is what let it be misread as the player's score.
-    { label: 'Winning shots', value: summary.totalWinners, note: 'shots that won you the point' },
-    { label: 'Mistakes', value: summary.totalErrors, note: 'shots you put out or in the net' },
+    { icon: 'check', label: 'Winning shots', value: summary.totalWinners },
+    { icon: 'cross', label: 'Mistakes', value: summary.totalErrors },
     {
+      icon: 'equals',
       label: 'Winning shots per mistake',
       // The single most telling ratio in the set: are you creating more
       // than you're giving away? Guarded so zero errors reads as a dash
@@ -37,8 +40,11 @@ function StatGrid({ summary }) {
       {tiles.map((tile) => (
         <div className="stat-tile" key={tile.label}>
           <span className="stat-value">{tile.value}</span>
-          <span className="stat-label">{tile.label}</span>
-          <span className="stat-note">{tile.note}</span>
+          <span className="stat-label">
+            <Icon name={tile.icon} size={14} />
+            {tile.label}
+          </span>
+          {tile.note && <span className="stat-note">{tile.note}</span>}
         </div>
       ))}
     </section>

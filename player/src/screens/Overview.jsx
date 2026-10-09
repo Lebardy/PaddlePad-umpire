@@ -21,6 +21,7 @@ import RallyRating from '../components/RallyRating'
 import LiveNote from '../components/LiveNote'
 import { NightBlock } from '../components/MatchList'
 import { SetupStrip } from '../components/SetupSignIn'
+import Icon from '../components/Icon'
 
 const TREND_WINDOW = 5
 
@@ -49,7 +50,7 @@ function LastNight({ matches }) {
   return (
     <section className="recent" aria-label="Your last night">
       <div className="section-head">
-        <h2>Your last night</h2>
+        <h2><Icon name="calendar" size={17} className="head-icon" />Your last night</h2>
         <Link className="link" to="/matches">All {matches.length} matches &rarr;</Link>
       </div>
       <NightBlock night={night} />
@@ -83,9 +84,9 @@ function Overview({ player }) {
         // Said plainly rather than drawn from too little data. A line
         // through three matches is three coin flips.
         <section className="trend trend-early" aria-label="Recent form">
-          <h2>Form</h2>
+          <h2><Icon name="trendUp" size={17} className="head-icon" />Form</h2>
           <p className="muted-inline">
-            Your form line appears once you&rsquo;ve played {TREND_WINDOW + 1} matches.
+            Appears after {TREND_WINDOW + 1} matches.
           </p>
         </section>
       )}

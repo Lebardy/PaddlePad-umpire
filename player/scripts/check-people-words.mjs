@@ -5,7 +5,7 @@
 //   node player/scripts/check-people-words.mjs
 // ============================================================
 
-const { findPeople, peopleLine } = await import('../src/lib/peopleWords.js')
+const { findPeople, peopleFacts } = await import('../src/lib/peopleWords.js')
 
 let pass = 0
 let fail = 0
@@ -16,9 +16,11 @@ function check(label, actual, expected) {
   console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${label}${ok ? '' : `\n       expected ${JSON.stringify(expected)}\n       got      ${JSON.stringify(actual)}`}`)
 }
 
-check('the usual line', peopleLine({ people: 21, partners: 15, faced: 18, beaten: 10 }), '21 people · 15 partnered · beaten 10 of 18 faced')
-check('one person, never faced anyone', peopleLine({ people: 1, partners: 1, faced: 0, beaten: 0 }), '1 person · 1 partnered')
-check('only ever faced people', peopleLine({ people: 2, partners: 0, faced: 2, beaten: 0 }), '2 people · beaten 0 of 2 faced')
+const said = (summary) => peopleFacts(summary).map((fact) => `${fact.figure} ${fact.label}`).join(' · ')
+check('the usual line', said({ people: 21, partners: 15, faced: 18, beaten: 10 }), '21 people · 15 partnered · 10 of 18 beaten')
+check('one person, never faced anyone', said({ people: 1, partners: 1, faced: 0, beaten: 0 }), '1 person · 1 partnered')
+check('only ever faced people', said({ people: 2, partners: 0, faced: 2, beaten: 0 }), '2 people · 0 of 2 beaten')
+check('each fact has its icon', peopleFacts({ people: 21, partners: 15, faced: 18, beaten: 10 }).map((fact) => fact.icon), ['people', 'swap', 'trophy'])
 
 const people = ['Marco Bautista', 'Rica Salazar', 'Niño Dela Cruz', 'Kristine Dela Cruz'].map((name) => ({ name }))
 check('any part of the name', findPeople(people, 'dela').map((p) => p.name), ['Niño Dela Cruz', 'Kristine Dela Cruz'])

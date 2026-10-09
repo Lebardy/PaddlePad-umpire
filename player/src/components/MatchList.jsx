@@ -14,6 +14,7 @@
 import { useId, useState } from 'react'
 import { Link } from '../lib/router'
 import { groupMatches, matchLine } from '../lib/nights'
+import Icon from './Icon'
 
 const resultOf = (match) => (match.won === null ? 'none' : match.won ? 'won' : 'lost')
 const letterOf = (match) => (match.won === null ? '–' : match.won ? 'W' : 'L')
@@ -83,7 +84,7 @@ function Month({ month, defaultOpen }) {
             {count} {count === 1 ? 'match' : 'matches'} &middot; <span className="month-record">{month.record}</span>
           </span>
         </span>
-        <span className="month-chevron" aria-hidden="true">&rsaquo;</span>
+        <Icon name="chevron" size={20} className="month-chevron" />
       </button>
       <div id={bodyId} hidden={!open}>
         {month.nights ? (

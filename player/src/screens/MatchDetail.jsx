@@ -70,13 +70,14 @@ function MatchPoints({ rally, won }) {
   return (
     <>
       <p className={`match-points ${change > 0 ? 'is-up' : change < 0 ? 'is-down' : ''}`}>
-        {change > 0 && `▲ +${change} PPR in this match`}
-        {change < 0 && `▼ −${Math.abs(change)} PPR in this match`}
+        {change !== 0 && <Icon name={change > 0 ? 'arrowUp' : 'arrowDown'} size={17} />}
+        {change > 0 && `+${change} PPR in this match`}
+        {change < 0 && `−${Math.abs(change)} PPR in this match`}
         {change === 0 && 'No change in PPR'}
       </p>
       {result !== null && result !== 0 && (
         <p className="match-points-split">
-          Rallies {signed(change - result)} · {won ? 'Winning' : 'Losing'} the match {signed(result)}
+          Rallies {signed(change - result)} · {won ? 'The win' : 'The loss'} {signed(result)}
         </p>
       )}
     </>
@@ -171,17 +172,21 @@ function MatchDetail({ id }) {
       </header>
 
       <ul className="fact-chips" aria-label="Match details">
-        <li className="chip">{match.isDoubles ? 'Doubles' : 'Singles'}</li>
-        {match.pointTarget !== 11 && <li className="chip">To {match.pointTarget}</li>}
-        {mins !== null && <li className="chip">{mins} min</li>}
+        <li className="chip">
+          <Icon name={match.isDoubles ? 'people' : 'you'} size={14} />
+          {match.isDoubles ? 'Doubles' : 'Singles'}
+        </li>
+        {match.pointTarget !== 11 && (
+          <li className="chip"><Icon name="target" size={14} />To {match.pointTarget}</li>
+        )}
+        {mins !== null && <li className="chip"><Icon name="clock" size={14} />{mins} min</li>}
         {match.usedStacking && <li className="chip">Stacked</li>}
         {match.endedEarly && <li className="chip">Stopped early</li>}
         <li className="chip chip-quiet">Match #{match.matchNumber}</li>
       </ul>
       {match.usedStacking && (
         <p className="chip-note">
-          Stacking means your team lined up on the same side before each serve
-          to keep your stronger forehand in the middle.
+          Stacked: you both lined up on one side before each serve.
         </p>
       )}
 
@@ -257,15 +262,15 @@ function MatchDetail({ id }) {
             value={thirdShots > 0 ? (stats.drop_attempts ?? 0) / thirdShots : null}
             caption={
               thirdShots > 0
-                ? `You chose the drop ${stats.drop_attempts} of ${thirdShots} times`
+                ? `${stats.drop_attempts} of ${thirdShots} third shots`
                 : 'No third shots logged'
             }
           />
         </div>
 
         <ul className="fact-chips" aria-label="Totals">
-          <li className="chip">{winners} {winners === 1 ? 'winning shot' : 'winning shots'}</li>
-          <li className="chip">{errors} {errors === 1 ? 'mistake' : 'mistakes'}</li>
+          <li className="chip"><Icon name="check" size={14} />{winners} {winners === 1 ? 'winning shot' : 'winning shots'}</li>
+          <li className="chip"><Icon name="cross" size={14} />{errors} {errors === 1 ? 'mistake' : 'mistakes'}</li>
           {stats.drive_attempts > 0 && (
             <li className="chip">{stats.drive_attempts} drives</li>
           )}

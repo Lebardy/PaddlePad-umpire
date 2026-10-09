@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'react'
 import FacilityLogo from '../components/FacilityLogo'
+import Icon from '../components/Icon'
 import { fetchFacility } from '../lib/api'
 import { navigate } from '../lib/router'
 
@@ -47,9 +48,9 @@ function FacilityPage({ id }) {
   }
 
   const place = current.facility
-  const figure = (label, value, wide) => (
+  const figure = (icon, label, value, wide) => (
     <div className={`place-figure${wide ? ' place-figure-wide' : ''}${value ? '' : ' place-figure-none'}`}>
-      <span className="place-figure-label">{label}</span>
+      <span className="place-figure-label"><Icon name={icon} size={14} />{label}</span>
       <b>{value ?? 'Not listed yet'}</b>
     </div>
   )
@@ -61,25 +62,25 @@ function FacilityPage({ id }) {
           <FacilityLogo name={place.name} logoUrl={place.logoUrl} size="lg" />
         </div>
         <div className="place-main">
-          <span className="place-eyebrow">Place to play</span>
           <h1>{place.name}</h1>
           {place.area && <p className="place-where">{place.area}</p>}
         </div>
         <div className="place-figures">
-          {figure('Open', place.openingHours, true)}
-          {figure('Court fee', place.feeText)}
-          {figure('Umpire fee', place.umpireFeeText)}
+          {figure('clock', 'Open', place.openingHours, true)}
+          {figure('court', 'Court fee', place.feeText)}
+          {figure('clipboard', 'Umpire fee', place.umpireFeeText)}
         </div>
       </section>
 
       {place.locationUrl && (
         <a className="place-map" href={place.locationUrl} target="_blank" rel="noopener noreferrer">
-          Open in Maps &rarr;
+          <Icon name="pin" size={18} />
+          Open in Maps
         </a>
       )}
       {place.details && (
         <section className="place-about">
-          <h2>About this place</h2>
+          <h2>About</h2>
           <p className="place-details">{place.details}</p>
         </section>
       )}

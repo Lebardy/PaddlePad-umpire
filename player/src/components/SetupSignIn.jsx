@@ -27,6 +27,7 @@ import { dismissSetup, isSetupDismissed, setCredentials } from '../lib/api'
 import { suggestUsername } from '../lib/username'
 import { canReturnUnaided } from '../lib/account'
 import { Link } from '../lib/router'
+import Icon from './Icon'
 
 /**
  * The fields themselves, shared by the pop-up and the card so the two
@@ -132,8 +133,7 @@ export function SetupPrompt({ player, onPlayerChange }) {
     <dialog className="setup-dialog" ref={ref} onCancel={close} onClose={close}>
       <h2>You&rsquo;re in, {player.name.split(' ')[0]}.</h2>
       <p>
-        You got here with a code. Pick a username and password and you
-        won&rsquo;t need it again — on this phone or any other.
+        Pick a username and password and you won&rsquo;t need your code again.
       </p>
       <SetupForm
         player={player}
@@ -163,8 +163,7 @@ export function SetupCard({ player, onPlayerChange }) {
     <section className="setup-card" aria-label="Set up signing in">
       <h2>Signing in</h2>
       <p>
-        You&rsquo;re signed in with a code, so you need it again every time.
-        Pick a username and password and you won&rsquo;t.
+        Pick a username and password and you won&rsquo;t need your code again.
       </p>
       {open ? (
         <SetupForm
@@ -191,7 +190,10 @@ export function SetupStrip({ player }) {
   if (canReturnUnaided(player)) return null
   return (
     <Link className="setup-strip" to="/you">
-      <span>You sign in with a code each time.</span>
+      <span className="setup-strip-what">
+        <Icon name="key" size={16} />
+        Skip the code next time.
+      </span>
       <span className="setup-strip-go">Set up &rarr;</span>
     </Link>
   )

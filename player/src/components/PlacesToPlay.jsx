@@ -9,12 +9,13 @@ import { useEffect, useRef, useState } from 'react'
 import { fetchFacilities } from '../lib/api'
 import { Link } from '../lib/router'
 import FacilityLogo from './FacilityLogo'
+import Icon from './Icon'
 
 function Ticket({ place }) {
   const facts = [
-    place.openingHours && `Open ${place.openingHours}`,
-    place.feeText && `Court ${place.feeText}`,
-    place.umpireFeeText && `Umpire ${place.umpireFeeText}`,
+    place.openingHours && { icon: 'clock', text: place.openingHours },
+    place.feeText && { icon: 'court', text: `Court ${place.feeText}` },
+    place.umpireFeeText && { icon: 'clipboard', text: `Umpire ${place.umpireFeeText}` },
   ].filter(Boolean)
   return (
     <li className="ticket-slot">
@@ -28,7 +29,10 @@ function Ticket({ place }) {
           {facts.length > 0 && (
             <span className="ticket-facts">
               {facts.map((fact) => (
-                <span key={fact}>{fact}</span>
+                <span key={fact.icon}>
+                  <Icon name={fact.icon} size={13} />
+                  {fact.text}
+                </span>
               ))}
             </span>
           )}
@@ -76,7 +80,7 @@ function PlacesToPlay() {
   return (
     <section className="places" aria-label="Places to play">
       <div className="section-head">
-        <h2>Places to play</h2>
+        <h2><Icon name="pin" size={17} className="head-icon" />Places to play</h2>
         <span className="chip">{places.length} {single ? 'place' : 'places'}</span>
       </div>
       <ul className={`ticket-rail${single ? ' ticket-rail-single' : ''}`} ref={railRef} onScroll={onScroll}>
@@ -96,7 +100,6 @@ function PlacesToPlay() {
           ) : (
             <p className="ticket-count" aria-hidden="true">{Math.min(current + 1, places.length)} of {places.length}</p>
           )}
-          <p className="ticket-hint">Swipe for more places</p>
         </>
       )}
     </section>

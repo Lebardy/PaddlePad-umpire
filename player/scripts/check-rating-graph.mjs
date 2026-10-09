@@ -10,7 +10,7 @@
 
 process.env.TZ = 'Asia/Manila'
 
-const { START, changeWords, graphView, weekView } = await import('../src/lib/ratingGraph.js')
+const { START, changeIcon, changeWords, graphView, weekView } = await import('../src/lib/ratingGraph.js')
 
 let pass = 0
 let fail = 0
@@ -96,10 +96,12 @@ const values = (view) => view.points.map((point) => point.value)
 }
 
 // ---- The words over the graph ----
-check('a climb reads with its arrow and PPR',
-  changeWords({ change: 45, words: 'since your lowest' }), '▲ +45 PPR since your lowest')
+check('a climb reads with its sign and PPR',
+  changeWords({ change: 45, words: 'since your lowest' }), '+45 PPR since your lowest')
 check('a drop uses a true minus sign',
-  changeWords({ change: -34, words: 'since your first match' }), '▼ −34 PPR since your first match')
+  changeWords({ change: -34, words: 'since your first match' }), '−34 PPR since your first match')
+check('the arrow points the way the rating went',
+  [changeIcon(45), changeIcon(-34), changeIcon(0)], ['arrowUp', 'arrowDown', null])
 check('no change says level', changeWords({ change: 0, words: 'in the last 7 days' }), 'Level in the last 7 days')
 
 // ---- High and low symbols ----

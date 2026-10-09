@@ -10,6 +10,7 @@
 import { navigate } from '../lib/router'
 import { usePlayerData } from '../lib/PlayerData'
 import Avatar from '../components/Avatar'
+import Icon from '../components/Icon'
 import MatchList from '../components/MatchList'
 
 function record(matches) {
@@ -53,7 +54,7 @@ function PersonDetail({ name }) {
         <ul className="person-records">
           {together.played > 0 && (
             <li>
-              <span className="pr-label">Together</span>
+              <span className="pr-label"><Icon name="people" size={15} />Together</span>
               <span className="pr-value">
                 {together.won}&ndash;{together.lost}
               </span>
@@ -62,7 +63,7 @@ function PersonDetail({ name }) {
           )}
           {against.played > 0 && (
             <li>
-              <span className="pr-label">Against</span>
+              <span className="pr-label"><Icon name="swap" size={15} />Against</span>
               <span className="pr-value">
                 {against.won}&ndash;{against.lost}
               </span>

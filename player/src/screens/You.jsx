@@ -201,8 +201,7 @@ function GoogleRow({ player, onPlayerChange, isOpen, onToggle, saved, onSaved })
       {connected ? (
         <form className="signin-form" onSubmit={disconnect}>
           <p className="hint">
-            You&rsquo;ll sign in with your username and password, or with a
-            code from whoever scores your matches.
+            You&rsquo;ll sign in with your username, or a code from your umpire.
           </p>
           {passwordField}
           {error && <p className="error">{error}</p>}
@@ -224,7 +223,7 @@ function GoogleRow({ player, onPlayerChange, isOpen, onToggle, saved, onSaved })
           />
           {error && <p className="error">{error}</p>}
           <p className="hint">
-            One tap to get back in, on any phone, with nothing to remember.
+            One tap to get back in, on any phone.
           </p>
         </div>
       )}
@@ -308,8 +307,7 @@ function Details({ player, onPlayerChange }) {
               -- but the umpire's roster changes under them, and they
               are the person who has to find you at the net. */}
           <p className="hint">
-            This is the name whoever scores your matches looks for on the
-            roster. Changing it changes what they see.
+            Umpires find you by this name. Changing it changes what they see.
           </p>
         </EditForm>
       </DetailRow>
@@ -399,8 +397,7 @@ function Details({ player, onPlayerChange }) {
           </DetailRow>
 
           <p className="detail-note">
-            Your code still works too, which is how you get back in if you
-            forget your password.
+            Forgot your password? Your code still gets you in.
           </p>
         </>
       ) : (
@@ -460,8 +457,7 @@ function Details({ player, onPlayerChange }) {
 
       {!canReturnUnaided(player) && open !== 'signin' && (
         <p className="detail-note">
-          You got in with a code, so you need it again every time. Pick a
-          username and password and you won&rsquo;t.
+          Set up a username and password and you won&rsquo;t need your code again.
         </p>
       )}
     </section>
@@ -501,7 +497,7 @@ function ThemeChoice() {
       </div>
       {choice === 'system' && (
         <p className="detail-note">
-          Following your phone&rsquo;s setting. It changes when your phone does.
+          Follows your phone&rsquo;s setting.
         </p>
       )}
     </section>
@@ -530,16 +526,16 @@ function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
         <p className="you-line">
           Your matches, as an umpire recorded them courtside.
         </p>
-        {/* The claim that nothing is compared against anyone else stopped
-            being true when the rating page and the monthly board arrived,
-            so this says where the exceptions are instead -- now behind a
-            tap, because it is an answer to a question, not a greeting. */}
+        {/* Not everything here is a plain count: the rating is worked
+            out, and the Leaderboard ranks people by it. This says so,
+            behind a tap, because it is an answer to a question, not a
+            greeting. */}
         <More label="Where do the numbers come from?">
           <p>
             Most numbers here are plain counts of what was tapped courtside.
-            Two things look further: your PaddlePad Rating, which is worked
-            out rally by rally from every match you play, and the monthly board, which
-            names people for what they did — it never ranks anyone.
+            Your PaddlePad Rating is worked out rally by rally from every
+            match you play. The Leaderboard ranks players by that rating, and
+            its monthly lists name people for what they did that month.
           </p>
         </More>
         {/* Written out rather than a custom install button: the browser
@@ -556,7 +552,7 @@ function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
       </section>
 
       <section className="you-section" aria-label="Account">
-        <Head icon="info">Account</Head>
+        <Head icon="lock">Account</Head>
         <button type="button" className="sign-out" onClick={onSignOut}>
           Sign out
         </button>
@@ -564,8 +560,7 @@ function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
             password can let themselves back in. */}
         {!canReturnUnaided(player) && (
           <p className="sign-out-note">
-            You&rsquo;ll need your code again to sign back in — ask whoever
-            scores your matches if you don&rsquo;t have it.
+            You&rsquo;ll need your code to sign back in. No code? Ask your umpire.
           </p>
         )}
 

@@ -1,4 +1,5 @@
 import { currentStreak, recentForm } from '../lib/derive'
+import Icon from './Icon'
 
 /**
  * The scoreboard the page leads with.
@@ -34,11 +35,12 @@ function Hero({ player, summary, matches, children }) {
       </div>
 
       <p className="sb-caption">
-        {summary.matches} {summary.matches === 1 ? 'match' : 'matches'} played
+        {summary.matches} {summary.matches === 1 ? 'match' : 'matches'}
         {streak && streak.length > 1 && (
           <>
             {' · '}
             <span className={streak.won ? 'streak-won' : 'streak-lost'}>
+              {streak.won && <Icon name="flame" size={15} />}
               {streak.length} {streak.won ? 'wins' : 'losses'} in a row
             </span>
           </>

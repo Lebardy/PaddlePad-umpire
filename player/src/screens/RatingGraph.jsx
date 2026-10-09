@@ -13,7 +13,8 @@ import { useEffect, useState } from 'react'
 import RatingLine from '../components/RatingLine'
 import { fetchRatingHistory } from '../lib/api'
 import { formatDate } from '../lib/format'
-import { changeClass, changeWords, graphView } from '../lib/ratingGraph'
+import Icon from '../components/Icon'
+import { changeClass, changeIcon, changeWords, graphView } from '../lib/ratingGraph'
 import { navigate } from '../lib/router'
 
 const FILTERS = [
@@ -107,7 +108,10 @@ function RatingGraph() {
       ) : (
         <>
           <section className="graph-card" aria-label="Your PaddlePad Rating graph">
-            <p className={`points-change ${changeClass(view.headline.change)}`}>{changeWords(view.headline)}</p>
+            <p className={`points-change ${changeClass(view.headline.change)}`}>
+              {changeIcon(view.headline.change) && <Icon name={changeIcon(view.headline.change)} size={17} />}
+              {changeWords(view.headline)}
+            </p>
             {/* Re-keyed per filter, so the line draws in again on every change. */}
             <RatingLine
               key={filter}

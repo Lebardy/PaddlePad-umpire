@@ -5,12 +5,12 @@
 // ============================================================
 
 /** "21 people · 15 partnered · beaten 10 of 18 faced". */
-export function peopleLine({ people, partners, faced, beaten }) {
+export function peopleFacts({ people, partners, faced, beaten }) {
   return [
-    `${people} ${people === 1 ? 'person' : 'people'}`,
-    partners > 0 ? `${partners} partnered` : null,
-    faced > 0 ? `beaten ${beaten} of ${faced} faced` : null,
-  ].filter(Boolean).join(' · ')
+    { icon: 'people', figure: `${people}`, label: people === 1 ? 'person' : 'people' },
+    partners > 0 ? { icon: 'swap', figure: `${partners}`, label: 'partnered' } : null,
+    faced > 0 ? { icon: 'trophy', figure: `${beaten} of ${faced}`, label: 'beaten' } : null,
+  ].filter(Boolean)
 }
 
 // Accents off, so "nino" finds Niño: nobody types the tilde into a search.
