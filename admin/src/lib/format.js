@@ -23,7 +23,7 @@ export function inviteStatusText(invite, now = Date.now()) {
 export function madeByText(invite) {
   if (!invite.created_by_name) return '—'
   return invite.made_before_admin_site
-    ? `${invite.created_by_name} (before the admin site)`
+    ? `${invite.created_by_name} (before this site)`
     : invite.created_by_name
 }
 
@@ -64,15 +64,15 @@ export function timeOfDay(iso) {
 
 const ACTION_LABELS = {
   'owner.created': 'Owner created',
-  'admin.added': 'Added an admin',
+  'admin.added': 'Added a manager',
   'admin.setup_link_created': 'Made a setup link',
   'admin.setup_completed': 'Finished setting up',
   'admin.signed_in': 'Signed in',
   'admin.sign_in_failed': 'Failed sign-in',
   // The keys keep their old names so older entries still match; the
   // words are the ones the site uses now.
-  'admin.switched_off': 'Paused an admin',
-  'admin.switched_on': 'Resumed an admin',
+  'admin.switched_off': 'Paused a manager',
+  'admin.switched_on': 'Resumed a manager',
   'admin.signed_out_others': 'Signed out other devices',
   'admin.backup_codes_created': 'Made backup codes',
   'admin.backup_code_used': 'Used a backup code',
@@ -81,7 +81,7 @@ const ACTION_LABELS = {
   'admin.google_disconnected': 'Disconnected Google',
   'invite.created': 'Made an invite code',
   'invite.cancelled': 'Cancelled an invite code',
-  'admin.moved': 'Moved an admin',
+  'admin.moved': 'Moved a manager',
   'umpire.moved': 'Moved an umpire',
   'umpire.paused': 'Paused an umpire',
   'umpire.unpaused': 'Resumed an umpire',

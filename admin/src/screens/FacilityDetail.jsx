@@ -99,7 +99,7 @@ export default function FacilityDetail({ id, me }) {
 
   const peopleTabs = [
     { id: 'umpires', label: 'Umpires', count: result.umpires.length },
-    { id: 'admins', label: 'Admins', count: result.admins.length },
+    { id: 'admins', label: 'Managers', count: result.admins.length },
   ]
   const intro = [
     facility.area,
@@ -200,7 +200,7 @@ export default function FacilityDetail({ id, me }) {
             </div>
           ))}
           {peopleTab === 'admins' && (result.admins.length === 0 ? (
-            <p className="empty">No admins yet.</p>
+            <p className="empty">No managers yet.</p>
           ) : (
             <div className="table-wrap">
               <table className="table">

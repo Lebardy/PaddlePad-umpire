@@ -105,8 +105,8 @@ section('which columns an edit actually changed')
 section('who may do what')
 {
   const owner = { role: 'owner', facilityId: null }
-  const adminA = { role: 'admin', facilityId: 'fa' }
-  const adminNone = { role: 'admin', facilityId: null }
+  const adminA = { role: 'manager', facilityId: 'fa' }
+  const adminNone = { role: 'manager', facilityId: null }
   check('the owner manages any facility', rules.mayManageFacility(owner, 'fb'), true)
   check('an admin manages their own facility', rules.mayManageFacility(adminA, 'fa'), true)
   check('an admin cannot manage another facility', rules.mayManageFacility(adminA, 'fb'), false)
@@ -124,8 +124,8 @@ section('who may do what')
 section('which facility a request is scoped to')
 {
   const owner = { role: 'owner', facilityId: null }
-  const adminA = { role: 'admin', facilityId: 'fa' }
-  const adminNone = { role: 'admin', facilityId: null }
+  const adminA = { role: 'manager', facilityId: 'fa' }
+  const adminNone = { role: 'manager', facilityId: null }
   check('the owner with nothing requested sees every facility', rules.facilityFilterFor(owner, null), { all: true })
   check('the owner requesting a facility is scoped to just it', rules.facilityFilterFor(owner, 'fb'), { id: 'fb' })
   check('a facility admin is scoped to their own facility', rules.facilityFilterFor(adminA, null), { id: 'fa' })

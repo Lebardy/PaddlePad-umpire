@@ -76,7 +76,7 @@ export default function Activity({ me }) {
 
   return (
     <section>
-      <PageBoard title="Activity" intro="Everything an admin has done, newest first. Entries can’t be changed or deleted.">
+      <PageBoard title="Activity" intro="Everything done on this site, newest first. Entries can’t be changed or deleted.">
         <div className="board-fields">
           <label className="board-field">
             <span>Who</span>

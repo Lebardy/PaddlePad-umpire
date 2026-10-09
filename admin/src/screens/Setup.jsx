@@ -13,8 +13,10 @@ export default function Setup({ secret, onSignedIn }) {
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
   // Set once setup itself is done, for the owner's one chance to save a
-  // set of backup codes before the site shows. Other admins never see it.
+  // set of backup codes before the site shows. Managers never see it.
   const [saved, setSaved] = useState(null)
+  // A manager's link says PaddlePad Manager from the first screen.
+  const site = link?.admin?.role === 'manager' ? 'Manager' : 'Admin'
 
   useEffect(() => {
     let live = true
@@ -58,7 +60,7 @@ export default function Setup({ secret, onSignedIn }) {
 
   if (saved) {
     return (
-      <Gate>
+      <Gate site={site}>
         <div className="gate-form">
           <h1>Save your backup codes</h1>
           <p>If you’re ever locked out, one of these signs you back in.</p>
@@ -70,7 +72,7 @@ export default function Setup({ secret, onSignedIn }) {
 
   if (loadError || !link) {
     return (
-      <Gate>
+      <Gate site={site}>
         <div className="gate-form" role={loadError ? 'alert' : 'status'}>
           <h1>{loadError ? 'Link not working' : 'Checking your link'}</h1>
           <p>{loadError ?? 'One moment…'}</p>
@@ -80,7 +82,7 @@ export default function Setup({ secret, onSignedIn }) {
   }
 
   return (
-    <Gate>
+    <Gate site={site}>
       <form className="gate-form" onSubmit={submitPassword}>
         <h1>Set up your account</h1>
         <p className="gate-for"><strong>{link.admin.name}</strong>{link.admin.email}</p>

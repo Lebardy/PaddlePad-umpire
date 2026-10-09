@@ -543,7 +543,7 @@ CREATE TABLE IF NOT EXISTS admins (
     google_sub        TEXT,
     -- Display only, so the account page can say which Google account.
     google_email      TEXT,
-    role              TEXT NOT NULL DEFAULT 'admin' CHECK (role IN ('owner', 'admin')),
+    role              TEXT NOT NULL DEFAULT 'manager' CHECK (role IN ('owner', 'manager')),
     deactivated_at    TIMESTAMPTZ,
     last_signed_in_at TIMESTAMPTZ,
     created_by        UUID REFERENCES admins (id) ON DELETE SET NULL,
@@ -798,3 +798,33 @@ CREATE INDEX IF NOT EXISTS matches_started_idx ON matches (started_at DESC);
 -- above). Set only by the Overview; the umpire's own end route clears
 -- it on reopening, so the umpire keeps the last word.
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ended_by_admin UUID REFERENCES admins (id) ON DELETE SET NULL;
+
+-- The lesser role was stored as 'admin' and is now 'manager'. The check
+-- above is written inline on CREATE TABLE IF NOT EXISTS, which never
+-- updates itself, so on every boot the role check is found by its
+-- definition and dropped, the stored values are converted, and the
+-- check goes back on (the same steps match_events takes for its type).
+DO $$
+DECLARE existing record;
+BEGIN
+    FOR existing IN
+        SELECT conname FROM pg_constraint
+         WHERE conrelid = 'admins'::regclass
+           AND contype = 'c'
+           AND pg_get_constraintdef(oid) ILIKE '%role%'
+    LOOP
+        EXECUTE format('ALTER TABLE admins DROP CONSTRAINT %I', existing.conname);
+    END LOOP;
+END $$;
+
+UPDATE admins SET role = 'manager' WHERE role = 'admin';
+ALTER TABLE admins ALTER COLUMN role SET DEFAULT 'manager';
+ALTER TABLE admins ADD CONSTRAINT admins_role_allowed CHECK (role IN ('owner', 'manager'));
+
+-- Activity lines written while the role was called admin say so in
+-- words. They are reworded, so the log reads one way throughout and a
+-- search for "manager" finds them.
+UPDATE admin_activity
+   SET summary = regexp_replace(summary, '^(Paused|Resumed|Moved) admin ', '\1 manager ')
+ WHERE action IN ('admin.switched_off', 'admin.switched_on', 'admin.moved')
+   AND summary ~ '^(Paused|Resumed|Moved) admin ';

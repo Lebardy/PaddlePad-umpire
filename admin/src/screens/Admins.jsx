@@ -158,11 +158,11 @@ export default function Admins({ me }) {
   return (
     <section>
       <PageBoard
-        title="Admins"
-        intro="Only the owner sees this page. A new admin gets a setup link and picks their own password."
+        title="Managers"
+        intro="Only the owner sees this page. A new manager gets a setup link and picks their own password."
       >
         <div className="tally">
-          <TallyCell figure={admins ? list.length : '–'} label="Admins" />
+          <TallyCell figure={admins ? list.length : '–'} label="Accounts" />
           <TallyCell figure={admins ? active : '–'} label="Active" />
           <TallyCell figure={admins ? list.length - active : '–'} label="Paused" />
           <TallyCell figure={admins ? list.filter(notSetUp).length : '–'} label="Not set up" />
@@ -171,11 +171,11 @@ export default function Admins({ me }) {
 
       <div className="sheet">
         <form className="form-strip" onSubmit={handleAdd}>
-          <h2 className="form-strip-title">Add an admin</h2>
+          <h2 className="form-strip-title">Add a manager</h2>
           <label className="field grow"><span>Name</span><input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} required /></label>
           <label className="field grow"><span>Email</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
           <FacilityPicker me={me} value={facilityId} onChange={setFacilityId} required />
-          <button type="submit" className="btn-primary" disabled={busy}><Icon name="plus" size={16} />{busy ? 'Adding…' : 'Add admin'}</button>
+          <button type="submit" className="btn-primary" disabled={busy}><Icon name="plus" size={16} />{busy ? 'Adding…' : 'Add manager'}</button>
         </form>
 
         {link && (
@@ -195,14 +195,14 @@ export default function Admins({ me }) {
 
         {error && <p className="form-error" role="alert">{error}</p>}
         {admins === null && !error && <p className="empty">Loading…</p>}
-        {admins?.length === 0 && <p className="empty">No admins yet.</p>}
+        {admins?.length === 0 && <p className="empty">No managers yet.</p>}
 
         {list.length > 0 && (
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Admin</th>
+                  <th>Name</th>
                   <th>Facility</th>
                   <th>Signs in with</th>
                   <th className="col-when">Last signed in</th>
@@ -215,7 +215,7 @@ export default function Admins({ me }) {
                   <tr key={admin.id} className={admin.active ? '' : 'is-faded'}>
                     <td>
                       <span className="cell-main"><strong>{admin.name}</strong>{admin.id === me.id && ' (you)'}</span>
-                      <span className="cell-sub">{admin.email} · {admin.role === 'owner' ? 'Owner' : 'Admin'}</span>
+                      <span className="cell-sub">{admin.email} · {admin.role === 'owner' ? 'Owner' : 'Manager'}</span>
                     </td>
                     <td>{admin.role === 'owner' ? 'All facilities' : (facilitiesById[admin.facilityId] ?? '—')}</td>
                     <td>
@@ -231,7 +231,7 @@ export default function Admins({ me }) {
               </tbody>
               {list.length === 1 && (
                 <tfoot>
-                  <tr><td colSpan={6} className="table-foot">Only you so far. Add an admin above, then send them their setup link.</td></tr>
+                  <tr><td colSpan={6} className="table-foot">Only you so far. Add a manager above, then send them their setup link.</td></tr>
                 </tfoot>
               )}
             </table>

@@ -1668,7 +1668,7 @@ async function main() {
     check('a short password is refused -> 400', short.status === 400, String(short.status))
     const ADMIN_PASSWORD = `smoke-${uuid()}`
     const setUp = await request(`/admin/auth/setup/${link}`, { method: 'POST', body: { password: ADMIN_PASSWORD } })
-    check('finishing setup signs the admin in -> 200', setUp.status === 200 && setUp.body.admin?.role === 'admin',
+    check('finishing setup signs the admin in -> 200', setUp.status === 200 && setUp.body.admin?.role === 'manager',
       JSON.stringify(setUp.body).slice(0, 80))
     const again = await request(`/admin/auth/setup/${link}`, { method: 'POST', body: { password: ADMIN_PASSWORD } })
     check('the link works only once -> 410', again.status === 410, String(again.status))

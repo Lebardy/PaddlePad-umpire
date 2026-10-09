@@ -246,7 +246,7 @@ export function requireAdminAccount(queryFn) {
       return res.status(401).json({ error: 'Missing or invalid token' })
     }
     if (payload.role !== 'admin') {
-      return res.status(403).json({ error: 'That action is for admins only' })
+      return res.status(403).json({ error: 'That action is for the admin site only' })
     }
     try {
       const { rows } = await queryFn(
@@ -255,7 +255,7 @@ export function requireAdminAccount(queryFn) {
       )
       const found = rows[0]
       if (!found || found.deactivated_at) {
-        return res.status(401).json({ error: 'Your admin access has ended' })
+        return res.status(401).json({ error: 'Your access has ended' })
       }
       if (sessionEnded(payload.iat, found.sessions_reset_at)) {
         return res.status(401).json({ error: 'Your session has ended. Sign in again.' })

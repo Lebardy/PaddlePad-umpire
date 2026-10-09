@@ -48,7 +48,7 @@ section('closing')
   check('a different name does not match', rules.confirmNameMatches('Jan', 'Jan Librando'), false)
   check('nothing typed does not match', rules.confirmNameMatches(undefined, 'Jan Librando'), false)
   check('the owner may close', rules.mayClose({ role: 'owner' }), true)
-  check('an admin may not close', rules.mayClose({ role: 'admin' }), false)
+  check('a manager may not close', rules.mayClose({ role: 'manager' }), false)
   check('no admin may not close', rules.mayClose(undefined), false)
   check('a closed umpire email is unique and unusable',
     rules.closedUmpireEmail('3f1c2b1e-0000-4000-8000-000000000001'),

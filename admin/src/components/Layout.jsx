@@ -7,7 +7,7 @@ const PAGES = [
   { to: '/players', label: 'Players', icon: 'people', current: (path) => path === '/players' || path.startsWith('/players/') },
   { to: '/umpires', label: 'Umpires', icon: 'clipboard', current: (path) => path === '/umpires' || path.startsWith('/umpires/') },
   { to: '/facilities', label: 'Facilities', icon: 'pin', facilityAdminLabel: 'Facility', current: (path) => path === '/facilities' || path.startsWith('/facilities/') },
-  { to: '/admins', label: 'Admins', icon: 'shield', ownerOnly: true, current: (path) => path === '/admins' },
+  { to: '/managers', label: 'Managers', icon: 'shield', ownerOnly: true, current: (path) => path === '/managers' },
   { to: '/activity', label: 'Activity', icon: 'clock', current: (path) => path === '/activity' },
 ]
 
@@ -17,8 +17,8 @@ export default function Layout({ admin, facilityLabel, path, onSignOut, children
   return (
     <div className="shell">
       <div className="topbar board-texture">
-        <Link to="/" className="brand-mark"><LampMark />PaddlePad<span>Admin</span></Link>
-        <nav aria-label="Admin pages">
+        <Link to="/" className="brand-mark"><LampMark />PaddlePad<span>{admin.role === 'owner' ? 'Admin' : 'Manager'}</span></Link>
+        <nav aria-label="Pages">
           <ul className="tabs">
             {PAGES.filter((page) => !page.ownerOnly || admin.role === 'owner').map((page) => (
               <li key={page.to}>
@@ -38,7 +38,7 @@ export default function Layout({ admin, facilityLabel, path, onSignOut, children
             title={facilityLabel ? `${admin.name} · ${facilityLabel}` : admin.name}
           >
             <strong>{admin.name}</strong>
-            <span className="who-role">{admin.role === 'owner' ? 'Owner' : 'Admin'}{facilityLabel ? ` · ${facilityLabel}` : ''}</span>
+            <span className="who-role">{admin.role === 'owner' ? 'Owner' : 'Manager'}{facilityLabel ? ` · ${facilityLabel}` : ''}</span>
           </Link>
           <button type="button" className="signout" onClick={onSignOut} aria-label="Sign out" title="Sign out"><Icon name="logout" size={18} className="icon-solo" /></button>
         </div>
