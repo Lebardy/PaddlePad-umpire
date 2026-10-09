@@ -41,12 +41,13 @@ from pipeline.feature_engineering import (
     extract_playstyle_components,
 )
 from pipeline.clustering import (
+    PLAYSTYLE_CLUSTERING_FEATURES,
     prepare_clustering_data,
-    test_skill_k_values,
+    choose_skill_k,
     cluster_skill_groups,
     interpret_skill_clusters,
     apply_skill_cluster_labels,
-    test_playstyle_k_values,
+    choose_playstyle_k,
     cluster_playstyles,
     interpret_playstyle_clusters,
     apply_playstyle_archetypes,
@@ -55,23 +56,9 @@ from pipeline.clustering import (
 RANDOM_STATE = 42
 
 # The player's own feature values behind their archetype, so a playstyle
-# can be explained rather than merely asserted. Same list the ML repo's
-# own final-profile builder selects.
-EVIDENCE_COLUMNS = [
-    "aggression_mean",
-    "aggression_std",
-    "drop_efficiency_mean",
-    "drop_efficiency_std",
-    "winner_rate_std",
-    "general_error_rate_std",
-    "dink_error_rate_std",
-    "drop_usage_rate",
-    "error_to_winner_ratio",
-    "drop_preference_rate_mean",
-    "drop_preference_rate_std",
-    "net_game_preference_rate_mean",
-    "net_game_preference_rate_std",
-]
+# can be explained rather than merely asserted. These are the columns the
+# playstyle features are made of, so the list is the pipeline's own.
+EVIDENCE_COLUMNS = list(PLAYSTYLE_CLUSTERING_FEATURES)
 
 
 class NotEnoughData(Exception):
@@ -120,7 +107,7 @@ def apply_gate(match_df, gate):
     the steadiest regulars on the strength of a single match.
 
     And the groups are found among whoever is in the pool:
-    test_skill_k_values cannot choose K for fewer than three players,
+    choose_skill_k cannot choose K for fewer than three players,
     so below that the clustering cannot run at all.
     """
     min_matches = gate["minMatchesPerPlayer"]
@@ -285,7 +272,7 @@ def run_pipeline(gated_df, rally_points):
 
     clustering_data = prepare_clustering_data(profiles, scaled_features)
 
-    best_skill_k, _ = test_skill_k_values(
+    best_skill_k, _ = choose_skill_k(
         clustering_data, k_min=2, k_max=5, random_state=RANDOM_STATE
     )
     skill_clustered, _ = cluster_skill_groups(
@@ -364,7 +351,7 @@ def run_pipeline(gated_df, rally_points):
         members = playstyle_cluster_data[
             playstyle_cluster_data["skill_group"] == group
         ]
-        # test_playstyle_k_values raises below three members. Those
+        # choose_playstyle_k raises below three members. Those
         # players keep their skill group -- only the archetype is
         # unavailable. That is a smaller loss than failing the whole
         # run, and much smaller than dropping them silently.
@@ -375,7 +362,7 @@ def run_pipeline(gated_df, rally_points):
                                            playstyle_traits=None))
             continue
 
-        group_data, best_k, _ = test_playstyle_k_values(
+        group_data, best_k, _ = choose_playstyle_k(
             playstyle_cluster_data, group, k_min=2, k_max=5,
             random_state=RANDOM_STATE, features=component_columns,
         )

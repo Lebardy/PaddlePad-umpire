@@ -10,9 +10,6 @@
 // by replaying them and scoring every counted rally's pre-rally forecast
 // (mean per-rally log loss) -- not by holding out a slice of them, which
 // on this little data was too small a sample to pick anything real.
-//
-// Writes server/scripts/.rating-split.json: which matches built the
-// ratings, which were predicted, and the k and scale that were chosen.
 // ============================================================
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
@@ -136,11 +133,6 @@ console.log(
 )
 console.log('(accuracy only -- the per-rally win chance is not a calibrated match-win probability, so no Brier score is reported)')
 
-writeFileSync(
-  join(here, '.rating-split.json'),
-  JSON.stringify({ train: train.map((m) => m.id), test: test.map((m) => m.id), best: { k: best.k, scale: best.scale } }, null, 2),
-)
-
 // Every player's points over the whole history, for
 // ml/scripts/playstyle_truth_check.py.
 const allPoints = rateHistory(matches, { k: best.k, scale: best.scale })
@@ -169,4 +161,4 @@ if (existsSync(truthPath)) {
   const d2 = ra.reduce((s, r, i) => s + (r - rb[i]) ** 2, 0)
   console.log(`rally rating vs true ability (all matches, ${n} players): Spearman ${(1 - (6 * d2) / (n * (n * n - 1))).toFixed(2)}`)
 }
-console.log(`(starting points ${START_POINTS}; split written to server/scripts/.rating-split.json)`)
+console.log(`(starting points ${START_POINTS})`)

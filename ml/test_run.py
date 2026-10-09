@@ -24,8 +24,8 @@ from pipeline.clustering import (
     TRAIT_DESCRIPTORS,
     cluster_playstyles,
     describe_playstyle_name,
-    test_playstyle_k_values,
-    test_playstyle_stability,
+    choose_playstyle_k,
+    measure_playstyle_stability,
 )
 from pipeline.feature_engineering import (
     PLAYSTYLE_FEATURES,
@@ -314,7 +314,7 @@ columns_frame["skill_group"] = "Everyone"
 columns_frame["pc_1"] = np.where(halves == 0, -5.0, 5.0) + column_rng.normal(scale=0.1, size=20)
 columns_frame["pc_2"] = column_rng.normal(scale=0.1, size=20)
 
-chosen_data, chosen_k, _ = test_playstyle_k_values(
+chosen_data, chosen_k, _ = choose_playstyle_k(
     columns_frame, "Everyone", features=["pc_1", "pc_2"])
 by_columns, _, _ = cluster_playstyles(chosen_data, chosen_k, features=["pc_1", "pc_2"])
 by_default, _, _ = cluster_playstyles(chosen_data, 2)
@@ -332,10 +332,10 @@ check("left alone, it still clusters on the thirteen measurements",
 # The stability check has to test the same setup: pointed at the extra
 # columns, every seed should find the halves; left alone, it should match
 # being handed the thirteen measurements.
-stable_columns = test_playstyle_stability(
+stable_columns = measure_playstyle_stability(
     columns_frame, "Everyone", features=["pc_1", "pc_2"])
-stable_default = test_playstyle_stability(columns_frame, "Everyone")
-stable_measurements = test_playstyle_stability(
+stable_default = measure_playstyle_stability(columns_frame, "Everyone")
+stable_measurements = measure_playstyle_stability(
     columns_frame, "Everyone", features=PLAYSTYLE_CLUSTERING_FEATURES)
 
 check("the stability check, pointed at other columns, finds the halves on every seed",

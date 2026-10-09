@@ -29,7 +29,7 @@
 // rather than the arithmetic. It is a judgement call, not a derivation.
 export const MIN_MATCHES_PER_PLAYER = 5
 
-// A hard floor from the code, not a preference: test_skill_k_values
+// A hard floor from the code, not a preference: choose_skill_k
 // sets maximum_k = min(k_max, len(X) - 1) and raises
 // ValueError("Not enough players for K selection.") below three. The
 // pipeline cannot run at all under this.
