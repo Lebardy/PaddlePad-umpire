@@ -283,7 +283,7 @@ function WorkOn({ rallyRating }) {
           <ol className="tips" aria-label="The mistakes you make most often">
             {faults.map((fault, i) => (
               <li key={fault.ending} className="tip rise" style={{ '--i': i }}>
-                <span className="tip-rank" aria-hidden="true">{i + 1}</span>
+                <span className="tip-rank" aria-hidden="true"><Icon name={fault.ending} size={30} /></span>
                 <div className="tip-body">
                   <div className="tip-head">
                     <span className="tip-name">{endingPhrase(fault.ending)}</span>

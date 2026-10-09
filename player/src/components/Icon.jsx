@@ -48,6 +48,18 @@ const PATHS = {
   pin: 'M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
   court: 'M5 3h14v18H5zM5 12h14M12 3v5M12 16v5',
   clipboard: 'M9 3h6v4H9zM9 5H6v16h12V5h-3M9 12h6M9 16h4',
+
+  // The mistakes on the Rating screen, each named by the rally ending it
+  // stands for (lib/faultTips.js). Lines are the court or the net, a
+  // circle is the ball, the rounded block is a paddle, the boot a foot.
+  out: 'M3 13h13V4M19.5 15.2a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6z',
+  net: 'M3 20h18M12 20V8M10.3 8h3.4M7.3 10.9a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6zM2.5 8.5l2 1.4',
+  dink_error: 'M3 20h18M12 20v-8M12 7.4a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6zM4 17c1.2-4.5 3.2-6.6 5.6-7',
+  kitchen: 'M3 4h18v16H3zM7 15.5h8.6a1.2 1.2 0 0 0 1.2-1.2c0-1-.8-1.6-1.9-1.8l-2.2-.4-1-2.1-1.9.8V9.5H7z',
+  service: 'M5.5 9h4A1.5 1.5 0 0 1 11 10.5v5A1.5 1.5 0 0 1 9.5 17h-4A1.5 1.5 0 0 1 4 15.5v-5A1.5 1.5 0 0 1 5.5 9zM7.5 17v4M17.5 3.7a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6z',
+  foot_fault: 'M16 3v18M4 17h14.5a1.5 1.5 0 0 0 1.5-1.5c0-1.5-1.2-2.3-2.8-2.6l-3.2-.6L12.2 9 9.5 10.2V8H4z',
+  two_bounce: 'M4 20h16M3.5 7.5c3 1.5 4.8 6 6 12.5 1.3-5 3.3-8.3 6-9.3M18 7.3a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6z',
+  net_touch: 'M3 20h18M14 20V4M7.1 5h4A1.5 1.5 0 0 1 12.6 6.5v6A1.5 1.5 0 0 1 11.1 14h-4A1.5 1.5 0 0 1 5.6 12.5v-6A1.5 1.5 0 0 1 7.1 5zM9.1 14v4',
 }
 
 function Icon({ name, className, size = 22, label }) {
