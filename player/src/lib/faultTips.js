@@ -12,14 +12,14 @@
 // ============================================================
 
 export const FAULT_TIPS = {
-  out: 'Aim for the middle of the court, well inside the lines. Save the lines for easy balls.',
-  net: 'Lift the ball: aim about a paddle’s height over the net. Most balls into the net are hit too flat.',
-  dink_error: 'Keep it short and gentle: small swing, paddle face open, aim just over the net into the kitchen.',
-  kitchen: 'When you volley, stay a step back from the kitchen line and let your weight settle before moving forward.',
-  service: 'Slow the serve down and aim deep to the middle of the box. A serve that lands beats a fast one that doesn’t.',
-  foot_fault: 'Set your feet behind the baseline before you serve, and keep them there until you’ve hit the ball.',
-  two_bounce: 'Let the serve and the return each bounce first. After serving, stay back until the return has landed.',
-  net_touch: 'After a hard shot near the net, stop your swing early and keep your paddle and body clear of it.',
+  out: 'Aim for the middle, well inside the lines.',
+  net: 'Lift it: a paddle’s height over the net.',
+  dink_error: 'Small swing, open paddle, just over the net.',
+  kitchen: 'Volley from a step behind the kitchen line.',
+  service: 'Slow it down and aim deep to the middle.',
+  foot_fault: 'Feet behind the baseline until you’ve hit.',
+  two_bounce: 'Let the serve and the return bounce first.',
+  net_touch: 'Near the net, stop your swing early.',
 }
 
 export const TIPS_SHOWN = 3

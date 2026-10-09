@@ -67,12 +67,12 @@ export function RallyPointsHeadline({ rallyRating }) {
       )}
       <LastWeek rallyRating={rallyRating} />
       <p className="points-anchor">
-        Everyone starts at {START.toLocaleString()} PPR. You&rsquo;d win about{' '}
-        <strong>{rallyRating.winChanceVsStart} of every 100</strong> rallies against a{' '}
+        Everyone starts at {START.toLocaleString()}. You&rsquo;d win about{' '}
+        <strong>{rallyRating.winChanceVsStart} of 100</strong> rallies against a{' '}
         {START.toLocaleString()} player.
       </p>
       <p className="points-basis">
-        Based on {rallyRating.rallies.toLocaleString()} rallies · {rallyRating.matches} matches
+        {rallyRating.rallies.toLocaleString()} rallies · {rallyRating.matches} matches
       </p>
     </>
   )

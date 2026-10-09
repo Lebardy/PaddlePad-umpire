@@ -28,6 +28,7 @@ const PATHS = {
   sparkle: 'M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z',
   star: 'M12 3l2.7 5.6 6.3.9-4.5 4.4 1 6.1L12 17l-5.5 3 1-6.1L3 9.5l6.3-.9z',
   arrowDown: 'M12 5v14M6 13l6 6 6-6',
+  arrowUp: 'M12 19V5M6 11l6-6 6 6',
   clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2',
   calendar: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
   info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5v.01',
