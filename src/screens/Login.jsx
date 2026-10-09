@@ -214,8 +214,7 @@ function Login({ onSignedIn }) {
       ) : (
         <>
           <p className="login-note">
-            Matches are recorded against your account, so scores can be traced
-            back to whoever logged them.
+            Scores are recorded under your account.
           </p>
 
           {/* Above BOTH ways of creating an account, because it feeds
@@ -238,7 +237,7 @@ function Login({ onSignedIn }) {
                 />
               </label>
               <p className="field-hint">
-                From whoever runs PaddlePad. Needed either way.
+                From whoever runs PaddlePad.
               </p>
             </div>
           )}

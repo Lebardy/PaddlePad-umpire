@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Icon from '../components/Icon'
 import {
   changeUmpirePassword,
   connectGoogle,
@@ -32,12 +33,12 @@ import { THEMES, getThemeChoice, setThemeChoice } from '../lib/theme'
 const VERSION = __APP_VERSION__
 
 /** One editable thing: its current value, a button, and the form. */
-function DetailRow({ label, value, action, isOpen, onToggle, saved, children }) {
+function DetailRow({ icon, label, value, action, isOpen, onToggle, saved, children }) {
   return (
     <div className={`detail-row${isOpen ? ' is-open' : ''}`}>
       <div className="detail-head">
         <div className="detail-text">
-          <span className="detail-label">{label}</span>
+          <span className="detail-label"><Icon name={icon} size={15} />{label}</span>
           <span className="detail-value">{value}</span>
         </div>
         {action && (
@@ -151,6 +152,7 @@ function GoogleRow({ umpire, onUmpireChange, isOpen, onToggle, saved, onSaved })
 
   return (
     <DetailRow
+      icon="key"
       label="Google"
       value={connected ? umpire.googleEmail : 'Not connected'}
       action={connected ? 'Disconnect' : 'Connect'}
@@ -251,15 +253,15 @@ function Account({ umpire, onUmpireChange, onBack, onSignOut }) {
 
       <h2>Your account</h2>
       <p className="login-note">
-        How you sign in, and how the app looks. Your name is what other
-        umpires see against the sessions you score.
+        Your name is what other umpires see on your sessions.
       </p>
 
       {umpire.facilityName && (
-        <DetailRow label="Where you umpire" value={umpire.facilityName} />
+        <DetailRow icon="pin" label="Where you umpire" value={umpire.facilityName} />
       )}
 
       <DetailRow
+        icon="user"
         label="Name"
         value={umpire.name}
         action="Change"
@@ -276,6 +278,7 @@ function Account({ umpire, onUmpireChange, onBack, onSignOut }) {
       </DetailRow>
 
       <DetailRow
+        icon="mail"
         label="Email"
         value={umpire.email}
         action="Change"
@@ -321,6 +324,7 @@ function Account({ umpire, onUmpireChange, onBack, onSignOut }) {
       </DetailRow>
 
       <DetailRow
+        icon="lock"
         label="Password"
         value={hasPassword ? '••••••••' : 'Not set — Google only'}
         action={hasPassword ? 'Change' : 'Set one'}
@@ -391,6 +395,7 @@ function Account({ umpire, onUmpireChange, onBack, onSignOut }) {
 
       {onSignOut && (
         <button type="button" className="sign-out" onClick={onSignOut}>
+          <Icon name="logout" size={18} />
           Sign out
         </button>
       )}

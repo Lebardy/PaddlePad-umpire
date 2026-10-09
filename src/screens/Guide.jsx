@@ -28,56 +28,59 @@
 // ============================================================
 
 import { FAULT_ENDINGS, RALLY_RULE, WINNING_ENDINGS } from '../lib/outcomes'
+import Icon from '../components/Icon'
 
 const STEPS = [
-  {
-    title: 'Make a session',
-    body: 'One night of play, named however you like — "Saturday League — Court 3". Every match belongs to a session.',
-  },
-  {
-    title: 'Add the players',
-    body: 'Open the session and add everyone playing. A player added once is on everyone’s roster from then on, so the next night you pick them rather than typing them again.',
-  },
-  {
-    title: 'Start a match',
-    body: 'Choose singles or doubles, pick the teams, and say who serves first. That is the whole setup.',
-  },
-  {
-    title: 'Two taps per rally',
-    body: 'When a rally ends, tap what ended it, then tap the player. The score, the serve and every statistic come from those taps.',
-  },
+  { title: 'Make a session', body: 'One night of play, named how you like. Every match belongs to one.' },
+  { title: 'Add the players', body: 'Add everyone playing. A player added once is on every roster from then on.' },
+  { title: 'Start a match', body: 'Singles or doubles, the teams, and who serves first.' },
+  { title: 'Two taps per rally', body: 'What ended it, then the player. The score, the serve and every statistic come from those taps.' },
 ]
 
 const TERMS = [
   {
     term: 'Dink',
-    body: 'A soft shot at the net. Dink winner and Missed dink are the two endings about them; every other ending is a shot played anywhere else.',
+    body: 'A soft shot at the net. Dink winner and Missed dink are the endings about them; every other ending is a shot played anywhere else.',
   },
   {
     term: 'Third shot',
-    body: 'Only the serving side gets these buttons, and only for their third shot of the rally. Drop ✓ it landed soft at the net, Drop ✗ they tried and missed it, Drive they hit it hard instead. It is recorded separately from how the rally ended, so one rally can have both.',
+    body: 'Serving side only, for their third shot of the rally. Drop ✓ landed soft at the net, Drop ✗ missed, Drive hit hard. Recorded separately from how the rally ended, so one rally can have both.',
   },
   {
     term: 'Stacking',
-    body: 'Tick it when a doubles pair line up on the same side each serve rather than switching. It changes nothing about scoring — it is recorded because it changes how the pair actually play.',
+    body: 'Tick it when a doubles pair line up on the same side each serve instead of switching. Scoring is unchanged; it is recorded because it changes how the pair play.',
   },
   {
     term: 'First server',
-    body: 'Who puts the first ball in play. In doubles that player is on the right by rule, so setup then asks only which of the other pair starts on the right — from those two facts the app follows the serve for the rest of the game.',
+    body: 'Who puts the first ball in play. In doubles they start on the right by rule, so setup only asks which of the other pair starts on the right. From those two facts the app follows the serve all game.',
   },
   {
     term: 'Who starts on the right',
-    body: 'Right means their own right, facing the net — so the two teams’ right-hand boxes are diagonally opposite, which is why a serve crosses. Watching a pair from behind them, their right is the player on your left. It is also called the even court, because that is the side you serve from when your team’s score is even.',
+    body: 'Their own right, facing the net, so the two teams’ right-hand boxes are diagonally opposite. Seen from behind a pair, their right is the player on your left. Also called the even court: you serve from it when your score is even.',
   },
   {
     term: 'Why the app asks',
-    body: 'It decides who serves when the ball goes over. A pair swaps sides only when they score, so whoever is on the right when their team wins the serve is fixed by their own score: even, and it is whoever started there; odd, and it is their partner. If the app ever names the wrong one, tap “Not them?” next to the score — that sticks for the rest of the match.',
+    body: 'It decides who serves when the ball goes over. A pair swaps sides only when they score, so on an even score the right-hand player is whoever started there, and on an odd score their partner. If the app names the wrong one, tap “Not them?” beside the score; that sticks for the match.',
   },
   {
     term: 'Play to',
-    body: '11, 15 or 21. Set it per match, because the app decides when the game is finished — get it wrong and a game to 15 will be called at 11.',
+    body: '11, 15 or 21, set per match. The app decides when the game is over, so a wrong setting calls a game to 15 at 11.',
   },
 ]
+
+// One folded section: its icon, its title, and the answer under it.
+function Section({ icon, title, open = false, children }) {
+  return (
+    <details className="guide-section" open={open}>
+      <summary>
+        <span className="guide-icon"><Icon name={icon} size={22} /></span>
+        <h3>{title}</h3>
+        <Icon name="chevron" size={18} className="guide-chevron" />
+      </summary>
+      {children}
+    </details>
+  )
+}
 
 function Guide({ onBack }) {
   return (
@@ -88,12 +91,11 @@ function Guide({ onBack }) {
 
       <h2>How this works</h2>
       <p className="guide-lede">
-        You tap what happened. The app works out the score, whose serve it is,
-        and everything the ratings are built from.
+        You tap what happened. The app works out the score, the serve and the
+        statistics.
       </p>
 
-      <section className="guide-section" aria-label="The flow">
-        <h3>Start to finish</h3>
+      <Section icon="list" title="Start to finish" open>
         <ol className="guide-steps">
           {STEPS.map((step, i) => (
             <li key={step.title}>
@@ -105,10 +107,9 @@ function Guide({ onBack }) {
             </li>
           ))}
         </ol>
-      </section>
+      </Section>
 
-      <section className="guide-section" aria-label="Scoring a rally">
-        <h3>Scoring a rally</h3>
+      <Section icon="target" title="Scoring a rally">
         <p>{RALLY_RULE}</p>
         {[
           ['Won with a shot', WINNING_ENDINGS],
@@ -127,20 +128,17 @@ function Guide({ onBack }) {
           </div>
         ))}
         <p>
-          In doubles, the player step is a picture of the court: each pair on
-          its side of the net, each player on the side they are standing on
-          right now, worked out from the score the same way the serve is. If
-          the picture is upside down from where you stand, tap{' '}
-          <strong>Swap ends</strong> once and it stays that way for the match.
+          In doubles you pick the player on a picture of the court, each where
+          they stand right now. Upside down from where you stand? Tap{' '}
+          <strong>Swap ends</strong> once; it stays that way for the match.
         </p>
         <p className="guide-note">
           Winning shots go to the player who hit them. Faults go to the player
-          who made them — not to whoever won the point.
+          who made them, not to whoever won the point.
         </p>
-      </section>
+      </Section>
 
-      <section className="guide-section" aria-label="Words the app uses">
-        <h3>Words the app asks you for</h3>
+      <Section icon="book" title="Words the app asks you for">
         <dl className="guide-terms">
           {TERMS.map((t) => (
             <div key={t.term}>
@@ -149,83 +147,67 @@ function Guide({ onBack }) {
             </div>
           ))}
         </dl>
-      </section>
+      </Section>
 
-      <section className="guide-section" aria-label="Fixing mistakes">
-        <h3>When you get it wrong</h3>
+      <Section icon="undo" title="When you get it wrong">
         <p>
-          <strong>Undo</strong> sits right under the score, beside the last
-          thing logged, because correcting a mis-tap has to be as quick as the
-          tap was. It removes the last thing logged, as many times as you need.
-          Tapped the wrong ending? <strong>Back</strong>, in the same place,
-          before you pick a player.
+          <strong>Undo</strong>, under the score, removes the last thing
+          logged, as many times as you need. Wrong ending tapped?{' '}
+          <strong>Back</strong>, in the same place, before you pick a player.
         </p>
         <p>
-          <strong>End match early</strong> is for a game stopped rather than
-          won — someone retires, or the court is needed. The score stands as it
-          was.
+          <strong>End match early</strong> is for a game stopped, not won:
+          someone retires, or the court is needed. The score stands.
         </p>
         <p>
           <strong>Cancel match</strong> throws away a match started by mistake,
-          before it finishes. A match that already finished is{' '}
-          <strong>voided</strong> instead: wrong court, wrong pairing. It stays
-          on record, stops counting, and you can put it back.
+          before it finishes. A finished match is <strong>voided</strong>{' '}
+          instead: it stays on record, stops counting, and can be put back.
         </p>
-      </section>
+      </Section>
 
-      <section className="guide-section" aria-label="Signal">
-        <h3>No signal?</h3>
+      <Section icon="offline" title="No signal?">
         <p>
-          Keep scoring. Everything is written to this phone first and sent up
-          when there is signal again — the indicator in the header shows what is
-          still waiting. The one thing to avoid is signing out while it says
-          there is something left, because that throws it away.
+          Keep scoring. Everything is saved on this phone first and sent when
+          there is signal; the indicator in the header shows what is waiting.
+          Don&rsquo;t sign out while something is waiting: that throws it away.
         </p>
         <p>
-          If the indicator turns red and says something couldn&rsquo;t sync,
-          the server refused it rather than missed it. Tap the indicator to
-          see what it was and why, then try it again or dismiss it.
+          A red indicator means the server refused something. Tap it to see
+          what and why, then try again or dismiss.
         </p>
         <p className="guide-note">
           Two phones must not score the same match at once. If someone takes
-          over, the app says so, and the phone that took over is the one whose
-          record counts.
+          over, the app says so, and theirs is the record that counts.
         </p>
-      </section>
+      </Section>
 
-      <section className="guide-section" aria-label="Whose sessions">
-        <h3>Whose sessions you can see</h3>
+      <Section icon="calendar" title="Whose sessions you can see">
         <p>
-          All of them. Every umpire account sees every record on
-          PaddlePad, because courts and phones change hands mid-session and a
-          player has to be the same person whoever scored them. Your own
-          sessions are listed first; below them are the ones other umpires
-          still have running, with their name against each.
+          Every session at the place you umpire, because courts and phones
+          change hands mid-session. Yours come first; below them are the ones
+          other umpires still have running, with their name on each.
         </p>
         <p>
-          <strong>End session</strong> when the night is over. That is what
-          takes it off everyone else&rsquo;s list — it is not the same as
-          voiding, and every match in it still counts. Reopen it if you end it
-          too early.
+          <strong>End session</strong> when the night is over. That takes it
+          off everyone else&rsquo;s list. It is not voiding: every match still
+          counts. Reopen it if you ended too early.
         </p>
-      </section>
+      </Section>
 
-      <section className="guide-section" aria-label="Players">
-        <h3>Players and their codes</h3>
+      <Section icon="qr" title="Players and their codes">
         <p>
-          Every player has a code that signs them into the player app, where
-          they see their own matches and statistics. Show it from{' '}
-          <strong>Players &amp; codes</strong> on the home screen, or from the
-          roster inside a session — the same code either way. Only ever show
-          someone their own: anyone holding a code can claim that record.
+          Every player has a code that signs them into the player app. Show it
+          from <strong>Players &amp; codes</strong> on the home screen or from
+          a session&rsquo;s roster; it is the same code. Only show someone
+          their own: anyone holding a code can claim that record.
         </p>
         <p>
-          The code keeps working after they have used it, and after they set a
-          password. That is deliberate — there are no email addresses here, so
-          no reset links, and you handing them a fresh code is how someone
-          locked out gets back in.
+          A code stops working once the player sets a password or connects
+          Google. Locked out? Give them a fresh code; that is how they get
+          back in.
         </p>
-      </section>
+      </Section>
     </div>
   )
 }

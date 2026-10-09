@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Icon from '../components/Icon'
 import { createSession } from '../lib/storage'
 import { useSessions } from '../lib/useLocalStore'
 
@@ -22,6 +23,7 @@ function SessionList({ sessions, onOpenSession, showOwner = false }) {
             </span>
             <span className="session-meta">
               {/* The server's count where this device has no roster yet. */}
+              <Icon name="people" size={16} />
               {s.playerCount ?? s.playerIds.length} players
               {showOwner && s.createdByName ? ` \u00b7 by ${s.createdByName}` : ''}
             </span>
@@ -84,11 +86,12 @@ function Home({ onOpenSession, onOpenGuide, onOpenPlayers, umpire }) {
       {onOpenGuide && !guideDismissed && (
         <div className="guide-nudge">
           <div>
-            <strong>New to this?</strong>
-            <p>Two minutes on what the buttons record and how a night runs.</p>
+            <strong>New here?</strong>
+            <p>A two-minute guide to the buttons.</p>
           </div>
           <div className="guide-nudge-actions">
             <button className="guide-nudge-open" onClick={onOpenGuide}>
+              <Icon name="book" size={18} />
               How this works
             </button>
             <button
@@ -96,7 +99,7 @@ function Home({ onOpenSession, onOpenGuide, onOpenPlayers, umpire }) {
               onClick={dismissGuideNudge}
               aria-label="Dismiss"
             >
-              ×
+              <Icon name="x" size={18} className="icon-solo" />
             </button>
           </div>
         </div>
@@ -112,7 +115,7 @@ function Home({ onOpenSession, onOpenGuide, onOpenPlayers, umpire }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
-          <button type="submit">New Session</button>
+          <button type="submit"><Icon name="plus" />New Session</button>
         </div>
       </form>
 
@@ -143,7 +146,7 @@ function Home({ onOpenSession, onOpenGuide, onOpenPlayers, umpire }) {
           <ul className="tool-list">
             <li>
               <button className="export-btn" onClick={onOpenPlayers}>
-                <span>Players &amp; codes</span>
+                <span><Icon name="qr" />Players &amp; codes</span>
                 <span className="tool-note">Show a player their sign-in code</span>
               </button>
             </li>
