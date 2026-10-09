@@ -2460,17 +2460,13 @@
 /* ============ What to work on ============ */
 
 .tips { list-style: none; padding: 0; margin: 0.9rem 0 0; display: grid; gap: 1rem; }
-.tip { display: grid; grid-template-columns: 2.1rem minmax(0, 1fr); gap: 0.75rem; align-items: start; }
+.tip { display: grid; grid-template-columns: 2.75rem minmax(0, 1fr); gap: 0.75rem; align-items: start; }
 .tip + .tip { padding-top: 1rem; border-top: 1px solid var(--border); }
 .tip-rank {
   display: grid;
   place-items: center;
-  width: 2.1rem;
-  height: 2.1rem;
-  font-family: var(--display);
-  font-size: 1.25rem;
-  font-weight: 900;
-  line-height: 1;
+  width: 2.75rem;
+  height: 2.75rem;
   color: var(--text);
   background: var(--surface-sunken);
   border-radius: 2px;
