@@ -1867,16 +1867,25 @@
 }
 .tab + .tab { border-left: 1px solid var(--board-rule); }
 .tab-active { color: var(--lamp); background: var(--board-raised); }
-.tab-active::before {
+/* One lamp for the whole bar, sliding to the chosen screen. The cells
+   stop growing at 9.5rem and sit centred, so the lamp does the same. */
+.tabbar::before {
+  --w: min(calc(100% / var(--n, 5)), 9.5rem);
   content: '';
   position: absolute;
+  z-index: 1;
   top: -1px;
-  left: 0;
-  right: 0;
+  left: calc((100% - var(--n, 5) * var(--w)) / 2);
+  width: var(--w);
   height: 3px;
   background: var(--lamp);
   box-shadow: 0 0 12px var(--lamp-glow);
+  opacity: var(--lit, 1);
+  transform: translateX(calc(var(--at, 0) * 100%));
+  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
 }
+.tab-icon { transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1); }
+.tab-active .tab-icon { transform: translateY(-1px) scale(1.1); }
 .tab:active { background: var(--board-raised); }
 .tab:focus-visible { outline-color: var(--lamp); outline-offset: -3px; }
 
@@ -1993,14 +2002,121 @@
 
 /* For anyone who asked their device for less motion, everything is
    already settled when they arrive. */
+
+/* ============ The scoreboard lights up ============ */
+
+/* One moment per screen, played once when it opens: digits roll (the
+   count-up in lib/motion.js) and lamps switch on. */
+@keyframes lamp-on { 0% { opacity: 0; } 22% { opacity: 0.9; } 34% { opacity: 0.25; } 52% { opacity: 1; } 64% { opacity: 0.6; } 100% { opacity: 1; } }
+@keyframes pill-on { from { opacity: 0.12; transform: scale(0.82); filter: saturate(0); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes lamp-flash { from { text-shadow: 0 0 60px var(--lamp); } }
+
+/* Overview: the record's lamps come on, then the last results, oldest first. */
+.sb-figure { animation: lamp-on 700ms linear both; }
+.sb-form .pill { animation: pill-on 360ms cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(620ms + var(--i, 0) * 110ms); }
+/* Rating: the change drops in once the number has rolled. */
+.points-week .points-change { animation: rise 420ms ease-out 620ms both; }
+/* Match: the result wipes in and the score's lamp flashes as it lands. */
+.match-board .result-word { animation: wipe 300ms ease-out both; }
+.ds-yours { animation: lamp-flash 700ms ease-out 250ms both; }
+/* Leaderboard: your row lights across once the board has glided to it. */
+.rank-you { animation: wipe 520ms ease-out 1400ms both; }
+
+/* The chosen filter's dark block slides to the cell that was tapped. */
+.filter-row { position: relative; }
+.filter-row::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(100% / var(--n, 3));
+  background: var(--button);
+  transform: translateX(calc(var(--at, 0) * 100%));
+  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.filter { position: relative; }
+.filter-row .filter-active { background: transparent; }
+
+/* A month opens and closes instead of snapping. */
+.fold { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 320ms cubic-bezier(0.16, 1, 0.3, 1); }
+.month-bar[aria-expanded="true"] + .fold { grid-template-rows: 1fr; }
+.fold > div { overflow: hidden; min-height: 0; }
+
+/* A tapped match's score and names travel to the top of its page, and
+   home again on Back (lib/router.jsx starts the transition). */
+.mrow.travels .mrow-score,
+.detail-score { view-transition-name: pp-score; }
+.mrow.travels .mrow-vs,
+.detail-versus { view-transition-name: pp-who; }
+::view-transition-group(pp-score),
+::view-transition-group(pp-who) { animation-duration: 420ms; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* ============ Playstyle emblems ============ */
+
+.step-lead { display: flex; align-items: flex-start; gap: 1rem; }
+.step-lead .step-value { min-width: 0; }
+.crest { display: inline-grid; flex: none; width: 5.4rem; margin-top: 0.2rem; }
+.emblem { display: block; width: 100%; height: auto; }
+.e-plate { fill: var(--board); stroke: var(--board-rule); stroke-width: 1.5; }
+.e-court { fill: none; stroke: var(--board-ink); stroke-opacity: 0.5; stroke-width: 1.8; stroke-dasharray: 1; }
+.e-net { stroke: var(--board-ink); stroke-width: 3.2; stroke-dasharray: 3 2.4; transform-origin: 36px 48px; }
+.e-zone { fill: var(--lamp); filter: drop-shadow(0 0 5px var(--lamp-glow)); }
+.e-cut { fill: none; stroke: var(--board); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.e-ball { fill: var(--board); }
+.e-shot { fill: none; stroke: var(--lamp); stroke-width: 4.2; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 4px var(--lamp-glow)); }
+.e-soft { stroke-dasharray: 0.1 7.2; stroke-width: 4.6; }
+.e-ring { fill: none; stroke: var(--lamp); stroke-width: 2.6; }
+.mark { display: block; fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
+.mark .dot { fill: currentColor; stroke: none; }
+.pips { display: grid; grid-template-columns: 1fr 1fr; }
+.pip { height: 2.7rem; padding: 0.45rem; background: var(--board); color: var(--lamp); border: 1.5px solid var(--lamp); border-top: 0; border-radius: 0 0 2px 2px; }
+.pip + .pip { border-left: 0; }
+.pip .mark { width: 100%; height: 100%; }
+.proof-word { display: inline-flex; align-items: center; gap: 0.4rem; }
+.proof-word .mark { flex: none; width: 1.6rem; height: 1.6rem; padding: 0.24rem; background: var(--board); color: var(--lamp); border-radius: 2px; }
+.proof-word .mini { flex: none; width: 1.6rem; }
+/* With a picture in front of the word, the row lines up on centres. */
+.proof-head { align-items: center; }
+
+/* The emblem draws itself the first time it is scrolled to: the court's
+   lines, the net, the lit part switching on, then the marks docking. */
+.draw .e-court { animation: e-line 620ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.draw .e-net { animation: e-net 320ms cubic-bezier(0.16, 1, 0.3, 1) 240ms both; }
+.draw .e-zone,
+.draw .e-cut,
+.draw .e-ball { animation: lamp-on 520ms linear 520ms both; }
+.draw .e-play { animation: e-wipe 520ms cubic-bezier(0.16, 1, 0.3, 1) 640ms both; }
+.draw ~ .pips .pip { animation: rise 300ms ease-out both; animation-delay: calc(980ms + var(--i, 0) * 110ms); }
+@keyframes e-line { from { stroke-dashoffset: 1; } }
+@keyframes e-net { from { transform: scaleX(0); } }
+@keyframes e-wipe { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
+
 @media (prefers-reduced-motion: reduce) {
   .rise,
   .ribbon-block,
   .mchart,
   .mchart-mark,
   .live-dot,
-  .ghost {
+  .ghost,
+  .sb-figure,
+  .sb-form .pill,
+  .points-week .points-change,
+  .match-board .result-word,
+  .ds-yours,
+  .rank-you,
+  .draw .e-court,
+  .draw .e-net,
+  .draw .e-zone,
+  .draw .e-cut,
+  .draw .e-ball,
+  .draw .e-play,
+  .draw ~ .pips .pip {
     animation: none;
+  }
+  .tabbar::before,
+  .tab-icon,
+  .filter-row::before,
+  .fold {
+    transition: none;
   }
 }
 

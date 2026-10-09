@@ -8,7 +8,8 @@
 // ============================================================
 
 import { useEffect, useRef } from 'react'
-import { easeInOutCubic, gapBefore, glideDuration, glideTarget, standingWords } from '../lib/leaderboard'
+import { easeInOutCubic, gapBefore, glideDuration, glideTarget, ordinal, standingWords } from '../lib/leaderboard'
+import { useCountUp } from '../lib/motion'
 
 const fmt = new Intl.NumberFormat('en-US')
 const GLIDE_DELAY_MS = 450
@@ -77,13 +78,14 @@ function RankPanel({ ranking, you }) {
   const boxRef = useRef(null)
   useGlideToYou(boxRef)
   const words = standingWords(you)
+  const place = useCountUp(you.place ?? 0, 900, you.of ?? 0)
 
   return (
     <section className="rank-panel" aria-label="PaddlePad Rating ranking">
       {words && (
         <div className="rank-board">
           <p className="rank-place-big">
-            {words.place}
+            {ordinal(place)}
             <small>of {words.of}</small>
           </p>
           <p className="rank-line">{words.line}</p>

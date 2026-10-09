@@ -33,7 +33,7 @@ const RESULTS = [
 /** One row of filter buttons. Both rows are the same control. */
 function FilterRow({ options, value, onChange, label }) {
   return (
-    <div className="filter-row" role="group" aria-label={label}>
+    <div className="filter-row" role="group" aria-label={label} style={{ '--at': options.findIndex((option) => option.key === value), '--n': options.length }}>
       {options.map((option) => (
         <button
           key={option.key}
