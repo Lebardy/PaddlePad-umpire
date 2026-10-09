@@ -1142,10 +1142,10 @@ section {
 
 /* Doubles: the court from above. Each half is a pair; the net runs
    between them. */
-.who-court { display: grid; gap: 0.5rem; }
+/* The court from the side: a pair stacked each side of an upright net. */
+.who-court { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 0.5rem; }
 .who-half {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem;
   padding: 0.5rem;
   border-radius: var(--radius-sm);
@@ -1153,6 +1153,7 @@ section {
 }
 .who-net {
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 0.6rem;
   color: var(--text-muted);
@@ -1163,17 +1164,11 @@ section {
   letter-spacing: 0.14em;
 }
 .who-net::before,
-.who-net::after { content: ''; flex: 1; border-top: 2px dashed var(--border); }
-.who-side {
-  font-family: var(--label);
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-}
+.who-net::after { content: ''; flex: 1; border-left: 2px dashed var(--border); }
+.who-net span { writing-mode: vertical-rl; }
 .who-court .who-btn { background: var(--bg-elevated); }
 .who-swap {
+  grid-column: 1 / -1;
   justify-self: center;
   margin-top: 0.15rem;
   padding: 0.35rem 0.9rem;

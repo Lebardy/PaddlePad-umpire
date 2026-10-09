@@ -103,43 +103,43 @@ function RallyLegend() {
 }
 
 /**
- * The "who" step for doubles, drawn as the court seen from above: each
- * pair on its own side of the net, each player on the side they are
- * standing on right now (see courtSides).
+ * The "who" step for doubles, drawn as the court seen from the side,
+ * where an umpire stands: one pair stacked on the left of the net, the
+ * other stacked on the right, each player where they are standing right
+ * now (see courtSides). `nearEnd` is the pair shown on the left. No
+ * player is labelled left or right: an umpire may sit on either side
+ * of the court, and the word would be wrong for half of them.
  *
- * Both pairs face the net, so they mirror each other. The near pair's
- * right is on the right of the screen; the far pair, facing the other
- * way, has its right on the LEFT of the screen -- which is what puts
- * two players on the same sideline diagonally across from each other,
- * exactly where they are on court.
+ * Both pairs face the net, so they mirror each other. The left pair's
+ * own right is at the bottom, nearest the umpire; the right pair,
+ * facing the other way, has its right at the TOP -- which is what puts
+ * the two players on the same sideline straight across the net from
+ * each other, exactly where they are on court.
  */
 function CourtPicker({ sides, nearEnd, serverId, name, onPick, onSwapEnds }) {
   const farEnd = nearEnd === 'A' ? 'B' : 'A'
 
-  function spot(id, side) {
+  function spot(id) {
     return (
       <button key={id} className="who-btn" onClick={() => onPick(id)}>
         {name(id)}
-        <span className="who-side">
-          {side}
-          {id === serverId ? ' · serving' : ''}
-        </span>
+        {id === serverId && <span className="who-serving">serving</span>}
       </button>
     )
   }
 
   return (
     <div className="who-court">
-      <div className="who-half far">
-        {spot(sides[farEnd].right, 'right')}
-        {spot(sides[farEnd].left, 'left')}
+      <div className="who-half">
+        {spot(sides[nearEnd].left)}
+        {spot(sides[nearEnd].right)}
       </div>
       <div className="who-net">
         <span>Net</span>
       </div>
-      <div className="who-half near">
-        {spot(sides[nearEnd].left, 'left')}
-        {spot(sides[nearEnd].right, 'right')}
+      <div className="who-half">
+        {spot(sides[farEnd].right)}
+        {spot(sides[farEnd].left)}
       </div>
       <button className="who-swap" onClick={onSwapEnds}>
         Swap ends
