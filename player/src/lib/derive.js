@@ -4,7 +4,7 @@
 // Everything here is a plain count or ratio over this player's own
 // matches. Nothing needs other players to exist, which is what makes it
 // safe to show from the very first match -- unlike a skill rating,
-// which is scaled against the whole club and would visibly move because
+// which is scaled against every other player and would visibly move because
 // SOMEONE ELSE played.
 // ============================================================
 
@@ -41,31 +41,6 @@ export function bestWin(matches) {
 }
 
 /**
- * A win/loss record against every name in a list drawn from each match.
- *
- * People are keyed by NAME, because names are all the server sends for
- * partners and opponents -- it resolves ids to names before responding.
- * Two players sharing a name would therefore be tallied as one person.
- * Fixing that would mean the server sending ids as well, which is not
- * worth a round of API changes for a club this size; it is written down
- * here so it is a known limit rather than a surprise later.
- */
-function tallyBy(matches, namesOf) {
-  const tally = new Map()
-  for (const match of matches) {
-    for (const name of namesOf(match)) {
-      if (!name) continue
-      const entry = tally.get(name) ?? { name, played: 0, won: 0, lost: 0 }
-      entry.played += 1
-      if (match.won === true) entry.won += 1
-      else if (match.won === false) entry.lost += 1
-      tally.set(name, entry)
-    }
-  }
-  return [...tally.values()].sort((a, b) => b.played - a.played || a.name.localeCompare(b.name))
-}
-
-/**
  * The match won from furthest behind.
  *
  * Read off `progression`, the per-point score margin from this player's
@@ -99,23 +74,6 @@ export function biggestComeback(matches) {
   return best
 }
 
-/** Everyone this player has partnered, most-played first. */
-export function partnerRecords(matches) {
-  return tallyBy(matches, (m) => [m.partner])
-}
-
-/**
- * Everyone this player has faced, most-played first.
- *
- * A doubles match contributes to BOTH opponents, so the totals here add
- * up to more than the number of matches played. That is the honest
- * reading of "how do I do against this person" and is what the screen
- * says: matches faced, not matches played.
- */
-export function opponentRecords(matches) {
-  return tallyBy(matches, (m) => m.opponents ?? [])
-}
-
 /**
  * Everyone this player has shared a court with, each appearing ONCE.
  *
@@ -128,10 +86,10 @@ export function opponentRecords(matches) {
  * relationship: "we won two together, and you beat me once" is a
  * sentence about one person, not two list items.
  *
- * Keyed by NAME, with the same caveat tallyBy carries: the server
- * resolves ids to names before responding, so two players sharing a name
- * are counted as one person. Written down as a known limit rather than
- * left to be discovered.
+ * Keyed by NAME, because names are all the server sends for partners
+ * and opponents: it resolves ids to names before responding, so two
+ * players sharing a name are counted as one person. Written down as a
+ * known limit rather than left to be discovered.
  */
 export function peopleTogether(matches) {
   const blank = () => ({ played: 0, won: 0, lost: 0 })
@@ -185,7 +143,7 @@ export function peopleTogether(matches) {
 /**
  * The facts that survive a long tail of one-match relationships.
  *
- * This is what replaced a "best partner" win rate. In a club where
+ * This is what replaced a "best partner" win rate. Where
  * partners rotate every match almost nobody reaches three matches with
  * the same person, so a rate was either meaningless or -- once gated to
  * stop it being meaningless -- absent entirely, which is exactly what
@@ -215,32 +173,6 @@ export function peopleSummary(matches) {
     lostTo: lostTo.size,
     playedMost: people[0] ?? null,
   }
-}
-
-/** Who this player has partnered most, and how it went. */
-export function topPartner(matches) {
-  return partnerRecords(matches)[0] ?? null
-}
-
-/**
- * The longest run of wins this player has ever put together.
- *
- * Uses the same rule as currentStreak: a match with no result breaks a
- * run rather than extending it.
- */
-export function longestWinStreak(matches) {
-  let best = 0
-  let run = 0
-  // Oldest first, so a run reads in the direction it was played.
-  for (let i = matches.length - 1; i >= 0; i -= 1) {
-    if (matches[i].won === true) {
-      run += 1
-      best = Math.max(best, run)
-    } else {
-      run = 0
-    }
-  }
-  return best
 }
 
 /**

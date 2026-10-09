@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ============================================================
-// Seeds a CLUB-SIZED pool of players so the ML pipeline has something
+// Seeds a REALISTIC-SIZED pool of players so the ML pipeline has something
 // real to cluster.
 //
 //   node scripts/seed-pool.mjs [players] [matchesPerPlayer]
@@ -9,7 +9,7 @@
 // WARNING: this writes REAL players and REAL matches. Only ever point it
 // at staging or a local test database. It refuses to run against a
 // database that already holds matches outside its own session, so it
-// cannot quietly inflate a real club's data.
+// cannot quietly inflate real data.
 //
 // Separate from seed-demo.mjs on purpose. That script makes ONE player's
 // app look good -- every match involves them. This one needs the

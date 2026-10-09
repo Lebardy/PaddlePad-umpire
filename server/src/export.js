@@ -91,7 +91,7 @@ const MAX_PLAUSIBLE_MATCH_MINS = 240
  * `match_number` means "this player's Nth completed match ever", which
  * is assigned by ordering ALL of a player's matches chronologically.
  * That is why this cannot be paginated or computed one match at a
- * time -- it needs the whole history in one pass. Fine at club scale;
+ * time -- it needs the whole history in one pass. Fine at this scale;
  * noted rather than solved.
  */
 export async function buildMatchLogRows(query) {

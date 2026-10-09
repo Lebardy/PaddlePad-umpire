@@ -102,7 +102,7 @@ export async function pullCore({ signal } = {}) {
  * Deliberately does NOT fetch each match's events. The session screen
  * only shows who played and whether the match finished, and fetching
  * full logs here was a request per match -- a slow, pointless fan-out
- * that grew with every game the club recorded. LiveMatch pulls the one
+ * that grew with every game recorded. LiveMatch pulls the one
  * log it actually needs, when it needs it.
  */
 export async function pullSession(sessionId, { signal } = {}) {

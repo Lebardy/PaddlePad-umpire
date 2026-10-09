@@ -55,7 +55,7 @@ def trigger():
     uses to talk to the API, so triggering a run needs the credential
     that could already read all the data anyway.
 
-    Synchronous on purpose: at club scale a run is seconds, and being
+    Synchronous on purpose: at this scale a run is seconds, and being
     able to trigger one and see the result in the response is worth more
     during a demo than freeing the connection early.
     """

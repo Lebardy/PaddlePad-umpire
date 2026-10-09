@@ -251,7 +251,7 @@ router.post('/register', async (req, res) => {
  * Google proves who someone is; it does not decide whether they may
  * have an account here. Registration stays invite-only whichever door
  * is used, because this API is on the public internet and an umpire
- * account can write into the club's match data. Signing IN is free; the
+ * account can write into the shared match data. Signing IN is free; the
  * first appearance of an unknown Google account still needs an invite.
  *
  * Three outcomes, in this order:
@@ -1046,7 +1046,7 @@ router.post('/player/login', async (req, res) => {
  * up with, and a matching address is decent evidence of the same
  * person. Players have no such column and never did. Google hands us a
  * display name and an address; neither is evidence about which row on
- * a club roster this human is.
+ * the roster this human is.
  *
  * So this endpoint resolves identity exactly the way /player/register
  * does, and shares assertMayLinkTo with it:

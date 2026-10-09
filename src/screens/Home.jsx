@@ -120,7 +120,7 @@ function Home({ onOpenSession, onOpenGuide, onOpenPlayers, umpire }) {
       {mine.length === 0 && <p className="empty">No sessions yet.</p>}
       <SessionList sessions={mine} onOpenSession={onOpenSession} />
 
-      {/* Every umpire account sees the whole club's records -- that is
+      {/* Every umpire account sees all the records -- that is
           deliberate, because courts and phones change hands mid-session
           and players must resolve to one identity whoever scored them.
           What was missing was any way to tell whose was whose, so a

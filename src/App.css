@@ -1231,7 +1231,6 @@ section {
 
 /* Third shot: one small panel per serving player. */
 .third-shot-log { margin-bottom: 1.5rem; }
-.third-shot-rule { margin: 0 0 0.6rem; font-size: 0.88rem; line-height: 1.5; color: var(--text-muted); }
 .third-shot-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

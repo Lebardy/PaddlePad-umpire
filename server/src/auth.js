@@ -70,7 +70,7 @@ export function signToken(umpire) {
  *
  * Carries a different role so it can never be mistaken for an umpire's.
  * A player may read their own history and nothing else -- they cannot
- * score, edit rosters, issue invites, or pull the club-wide export.
+ * score, edit rosters, issue invites, or pull the full export.
  * That separation is enforced by role, not by which screens the app
  * happens to show.
  */
