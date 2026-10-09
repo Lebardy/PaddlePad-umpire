@@ -56,10 +56,28 @@ const MARKS = {
   'Solid-Net': <><path d="M3 5v14M21 5v14M3 12h18M3 17h18M8 8v9M12 8v9M16 8v9" /><path d="M3 7.5h18" strokeWidth="3.4" /></>,
 }
 
-/** The mark for one trait word, or nothing for a word that has none. */
-export function TraitMark({ word }) {
-  if (!MARKS[word]) return null
-  return <svg className="mark" viewBox="0 0 24 24" aria-hidden="true">{MARKS[word]}</svg>
+/** The court for one identity; `className` says how large and whether it draws in. */
+function Court({ identity, className }) {
+  const { lit, play } = COURTS[identity]
+  return (
+    <svg className={className} viewBox="0 0 72 96" aria-hidden="true">
+      <rect className="e-plate" x="1" y="1" width="70" height="94" rx="3" />
+      {lit}
+      <g className="e-court">
+        <rect x="12" y="10" width="48" height="76" pathLength="1" />
+        <path d="M12 36h48M12 60h48M36 10v26M36 60v26" pathLength="1" />
+      </g>
+      <path className="e-net" d="M8 48h56" />
+      {play}
+    </svg>
+  )
+}
+
+/** The small picture for one word of a name: a trait's mark, or the identity's court. */
+export function WordMark({ word }) {
+  if (MARKS[word]) return <svg className="mark" viewBox="0 0 24 24" aria-hidden="true">{MARKS[word]}</svg>
+  const identity = emblemFor(word)?.identity
+  return identity ? <Court identity={identity} className="emblem mini" /> : null
 }
 
 /** Decoration beside the name, which already says it in words. */
@@ -68,23 +86,13 @@ function StyleEmblem({ name }) {
   const inView = useInView(ref)
   const emblem = emblemFor(name)
   if (!emblem) return null
-  const { lit, play } = COURTS[emblem.identity]
   return (
     <span className="crest" ref={ref} aria-hidden="true">
-      <svg className={`emblem${inView ? ' draw' : ''}`} viewBox="0 0 72 96">
-        <rect className="e-plate" x="1" y="1" width="70" height="94" rx="3" />
-        {lit}
-        <g className="e-court">
-          <rect x="12" y="10" width="48" height="76" pathLength="1" />
-          <path d="M12 36h48M12 60h48M36 10v26M36 60v26" pathLength="1" />
-        </g>
-        <path className="e-net" d="M8 48h56" />
-        {play}
-      </svg>
+      <Court identity={emblem.identity} className={`emblem${inView ? ' draw' : ''}`} />
       {emblem.traits.length > 0 && (
         <span className="pips">
           {emblem.traits.map((word, i) => (
-            <span className="pip" key={word} style={{ '--i': i }}><TraitMark word={word} /></span>
+            <span className="pip" key={word} style={{ '--i': i }}><WordMark word={word} /></span>
           ))}
         </span>
       )}

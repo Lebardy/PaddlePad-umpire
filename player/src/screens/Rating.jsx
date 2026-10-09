@@ -39,7 +39,7 @@ import More from '../components/More'
 import Collapsible from '../components/Collapsible'
 import ShotProfile from '../components/ShotProfile'
 import Icon from '../components/Icon'
-import StyleEmblem, { TraitMark } from '../components/StyleEmblem'
+import StyleEmblem, { WordMark } from '../components/StyleEmblem'
 
 
 // Said only where there IS a direction. Most of these measurements are
@@ -360,7 +360,7 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
   return (
     <>
       <div className="proof-head">
-        {word && <span className="proof-word"><TraitMark word={word} />{word}</span>}
+        {word && <span className="proof-word"><WordMark word={word} />{word}</span>}
         <span className="proof-measure">{measure.label}</span>
         {DIRECTION[measure.better] && (
           <span className="proof-better">{DIRECTION[measure.better]}</span>
@@ -412,15 +412,10 @@ function ComparedWith({ band, styleSize }) {
       <p className="step-line">{styleShareLine(styleSize, band.size)}</p>
       <More label="Who are they?">
         <p>
-          Everyone rated is first split into a few groups of players whose
-          matches go in similar ways — how often they win points, make
-          mistakes, land drops and so on. Yours has {band.size} players.
-        </p>
-        <p>
-          Styles are then worked out inside each group, so a word like
-          &ldquo;Steady&rdquo; means steady for players at your level, not
-          compared with everyone. Your PPR doesn&rsquo;t decide which
-          group you&rsquo;re in.
+          Everyone rated is split into a few groups by how their matches go:
+          points won, mistakes, drops landed. Yours has {band.size} players.
+          A word like &ldquo;Steady&rdquo; means steady among them, not
+          everyone. Your PPR doesn&rsquo;t decide your group.
         </p>
       </More>
     </>
@@ -466,7 +461,7 @@ function Playstyle({ standing, number }) {
             // says that rather than "yours is less than".
             <li key={`neutral-${item.label}`} className="proof-row">
               <div className="proof-head">
-                <span className="proof-word">{item.label}</span>
+                <span className="proof-word"><WordMark word={item.label} />{item.label}</span>
               </div>
               {/* A habit with nothing recorded gets no row of its own: it
                   has nothing to show, and a stray "nothing recorded" line
@@ -491,15 +486,11 @@ function Playstyle({ standing, number }) {
 
       <More label="How this was worked out">
         <p>
-          Inside your group, players are grouped again by how they play. Each
-          word in the name is a measurement where players with your style sit
-          furthest from your group&rsquo;s average — so the bars compare your
-          style with your group, and your own number shows where you sit
-          inside your style.
-        </p>
-        <p>
-          Averages only, never anyone&rsquo;s own numbers but yours. A style with
-          fewer than three players is never averaged at all.
+          Your group is split again by how its players play. Each word is
+          the measurement where your style sits furthest from your
+          group&rsquo;s average. The bars show averages only, never
+          anyone&rsquo;s numbers but yours, and none for a style of fewer
+          than three.
         </p>
       </More>
     </Step>

@@ -2073,6 +2073,9 @@
 .pip .mark { width: 100%; height: 100%; }
 .proof-word { display: inline-flex; align-items: center; gap: 0.4rem; }
 .proof-word .mark { flex: none; width: 1.6rem; height: 1.6rem; padding: 0.24rem; background: var(--board); color: var(--lamp); border-radius: 2px; }
+.proof-word .mini { flex: none; width: 1.6rem; }
+/* With a picture in front of the word, the row lines up on centres. */
+.proof-head { align-items: center; }
 
 /* The emblem draws itself the first time it is scrolled to: the court's
    lines, the net, the lit part switching on, then the marks docking. */
