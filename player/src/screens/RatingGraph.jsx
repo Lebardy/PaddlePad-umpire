@@ -85,7 +85,7 @@ function RatingGraph() {
         <span className="graph-now-key"><span className="graph-glyph is-now" aria-hidden="true">●</span> now</span>
       </p>
 
-      <div className="filter-row graph-filters" role="group" aria-label="How far back">
+      <div className="filter-row graph-filters" role="group" aria-label="How far back" style={{ '--at': FILTERS.indexOf(chosen), '--n': FILTERS.length }}>
         {FILTERS.map((option) => (
           <button
             key={option.key}

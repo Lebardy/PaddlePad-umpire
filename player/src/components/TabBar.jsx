@@ -33,9 +33,11 @@ function isActive(tab, path) {
 }
 
 function TabBar({ path, showLeaderboard }) {
+  const shown = TABS.filter((tab) => !tab.onlyWhenOpen || showLeaderboard)
+  const at = shown.findIndex((tab) => isActive(tab, path))
   return (
-    <nav className="tabbar" aria-label="Sections">
-      {TABS.filter((tab) => !tab.onlyWhenOpen || showLeaderboard).map((tab) => {
+    <nav className="tabbar" aria-label="Sections" style={{ '--at': Math.max(at, 0), '--n': shown.length, '--lit': at < 0 ? 0 : 1 }}>
+      {shown.map((tab) => {
         const active = isActive(tab, path)
         return (
           <Link

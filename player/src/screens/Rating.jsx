@@ -39,6 +39,7 @@ import More from '../components/More'
 import Collapsible from '../components/Collapsible'
 import ShotProfile from '../components/ShotProfile'
 import Icon from '../components/Icon'
+import StyleEmblem, { TraitMark } from '../components/StyleEmblem'
 
 
 // Said only where there IS a direction. Most of these measurements are
@@ -61,14 +62,20 @@ function showValue(value, as) {
 }
 
 // `number` only staggers the entrance; each step is marked by its icon.
-function Step({ number, icon, title, value, children }) {
+// `lead` is drawn beside the value: the playstyle's emblem.
+function Step({ number, icon, title, value, lead, children }) {
   return (
     <section className="step rise" style={{ '--i': number }} aria-label={title}>
       <div className="step-head">
         <span className="step-n"><Icon name={icon} size={18} /></span>
         <h2>{title}</h2>
       </div>
-      {value && <p className="step-value">{value}</p>}
+      {value && (
+        <div className="step-lead">
+          {lead}
+          <p className="step-value">{value}</p>
+        </div>
+      )}
       {children}
     </section>
   )
@@ -353,7 +360,7 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
   return (
     <>
       <div className="proof-head">
-        {word && <span className="proof-word">{word}</span>}
+        {word && <span className="proof-word"><TraitMark word={word} />{word}</span>}
         <span className="proof-measure">{measure.label}</span>
         {DIRECTION[measure.better] && (
           <span className="proof-better">{DIRECTION[measure.better]}</span>
@@ -437,7 +444,7 @@ function Playstyle({ standing, number }) {
 
   if (!proof) {
     return (
-      <Step number={number} icon="sparkle" title="Your playstyle" value={name}>
+      <Step number={number} icon="sparkle" title="Your playstyle" value={name} lead={<StyleEmblem name={name} />}>
         <p className="step-line">
           This name comes from how players with your style compare with the
           players closest to your level. The measurements behind it weren&rsquo;t recorded for this
@@ -448,7 +455,7 @@ function Playstyle({ standing, number }) {
   }
 
   return (
-    <Step number={number} icon="sparkle" title="Your playstyle" value={name}>
+    <Step number={number} icon="sparkle" title="Your playstyle" value={name} lead={<StyleEmblem name={name} />}>
       <ComparedWith band={band} styleSize={proof.styleSize} />
 
       <ul className="proof" aria-label="Why this name">

@@ -482,7 +482,7 @@ function ThemeChoice() {
   return (
     <section className="you-section" aria-label="Appearance">
       <Head icon="sparkle">Appearance</Head>
-      <div className="filter-row" role="group" aria-label="Theme">
+      <div className="filter-row" role="group" aria-label="Theme" style={{ '--at': THEMES.findIndex((theme) => theme.key === choice), '--n': THEMES.length }}>
         {THEMES.map((theme) => (
           <button
             key={theme.key}

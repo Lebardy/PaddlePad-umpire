@@ -13,20 +13,43 @@
 // ============================================================
 
 import { useCallback, useSyncExternalStore } from 'react'
+import { flushSync } from 'react-dom'
 
 const listeners = new Set()
 
+// The match page last opened from a row in a list, and the path last
+// shown. The score and the names travel between that row and the page
+// (the `travels` rules in App.css), in both directions.
+let travelling = null
+let shown = window.location.pathname
+
+const rowFor = (path) => document.querySelector(`.mrow[href="${path}"]`)
+
 function notify() {
+  shown = window.location.pathname
   for (const listener of listeners) listener()
 }
 
+// Where the browser can animate between two states of the page, the
+// change is made inside one; everyone else, and anyone who asked for
+// less motion, gets the new screen at once.
+function change(travels) {
+  const calm = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  if (!travels || !document.startViewTransition || calm) return notify()
+  document.startViewTransition(() => {
+    flushSync(notify)
+    // Coming back, the list is new: name the row before the browser looks.
+    rowFor(travelling)?.classList.add('travels')
+  })
+}
+
+window.addEventListener('popstate', () => {
+  change([shown, window.location.pathname].includes(travelling))
+})
+
 function subscribe(listener) {
   listeners.add(listener)
-  window.addEventListener('popstate', listener)
-  return () => {
-    listeners.delete(listener)
-    window.removeEventListener('popstate', listener)
-  }
+  return () => listeners.delete(listener)
 }
 
 function getSnapshot() {
@@ -56,6 +79,13 @@ export function useRoute() {
  */
 export function navigate(to, { replace = false } = {}) {
   if (to === window.location.pathname) return
+  const row = rowFor(to)
+  if (row) {
+    travelling = to
+    // Only one row at a time may carry the travelling names.
+    document.querySelector('.mrow.travels')?.classList.remove('travels')
+    row.classList.add('travels')
+  }
 
   try {
     window.history.replaceState(
@@ -70,7 +100,7 @@ export function navigate(to, { replace = false } = {}) {
 
   const method = replace ? 'replaceState' : 'pushState'
   window.history[method]({ scrollY: 0 }, '', to)
-  notify()
+  change(Boolean(row))
 }
 
 /** The scroll position stored for the entry now being displayed. */

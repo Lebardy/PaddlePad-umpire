@@ -86,7 +86,8 @@ function Month({ month, defaultOpen }) {
         </span>
         <Icon name="chevron" size={20} className="month-chevron" />
       </button>
-      <div id={bodyId} hidden={!open}>
+      <div id={bodyId} className="fold" inert={!open}>
+        <div>
         {month.nights ? (
           month.nights.map((night) => <NightBlock key={night.key} night={night} />)
         ) : (
@@ -94,6 +95,7 @@ function Month({ month, defaultOpen }) {
             {month.matches.map((match) => <MatchRow key={match.id} match={match} dated />)}
           </ol>
         )}
+        </div>
       </div>
     </>
   )

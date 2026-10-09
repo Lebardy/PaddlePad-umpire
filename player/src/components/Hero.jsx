@@ -1,4 +1,5 @@
 import { currentStreak, recentForm } from '../lib/derive'
+import { useCountUp } from '../lib/motion'
 import Icon from './Icon'
 
 /**
@@ -12,6 +13,8 @@ import Icon from './Icon'
 function Hero({ player, summary, matches, children }) {
   const form = recentForm(matches)
   const streak = currentStreak(matches)
+  const wins = useCountUp(summary.wins, 760)
+  const losses = useCountUp(summary.losses, 760)
 
   return (
     <header className="scoreboard" aria-label="Your record">
@@ -26,11 +29,11 @@ function Hero({ player, summary, matches, children }) {
       <div className="sb-record">
         <p className="sb-cell">
           <span className="sb-label">Won</span>
-          <span className="sb-figure">{summary.wins}</span>
+          <span className="sb-figure">{wins}</span>
         </p>
         <p className="sb-cell">
           <span className="sb-label">Lost</span>
-          <span className="sb-figure">{summary.losses}</span>
+          <span className="sb-figure">{losses}</span>
         </p>
       </div>
 
@@ -55,9 +58,10 @@ function Hero({ player, summary, matches, children }) {
           <ol className="form-pills">
             {/* Reversed so it reads oldest to newest, left to right --
                 the direction people expect a run of results to run. */}
-            {[...form].reverse().map((entry) => (
+            {[...form].reverse().map((entry, i) => (
               <li
                 key={entry.id}
+                style={{ '--i': i }}
                 className={
                   entry.won === null ? 'pill pill-none' : entry.won ? 'pill pill-won' : 'pill pill-lost'
                 }

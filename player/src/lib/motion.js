@@ -59,9 +59,9 @@ export function useInView(ref, threshold = 0.25) {
  * arriving, short enough that nobody waits for it. Reduced motion gets
  * the target straight away.
  */
-export function useCountUp(target, duration = 600) {
+export function useCountUp(target, duration = 600, from = 0) {
   const reduced = prefersReducedMotion()
-  const [shown, setShown] = useState(reduced ? target : 0)
+  const [shown, setShown] = useState(reduced ? target : from)
 
   useEffect(() => {
     if (reduced || !Number.isFinite(target)) return undefined
@@ -69,12 +69,12 @@ export function useCountUp(target, duration = 600) {
     const start = performance.now()
     const tick = (now) => {
       const t = Math.min((now - start) / duration, 1)
-      setShown(Math.round(target * (1 - (1 - t) ** 3)))
+      setShown(Math.round(from + (target - from) * (1 - (1 - t) ** 3)))
       if (t < 1) frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [target, duration, reduced])
+  }, [target, duration, from, reduced])
 
   return reduced || !Number.isFinite(target) ? target : shown
 }

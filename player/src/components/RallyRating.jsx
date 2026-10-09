@@ -13,6 +13,7 @@
 import { formatDate } from '../lib/format'
 import { changeClass, changeIcon, changeWords, weekView } from '../lib/ratingGraph'
 import { Link } from '../lib/router'
+import { useCountUp } from '../lib/motion'
 import { ordinal } from '../lib/leaderboard'
 import Icon from './Icon'
 import Meter from './Meter'
@@ -58,10 +59,12 @@ function LastWeek({ rallyRating }) {
  * and no reliability figure.
  */
 export function RallyPointsHeadline({ rallyRating }) {
+  const week = rallyRating.lastWeek ? weekView(rallyRating.lastWeek) : { empty: true }
+  const points = useCountUp(rallyRating.points, 900, week.empty ? rallyRating.points : week.points[0].value)
   return (
     <>
       <p className="points-figure">
-        {rallyRating.points.toLocaleString()} <span className="points-unit">PPR</span>
+        {points.toLocaleString()} <span className="points-unit">PPR</span>
       </p>
       {rallyRating.earlyEstimate && (
         <p className="points-early">
