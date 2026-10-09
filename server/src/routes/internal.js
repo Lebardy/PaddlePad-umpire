@@ -125,7 +125,7 @@ router.post('/ratings', async (req, res) => {
     )
     const runId = rows[0].id
 
-    // One multi-row insert rather than a loop: club-scale runs are a few
+    // One multi-row insert rather than a loop: a run is a few
     // dozen players, well inside Postgres' parameter limit, and it keeps
     // the whole snapshot to a single round trip.
     const values = []
