@@ -39,7 +39,7 @@ export default function Totals({ totals, facilityName, row = false }) {
       </div>
       {facilityName && (
         <p className="hint" style={{ marginTop: '0.6rem' }}>
-          Players counts everyone who has played at {facilityName}. Players themselves belong to no facility.
+          Players counts everyone who has played at {facilityName}.
         </p>
       )}
     </>

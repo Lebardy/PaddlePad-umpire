@@ -724,3 +724,18 @@ tr.is-voided .reason { opacity: 0.6; }
 .logo-actions .row-actions { justify-content: flex-start; align-items: flex-start; }
 .logo-actions .confirm { justify-items: start; }
 .logo-actions .row-actions > .row-error { text-align: left; }
+
+/* ============ Icons ============ */
+
+/* Beside a label everywhere; a section's heading opens with a lit badge,
+   the mark the player app uses for its bands. */
+.icon { flex: none; vertical-align: -0.2em; margin-right: 0.4em; }
+.icon-solo { margin-right: 0; }
+/* The menu's icons take the room its padding gives back, so the name
+   beside it is no more squeezed than it was. */
+.tabs a { padding-inline: 1rem; }
+.section-title .icon,
+.form-strip-title .icon {
+  box-sizing: border-box; width: 1.6rem; height: 1.6rem; padding: 0.25rem; margin-right: 0.5rem;
+  background: var(--lamp); color: #15181d; border-radius: 2px; vertical-align: -0.28em; stroke-width: 2.2;
+}

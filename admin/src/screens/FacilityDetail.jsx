@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Icon from '../components/Icon'
 import PageBoard from '../components/PageBoard'
 import LogoEditor from '../components/LogoEditor'
 import PanelTabs from '../components/PanelTabs'
@@ -128,13 +129,13 @@ export default function FacilityDetail({ id, me }) {
         {me.role === 'owner' && <Link to="/facilities" className="back-link">← Facilities</Link>}
 
         <div>
-          <h2 className="section-title">Details</h2>
+          <h2 className="section-title"><Icon name="list" />Details</h2>
           <LogoEditor
             facility={facility}
             onChange={(updated) => setResult((current) => ({ ...current, facility: updated }))}
           />
           {!editing && (facility.details ? <p>{facility.details}</p> : <p className="hint">No extra details yet.</p>)}
-          {!editing && <button type="button" className="btn-quiet btn-small" onClick={startEdit}>Edit details</button>}
+          {!editing && <button type="button" className="btn-quiet btn-small" onClick={startEdit}><Icon name="edit" size={15} />Edit details</button>}
 
           {editing && (
             <form className="edit-panel" onSubmit={handleSave}>

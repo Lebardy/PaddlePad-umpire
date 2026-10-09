@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import Icon from '../components/Icon'
 import CloseSessionDialog from '../components/CloseSessionDialog'
 import FacilityPicker from '../components/FacilityPicker'
 import LiveBoard from '../components/LiveBoard'
@@ -126,8 +127,8 @@ export default function Overview({ me, facilityLabel }) {
             <h1>Overview</h1>
             <p>
               {isOwner && !facilityId
-                ? <>What’s happening <strong>at every facility</strong> right now, the totals, and anything worth a look.</>
-                : <>What’s going on at <strong>{data?.facilityName ?? facilityLabel ?? 'your facility'}</strong> right now, the totals, and anything worth a look.</>}
+                ? <><strong>Every facility</strong>, right now.</>
+                : <><strong>{data?.facilityName ?? facilityLabel ?? 'Your facility'}</strong>, right now.</>}
             </p>
           </div>
           <div className="board-head-group">
@@ -154,19 +155,19 @@ export default function Overview({ me, facilityLabel }) {
               actions={warningActions}
               duplicateActions={duplicateActions}
             />
-            <div className="section-head totals-head"><h2 className="section-title">Totals</h2></div>
+            <div className="section-head totals-head"><h2 className="section-title"><Icon name="sum" />Totals</h2></div>
             <Totals totals={data.totals} isOwner={isOwner} facilityName={data.facilityName} row />
           </>
         ) : (
           <>
             <div className="sheet-split">
               <div>
-                <div className="section-head"><h2 className="section-title">Right now</h2>
+                <div className="section-head"><h2 className="section-title"><Icon name="live" />Right now</h2>
                   <span className="section-count">Newest session first</span></div>
                 {data.sessions.map((s) => <SessionCard key={s.id} session={s} showFacility={showFacility} now={now} />)}
               </div>
               <aside>
-                <div className="section-head"><h2 className="section-title">Totals</h2></div>
+                <div className="section-head"><h2 className="section-title"><Icon name="sum" />Totals</h2></div>
                 <Totals totals={data.totals} isOwner={isOwner} facilityName={data.facilityName} />
               </aside>
             </div>

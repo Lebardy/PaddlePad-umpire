@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import Icon from '../components/Icon'
 import FacilityPicker from '../components/FacilityPicker'
 import PageBoard, { TallyCell } from '../components/PageBoard'
 import UmpireTabs from '../components/UmpireTabs'
@@ -118,7 +119,7 @@ export default function Invites({ me }) {
     <section>
       <PageBoard
         title="Umpires"
-        intro="A new umpire needs an invite code to create their account. Each code works once. Send it to them yourself."
+        intro="A new umpire needs a code to sign up. Each works once; send it yourself."
       >
         <div className="board-head-group">
           <FacilityPicker me={me} value={filterFacilityId} onChange={updateFilterFacility} includeAll variant="board" label="Facility" />
@@ -146,7 +147,7 @@ export default function Invites({ me }) {
               {EXPIRY_CHOICES.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
             </select>
           </label>
-          <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Making…' : 'Make a code'}</button>
+          <button type="submit" className="btn-primary" disabled={busy}><Icon name="plus" size={16} />{busy ? 'Making…' : 'Make a code'}</button>
         </form>
 
         {fresh && (
@@ -160,6 +161,7 @@ export default function Invites({ me }) {
             </div>
             <div className="ticket-actions">
               <button type="button" className="btn-lamp" onClick={() => handleCopy(fresh.code)}>
+                <Icon name="copy" size={16} />
                 {copied === fresh.code ? 'Copied' : 'Copy code'}
               </button>
               <button type="button" className="btn-board" onClick={() => setNewest(null)}>Done</button>

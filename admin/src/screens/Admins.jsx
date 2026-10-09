@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Icon from '../components/Icon'
 import FacilityPicker from '../components/FacilityPicker'
 import PageBoard, { TallyCell } from '../components/PageBoard'
 import RowConfirm from '../components/RowConfirm'
@@ -158,7 +159,7 @@ export default function Admins({ me }) {
     <section>
       <PageBoard
         title="Admins"
-        intro="Only you, as the owner, can see this page. A new admin gets a setup link from you and chooses their own password."
+        intro="Only the owner sees this page. A new admin gets a setup link and picks their own password."
       >
         <div className="tally">
           <TallyCell figure={admins ? list.length : '–'} label="Admins" />
@@ -174,7 +175,7 @@ export default function Admins({ me }) {
           <label className="field grow"><span>Name</span><input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} required /></label>
           <label className="field grow"><span>Email</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
           <FacilityPicker me={me} value={facilityId} onChange={setFacilityId} required />
-          <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Adding…' : 'Add admin'}</button>
+          <button type="submit" className="btn-primary" disabled={busy}><Icon name="plus" size={16} />{busy ? 'Adding…' : 'Add admin'}</button>
         </form>
 
         {link && (
@@ -186,7 +187,7 @@ export default function Admins({ me }) {
               <input className="link-field" readOnly value={link.url} onFocus={(e) => e.target.select()} aria-label="Setup link" />
             </div>
             <div className="ticket-actions">
-              <button type="button" className="btn-lamp" onClick={copyLink}>{copied ? 'Copied' : 'Copy link'}</button>
+              <button type="button" className="btn-lamp" onClick={copyLink}><Icon name="copy" size={16} />{copied ? 'Copied' : 'Copy link'}</button>
               <button type="button" className="btn-board" onClick={() => setLink(null)}>Done</button>
             </div>
           </div>

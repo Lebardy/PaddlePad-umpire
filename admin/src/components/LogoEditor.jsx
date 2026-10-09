@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import Icon from './Icon'
 import FacilityLogo from './FacilityLogo'
 import RowConfirm from './RowConfirm'
 import { removeFacilityLogo, uploadFacilityLogo } from '../lib/api'
@@ -41,6 +42,7 @@ export default function LogoEditor({ facility, onChange }) {
         <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={handlePick} />
         <div className="row-actions">
           <button type="button" className="btn-quiet btn-small" disabled={busy} onClick={() => input.current?.click()}>
+            <Icon name="upload" size={15} />
             {busy ? 'Uploading…' : facility.logoUrl ? 'Replace' : 'Upload logo'}
           </button>
           {facility.logoUrl && !busy && (
@@ -58,7 +60,7 @@ export default function LogoEditor({ facility, onChange }) {
             />
           )}
         </div>
-        <p className="hint">PNG, JPEG or WebP, up to 10 MB. It’s shrunk to fit 512 × 512.</p>
+        <p className="hint">PNG, JPEG or WebP, up to 10 MB.</p>
         {error && <p className="form-error" role="alert">{error}</p>}
       </div>
     </div>

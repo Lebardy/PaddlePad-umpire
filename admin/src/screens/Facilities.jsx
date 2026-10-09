@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Icon from '../components/Icon'
 import FacilityLogo from '../components/FacilityLogo'
 import PageBoard, { TallyCell } from '../components/PageBoard'
 import { createFacility, listFacilities } from '../lib/api'
@@ -67,7 +68,7 @@ export default function Facilities({ me }) {
     <section>
       <PageBoard
         title="Facilities"
-        intro="Where umpires work and matches are scored, each for an hourly fee it sets. Open one to see its admins, umpires and details."
+        intro="Where matches are scored. Open one to see its umpires, admins and details."
       >
         <div className="tally">
           <TallyCell figure={facilities ? facilities.length : '–'} label="Facilities" />
@@ -105,7 +106,7 @@ export default function Facilities({ me }) {
             <span>Details (optional)</span>
             <textarea maxLength={1000} value={details} onChange={(e) => setDetails(e.target.value)} />
           </label>
-          <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Making…' : 'Make facility'}</button>
+          <button type="submit" className="btn-primary" disabled={busy}><Icon name="plus" size={16} />{busy ? 'Making…' : 'Make facility'}</button>
         </form>
 
         {formError && <p className="form-error" role="alert">{formError}</p>}
