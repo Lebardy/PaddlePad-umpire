@@ -1,25 +1,25 @@
 // ============================================================
-// When a skill rating is allowed to mean anything
+// When a skill group and a playstyle are allowed to mean anything
 //
-// The pipeline will happily produce a number from four players and one
-// match each. That number is not weak -- it is confidently wrong, in
+// The pipeline will happily produce a result from four players and one
+// match each. That result is not weak -- it is confidently wrong, in
 // two specific ways that are worth naming because they are properties
 // of the algorithm rather than of the data:
 //
-//  1. The score is entirely POOL-RELATIVE. skill_model.min_max_normalize
-//     places each player between the weakest and strongest player
-//     currently present, so in a pool of four the best of them scores
-//     100 whether they are good or not.
+//  1. The result is entirely POOL-RELATIVE. Every feature is
+//     standardised against the players currently present and K-Means
+//     groups whoever is there, so a pool of four is split into groups
+//     whether or not its players differ in any way that matters.
 //
 //  2. A player with ONE match has no spread in any of their per-match
 //     rates, so pandas returns NaN for all seven consistency features
 //     and aggregate_player_profiles fills them with 0.0. Zero spread
-//     reads to the skill model as FLAWLESS CONSISTENCY, and it is
-//     rewarded for it. A one-match player outranks a genuine regular.
+//     reads to K-Means as FLAWLESS CONSISTENCY, which pulls a one-match
+//     player towards the steadiest regulars.
 //
 // So a player below the floor is left OUT of the run entirely rather
-// than rated badly. Rating someone off one match and quietly correcting
-// it later is worse than not rating them yet.
+// than grouped badly. Grouping someone off one match and quietly
+// correcting it later is worse than not grouping them yet.
 //
 // These are served to the ML service over /internal/match-logs.json so
 // there is one definition rather than a copy in Python that can drift.

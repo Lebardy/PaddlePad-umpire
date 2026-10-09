@@ -720,11 +720,12 @@ that would be a real login with a real password hash, able to sign in to
 the umpire app and score matches. The ML service needs to read match
 logs and write a ratings snapshot. A header key grants exactly that.
 
-Ratings are stored as immutable **snapshots** (`rating_runs` +
-`player_ratings`), never as a column on `players`. The score is entirely
-pool-relative, so it moves when *other* people play; without the date
-and pool size stored alongside it, that movement would be unexplainable
-after the fact. See the comment above those tables in `schema.sql`.
+The pipeline's results are stored as immutable **snapshots**
+(`rating_runs` + `player_ratings`), never as columns on `players`. A
+skill group or playstyle is entirely pool-relative, so it can change
+when *other* people play; without the date and pool size stored
+alongside it, that change would be unexplainable after the fact. See
+the comment above those tables in `schema.sql`.
 
 ## Security notes
 
