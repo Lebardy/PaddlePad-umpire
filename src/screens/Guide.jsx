@@ -120,7 +120,7 @@ function Guide({ onBack }) {
             <dl className="guide-terms">
               {endings.map((ending) => (
                 <div key={ending.key}>
-                  <dt>{ending.label}</dt>
+                  <dt><Icon name={ending.key} size={18} />{ending.label}</dt>
                   <dd>{ending.help}</dd>
                 </div>
               ))}
@@ -128,8 +128,9 @@ function Guide({ onBack }) {
           </div>
         ))}
         <p>
-          In doubles you pick the player on a picture of the court, each where
-          they stand right now. Upside down from where you stand? Tap{' '}
+          In doubles you pick the player on a picture of the court seen from
+          the side: one pair left of the net, the other right, each where
+          they stand right now. Back to front from where you stand? Tap{' '}
           <strong>Swap ends</strong> once; it stays that way for the match.
         </p>
         <p className="guide-note">
