@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Icon from '../components/Icon'
 import {
   addRallyEvent,
   addServerCorrection,
@@ -72,7 +73,8 @@ function RallyLegend() {
   return (
     <section className="rally-legend-wrap">
       <button className="collapsible-toggle" onClick={toggle} aria-expanded={!collapsed}>
-        {collapsed ? '▸' : '▾'} What do these mean?
+        <Icon name="chevron" size={16} className={collapsed ? '' : 'icon-down'} />
+        What do these mean?
       </button>
       {!collapsed && (
         <div className="rally-legend">

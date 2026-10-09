@@ -1,4 +1,5 @@
 import { useSyncStatus } from '../lib/useSyncStatus'
+import Icon from './Icon'
 
 /**
  * Sync state, shown only when there is something to say.
@@ -13,8 +14,14 @@ function SyncIndicator({ onOpenSync }) {
 
   if (dead > 0) {
     return (
-      <button className="sync-pill sync-pill--error" onClick={onOpenSync}>
-        {dead} change{dead === 1 ? '' : 's'} couldn&rsquo;t sync
+      <button
+        className="sync-pill sync-pill--error"
+        onClick={onOpenSync}
+        aria-label={`${dead} change${dead === 1 ? '' : 's'} couldn’t sync`}
+      >
+        <Icon name="alert" size={16} />
+        {dead}
+        <span className="sync-pill-words"> change{dead === 1 ? '' : 's'} couldn&rsquo;t sync</span>
       </button>
     )
   }

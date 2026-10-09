@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Icon from '../components/Icon'
 import { DEFAULT_POINT_TARGET, POINT_TARGETS } from '../lib/pickleball'
 import { createMatch } from '../lib/storage'
 import { useSession, usePlayers } from '../lib/useLocalStore'
@@ -121,12 +122,14 @@ function MatchSetup({ sessionId, onBack, onStart }) {
               className={!isDoubles ? 'active' : ''}
               onClick={() => toggleFormat(false)}
             >
+              <Icon name="user" size={18} />
               Singles
             </button>
             <button
               className={isDoubles ? 'active' : ''}
               onClick={() => toggleFormat(true)}
             >
+              <Icon name="people" size={18} />
               Doubles
             </button>
           </div>
@@ -146,8 +149,7 @@ function MatchSetup({ sessionId, onBack, onStart }) {
             ))}
           </div>
           <p className="setup-note">
-            Win by 2 whichever you pick, and it can&rsquo;t be changed once
-            the match starts.
+            Win by 2. Can&rsquo;t be changed once the match starts.
           </p>
         </section>
       </div>
@@ -257,6 +259,7 @@ function MatchSetup({ sessionId, onBack, onStart }) {
         disabled={!readyToStart}
         onClick={handleStart}
       >
+        <Icon name="play" />
         Start Match
       </button>
     </div>

@@ -18,7 +18,7 @@ export const FAULT_ENDINGS = RALLY_ENDINGS.filter((ending) => ending.outcome ===
 
 // The whole rule in one line. Everything else is this said slower.
 export const RALLY_RULE =
-  'When a rally ends, tap what ended it, then tap the player who hit that shot or made that fault. An ace, a service fault or a foot fault can only be the server, so those count straight away.'
+  'Tap what ended the rally, then the player who did it. An ace, a service fault or a foot fault can only be the server, so those count at once.'
 
 export const THIRD_SHOT_RULE =
-  'Only the serving side gets these, and only for their third shot of the rally. Drop ✓ it landed soft at the net, Drop ✗ they tried and missed it, Drive they hit it hard instead. Separate from how the rally ended — one rally can have both.'
+  'Serving side only, for their third shot. Drop ✓ landed soft at the net, Drop ✗ missed, Drive hit hard. Separate from how the rally ended: one rally can have both.'

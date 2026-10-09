@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Icon from '../components/Icon'
 import { deadLetter, pending } from '../lib/outbox'
 import { describeRefused } from '../lib/refused'
 import { getKnownPlayers, getMatch, getSession } from '../lib/storage'
@@ -78,19 +79,18 @@ function CouldntSync({ onBack }) {
       <button className="back-link" onClick={onBack}>
         &larr; Back
       </button>
-      <h2>Couldn&rsquo;t sync</h2>
+      <h2><Icon name="alert" size={26} />Couldn&rsquo;t sync</h2>
       {refused.length > 0 && (
         <p className="login-note">
-          The server refused these changes, so they are on this device only.
-          Try one again once its cause is fixed, starting from the top, or
-          dismiss it to let it go.
+          The server refused these, so they are only on this device. Fix
+          the cause and try again from the top, or dismiss.
         </p>
       )}
 
       <p className="couldnt-sync-note" role="status">{note}</p>
 
       {refused.length === 0 && (
-        <p className="empty">Nothing here. Every change the server refused has been dealt with.</p>
+        <p className="empty">Nothing here. Every refused change has been dealt with.</p>
       )}
 
       {refused.map((entry) => (
@@ -104,9 +104,11 @@ function CouldntSync({ onBack }) {
           </p>
           <div className="dupe-actions">
             <button className="dupe-yes" onClick={() => tryAgain(entry.key)} disabled={busy}>
+              <Icon name="retry" size={18} />
               Try again
             </button>
             <button className="dupe-no" onClick={() => dismiss(entry.key)} disabled={busy}>
+              <Icon name="x" size={18} />
               Dismiss
             </button>
           </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Icon from '../components/Icon'
 import { DEFAULT_POINT_TARGET } from '../lib/pickleball'
 import {
   rememberPlayer,
@@ -124,6 +125,7 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
                 setSessionEnded(sessionId, true)
               }}
             >
+              <Icon name="flag" size={18} />
               End session
             </button>
           )}
@@ -144,6 +146,7 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
           disabled={roster.length < 2}
           onClick={() => onNewMatch(sessionId)}
         >
+          <Icon name="plus" />
           New Match
         </button>
         {roster.length < 2 && (
@@ -183,10 +186,11 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
               {p.name}
               <span className="roster-actions">
                 <button className="share-code" onClick={() => setSharing(p)}>
+                  <Icon name="qr" size={16} />
                   Code
                 </button>
-                <button className="remove" onClick={() => handleRemove(p.id)}>
-                  Remove
+                <button className="remove" onClick={() => handleRemove(p.id)} aria-label={`Remove ${p.name}`} title="Remove">
+                  <Icon name="x" size={18} className="icon-solo" />
                 </button>
               </span>
             </li>
