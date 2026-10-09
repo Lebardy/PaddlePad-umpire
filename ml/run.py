@@ -41,6 +41,7 @@ from pipeline.feature_engineering import (
     extract_playstyle_components,
 )
 from pipeline.clustering import (
+    PLAYSTYLE_CLUSTERING_FEATURES,
     prepare_clustering_data,
     choose_skill_k,
     cluster_skill_groups,
@@ -55,23 +56,9 @@ from pipeline.clustering import (
 RANDOM_STATE = 42
 
 # The player's own feature values behind their archetype, so a playstyle
-# can be explained rather than merely asserted. Same list the ML repo's
-# own final-profile builder selects.
-EVIDENCE_COLUMNS = [
-    "aggression_mean",
-    "aggression_std",
-    "drop_efficiency_mean",
-    "drop_efficiency_std",
-    "winner_rate_std",
-    "general_error_rate_std",
-    "dink_error_rate_std",
-    "drop_usage_rate",
-    "error_to_winner_ratio",
-    "drop_preference_rate_mean",
-    "drop_preference_rate_std",
-    "net_game_preference_rate_mean",
-    "net_game_preference_rate_std",
-]
+# can be explained rather than merely asserted. These are the columns the
+# playstyle features are made of, so the list is the pipeline's own.
+EVIDENCE_COLUMNS = list(PLAYSTYLE_CLUSTERING_FEATURES)
 
 
 class NotEnoughData(Exception):
