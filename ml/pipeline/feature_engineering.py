@@ -701,7 +701,7 @@ def extract_playstyle_components(
     Keeps the fewest components that together explain at
     least `min_share` of the spread. The second-level
     K-Means clusters on these scores (see the `features`
-    argument of clustering.test_playstyle_k_values); the
+    argument of clustering.choose_playstyle_k); the
     archetype names are still read from the features
     themselves.
 

@@ -205,41 +205,24 @@ def print_clustering_samples(
 
 
 # ============================================================
-# TEST K VALUES FOR SKILL CLUSTERING
+# TRY EACH K AND KEEP THE BEST
 # ============================================================
 
-def test_skill_k_values(
-    clustering_data,
-    k_min=2,
-    k_max=5,
-    random_state=42
+def score_k_values(
+    X,
+    k_min,
+    maximum_k,
+    random_state
 ):
     """
-    Test multiple K values for the first-level
-    skill clustering.
+    Fit K-Means for every K from k_min to maximum_k and score
+    each fit with the Silhouette Score.
 
-    K is selected using the highest Silhouette Score.
+    Prints one line per K. Returns the K with the highest
+    score, and every fit keyed by K.
     """
 
-    X = clustering_data[
-        CLUSTERING_FEATURES
-    ].copy()
-
-    maximum_k = min(
-        k_max,
-        len(X) - 1
-    )
-
-    if maximum_k < k_min:
-        raise ValueError(
-            "Not enough players for K selection."
-        )
-
     results = {}
-
-    print(
-        "\n=== SKILL CLUSTER K SELECTION ==="
-    )
 
     for k in range(
         k_min,
@@ -277,6 +260,54 @@ def test_skill_k_values(
         results,
         key=lambda k:
         results[k]["silhouette"]
+    )
+
+    return (
+        best_k,
+        results
+    )
+
+
+# ============================================================
+# CHOOSE K FOR SKILL CLUSTERING
+# ============================================================
+
+def choose_skill_k(
+    clustering_data,
+    k_min=2,
+    k_max=5,
+    random_state=42
+):
+    """
+    Test multiple K values for the first-level
+    skill clustering.
+
+    K is selected using the highest Silhouette Score.
+    """
+
+    X = clustering_data[
+        CLUSTERING_FEATURES
+    ].copy()
+
+    maximum_k = min(
+        k_max,
+        len(X) - 1
+    )
+
+    if maximum_k < k_min:
+        raise ValueError(
+            "Not enough players for K selection."
+        )
+
+    print(
+        "\n=== SKILL CLUSTER K SELECTION ==="
+    )
+
+    best_k, results = score_k_values(
+        X,
+        k_min,
+        maximum_k,
+        random_state
     )
 
     print(
@@ -756,7 +787,7 @@ def print_skill_group_summary(
 # LEVEL 2: PLAYSTYLE K SELECTION
 # ============================================================
 
-def test_playstyle_k_values(
+def choose_playstyle_k(
     skill_clustered,
     skill_group,
     k_min=2,
@@ -822,49 +853,16 @@ def test_playstyle_k_values(
         len(group_data) - 1
     )
 
-    results = {}
-
     print(
         f"\n=== PLAYSTYLE K SELECTION: "
         f"{skill_group} ==="
     )
 
-    for k in range(
+    best_k, results = score_k_values(
+        X,
         k_min,
-        maximum_k + 1
-    ):
-
-        kmeans = KMeans(
-            n_clusters=k,
-            random_state=random_state,
-            n_init=20
-        )
-
-        labels = (
-            kmeans.fit_predict(X)
-        )
-
-        score = silhouette_score(
-            X,
-            labels
-        )
-
-        results[k] = {
-            "silhouette": score,
-            "labels": labels,
-            "model": kmeans
-        }
-
-        print(
-            f"  K={k}: "
-            f"Silhouette Score = "
-            f"{score:.3f}"
-        )
-
-    best_k = max(
-        results,
-        key=lambda k:
-        results[k]["silhouette"]
+        maximum_k,
+        random_state
     )
 
     print(
@@ -899,7 +897,7 @@ def cluster_playstyles(
     Run second-level K-Means inside one skill group.
 
     `features` names the columns K-Means sees, as in
-    test_playstyle_k_values.
+    choose_playstyle_k.
     """
 
     if features is None:
@@ -1086,10 +1084,10 @@ def print_playstyle_cluster_profiles(
         )
 
 # ============================================================
-# PLAYSTYLE STABILITY TEST
+# PLAYSTYLE STABILITY
 # ============================================================
 
-def test_playstyle_stability(
+def measure_playstyle_stability(
     skill_clustered,
     skill_group,
     random_states=None,
@@ -1110,7 +1108,7 @@ def test_playstyle_stability(
     The first run is used as the reference partition.
 
     `features` names the columns K-Means sees, as in
-    test_playstyle_k_values; pass the same columns the
+    choose_playstyle_k; pass the same columns the
     real clustering used, or this tests a different setup.
     """
 

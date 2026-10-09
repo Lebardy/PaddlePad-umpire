@@ -63,7 +63,7 @@ one definition rather than a copy here that drifts.
 | Rule | Why |
 |---|---|
 | A player needs **5+ matches** | At one match there is no spread in any per-match rate, so all seven consistency features are `NaN` filled with `0.0` — which K-Means reads as *flawless consistency*, pulling such a player towards the steadiest regulars on the strength of a single match. |
-| The pool needs **3+ players** | `test_skill_k_values` raises below three. Hard limit, not a preference. |
+| The pool needs **3+ players** | `choose_skill_k` raises below three. Hard limit, not a preference. |
 | The pool wants **~40 players** | The clustering is two-level and skips any skill group with fewer than three members. Below roughly forty, the archetype half stops being produced. |
 
 Players under the floor are left out of the run, not rated badly. A run
