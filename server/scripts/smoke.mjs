@@ -2537,7 +2537,6 @@ async function main() {
     check('admin B completes setup through the API -> 200', adminBSetup.status === 200, redacted(adminBSetup.body).slice(0, 80))
     const adminBIn = await request('/admin/auth/login', { method: 'POST', body: { email: adminBEmail, password: ADMIN_B_PASSWORD } })
     check('admin B signs in -> 200', adminBIn.status === 200, String(adminBIn.status))
-    const adminBToken = adminBIn.body.token
 
     // An admin with no facility at all: this API always requires a real
     // facilityId to add one (POST /admin/admins refuses otherwise), so
