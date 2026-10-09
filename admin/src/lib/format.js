@@ -172,10 +172,7 @@ export function confirmNameMatches(typed, name) {
 
 /**
  * The rating an admin sees is the one the player sees: their PaddlePad
- * Rating (PPR), worked out rally by rally. The old 0-100 skill score
- * from the nightly model stood here until 2026-09-28; it is not shown
- * to players any more, so an admin reading it would be reading a number
- * nobody else sees.
+ * Rating (PPR), worked out rally by rally.
  */
 export function pprText(ppr) {
   if (ppr?.state === 'rated') return `${ppr.points.toLocaleString('en-US')} PPR`

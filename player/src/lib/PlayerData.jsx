@@ -29,9 +29,10 @@ export function PlayerDataProvider({ children }) {
     summary: null,
     matches: [],
     inProgress: 0,
-    // Either a skill score with the pool it was measured against, or
-    // the reason there isn't one yet. Never a bare null -- see
-    // getRatingState on the server for why the difference matters.
+    // Either the nightly run's group and playstyle with the pool they
+    // were found in, or the reason there are none yet. Never a bare
+    // null -- see getRatingState on the server for why the difference
+    // matters.
     rating: null,
     // The player-facing rally rating: points with anchors, or progress
     // towards five matches.

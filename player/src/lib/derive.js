@@ -3,9 +3,7 @@
 //
 // Everything here is a plain count or ratio over this player's own
 // matches. Nothing needs other players to exist, which is what makes it
-// safe to show from the very first match -- unlike a skill rating,
-// which is scaled against the whole club and would visibly move because
-// SOMEONE ELSE played.
+// safe to show from the very first match.
 // ============================================================
 
 /** Results of the most recent matches, newest first. */
