@@ -230,7 +230,7 @@ export default function Account({ admin, onAdminChange }) {
 
       <div className="sheet">
         <div className="settings">
-          <Setting as="form" title="Your name" about="Shown at the top of every page and beside everything you do in Activity." onSubmit={saveName}>
+          <Setting as="form" title="Your name" about="Shown on every page and beside what you do in Activity." onSubmit={saveName}>
             <label className="field"><span>Name</span><input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} required /></label>
             <Status status={nameStatus} />
             <button type="submit" className="btn-primary" disabled={nameBusy}>{nameBusy ? 'Saving…' : 'Save name'}</button>
@@ -239,7 +239,7 @@ export default function Account({ admin, onAdminChange }) {
           <Setting
             as="form"
             title={admin.hasPassword ? 'Change password' : 'Set a password'}
-            about="At least 8 characters. There are no reset emails, so keep it somewhere safe."
+            about="At least 8 characters. There are no reset emails."
             onSubmit={savePassword}
           >
             <ProofField admin={admin} proof={passwordProof} busy={passwordBusy} bypass={viaBackupCode} />
@@ -257,7 +257,7 @@ export default function Account({ admin, onAdminChange }) {
             </button>
           </Setting>
 
-          <Setting title="Google" about="Sign in with a Google account instead of typing a password.">
+          <Setting title="Google" about="Sign in with Google instead of a password.">
             {admin.googleEmail ? (
               <>
                 <p>Connected to <strong>{admin.googleEmail}</strong>.</p>
@@ -278,7 +278,7 @@ export default function Account({ admin, onAdminChange }) {
             )}
           </Setting>
 
-          <Setting title="Sessions" about="Signs out every other browser where you’re signed in as you. You stay signed in here.">
+          <Setting title="Sessions" about="Signs you out of every other browser. You stay signed in here.">
             <Status status={sessionsStatus} />
             <button type="button" className="btn-quiet" disabled={sessionsBusy} onClick={signOutEverywhereElse}>
               {sessionsBusy ? 'Saving…' : 'Sign out everywhere else'}
@@ -286,7 +286,7 @@ export default function Account({ admin, onAdminChange }) {
           </Setting>
 
           {admin.role === 'owner' && (
-            <Setting title="Backup codes" about="A way back in if you ever lose your password and your Google account both.">
+            <Setting title="Backup codes" about="A way back in if you lose both your password and Google.">
               {backupCodesLoaded && (
                 codesGone
                   ? <p>You don’t have backup codes yet.</p>

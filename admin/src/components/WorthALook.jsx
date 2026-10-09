@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Icon from './Icon'
 import { agoText, countWord, formatWhen } from '../lib/format'
 import DuplicatePlayers from './DuplicatePlayers'
 import PanelTabs from './PanelTabs'
@@ -190,7 +191,7 @@ export default function WorthALook({ warnings, leftOpen, duplicates, showFacilit
   return (
     <div>
       <div className="section-head">
-        <h2 className="section-title">Worth a look{activeCount > 0 && <span className="worth-count">{activeCount}</span>}</h2>
+        <h2 className="section-title"><Icon name="alert" />Worth a look{activeCount > 0 && <span className="worth-count">{activeCount}</span>}</h2>
         {!isEmpty && <span className="section-count">{current.note ?? MATCH_NOTE}</span>}
       </div>
 

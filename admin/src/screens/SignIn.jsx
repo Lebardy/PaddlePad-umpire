@@ -80,7 +80,7 @@ export default function SignIn({ onSignedIn }) {
         <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
         <GoogleButton withDivider disabled={busy} label="Sign in with Google" onToken={(token) => run(() => signInWithGoogle(token))} />
         <button type="button" className="gate-link" onClick={() => swap(true)}>Use a backup code</button>
-        <p className="gate-note">Admin accounts are added by the owner. There is no sign-up here.</p>
+        <p className="gate-note">The owner adds admin accounts. There is no sign-up here.</p>
       </form>
     </Gate>
   )

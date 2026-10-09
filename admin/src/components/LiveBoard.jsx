@@ -7,7 +7,7 @@ export default function LiveBoard({ live }) {
     return (
       <div className="live-board live-quiet">
         <span className="live-label"><i className="on-air is-off" aria-hidden="true" />Nothing live right now</span>
-        <span className="live-quiet-note">No session is open. The board lights up when one starts.</span>
+        <span className="live-quiet-note">No session is open.</span>
       </div>
     )
   }

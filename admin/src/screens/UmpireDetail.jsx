@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Icon from '../components/Icon'
 import AccountActions from '../components/AccountActions'
 import FacilityPicker from '../components/FacilityPicker'
 import PageBoard, { TallyCell } from '../components/PageBoard'
@@ -93,7 +94,7 @@ export default function UmpireDetail({ id, me }) {
         )}
 
         <div>
-          <h2 className="section-title">Details</h2>
+          <h2 className="section-title"><Icon name="list" />Details</h2>
           <div className="detail-facts" style={{ '--fact-columns': 3 }}>
             <div className="detail-fact"><span>Email</span><strong>{umpire.email}</strong></div>
             <div className="detail-fact"><span>Google</span><strong>{umpire.googleEmail ?? 'Not connected'}</strong></div>
@@ -105,7 +106,7 @@ export default function UmpireDetail({ id, me }) {
         </div>
 
         <div>
-          <h2 className="section-title">Recent matches scored</h2>
+          <h2 className="section-title"><Icon name="calendar" />Recent matches scored</h2>
           {umpire.matches.length === 0 ? (
             <p className="empty">No matches scored yet.</p>
           ) : (

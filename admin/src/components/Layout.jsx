@@ -1,13 +1,14 @@
 import { Link } from '../lib/router'
+import Icon from './Icon'
 import LampMark from './LampMark'
 
 const PAGES = [
-  { to: '/', label: 'Overview', current: (path) => path === '/' },
-  { to: '/players', label: 'Players', current: (path) => path === '/players' || path.startsWith('/players/') },
-  { to: '/umpires', label: 'Umpires', current: (path) => path === '/umpires' || path.startsWith('/umpires/') },
-  { to: '/facilities', label: 'Facilities', facilityAdminLabel: 'Facility', current: (path) => path === '/facilities' || path.startsWith('/facilities/') },
-  { to: '/admins', label: 'Admins', ownerOnly: true, current: (path) => path === '/admins' },
-  { to: '/activity', label: 'Activity', current: (path) => path === '/activity' },
+  { to: '/', label: 'Overview', icon: 'overview', current: (path) => path === '/' },
+  { to: '/players', label: 'Players', icon: 'people', current: (path) => path === '/players' || path.startsWith('/players/') },
+  { to: '/umpires', label: 'Umpires', icon: 'clipboard', current: (path) => path === '/umpires' || path.startsWith('/umpires/') },
+  { to: '/facilities', label: 'Facilities', icon: 'pin', facilityAdminLabel: 'Facility', current: (path) => path === '/facilities' || path.startsWith('/facilities/') },
+  { to: '/admins', label: 'Admins', icon: 'shield', ownerOnly: true, current: (path) => path === '/admins' },
+  { to: '/activity', label: 'Activity', icon: 'clock', current: (path) => path === '/activity' },
 ]
 
 /** The board across the top of every page, and the page under it. Only pages that exist are listed. */
@@ -22,6 +23,7 @@ export default function Layout({ admin, facilityLabel, path, onSignOut, children
             {PAGES.filter((page) => !page.ownerOnly || admin.role === 'owner').map((page) => (
               <li key={page.to}>
                 <Link to={page.to} aria-current={page.current(path) ? 'page' : undefined}>
+                  <Icon name={page.icon} size={16} />
                   {admin.role !== 'owner' && page.facilityAdminLabel ? page.facilityAdminLabel : page.label}
                 </Link>
               </li>
@@ -38,7 +40,7 @@ export default function Layout({ admin, facilityLabel, path, onSignOut, children
             <strong>{admin.name}</strong>
             <span className="who-role">{admin.role === 'owner' ? 'Owner' : 'Admin'}{facilityLabel ? ` · ${facilityLabel}` : ''}</span>
           </Link>
-          <button type="button" className="signout" onClick={onSignOut}>Sign out</button>
+          <button type="button" className="signout" onClick={onSignOut} aria-label="Sign out" title="Sign out"><Icon name="logout" size={18} className="icon-solo" /></button>
         </div>
       </div>
       <main className="page">{children}</main>

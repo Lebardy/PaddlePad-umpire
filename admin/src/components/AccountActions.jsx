@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import Icon from './Icon'
 import RowConfirm from './RowConfirm'
 import { closePerson, pausePerson, unpausePerson } from '../lib/api'
 import { confirmNameMatches } from '../lib/format'
@@ -82,7 +83,7 @@ export default function AccountActions({ kind, person, me, onChanged, extraActio
 
   return (
     <div>
-      <h2 className="section-title">Actions</h2>
+      <h2 className="section-title"><Icon name="edit" />Actions</h2>
       <div className="actions-row">
         {canPause && person.status !== 'closed' && person.status !== 'paused' && (
           <RowConfirm

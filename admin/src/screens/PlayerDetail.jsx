@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Icon from '../components/Icon'
 import AccountActions from '../components/AccountActions'
 import ClaimCodeReveal from '../components/ClaimCodeReveal'
 import PageBoard, { TallyCell } from '../components/PageBoard'
@@ -94,7 +95,7 @@ export default function PlayerDetail({ id, me }) {
         )}
 
         <div>
-          <h2 className="section-title">Details</h2>
+          <h2 className="section-title"><Icon name="list" />Details</h2>
           <div className="detail-facts">
             <div className="detail-fact"><span>Username</span><strong>{player.username ?? 'None'}</strong></div>
             <div className="detail-fact"><span>Google</span><strong>{player.googleEmail ?? 'Not connected'}</strong></div>
@@ -107,7 +108,7 @@ export default function PlayerDetail({ id, me }) {
         </div>
 
         <div>
-          <h2 className="section-title">Recent matches</h2>
+          <h2 className="section-title"><Icon name="calendar" />Recent matches</h2>
           {player.matches.length === 0 ? (
             <p className="empty">No finished matches yet.</p>
           ) : (

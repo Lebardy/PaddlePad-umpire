@@ -19,7 +19,7 @@ const KIND = {
   players: {
     list: listPlayers,
     title: 'Players',
-    intro: 'Everyone who plays on PaddlePad. Open someone to see their details, pause their account or make a new claim code.',
+    intro: 'Open a player to see their details, pause them or make a new claim code.',
     searchLabel: 'Search by name, username or email',
     emptyAll: 'No players yet.',
     detailPath: (id) => `/players/${id}`,
@@ -27,7 +27,7 @@ const KIND = {
   umpires: {
     list: listUmpires,
     title: 'Umpires',
-    intro: 'The umpires who score matches. Open someone to see their details or pause their account; new umpires join with an invite code.',
+    intro: 'Open an umpire to see their details or pause them. New umpires join with an invite code.',
     searchLabel: 'Search by name or email',
     emptyAll: 'No umpires yet.',
     detailPath: (id) => `/umpires/${id}`,
