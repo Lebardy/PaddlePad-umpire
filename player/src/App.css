@@ -1206,6 +1206,10 @@
 /* ============ Leaderboard ============ */
 
 .rank-panel { margin: 0 calc(var(--gutter) * -1) 1.25rem; background: var(--surface); border-bottom: 1px solid var(--border); }
+/* A panel like the bands under it once there is room around the column. */
+@media (min-width: 640px) {
+  .rank-panel { margin-inline: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+}
 .rank-board { background: var(--board); color: var(--board-ink); padding: 1rem var(--gutter) 0.85rem; border-bottom: 4px solid var(--lamp); }
 .rank-place-big { margin: 0; font-family: var(--display); font-weight: 900; font-size: 4.6rem; line-height: 0.9; color: var(--lamp); font-variant-numeric: tabular-nums; }
 .rank-place-big small { font-family: var(--label); font-size: 1.1rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--board-muted); margin-left: 0.3rem; }
@@ -1416,6 +1420,12 @@
   background: var(--surface);
   margin-inline: calc(var(--gutter) * -1);
   border-block: 1px solid var(--border);
+}
+/* Inside the column once there is room around it; the list's own rule
+   above would otherwise keep it running into the margin. */
+@media (min-width: 640px) {
+  .people-facts { margin-inline: 0; margin-bottom: 1.25rem; border-radius: var(--radius) var(--radius) 0 0; overflow: hidden; }
+  .person-list { margin-inline: 0; }
 }
 .person-list li + li { border-top: 1px solid var(--border); }
 .person-row {
