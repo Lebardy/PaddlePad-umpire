@@ -243,11 +243,9 @@ function scoringRallies(row, events) {
  * Headline totals across a player's whole history.
  *
  * Only raw counts and simple ratios -- nothing here needs a population
- * to be meaningful. The skill score and playstyle archetype from the ML
+ * to be meaningful. The skill group and playstyle archetype from the ML
  * pipeline deliberately are NOT computed here: those need many matches
- * per player and many players before they say anything true, and a
- * rating that moves because someone else played would destroy trust in
- * it immediately.
+ * per player and many players before they say anything true.
  */
 // Below this, a conversion rate is a coin landing heads twice. Ten of
 // each is still a small sample -- the app says so beside it -- but it
@@ -351,77 +349,26 @@ export async function countMatchesInProgress(query, playerId) {
 }
 
 // ============================================================
-// The ML skill rating, and what to say when there isn't one
+// The ML pipeline's result, and what to say when there isn't one
 // ============================================================
 
 /**
- * What this player's rating situation is right now.
+ * What this player's situation with the pipeline is right now.
  *
- * Returns one of four states rather than a nullable score, because
+ * Returns one of four states rather than a nullable result, because
  * "we have not computed this yet" and "you have not played enough" and
  * "not enough people have played enough" are three genuinely different
  * things and the app should not be left guessing which it is looking
- * at. Only `rated` carries a number.
+ * at. Only `rated` carries a skill group and a playstyle, from the
+ * latest completed run the player is in.
  *
  * `matchCount` is passed in rather than re-queried: the caller has
  * already loaded this player's matches, and that array is filtered by
  * exactly the same rules the gate counts against.
  */
-// How many runs back to look when assembling a history. Nightly runs
-// make this about two months. It is a scan bound, not a point count --
-// most of these collapse away, see below.
-const HISTORY_RUNS_SCANNED = 60
-
-// How many points survive into the response. Enough to show a shape,
-// few enough that the payload stays small forever.
-const HISTORY_POINTS = 12
-
-/**
- * Turns a player's rating rows into the points where their score CHANGED.
- *
- * Not a list of runs, and that distinction is the whole design.
- *
- * The pipeline is deterministic: `random_state=42` is fixed, and the
- * skill score does not come from K-Means at all -- it is a weighted sum
- * of min-max normalised features. So two runs over unchanged data
- * produce byte-identical scores. That is not a guess; on staging the
- * same player scored 36.1900 in two consecutive runs.
- *
- * Charting every nightly run would therefore draw a flat line almost
- * every day, with the occasional step lost among fifty identical
- * points. Collapsing runs of equal scores and keeping the EARLIEST of
- * each streak means every point answers "this is when it became that",
- * which is the question someone watching their score actually has.
- *
- * `rows` arrives newest-first; the result is oldest-first, because that
- * is the direction a chart is read.
- */
-function buildRatingHistory(rows) {
-  const points = []
-  // Walked newest-first, so the LAST row of each equal streak is the
-  // earliest one -- overwriting as we go leaves exactly that.
-  for (const row of rows) {
-    const previous = points[points.length - 1]
-    if (previous && previous.skillScore === Math.round(row.skill_score)) {
-      previous.computedAt = row.computed_at
-      previous.poolSize = row.player_count
-      continue
-    }
-    points.push({
-      // Rounded to match the headline number. Comparing the raw floats
-      // would treat 36.19 and 36.191 as a change and draw a step the
-      // player could never see in the number itself.
-      skillScore: Math.round(row.skill_score),
-      computedAt: row.computed_at,
-      poolSize: row.player_count,
-    })
-  }
-  return points.slice(0, HISTORY_POINTS).reverse()
-}
-
 export async function getRatingState(query, playerId, matchCount) {
   const { rows: rated } = await query(
-    `SELECT r.skill_score, r.skill_group, r.playstyle_archetype,
+    `SELECT r.skill_group, r.playstyle_archetype,
             r.evidence, r.match_count,
             run.computed_at, run.player_count
        FROM player_ratings r
@@ -429,36 +376,22 @@ export async function getRatingState(query, playerId, matchCount) {
       WHERE r.player_id = $1
         AND run.status = 'completed'
       ORDER BY run.computed_at DESC
-      LIMIT $2`,
-    [playerId, HISTORY_RUNS_SCANNED],
+      LIMIT 1`,
+    [playerId],
   )
 
   if (rated[0]) {
     const row = rated[0]
     return {
       state: 'rated',
-      // Rounded here rather than in the app: the extra decimals are
-      // false precision on a score this relative, and rounding once at
-      // the source stops two screens disagreeing.
-      skillScore: Math.round(row.skill_score),
       playstyleArchetype: row.playstyle_archetype,
       skillGroup: row.skill_group,
       evidence: row.evidence,
-      // The two facts that make a relative score interpretable. Never
-      // send the score without them.
+      // The two facts that make a pool-relative result interpretable.
+      // Never send the result without them.
       computedAt: row.computed_at,
       poolSize: row.player_count,
       fromMatches: row.match_count,
-      // When the score actually moved, and what pool it was measured
-      // against each time. See buildRatingHistory for why this is a
-      // list of CHANGES rather than a list of runs.
-      history: buildRatingHistory(rated),
-      // skill_tier is deliberately not returned. assign_skill_tier
-      // applies absolute cutoffs (40 / 75) to a purely relative score,
-      // so in a small pool the top player is labelled "Professional"
-      // regardless of how they play -- a straightforwardly false claim
-      // to put in front of a real person. The value stays in the
-      // database for analysis.
     }
   }
 
@@ -510,14 +443,8 @@ export async function getRatingState(query, playerId, matchCount) {
 /**
  * What the rating screen's playstyle card needs about this player's
  * place in the latest pipeline run: their group's name and size, and
- * their style with the numbers that earned each word.
- *
- * It used to also send a ladder of every group, the old score's four
- * parts against the group above, the spread of the player's games and a
- * histogram of everyone's scores. Those supported a first card built on
- * the old 0-100 score; the screen now shows rally points there and folds
- * the group into one line, so none of them are sent. Still never another
- * player's score, name, id or group.
+ * their style with the numbers that earned each word. Never another
+ * player's name, id or group.
  */
 export async function getClubStanding(query, playerId) {
   // The latest completed run this player is actually IN. A later run
