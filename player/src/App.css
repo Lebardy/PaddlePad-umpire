@@ -283,7 +283,7 @@
 .gate-tab { white-space: normal; text-wrap: balance; line-height: 1.15; }
 /* Each way in carries its icon above its words. */
 .gate-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3rem; padding-block: 0.65rem 0.55rem; }
-.gate-tab svg { flex: none; }
+.gate-tab svg { flex: none; width: 1.65rem; height: 1.65rem; }
 .filter-active,
 .gate-tab[aria-selected='true'] {
   background: var(--button);
@@ -396,7 +396,9 @@
 }
 .stat-value { font-size: 2.3rem; color: var(--board-ink); }
 .stat-label { display: flex; align-items: flex-start; gap: 0.35rem; font-size: 0.85rem; letter-spacing: 0.06em; color: var(--board-ink); margin-top: 0.2rem; }
-.stat-label svg { flex: none; margin-top: 0.12em; color: var(--board-muted); }
+/* Each cell's pictogram, lit, in the corner opposite its number. */
+.stat-tile { position: relative; }
+.stat-label svg { position: absolute; top: 0.95rem; right: var(--gutter); width: 1.6rem; height: 1.6rem; color: var(--lamp); }
 .stat-note { font-size: 0.8rem; color: var(--board-muted); line-height: 1.35; }
 
 .sb-form {
@@ -1264,7 +1266,7 @@
   font-family: var(--label); font-size: 0.86rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--board-muted); cursor: pointer;
   display: inline-flex; align-items: center; gap: 0.35rem;
 }
-.month-tab svg { flex: none; }
+.month-tab svg { flex: none; width: 1.15rem; height: 1.15rem; }
 .month-tab-on { color: var(--lamp); border-bottom-color: var(--lamp); }
 .month-rows { list-style: none; margin: 0; padding: 0; }
 .month-row + .month-row { border-top: 1px solid var(--border); }
@@ -1407,9 +1409,9 @@
   display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
   background: var(--board); color: var(--board-ink); border-bottom: 4px solid var(--lamp);
 }
-.people-facts li { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 0.4rem; row-gap: 0.15rem; padding: 0.75rem 0.5rem 0.8rem var(--gutter); }
+.people-facts li { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: start; row-gap: 0.3rem; padding: 0.8rem 0.5rem 0.8rem var(--gutter); }
 .people-facts li + li { border-left: 1px solid var(--board-rule); padding-left: 0.75rem; }
-.people-facts svg { color: var(--board-muted); }
+.people-facts svg { width: 1.6rem; height: 1.6rem; color: var(--board-ink); }
 .people-facts b { font-family: var(--display); font-weight: 900; font-size: clamp(1.5rem, 7vw, 1.9rem); line-height: 1; color: var(--lamp); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .people-facts span { grid-column: 1 / -1; font-family: var(--label); font-weight: 700; font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--board-muted); }
 
@@ -1468,7 +1470,8 @@
 .person-records { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); border-top: 1px solid var(--board-rule); }
 .person-records li { display: flex; flex-direction: column; gap: 0.1rem; padding-top: 0.75rem; }
 .person-records li + li { border-left: 1px solid var(--board-rule); padding-left: var(--gutter); }
-.pr-label { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; color: var(--board-muted); }
+.pr-label { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--board-muted); }
+.pr-label svg { flex: none; width: 1.2rem; height: 1.2rem; color: var(--board-ink); }
 .pr-value { font-size: 3.2rem; font-weight: 900; color: var(--lamp); text-shadow: 0 0 18px var(--lamp-glow); }
 .pr-note { font-size: 0.85rem; color: var(--board-muted); }
 .person-detail .match-list { margin-top: 0; }
@@ -1524,7 +1527,8 @@
 .place-figure + .place-figure { border-left: 1px solid var(--board-rule); }
 .place-figure-wide { grid-column: 1 / -1; border-bottom: 1px solid var(--board-rule); }
 .place-figure-wide + .place-figure { border-left: 0; }
-.place-figure-label { display: flex; align-items: center; gap: 0.35rem; font-family: var(--label); font-weight: 700; font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--board-muted); }
+.place-figure-label svg { flex: none; width: 1.15rem; height: 1.15rem; color: var(--board-ink); }
+.place-figure-label { display: flex; align-items: center; gap: 0.4rem; font-family: var(--label); font-weight: 700; font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--board-muted); }
 .place-figure b { display: block; margin-top: 0.2rem; font-family: var(--display); font-weight: 800; font-size: 1.55rem; line-height: 1.05; color: var(--lamp); overflow-wrap: anywhere; }
 .place-figure-none b { font-family: var(--sans); font-weight: 500; font-size: 1.05rem; color: var(--board-muted); }
 .place-map {
@@ -1587,13 +1591,28 @@
 
 .you-section > .you-head,
 .you-details > .you-head { gap: 0.5rem; justify-content: flex-start; }
-.you-head svg { color: var(--lamp); flex: none; }
-/* An icon opening any other band's heading. */
-.head-icon { color: var(--lamp); flex: none; vertical-align: -0.16em; margin-right: 0.45rem; }
+/* The icon opening a band's heading is a lit badge, the same one the
+   Rating screen marks its sections with. */
+.you-head svg,
+.head-icon,
+.link-code > h2 svg {
+  flex: none;
+  box-sizing: border-box;
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0.28rem;
+  border-radius: 2px;
+  background: var(--lamp);
+  color: #15181d;
+  stroke-width: 2.2;
+}
+.head-icon,
+.link-code > h2 svg { margin-right: 0.55rem; }
+.section-head h2,
+.trend-head h2 { display: flex; align-items: center; min-width: 0; }
 .bests > h2,
 .link-code > h2,
 .trend-early > h2 { justify-content: flex-start; gap: 0; }
-.link-code > h2 svg { color: var(--lamp); flex: none; margin-right: 0.5rem; }
 .you-section p,
 .you-line { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.55; margin: 0 0 0.7rem; }
 .you-section .filter-row { margin-bottom: 0; }
@@ -2031,7 +2050,7 @@
   text-decoration: none;
 }
 .setup-strip-what { display: inline-flex; align-items: center; gap: 0.4rem; }
-.setup-strip-what svg { flex: none; color: var(--text-muted); }
+.setup-strip-what svg { flex: none; width: 1.25rem; height: 1.25rem; color: var(--text); }
 .setup-strip-go { font-family: var(--label); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary); white-space: nowrap; }
 /* Under ten matches the points are an early estimate, and say so right
    under the number. The tag carries a border because the sunken
@@ -2390,7 +2409,7 @@
   align-items: center;
   gap: 0.35rem;
 }
-.endings-head svg { flex: none; stroke-width: 2.6; }
+.endings-head svg { flex: none; width: 1.2rem; height: 1.2rem; stroke-width: 2.6; }
 .is-won .endings-head svg { color: var(--status-good); }
 .is-lost .endings-head svg { color: var(--status-critical); }
 .endings-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.35rem; }
