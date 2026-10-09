@@ -180,8 +180,10 @@ export function block(key, info) {
  * Retires an entry that can never succeed.
  *
  * Dead-lettered work is kept, never silently dropped: the umpire's taps
- * are still in local storage, and the entry is listed so they can retry
- * or knowingly discard it. Continuing to drain past it is deliberate --
+ * are still in local storage, and the entry is listed (screens/
+ * CouldntSync.jsx) so they can retry or knowingly discard it. Listed
+ * once: a change refused a second time replaces its earlier line.
+ * Continuing to drain past it is deliberate --
  * head-of-line blocking is correct for a transient error but would
  * freeze the app forever on a permanent one.
  */
@@ -195,7 +197,7 @@ export function killEntry(key, error) {
     order: state.order.filter((k) => k !== key),
     entries,
     deadLetter: [
-      ...state.deadLetter,
+      ...state.deadLetter.filter((d) => d.key !== key),
       { ...entry, key, error, diedAt: Date.now() },
     ],
   })
@@ -207,7 +209,8 @@ export function reviveDead(key) {
   const dead = state.deadLetter.find((d) => d.key === key)
   if (!dead) return
   save({
-    order: [...state.order, key],
+    // Already queued again if the umpire changed it after it was refused.
+    order: state.order.includes(key) ? state.order : [...state.order, key],
     entries: {
       ...state.entries,
       [key]: {
@@ -218,6 +221,9 @@ export function reviveDead(key) {
         nextAttemptAt: 0,
         lastError: null,
         state: 'pending',
+        // Kept so that a second refusal goes back to the same place in
+        // the list instead of jumping to the end.
+        refusedFirst: dead.refusedFirst ?? dead.diedAt,
       },
     },
     deadLetter: state.deadLetter.filter((d) => d.key !== key),

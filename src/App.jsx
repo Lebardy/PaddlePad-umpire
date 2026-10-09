@@ -7,6 +7,7 @@ import Login from './screens/Login'
 import Guide from './screens/Guide'
 import Players from './screens/Players'
 import Account from './screens/Account'
+import CouldntSync from './screens/CouldntSync'
 import { clearSession, fetchCurrentUmpire, getStoredUmpire, subscribeSessionEnded } from './lib/api'
 import SyncIndicator from './components/SyncIndicator'
 import UpdateNotice from './components/UpdateNotice'
@@ -149,7 +150,7 @@ function App() {
         {signedIn && (
           <div className="header-right">
             <UpdateNotice />
-            <SyncIndicator />
+            <SyncIndicator onOpenSync={() => setView({ name: 'sync' })} />
             {/* Permanent, not a one-time tour. Most of what the guide
                 explains is as useful on the second night as the first,
                 and someone who dismissed a walkthrough would have no
@@ -217,6 +218,7 @@ function App() {
             )}
             {view.name === 'guide' && <Guide onBack={goHome} />}
             {view.name === 'players' && <Players onBack={goHome} />}
+            {view.name === 'sync' && <CouldntSync onBack={goHome} />}
 
             {view.name === 'account' && (
               <Account
