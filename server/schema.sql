@@ -100,19 +100,18 @@ CREATE TABLE IF NOT EXISTS players (
 CREATE UNIQUE INDEX IF NOT EXISTS players_name_lower_idx
     ON players (lower(name));
 
--- Groundwork for letting a player claim their own record later (by QR
--- or by typing the code), inheriting the history an umpire already
--- logged for them. Nothing reads this yet.
+-- Lets a player claim their own record by typing the code, inheriting
+-- the history an umpire already logged for them. POST /auth/player/claim
+-- signs them in with it; it is cleared once they set a password or
+-- connect Google.
 --
--- It exists from the start so that feature is a small addition rather
--- than a schema migration plus a backfill across every historical row.
 -- Codes are minted lazily on first read rather than backfilled, which
 -- keeps this a one-line ALTER.
 --
 -- SECURITY: claim_code is a bearer secret -- anyone holding it can
 -- claim that player. It must never be included in list responses; the
--- roster is the most screenshotted screen in the app. Only the
--- single-player claim-code endpoint may return it.
+-- roster is the most screenshotted screen in the app. Only a route that
+-- answers for one player at a time may return it.
 ALTER TABLE players ADD COLUMN IF NOT EXISTS claim_code TEXT;
 ALTER TABLE players ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
 

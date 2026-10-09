@@ -135,11 +135,6 @@ export function getMatches() {
   return readJSON(MATCHES_KEY, [])
 }
 
-/** Matches belonging to one session, for the SessionDetail match list. */
-export function getMatchesForSession(sessionId) {
-  return getMatches().filter((m) => m.sessionId === sessionId)
-}
-
 /** A single match by id, or null if it doesn't exist. */
 export function getMatch(matchId) {
   return getMatches().find((m) => m.id === matchId) ?? null
@@ -617,7 +612,7 @@ export function migrateLegacyData() {
  *
  * So leaving it behind is not merely untidy: it can undo a deletion,
  * and it hands the next person to use the device a full copy of the
- * club's match history.
+ * match history.
  *
  * The caller is responsible for warning about unsynced work first --
  * see handleSignOut in App.jsx. This function itself is unconditional

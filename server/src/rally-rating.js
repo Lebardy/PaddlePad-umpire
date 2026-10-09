@@ -388,7 +388,8 @@ function wholeBreakdown(rating) {
   for (let i = 0; left > 0 && byRemainder.length > 0; i = (i + 1) % byRemainder.length, left -= 1) {
     byRemainder[i].points += 1
   }
-  return rows.map(({ exact, ...row }) => row)
+  for (const row of rows) delete row.exact
+  return rows
 }
 
 /** pg returns timestamps as Dates; the app is sent ISO strings either way. */

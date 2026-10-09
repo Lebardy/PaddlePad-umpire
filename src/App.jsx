@@ -108,7 +108,7 @@ function App() {
   // local records the server did not return, so anything deleted on the
   // server would come back on this device -- and anything still queued
   // would be pushed up again, undoing the deletion. It would also hand
-  // the next person to use this device the club's whole match history.
+  // the next person to use this device the whole match history.
   //
   // Unsynced work is the one thing worth stopping for, because it
   // exists nowhere else yet.

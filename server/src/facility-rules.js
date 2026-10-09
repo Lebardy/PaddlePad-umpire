@@ -5,7 +5,6 @@
 // ============================================================
 
 export const STARTING_FACILITY_NAME = 'Starting facility'
-export const NO_FACILITY_MESSAGE = "Your account isn't linked to a facility yet. Ask your admin."
 
 const PESOS = new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 

@@ -3,7 +3,7 @@ import { searchPlayers } from '../lib/api'
 import PlayerCodeCard from '../components/PlayerCodeCard'
 
 // ============================================================
-// The club roster, and the only other place a claim code is shown.
+// The player roster, and the only other place a claim code is shown.
 //
 // Until now a code could be reached from exactly one screen: the roster
 // inside a session, next to a player already added to it. That was fine
@@ -14,14 +14,14 @@ import PlayerCodeCard from '../components/PlayerCodeCard'
 // answer was "add them to a session first", which writes a row to make
 // a lookup possible.
 //
-// So this is a search over the same club-wide registry the player
+// So this is a search over the same shared registry the player
 // picker searches, with the code card the session roster already uses.
 // No new endpoint and no new way to see a code: GET /players has never
 // returned claim_code and still does not, and the code itself still
 // comes one player at a time from GET /players/:id/claim-code.
 //
 // Deliberately search-first rather than a listed roster. The registry
-// is club-wide and grows without limit, the server caps a response at
+// is shared and grows without limit, the server caps a response at
 // 50 rows, and a screen that quietly showed the first 50 of 200 players
 // would be worse than one that asks who you are looking for.
 //

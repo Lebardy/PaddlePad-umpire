@@ -3,7 +3,7 @@
 //
 // Deliberately NOT built on buildMatchLogRows(). That function takes no
 // filter and assigns match_number in a second pass over the entire
-// club's history, so filtering its output would mean scanning every
+// match history, so filtering its output would mean scanning every
 // match ever played on each page view. It also returns partners and
 // opponents as UUIDs, and a player wants names.
 //
@@ -446,7 +446,7 @@ export async function getRatingState(query, playerId, matchCount) {
  * their style with the numbers that earned each word. Never another
  * player's name, id or group.
  */
-export async function getClubStanding(query, playerId) {
+export async function getStanding(query, playerId) {
   // The latest completed run this player is actually IN. A later run
   // they missed would describe a group they were not part of.
   const { rows: mine } = await query(

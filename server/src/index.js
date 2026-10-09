@@ -108,8 +108,8 @@ app.use('/auth/register', rateLimit({ max: 5, windowMs: 60_000 }))
 // which is easy to forget when raising or lowering either one.
 app.use('/auth/google/link', rateLimit({ max: 10, windowMs: 60_000 }))
 // 20 rather than login's 10 because FOUR paths now share this bucket --
-// /auth/google, /link, /connect and /disconnect -- and a club behind one
-// wifi address shares it with each other. The same mistake was already
+// /auth/google, /link, /connect and /disconnect -- and everyone at a venue behind one
+// wifi address shares it. The same mistake was already
 // made and fixed on the player side: a parent limit sized for one
 // endpoint quietly became the ceiling on connecting Google at all.
 app.use('/auth/google', rateLimit({ max: 20, windowMs: 60_000 }))
@@ -154,7 +154,7 @@ app.use('/auth/player/credentials', rateLimit({ max: 10, windowMs: 60_000 }))
 // It was 5, and that was wrong for a second reason. Per the note above,
 // a request to .../google/link is counted in the parent bucket too, so
 // 5 here would have been the real ceiling on connecting Google as well
-// as on signing in with it -- and a club sharing one wifi address
+// as on signing in with it -- and a venue sharing one wifi address
 // shares one bucket.
 app.use('/auth/player/google/link', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/auth/player/google/unlink', rateLimit({ max: 10, windowMs: 60_000 }))
@@ -168,7 +168,7 @@ app.use('/player/link', rateLimit({ max: 10, windowMs: 60_000 }))
 // same minute, a few requests each -- not for one phone.
 app.use('/player', rateLimit({ max: 300, windowMs: 60_000 }))
 // One caller, a handful of calls per run. Tight enough that a leaked
-// key cannot be used to scrape the whole club's match log repeatedly,
+// key cannot be used to scrape the whole match log repeatedly,
 // loose enough for a nightly run plus a few manual triggers in a demo.
 app.use('/internal', rateLimit({ max: 20, windowMs: 60_000 }))
 

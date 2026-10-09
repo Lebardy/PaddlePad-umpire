@@ -30,8 +30,6 @@ const DEVICE_KEY = 'paddlepad.deviceId'
 
 const EMPTY = Object.freeze({ order: [], entries: {}, deadLetter: [] })
 
-export const MAX_ATTEMPTS = 8
-
 function load() {
   const value = read(OUTBOX_KEY, EMPTY)
   // Defend against a half-written or hand-edited value; an outbox that
@@ -93,10 +91,6 @@ export function markDirty(kind, entityId) {
   save({ ...state, order, entries })
 }
 
-export function getState() {
-  return load()
-}
-
 /**
  * Empties the queue completely, dead letters included.
  *
@@ -140,7 +134,7 @@ export function resolve(key) {
 /**
  * Records a failure that is worth retrying, with backoff.
  *
- * Jittered so that a whole club's devices coming back onto the same wifi
+ * Jittered so that a whole venue's devices coming back onto the same wifi
  * don't retry in lockstep.
  */
 export function defer(key, error, delayMs) {
