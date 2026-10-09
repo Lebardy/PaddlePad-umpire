@@ -19,7 +19,7 @@
 //
 // Each word in the style name shows this player's own number, the
 // average of players with their style and their group's average, with
-// one plain sentence saying which way the style leans. Nobody's
+// an arrow and a short line saying which way the style leans. Nobody's
 // individual numbers but their own; see server/src/playstyle.js.
 //
 // It never shows a ranking and never anyone else's score. Why is one
@@ -32,12 +32,13 @@ import { usePlayerData } from '../lib/PlayerData'
 import { navigate } from '../lib/router'
 import { endingPhrase, namedLeaders } from '../lib/endingWords'
 import { styleName } from '../lib/styleName'
-import { MEASURES, hiddenStyleNote, styleShareLine, traitLine } from '../lib/styleProof'
+import { MEASURES, hiddenStyleNote, styleShareLine, traitLine, verdictWay } from '../lib/styleProof'
 import { faultsToWorkOn } from '../lib/faultTips'
 import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
 import More from '../components/More'
 import Collapsible from '../components/Collapsible'
 import ShotProfile from '../components/ShotProfile'
+import Icon from '../components/Icon'
 
 
 // Said only where there IS a direction. Most of these measurements are
@@ -59,11 +60,12 @@ function showValue(value, as) {
   return `±${value.toFixed(2)}`
 }
 
-function Step({ number, title, value, children }) {
+// `number` only staggers the entrance; each step is marked by its icon.
+function Step({ number, icon, title, value, children }) {
   return (
     <section className="step rise" style={{ '--i': number }} aria-label={title}>
       <div className="step-head">
-        <span className="step-n" aria-hidden="true">{number}</span>
+        <span className="step-n"><Icon name={icon} size={18} /></span>
         <h2>{title}</h2>
       </div>
       {value && <p className="step-value">{value}</p>}
@@ -158,7 +160,7 @@ function Score({ rallyRating }) {
   const total = rallyRating.points - 1500
 
   return (
-    <Step number={1} title="Your rating">
+    <Step number={1} icon="trendUp" title="PaddlePad Rating">
       <RallyPointsHeadline rallyRating={rallyRating} />
 
       {rows.length > 0 && (
@@ -261,7 +263,7 @@ function WorkOn({ rallyRating }) {
   const faults = enough ? faultsToWorkOn(rallyRating.breakdown) : []
 
   return (
-    <Step number={2} title="What to work on">
+    <Step number={2} icon="target" title="What to work on">
       {!enough ? (
         <p className="step-line">
           Tips appear once 20 of your rallies have been scored with how they
@@ -271,10 +273,7 @@ function WorkOn({ rallyRating }) {
         <p className="step-line">None of these mistakes show up in your rallies yet.</p>
       ) : (
         <>
-          <p className="step-line">
-            The mistakes you make most often.
-          </p>
-          <ol className="tips" aria-label="Mistakes to work on">
+          <ol className="tips" aria-label="The mistakes you make most often">
             {faults.map((fault, i) => (
               <li key={fault.ending} className="tip rise" style={{ '--i': i }}>
                 <span className="tip-rank" aria-hidden="true">{i + 1}</span>
@@ -337,7 +336,7 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
   const hasStyle = row.style !== null && row.style !== undefined
   const bars = [
     { who: 'you', value: row.you, mine: true },
-    ...(hasStyle ? [{ who: 'players with your style', value: row.style }] : []),
+    ...(hasStyle ? [{ who: 'your style', value: row.style }] : []),
     { who: 'your group', value: row.group },
   ]
   // Bars are drawn against the biggest of them, so a row is read by
@@ -349,6 +348,7 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
   // gaps were small. No line when the numbers can't point (a style of two
   // has no average; see lib/styleProof.js).
   const line = traitLine(row, proof?.styleSize)
+  const way = verdictWay(row, proof?.styleSize)
 
   return (
     <>
@@ -381,7 +381,12 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
         </ul>
       )}
 
-      {withVerdict && word && row.you !== null && line && <p className="proof-verdict">{line}</p>}
+      {withVerdict && word && row.you !== null && line && (
+        <p className="proof-verdict">
+          <Icon name={way === 'higher' ? 'arrowUp' : 'arrowDown'} size={15} />
+          {line}
+        </p>
+      )}
     </>
   )
 }
@@ -397,10 +402,7 @@ function ComparedWith({ band, styleSize }) {
   if (!band?.size) return null
   return (
     <>
-      <p className="step-line">
-        Compared with the <strong>{band.size} players</strong> closest to your
-        level{styleShareLine(styleSize) ? <> — {styleShareLine(styleSize)}</> : ''}.
-      </p>
+      <p className="step-line">{styleShareLine(styleSize, band.size)}</p>
       <More label="Who are they?">
         <p>
           Everyone rated is first split into a few groups of players whose
@@ -424,7 +426,7 @@ function Playstyle({ standing, number }) {
 
   if (!name) {
     return (
-      <Step number={number} title="Your playstyle" value="Not worked out yet">
+      <Step number={number} icon="sparkle" title="Your playstyle" value="Not worked out yet">
         <p className="step-line">
           Styles are worked out among the players closest to your level, and
           that needs at least three of them. There {band?.size === 1 || !band?.size ? 'is 1' : `are ${band.size}`} so far.
@@ -435,7 +437,7 @@ function Playstyle({ standing, number }) {
 
   if (!proof) {
     return (
-      <Step number={number} title="Your playstyle" value={name}>
+      <Step number={number} icon="sparkle" title="Your playstyle" value={name}>
         <p className="step-line">
           This name comes from how players with your style compare with the
           players closest to your level. The measurements behind it weren&rsquo;t recorded for this
@@ -446,7 +448,7 @@ function Playstyle({ standing, number }) {
   }
 
   return (
-    <Step number={number} title="Your playstyle" value={name}>
+    <Step number={number} icon="sparkle" title="Your playstyle" value={name}>
       <ComparedWith band={band} styleSize={proof.styleSize} />
 
       <ul className="proof" aria-label="Why this name">
@@ -527,7 +529,7 @@ function Rating() {
           and 3 -- which the nightly run can fill in on its own count --
           never appear without it. */}
       {standing && rally?.state === 'not_enough_matches' && (
-        <Step number={1} title="Your rating">
+        <Step number={1} icon="trendUp" title="PaddlePad Rating">
           <RallyProgress rallyRating={rally} />
         </Step>
       )}
@@ -544,10 +546,9 @@ function Rating() {
       {mlRated && <Playstyle standing={standing} number={rally?.state === 'rated' ? 3 : 2} />}
 
       {/* Moved here from the Overview: where your points come from sits
-          beside the playstyle that already talks about drops. Numbered
-          after whatever steps came before it. */}
+          beside the playstyle that already talks about drops. */}
       {standing && rally && summary && (
-        <Step number={(rally.state === 'rated' ? 2 : 1) + (mlRated ? 1 : 0) + 1} title="How you win points">
+        <Step number={(rally.state === 'rated' ? 2 : 1) + (mlRated ? 1 : 0) + 1} icon="trophy" title="How you win points">
           <ShotProfile summary={summary} />
         </Step>
       )}

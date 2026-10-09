@@ -650,7 +650,6 @@
   padding-top: 1rem;
   border-top: 1px solid var(--border);
 }
-.shot-note { font-size: 0.84rem; color: var(--text-muted); line-height: 1.5; margin-top: 0.6rem; }
 
 /* ============ Form trend ============ */
 
@@ -1387,7 +1386,8 @@
 .proof-bars li.is-you .proof-fill { background: var(--series-1); }
 .proof-number { font-size: 0.84rem; font-variant-numeric: tabular-nums; text-align: right; color: var(--text-muted); }
 .proof-bars li.is-you .proof-number { color: var(--text); font-weight: 700; }
-.proof-verdict { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin-top: 0.5rem; }
+.proof-verdict { display: flex; align-items: center; gap: 0.3rem; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin-top: 0.5rem; }
+.proof-verdict svg { flex: none; }
 
 /* ============ People ============ */
 
