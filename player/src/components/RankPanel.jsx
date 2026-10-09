@@ -82,7 +82,6 @@ function RankPanel({ ranking, you }) {
     <section className="rank-panel" aria-label="PaddlePad Rating ranking">
       {words && (
         <div className="rank-board">
-          <span className="rank-eyebrow">Your place · PaddlePad Rating</span>
           <p className="rank-place-big">
             {words.place}
             <small>of {words.of}</small>
@@ -108,7 +107,7 @@ function RankPanel({ ranking, you }) {
       </div>
 
       <p className="rank-foot">
-        {ranking.length} players with 10+ matches and a match in the last 60 days.
+        On the board: 10+ matches, one in the last 60 days.
       </p>
     </section>
   )

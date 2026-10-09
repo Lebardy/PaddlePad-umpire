@@ -18,6 +18,7 @@
 import { useState } from 'react'
 import { linkCode, updateProfile } from '../lib/api'
 import { usePlayerData } from '../lib/PlayerData'
+import Icon from '../components/Icon'
 
 function Result({ result, onPlayerChange }) {
   const { refresh } = usePlayerData()
@@ -131,10 +132,9 @@ function LinkCode({ onPlayerChange }) {
   if (!open) {
     return (
       <section className="link-code" aria-label="Link a code">
-        <h2>Been playing already?</h2>
+        <h2><Icon name="qr" size={16} />Been playing already?</h2>
         <p>
-          If someone has been scoring your matches, they can give you a code
-          and those matches will join this account.
+          A code from your umpire adds those matches to this account.
         </p>
         <button type="button" onClick={() => setOpen(true)}>
           I have a code
@@ -145,7 +145,7 @@ function LinkCode({ onPlayerChange }) {
 
   return (
     <section className="link-code is-open" aria-label="Link a code">
-      <h2>Been playing already?</h2>
+      <h2><Icon name="qr" size={16} />Been playing already?</h2>
 
       {result ? (
         <Result result={result} onPlayerChange={onPlayerChange} />
@@ -200,8 +200,8 @@ function LinkCode({ onPlayerChange }) {
             required
           />
           <p className="hint">
-            Ask whoever scores your matches — they can show you a code or a QR.
-            You&rsquo;ll see what it holds before anything changes.
+            Your umpire can show you a code or a QR. You&rsquo;ll see what it
+            holds before anything changes.
           </p>
 
           {error && <p className="error">{error}</p>}

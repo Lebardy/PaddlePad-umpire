@@ -28,6 +28,7 @@
 import { useState } from 'react'
 import Claim from './Claim'
 import GoogleButton from '../components/GoogleButton'
+import Icon from '../components/Icon'
 
 // Mirrors the check GoogleButton makes before rendering anything.
 const GOOGLE_ENABLED = Boolean(import.meta.env?.VITE_GOOGLE_CLIENT_ID)
@@ -36,9 +37,9 @@ import { claimCodeFromUrl } from '../lib/router'
 import { suggestUsername } from '../lib/username'
 
 const TABS = [
-  { id: 'signin', label: 'Sign in' },
-  { id: 'create', label: 'Create account' },
-  { id: 'code', label: 'Have a code' },
+  { id: 'signin', label: 'Sign in', icon: 'you' },
+  { id: 'create', label: 'Create account', icon: 'userPlus' },
+  { id: 'code', label: 'Have a code', icon: 'qr' },
 ]
 
 function SignInPanel({ onSignedIn }) {
@@ -92,8 +93,7 @@ function SignInPanel({ onSignedIn }) {
       </button>
 
       <p className="hint">
-        Forgotten your password? Ask whoever scores your matches for a new
-        code — it will sign you back in.
+        Forgot your password? Ask your umpire for a new code.
       </p>
     </form>
   )
@@ -147,8 +147,7 @@ function CreatePanel({ onSignedIn }) {
         required
       />
       <p className="hint">
-        The name an umpire would write on the scoresheet, so your matches
-        find you.
+        As an umpire would write it, so your matches find you.
       </p>
 
       <label htmlFor="create-username">Username</label>
@@ -166,7 +165,7 @@ function CreatePanel({ onSignedIn }) {
         }}
         required
       />
-      <p className="hint">Letters, numbers and underscores. Only you type this one.</p>
+      <p className="hint">Letters, numbers and underscores.</p>
 
       <label htmlFor="create-password">Password</label>
       <input
@@ -196,9 +195,8 @@ function CreatePanel({ onSignedIn }) {
             required
           />
           <p className="hint">
-            Someone is already playing under that name, so we need to know
-            it&rsquo;s you. Whoever scores your matches can show you a code —
-            your matches so far will come with the account.
+            That name is already playing. Enter the code your umpire shows
+            you and your matches come with you.
           </p>
         </>
       )}
@@ -262,9 +260,8 @@ function GooglePending({ pending, onSignedIn, onCancel }) {
         required
       />
       <p className="hint">
-        The name an umpire would write on the scoresheet, so your matches
-        find you. Change it if Google&rsquo;s version isn&rsquo;t what they
-        call you.
+        As an umpire would write it. Change it if Google&rsquo;s version
+        isn&rsquo;t what they call you.
       </p>
 
       {needsCode && (
@@ -283,9 +280,8 @@ function GooglePending({ pending, onSignedIn, onCancel }) {
             required
           />
           <p className="hint">
-            Someone is already playing under that name, so we need to know
-            it&rsquo;s you. Whoever scores your matches can show you a code —
-            your matches so far will come with the account.
+            That name is already playing. Enter the code your umpire shows
+            you and your matches come with you.
           </p>
         </>
       )}
@@ -342,8 +338,7 @@ function SignIn({ onSignedIn }) {
       <div className="gate">
         <h1>Almost there</h1>
         <p className="lede">
-          Google knows who you are. We still need to know which player that
-          is.
+          One more thing: which player are you?
         </p>
         <GooglePending
           pending={pending}
@@ -360,7 +355,7 @@ function SignIn({ onSignedIn }) {
         <img className="gate-logo" src="/favicon.svg" alt="" />
         PaddlePad
       </h1>
-      <p className="lede">See the matches your umpire has been recording for you.</p>
+      <p className="lede">Your matches, as your umpire scored them.</p>
 
       {pausedNotice && tab !== 'code' && <p className="error">{pausedNotice}</p>}
 
@@ -389,6 +384,7 @@ function SignIn({ onSignedIn }) {
             aria-selected={tab === entry.id}
             onClick={() => setTab(entry.id)}
           >
+            <Icon name={entry.icon} size={20} />
             {entry.label}
           </button>
         ))}

@@ -12,6 +12,8 @@
 // per-point markup a screen reader would have to wade through.
 // ============================================================
 
+import Icon from './Icon'
+
 const WIDTH = 300
 const HEIGHT = 90
 
@@ -31,7 +33,7 @@ function TrendChart({ points, window: windowSize }) {
   return (
     <section className="trend" aria-label="Recent form">
       <div className="trend-head">
-        <h2>Form</h2>
+        <h2><Icon name="trendUp" size={17} className="head-icon" />Form</h2>
         <span className="trend-now">{last}%</span>
       </div>
 
@@ -54,7 +56,7 @@ function TrendChart({ points, window: windowSize }) {
         <path className="trend-line" d={line} />
       </svg>
 
-      <p className="trend-caption">Win rate across every {windowSize} matches in a row.</p>
+      <p className="trend-caption">Win rate, {windowSize} matches at a time.</p>
     </section>
   )
 }

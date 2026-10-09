@@ -67,8 +67,7 @@ function Claim({ onClaimed, pausedNotice }) {
         required
       />
       <p className="hint">
-        Ask whoever scored your match — they can show you a code or a QR to
-        scan. You can set up a username and password afterwards.
+        Your umpire can show you a code or a QR to scan.
       </p>
 
       {error && <p className="error">{error}</p>}

@@ -24,12 +24,15 @@ export const signed = (n) => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0
 /** The colour class for a change: up, down, or neither. */
 export const changeClass = (n) => (n > 0 ? 'is-up' : n < 0 ? 'is-down' : '')
 
-/** "▲ +6 PPR in the last 7 days", from a view's headline. */
+/** "+6 PPR in the last 7 days", from a view's headline. */
 export function changeWords({ change, words }) {
-  if (change > 0) return `▲ +${change} PPR ${words}`
-  if (change < 0) return `▼ −${Math.abs(change)} PPR ${words}`
+  if (change > 0) return `+${change} PPR ${words}`
+  if (change < 0) return `−${Math.abs(change)} PPR ${words}`
   return `Level ${words}`
 }
+
+/** The arrow drawn before those words; none when the rating is level. */
+export const changeIcon = (n) => (n > 0 ? 'arrowUp' : n < 0 ? 'arrowDown' : null)
 
 const localDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
 const localMonth = (date) => date.getFullYear() * 12 + date.getMonth()

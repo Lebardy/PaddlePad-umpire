@@ -11,9 +11,10 @@
 // ============================================================
 
 import { formatDate } from '../lib/format'
-import { changeClass, changeWords, weekView } from '../lib/ratingGraph'
+import { changeClass, changeIcon, changeWords, weekView } from '../lib/ratingGraph'
 import { Link } from '../lib/router'
 import { ordinal } from '../lib/leaderboard'
+import Icon from './Icon'
 import Meter from './Meter'
 import RatingLine from './RatingLine'
 
@@ -31,11 +32,14 @@ function LastWeek({ rallyRating }) {
       {view.empty ? (
         <p className="points-quiet">
           No matches in the last 7 days.
-          {rallyRating.lastPlayedAt && <> You last played on {formatDate(rallyRating.lastPlayedAt)}.</>}
+          {rallyRating.lastPlayedAt && <> Last played {formatDate(rallyRating.lastPlayedAt)}.</>}
         </p>
       ) : (
         <>
-          <p className={`points-change ${changeClass(view.headline.change)}`}>{changeWords(view.headline)}</p>
+          <p className={`points-change ${changeClass(view.headline.change)}`}>
+            {changeIcon(view.headline.change) && <Icon name={changeIcon(view.headline.change)} size={17} />}
+            {changeWords(view.headline)}
+          </p>
           <RatingLine
             view={view}
             compact
@@ -62,7 +66,7 @@ export function RallyPointsHeadline({ rallyRating }) {
       {rallyRating.earlyEstimate && (
         <p className="points-early">
           <span className="points-early-tag">Early estimate<span className="points-early-stop">.</span></span>{' '}
-          Based on only a few games so far. It will settle as you play more, and against more people.
+          It will settle as you play more, and against more people.
         </p>
       )}
       <LastWeek rallyRating={rallyRating} />
@@ -106,7 +110,7 @@ function RallyRating({ rallyRating, place = null }) {
 
   const head = (
     <div className="section-head">
-      <h2>PaddlePad Rating</h2>
+      <h2><Icon name="gauge" size={17} className="head-icon" />PaddlePad Rating</h2>
       <Link className="link" to="/rating">Your rating &rarr;</Link>
     </div>
   )
@@ -138,10 +142,6 @@ function RallyRating({ rallyRating, place = null }) {
           It will settle as you play more.
         </p>
       )}
-      <p className="points-anchor">
-        You&rsquo;d win about <strong>{rallyRating.winChanceVsStart} of every 100</strong> rallies against a{' '}
-        {START.toLocaleString()} player.
-      </p>
     </section>
   )
 }

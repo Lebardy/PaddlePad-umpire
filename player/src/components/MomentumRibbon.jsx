@@ -78,7 +78,7 @@ function MomentumRibbon({ moments, path, points, asShown, winners, losers, lowIn
     event.preventDefault()
   }
 
-  let readout = <span className="ribbon-hint">Tap a box to see how that point was won</span>
+  let readout = <span className="ribbon-hint">Tap a point to see how it was won</span>
   if (selected !== null) {
     const moment = moments[selected]
     const point = points?.[selected]

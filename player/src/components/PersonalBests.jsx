@@ -8,11 +8,12 @@
 // ============================================================
 
 import { Link } from '../lib/router'
+import Icon from './Icon'
 
 function PersonalBests({ bests }) {
   return (
     <section className="bests" aria-label="Personal bests">
-      <h2>Your best</h2>
+      <h2><Icon name="star" size={17} className="head-icon" />Your best</h2>
       <ul className="bests-list">
         {bests.map((best) => (
           <li key={best.key}>

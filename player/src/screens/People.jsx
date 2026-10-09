@@ -29,8 +29,9 @@ import { Link } from '../lib/router'
 import { usePlayerData } from '../lib/PlayerData'
 import { peopleSummary, peopleTogether } from '../lib/derive'
 import { lastPlayedLabel } from '../lib/format'
-import { findPeople, peopleLine } from '../lib/peopleWords'
+import { findPeople, peopleFacts } from '../lib/peopleWords'
 import Avatar from '../components/Avatar'
+import Icon from '../components/Icon'
 import PlacesToPlay from '../components/PlacesToPlay'
 
 // The last five results fit beside the name on a 320px phone.
@@ -99,7 +100,15 @@ function People() {
   return (
     <div className="people-screen">
       <h1>People</h1>
-      <p className="people-summary">{peopleLine(summary)}</p>
+      <ul className="people-facts">
+        {peopleFacts(summary).map((fact) => (
+          <li key={fact.label}>
+            <Icon name={fact.icon} size={18} />
+            <b>{fact.figure}</b>
+            <span>{fact.label}</span>
+          </li>
+        ))}
+      </ul>
 
       {searchable && (
         <input

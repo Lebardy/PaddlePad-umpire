@@ -160,7 +160,7 @@ function Score({ rallyRating }) {
   const total = rallyRating.points - 1500
 
   return (
-    <Step number={1} icon="trendUp" title="PaddlePad Rating">
+    <Step number={1} icon="gauge" title="PaddlePad Rating">
       <RallyPointsHeadline rallyRating={rallyRating} />
 
       {rows.length > 0 && (
@@ -529,7 +529,7 @@ function Rating() {
           and 3 -- which the nightly run can fill in on its own count --
           never appear without it. */}
       {standing && rally?.state === 'not_enough_matches' && (
-        <Step number={1} icon="trendUp" title="PaddlePad Rating">
+        <Step number={1} icon="gauge" title="PaddlePad Rating">
           <RallyProgress rallyRating={rally} />
         </Step>
       )}
