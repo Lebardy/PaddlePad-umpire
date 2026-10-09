@@ -181,6 +181,11 @@ function Guide({ onBack }) {
           still waiting. The one thing to avoid is signing out while it says
           there is something left, because that throws it away.
         </p>
+        <p>
+          If the indicator turns red and says something couldn&rsquo;t sync,
+          the server refused it rather than missed it. Tap the indicator to
+          see what it was and why, then try it again or dismiss it.
+        </p>
         <p className="guide-note">
           Two phones must not score the same match at once. If someone takes
           over, the app says so, and the phone that took over is the one whose

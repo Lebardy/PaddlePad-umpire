@@ -268,6 +268,7 @@ section {
 .account > h2,
 .guide > h2,
 .players-screen > h2,
+.couldnt-sync > h2,
 .login h2,
 .not-found h2 {
   font-family: var(--display);
@@ -1303,6 +1304,9 @@ section {
 
 .history-list { max-height: 16rem; overflow-y: auto; margin-top: 0.4rem; }
 .history-list li { padding: 0.6rem 1rem; font-size: 0.95rem; }
+
+/* What a "Try again" on the couldn't-sync list came to. */
+.couldnt-sync-note { min-height: 1.5rem; margin-bottom: 0.6rem; font-weight: 600; }
 
 /* Scoring-lease takeover */
 .takeover {
