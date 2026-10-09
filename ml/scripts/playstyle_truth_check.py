@@ -13,8 +13,10 @@ habit of playing at the net, written down when it was seeded.
 For several K-Means random starts, it asks three things of the simulated
 players:
 
-  group order   do higher-numbered skill groups hold players with higher
-                hidden ability? (Spearman of group number with ability)
+  group order   do higher skill groups hold players with higher hidden
+                ability? (Spearman of a group's place in the run's own
+                order, lowest to highest, with ability. Empty when the run
+                gave the groups neutral letters and no order.)
   net habit     inside each skill group, how much of the spread in the
                 hidden net habit do the playstyles account for? Higher
                 means the styles found a real difference in how people
@@ -36,7 +38,6 @@ import contextlib
 import io
 import json
 import os
-import re
 import sys
 import warnings
 from pathlib import Path
@@ -87,10 +88,11 @@ def pipeline(seed):
     run.RANDOM_STATE = seed
     try:
         with contextlib.redirect_stdout(io.StringIO()):
-            final, *_ = run.run_pipeline(gated, rally_points)
+            final, _, structure = run.run_pipeline(gated, rally_points)
     finally:
         run.RANDOM_STATE = original_seed
-    return final[["player_id", "skill_group", "playstyle_archetype"]].merge(truth, on="player_id")
+    merged = final[["player_id", "skill_group", "playstyle_archetype"]].merge(truth, on="player_id")
+    return merged, structure["groupOrder"]
 
 
 def between_share(df, column, labels):
@@ -114,19 +116,24 @@ def chance_share(df, column, rng):
     return float(np.nanmean(scores))
 
 
-def group_order(df):
-    number = df["skill_group"].map(lambda name: int(re.search(r"(\d+)$", str(name)).group(1)))
-    return number.corr(df["ability"], method="spearman")
+def group_order(df, order):
+    """Spearman of each player's group place with their hidden ability.
+    `order` is the run's list of group names, lowest to highest, or None
+    when the run named the groups with neutral letters."""
+    if order is None:
+        return np.nan
+    place = df["skill_group"].map({name: i for i, name in enumerate(order)})
+    return place.corr(df["ability"], method="spearman")
 
 
 rng = np.random.default_rng(7)
 results = []
 for seed in SEEDS:
-    df = pipeline(seed)
+    df, order = pipeline(seed)
     results.append({
         "seed": seed,
         "players": len(df),
-        "group_order": group_order(df),
+        "group_order": group_order(df, order),
         "net_habit": between_share(df, "netPlay", df["playstyle_archetype"]),
         "net_habit_chance": chance_share(df, "netPlay", rng),
         "ability_leak": between_share(df, "ability", df["playstyle_archetype"]),
