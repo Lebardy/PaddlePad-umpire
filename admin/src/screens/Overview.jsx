@@ -10,6 +10,7 @@ import VoidDialog from '../components/VoidDialog'
 import WorthALook from '../components/WorthALook'
 import { fetchOverview, markLooksFine, markNotSamePerson, unvoidMatch } from '../lib/api'
 import { clockText } from '../lib/format'
+import ManagerHome from './ManagerHome'
 
 const REFRESH_MS = 30_000
 
@@ -118,6 +119,30 @@ export default function Overview({ me, facilityLabel }) {
     return <section className="sheet"><p className="empty missing">You’re not linked to a facility yet. Ask the owner.</p></section>
   }
 
+  // The pop-ups a row's button opens, shared by the owner's page and a manager's.
+  const dialogs = (
+    <>
+      {voiding && (
+        <VoidDialog warning={voiding} onCancel={() => setVoiding(null)} onDone={async () => { setVoiding(null); await load() }} />
+      )}
+      {merging && (
+        <MergeDialog pair={merging} onCancel={() => setMerging(null)} onDone={async () => { setMerging(null); await load() }} />
+      )}
+      {closingSession && (
+        <CloseSessionDialog
+          session={closingSession}
+          onCancel={() => setClosingSession(null)}
+          onDone={async () => { setClosingSession(null); await load() }}
+        />
+      )}
+    </>
+  )
+
+  // A manager's Overview is their own page; everything below is the owner's.
+  if (!isOwner) {
+    return <><ManagerHome me={me} data={data} error={error} now={now} actions={warningActions} />{dialogs}</>
+  }
+
   const showFacility = isOwner && !facilityId
   return (
     <section>
@@ -184,19 +209,7 @@ export default function Overview({ me, facilityLabel }) {
         ))}
       </div>
 
-      {voiding && (
-        <VoidDialog warning={voiding} onCancel={() => setVoiding(null)} onDone={async () => { setVoiding(null); await load() }} />
-      )}
-      {merging && (
-        <MergeDialog pair={merging} onCancel={() => setMerging(null)} onDone={async () => { setMerging(null); await load() }} />
-      )}
-      {closingSession && (
-        <CloseSessionDialog
-          session={closingSession}
-          onCancel={() => setClosingSession(null)}
-          onDone={async () => { setClosingSession(null); await load() }}
-        />
-      )}
+      {dialogs}
     </section>
   )
 }

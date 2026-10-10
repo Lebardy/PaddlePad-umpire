@@ -240,6 +240,10 @@ export function fetchOverview({ facilityId } = {}) {
   const query = facilityId ? `?facilityId=${encodeURIComponent(facilityId)}` : ''
   return apiFetch(`/admin/overview${query}`)
 }
+
+export function listPastSessions({ before } = {}) {
+  return apiFetch(`/admin/overview/past-sessions${before ? `?before=${encodeURIComponent(before)}` : ''}`)
+}
 export const markLooksFine = (matchId, reason) => post('/admin/overview/looks-fine', { matchId, reason })
 export const voidMatch = (matchId, reason) => post('/admin/overview/void', { matchId, reason })
 export const unvoidMatch = (matchId) => post('/admin/overview/unvoid', { matchId })
