@@ -641,6 +641,8 @@ td.table-foot { display: table-cell; }
 .home-rail, .home-feed { display: grid; gap: 1.5rem; min-width: 0; }
 .home-gap { margin-top: 0.75rem; }
 .home-invite { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0; }
+.home-flag { width: 1%; text-align: right; }
+.home-flag .icon, .cell-sub .icon { margin-right: 0.25em; }
 .home-feed .table-wrap + .table-wrap, .home-feed .notice + .table-wrap { margin-top: 0.75rem; }
 /* A link that looks like one of the site's buttons. */
 a.btn-primary, a.btn-quiet { display: inline-flex; align-items: center; text-decoration: none; }
