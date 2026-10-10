@@ -634,6 +634,21 @@ td.table-foot { display: table-cell; }
 /* --- The sheet: right now + totals side by side, then the warnings --- */
 .sheet-split { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: 1.5rem; align-items: start; }
 @media (max-width: 1180px) { .sheet-split { grid-template-columns: minmax(0, 1fr) 17rem; } }
+/* --- A manager's home: their place in a rail, one feed beside it --- */
+.home-title { display: flex; align-items: center; gap: 0.75rem; }
+.home-title .fac-logo { width: 3.4rem; height: 3.4rem; font-size: 1.4rem; flex: none; }
+.home-split { grid-template-columns: 19rem minmax(0, 1fr); align-items: start; }
+.home-rail, .home-feed { display: grid; gap: 1.5rem; min-width: 0; }
+.home-gap { margin-top: 0.75rem; }
+.home-invite { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0; }
+.home-feed .table-wrap + .table-wrap, .home-feed .notice + .table-wrap { margin-top: 0.75rem; }
+/* A link that looks like one of the site's buttons. */
+a.btn-primary, a.btn-quiet { display: inline-flex; align-items: center; text-decoration: none; }
+/* Tablet width: the feed first, the rail's two blocks side by side under it. */
+@media (max-width: 1180px) {
+  .home-split { grid-template-columns: minmax(0, 1fr); }
+  .home-rail { order: 1; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+}
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem; }
 .section-head .section-title { margin: 0; }
 .section-count { font-family: var(--label); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-size: 0.95rem; }

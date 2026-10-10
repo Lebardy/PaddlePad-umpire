@@ -101,7 +101,7 @@ const TABS = [
     empty: ['No likely duplicates', 'Every player name looks like a different person.'] },
 ]
 
-function AllClear({ title, text }) {
+export function AllClear({ title, text }) {
   return (
     <div className="all-clear">
       <strong>{title}</strong>
@@ -110,7 +110,7 @@ function AllClear({ title, text }) {
   )
 }
 
-function MatchTable({ warnings, showFacility, now, actions }) {
+export function MatchTable({ warnings, showFacility, now, actions }) {
   return (
     <div className="table-wrap">
       <table className="table">
@@ -134,7 +134,7 @@ function MatchTable({ warnings, showFacility, now, actions }) {
   )
 }
 
-function LeftOpenTable({ sessions, showFacility, actions }) {
+export function LeftOpenTable({ sessions, showFacility, actions }) {
   return (
     <div className="table-wrap">
       <table className="table">
