@@ -14,10 +14,13 @@ const PAGES = [
 /** The board across the top of every page, and the page under it. Only pages that exist are listed. */
 export default function Layout({ admin, facilityLabel, path, onSignOut, children }) {
   const onAccount = path === '/account'
+  const site = admin.role === 'owner' ? 'Admin' : 'Manager'
+  // A manager's sign already says Manager, so under their name goes their facility alone.
+  const role = admin.role === 'owner' ? `Owner${facilityLabel ? ` · ${facilityLabel}` : ''}` : (facilityLabel ?? 'Manager')
   return (
     <div className="shell">
       <div className="topbar board-texture">
-        <Link to="/" className="brand-mark"><LampMark />PaddlePad<span>{admin.role === 'owner' ? 'Admin' : 'Manager'}</span></Link>
+        <Link to="/" className="brand-mark" aria-label={`PaddlePad ${site}`}><LampMark /><span className="brand-name">PaddlePad</span><span>{site}</span></Link>
         <nav aria-label="Pages">
           <ul className="tabs">
             {PAGES.filter((page) => !page.ownerOnly || admin.role === 'owner').map((page) => (
@@ -38,7 +41,7 @@ export default function Layout({ admin, facilityLabel, path, onSignOut, children
             title={facilityLabel ? `${admin.name} · ${facilityLabel}` : admin.name}
           >
             <strong>{admin.name}</strong>
-            <span className="who-role">{admin.role === 'owner' ? 'Owner' : 'Manager'}{facilityLabel ? ` · ${facilityLabel}` : ''}</span>
+            <span className="who-role">{role}</span>
           </Link>
           <button type="button" className="signout" onClick={onSignOut} aria-label="Sign out" title="Sign out"><Icon name="logout" size={18} className="icon-solo" /></button>
         </div>
