@@ -144,7 +144,7 @@ section('what the site sees')
   check('a facility as the site sees it', rules.facilityPayload(payloadRow), {
     id: 'f1', name: 'Court Nine', area: 'Dumaguete', locationUrl: null, openingHours: null,
     hourlyFeeCentavos: 15000, feeText: '₱150 per hour',
-    umpireFeeCentavos: 10000, umpireFeeText: '₱100 per hour', details: null, logoUrl: null,
+    umpireFeeCentavos: 10000, umpireFeeText: '₱100 per hour', details: null, filmsMatches: false, logoUrl: null,
     createdAt: '2026-09-19T00:00:00Z', updatedAt: '2026-09-19T00:00:00Z',
   })
   check('no umpire fee reads as nothing, not "Fee not set"',
@@ -302,6 +302,22 @@ section('what players see of a facility')
     locationUrl: null, details: null, logoUrl: null,
   })
   check('a free facility says so', rules.playerFacilityPage({ ...bare, hourly_fee_centavos: 0 }).feeText, 'Free')
+}
+
+section('films matches')
+{
+  check('creating without it does not set it (the column defaults to off)',
+    'films_matches' in rules.readFacility({ name: 'A' }).values, false)
+  check('creating with it on', rules.readFacility({ name: 'A', filmsMatches: true }).values.films_matches, true)
+  check('a partial change reads it', rules.readFacility({ filmsMatches: true }, { partial: true }), { values: { films_matches: true } })
+  check('switching it off is a change too', rules.readFacility({ filmsMatches: false }, { partial: true }), { values: { films_matches: false } })
+  check('a partial change without it leaves it alone', rules.readFacility({ area: 'X' }, { partial: true }), { values: { area: 'X' } })
+  check('anything but on or off is refused', rules.readFacility({ filmsMatches: 'yes' }, { partial: true }), { error: 'Films matches must be on or off' })
+  check('it is a column a save may set', rules.facilityColumns({ films_matches: true }), ['films_matches'])
+  check('switching it counts as a change', rules.changedFacilityColumns({ films_matches: false }, { films_matches: true }), ['films_matches'])
+  check('resending the same value does not', rules.changedFacilityColumns({ films_matches: true }, { films_matches: true }), [])
+  check('the site sees it on', rules.facilityPayload({ id: 'f', name: 'A', films_matches: true }).filmsMatches, true)
+  check('a row read without the column is off', rules.facilityPayload({ id: 'f', name: 'A' }).filmsMatches, false)
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

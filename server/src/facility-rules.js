@@ -88,11 +88,17 @@ export function readFacility(body = {}, { partial = false } = {}) {
       values[field.column] = text
     }
   }
+  // Read only when sent, when creating as well: a new facility that
+  // says nothing gets the column's own default, which is off.
+  if (Object.prototype.hasOwnProperty.call(body, 'filmsMatches')) {
+    if (typeof body.filmsMatches !== 'boolean') return { error: 'Films matches must be on or off' }
+    values.films_matches = body.filmsMatches
+  }
   return { values }
 }
 
 /** The only columns a facility create/update may ever set from caller-supplied values. */
-const FACILITY_VALUE_COLUMNS = ['name', 'area', 'location_url', 'opening_hours', 'hourly_fee_centavos', 'umpire_fee_centavos', 'details']
+const FACILITY_VALUE_COLUMNS = ['name', 'area', 'location_url', 'opening_hours', 'hourly_fee_centavos', 'umpire_fee_centavos', 'details', 'films_matches']
 
 /**
  * Keeps only the fixed, known facility columns present in `values`,
@@ -224,6 +230,7 @@ export function facilityPayload(row) {
     // Unlike the court fee, an unset umpire fee is simply left out.
     umpireFeeText: row.umpire_fee_centavos == null ? null : feeText(row.umpire_fee_centavos),
     details: row.details ?? null,
+    filmsMatches: row.films_matches === true,
     logoUrl: logoPath(row.id, row.logo_updated_at ?? null),
     createdAt: row.created_at,
     updatedAt: row.updated_at,

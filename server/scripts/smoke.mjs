@@ -2634,6 +2634,39 @@ async function main() {
     check('a save with no actual change writes no facility.updated entry',
       afterFacUpdatedNoChange === afterFacUpdated, `${afterFacUpdated} -> ${afterFacUpdatedNoChange}`)
 
+    // --- the "Films matches" switch ---
+    check('a new facility does not film', pageA.body.facility?.filmsMatches === false, String(pageA.body.facility?.filmsMatches))
+    const filmBAsA = await request(`/admin/facilities/${facilityBId}`, {
+      method: 'PATCH', bearer: adminAToken, body: { filmsMatches: true },
+    })
+    check("admin A switching on facility B's filming -> 404", filmBAsA.status === 404, String(filmBAsA.status))
+    const filmBad = await request(`/admin/facilities/${facilityAId}`, {
+      method: 'PATCH', bearer: adminAToken, body: { filmsMatches: 'yes' },
+    })
+    check('a switch that is neither on nor off -> 400',
+      filmBad.status === 400 && filmBad.body.error === 'Films matches must be on or off', JSON.stringify(filmBad.body).slice(0, 100))
+    const beforeFilm = await countByAction('facility.updated', facilityAId, fOwnerToken)
+    const filmOn = await request(`/admin/facilities/${facilityAId}`, {
+      method: 'PATCH', bearer: adminAToken, body: { filmsMatches: true },
+    })
+    check("admin A switches on facility A's filming -> 200, and the answer says so",
+      filmOn.status === 200 && filmOn.body.facility?.filmsMatches === true, JSON.stringify(filmOn.body).slice(0, 120))
+    const filmActivity = await request('/admin/activity?action=facility.updated', { bearer: fOwnerToken })
+    const filmEntry = (filmActivity.body.entries ?? []).find((e) => e.targetId === facilityAId)
+    check('Activity records it as a change to match filming',
+      (await countByAction('facility.updated', facilityAId, fOwnerToken)) === beforeFilm + 1
+        && /^Changed match filming for /.test(filmEntry?.summary ?? ''), String(filmEntry?.summary))
+    const filmList = await request('/admin/facilities', { bearer: fOwnerToken })
+    check('the facility list says which facility films',
+      (filmList.body.facilities ?? []).find((f) => f.id === facilityAId)?.filmsMatches === true
+        && (filmList.body.facilities ?? []).find((f) => f.id === facilityBId)?.filmsMatches === false,
+      JSON.stringify((filmList.body.facilities ?? []).filter((f) => [facilityAId, facilityBId].includes(f.id)).map((f) => f.filmsMatches)))
+    const filmOff = await request(`/admin/facilities/${facilityAId}`, {
+      method: 'PATCH', bearer: fOwnerToken, body: { filmsMatches: false },
+    })
+    check('the owner switches it off again -> 200', filmOff.status === 200 && filmOff.body.facility?.filmsMatches === false,
+      JSON.stringify(filmOff.body).slice(0, 120))
+
     // --- 6: pausing players stays the owner's alone ---
     const plName = `Smoke Facility Player ${fStamp}`
     const plCreated = await request('/players', { method: 'POST', bearer: umpAToken, body: { name: plName } })

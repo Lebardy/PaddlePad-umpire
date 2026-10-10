@@ -828,3 +828,10 @@ UPDATE admin_activity
    SET summary = regexp_replace(summary, '^(Paused|Resumed|Moved) admin ', '\1 manager ')
  WHERE action IN ('admin.switched_off', 'admin.switched_on', 'admin.moved')
    AND summary ~ '^(Paused|Resumed|Moved) admin ';
+
+-- Whether this facility films its matches: a phone in a holder at the
+-- court, signed in to the umpire app. Off for every facility until its
+-- owner or manager switches it on. The umpire app offers its camera
+-- only where this is on; where it is off, a player in a match may film
+-- it themselves.
+ALTER TABLE facilities ADD COLUMN IF NOT EXISTS films_matches BOOLEAN NOT NULL DEFAULT false;

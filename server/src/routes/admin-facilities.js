@@ -40,6 +40,7 @@ const FIELD_LABELS = {
   hourly_fee_centavos: 'court fee',
   umpire_fee_centavos: 'umpire fee',
   details: 'details',
+  films_matches: 'match filming',
 }
 
 router.get('/', async (req, res) => {
