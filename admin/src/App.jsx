@@ -101,7 +101,7 @@ export default function App() {
   return (
     <>
       <div className="narrow-screen" role="note">
-        <p className="brand-mark">PaddlePad<span>Admin</span></p>
+        <p className="brand-mark">PaddlePad<span>{admin && admin.role !== 'owner' ? 'Manager' : 'Admin'}</span></p>
         <p>This site is made for a laptop or tablet. Open it on a bigger screen.</p>
       </div>
       <div className="wide-screen">{content}</div>

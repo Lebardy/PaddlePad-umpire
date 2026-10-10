@@ -1,8 +1,11 @@
+import { useEffect } from 'react'
 import LampMark from './LampMark'
 
 /** Sign-in and setup: the scoreboard on the left, the form on paper beside it. */
 /** `site` is the word after PaddlePad: Admin, or Manager on a manager's setup link. */
 export default function Gate({ site = 'Admin', children }) {
+  // The browser tab says what the sign reads.
+  useEffect(() => { document.title = `PaddlePad ${site}` }, [site])
   return (
     <div className="gate">
       <div className="gate-board board-texture">
