@@ -303,6 +303,11 @@ button.tally-cell:focus-visible { outline: 2px solid var(--lamp); outline-offset
 .field input::placeholder, .field textarea::placeholder { color: var(--text-muted); }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--primary-soft); }
 .field textarea { min-height: 4.5rem; resize: vertical; font: inherit; }
+/* A tick box inside a field: the box keeps its own size instead of the
+   full-width field look, and its note sits beside it. */
+.switch-row { display: flex; align-items: center; gap: 0.6rem; min-height: 2.75rem; color: var(--text-secondary); font-size: 0.92rem; cursor: pointer; }
+.field .switch-row input { width: 1.3rem; height: 1.3rem; min-height: 0; padding: 0; flex: none; accent-color: var(--primary); }
+.films-line { display: flex; align-items: center; gap: 0.4rem; margin: 0; font-weight: 600; }
 
 .btn-primary, .btn-quiet, .btn-danger, .btn-lamp, .btn-board {
   min-height: 2.75rem; padding: 0.45rem 1.1rem; border-radius: var(--radius-sm); cursor: pointer; white-space: nowrap;

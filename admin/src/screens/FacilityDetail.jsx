@@ -45,6 +45,7 @@ export default function FacilityDetail({ id, me }) {
       hourlyFee: facility.hourlyFeeCentavos != null ? String(facility.hourlyFeeCentavos / 100) : '',
       umpireFee: facility.umpireFeeCentavos != null ? String(facility.umpireFeeCentavos / 100) : '',
       details: facility.details ?? '',
+      filmsMatches: facility.filmsMatches === true,
     })
     setSaveError(null)
     setEditing(true)
@@ -67,6 +68,7 @@ export default function FacilityDetail({ id, me }) {
         hourlyFee: fields.hourlyFee.trim(),
         umpireFee: fields.umpireFee.trim(),
         details: fields.details.trim(),
+        filmsMatches: fields.filmsMatches,
       })
       setResult((current) => ({ ...current, facility: updated }))
       setEditing(false)
@@ -106,6 +108,7 @@ export default function FacilityDetail({ id, me }) {
     facility.feeText && `Court ${facility.feeText}`,
     facility.umpireFeeText && `Umpire ${facility.umpireFeeText}`,
     facility.openingHours,
+    facility.filmsMatches && 'Films matches',
   ].filter(Boolean).join(' · ')
 
   return (
@@ -135,6 +138,7 @@ export default function FacilityDetail({ id, me }) {
             onChange={(updated) => setResult((current) => ({ ...current, facility: updated }))}
           />
           {!editing && (facility.details ? <p>{facility.details}</p> : <p className="hint">No extra details yet.</p>)}
+          {!editing && facility.filmsMatches && <p className="films-line"><Icon name="camera" size={16} />Films matches</p>}
           {!editing && <button type="button" className="btn-quiet btn-small" onClick={startEdit}><Icon name="edit" size={15} />Edit details</button>}
 
           {editing && (
@@ -166,6 +170,15 @@ export default function FacilityDetail({ id, me }) {
                   <input inputMode="decimal" value={fields.umpireFee} placeholder="e.g. 100"
                     onChange={(e) => setFields({ ...fields, umpireFee: e.target.value })} />
                 </label>
+                {/* A div, not a label: the tick box and its note are the
+                    label, and the heading above them is only a heading. */}
+                <div className="field"><span>Films matches</span>
+                  <label className="switch-row">
+                    <input type="checkbox" aria-label="Films matches" checked={fields.filmsMatches}
+                      onChange={(e) => setFields({ ...fields, filmsMatches: e.target.checked })} />
+                    <span>Needs wifi at the courts and a phone in a holder.</span>
+                  </label>
+                </div>
               </div>
               <label className="field"><span>Details</span>
                 <textarea maxLength={1000} value={fields.details} onChange={(e) => setFields({ ...fields, details: e.target.value })} />
