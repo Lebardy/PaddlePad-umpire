@@ -86,7 +86,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
         intro={facility?.area}
       >
         {data && (
-          <div className="board-head-group">
+          <div className="board-head-group home-numbers">
             {data.totals.sessions.count === 0 ? (
               <p className="page-board-intro">Nothing has been scored here yet.</p>
             ) : (
@@ -129,7 +129,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
                   <div className="detail-facts" style={{ '--fact-columns': 1 }}>
                     {data.umpires.map((umpire) => (
                       <div className="detail-fact" key={umpire.id}>
-                        <strong><Link to={`/umpires/${umpire.id}`}>{umpire.name}</Link>{umpire.paused && ' · Paused'}</strong>
+                        <strong><Link to={`/umpires/${umpire.id}`} className="row-link">{umpire.name}</Link>{umpire.paused && ' · Paused'}</strong>
                         <div className="cell-sub">{umpireWeekText(umpire)} · {umpireLastText(umpire, now)}</div>
                       </div>
                     ))}
