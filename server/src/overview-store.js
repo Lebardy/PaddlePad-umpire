@@ -404,7 +404,7 @@ async function loadUmpireWeek(queryFn, facilityId) {
   }))
 }
 
-export const PAST_SESSIONS_PAGE = 5
+const PAST_SESSIONS_PAGE = 5
 
 /**
  * A page of finished sessions, newest first. A session is dated by its

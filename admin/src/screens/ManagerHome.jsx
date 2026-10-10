@@ -56,12 +56,14 @@ export default function ManagerHome({ me, data, error, now, actions }) {
   }, [sessionsKey])
 
   async function showOlder() {
+    // Reads the counter without raising it: a reload that starts while this is in flight wins.
     const id = request.current
     setLoadingOlder(true)
     try {
       const page = await listPastSessions({ before: past.next })
       if (request.current !== id) return
       setPast((current) => ({ sessions: [...current.sessions, ...page.sessions], next: page.next }))
+      setPastError(null)
     } catch (err) {
       if (request.current === id) setPastError(err.message)
     } finally {
@@ -71,7 +73,9 @@ export default function ManagerHome({ me, data, error, now, actions }) {
 
   const name = facility?.name ?? data?.facilityName ?? 'Your facility'
   const waiting = data ? waitingCount(data) : 0
-  const noUmpires = data?.umpires?.length === 0
+  // An api that does not send the umpires yet must not blank the page.
+  const umpires = data?.umpires ?? []
+  const noUmpires = data != null && umpires.length === 0
   const missing = facility && missingLine(facility)
   const filters = [
     { id: 'all', label: 'Everything' },
@@ -114,7 +118,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
                   ))}
                 </div>
                 {missing && <p className="hint home-gap">{missing}</p>}
-                <Link to="/facilities" className="btn-quiet btn-small home-gap"><Icon name="edit" size={15} />Edit details</Link>
+                <Link to={`/facilities/${me.facilityId}`} className="btn-quiet btn-small home-gap"><Icon name="edit" size={15} />Edit details</Link>
               </>
             )}
           </div>
@@ -125,9 +129,9 @@ export default function ManagerHome({ me, data, error, now, actions }) {
             {data && (
               <>
                 {noUmpires && <p className="hint">No umpires yet.</p>}
-                {data.umpires.length > 0 && (
+                {umpires.length > 0 && (
                   <div className="detail-facts" style={{ '--fact-columns': 1 }}>
-                    {data.umpires.map((umpire) => (
+                    {umpires.map((umpire) => (
                       <div className="detail-fact" key={umpire.id}>
                         <strong><Link to={`/umpires/${umpire.id}`} className="row-link">{umpire.name}</Link>{umpire.paused && ' · Paused'}</strong>
                         <div className="cell-sub">{umpireWeekText(umpire)} · {umpireLastText(umpire, now)}</div>

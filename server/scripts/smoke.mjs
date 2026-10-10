@@ -3095,6 +3095,9 @@ async function main() {
     check('the umpire sees M1 voided with the reason', Boolean(m1AsUmpire.body.match?.voidedAt) && m1AsUmpire.body.match?.voidReason === 'smoke test void')
     const afterVoid = await request('/admin/overview', { bearer: adminAToken })
     check('M1 stays listed as voided, by me', afterVoid.body.warnings?.find((w) => w.matchId === m1Id)?.voided?.byMe === true)
+    const weekAfterVoid = afterVoid.body.umpires?.find((u) => u.id === umpireAId)?.weekMatches
+    check("a voided match no longer counts in its umpire's week",
+      weekAfterVoid === umpARow?.weekMatches - 1, `${weekAfterVoid} after, ${umpARow?.weekMatches} before`)
     const undone = await request('/admin/overview/unvoid', { method: 'POST', bearer: adminAToken, body: { matchId: m1Id } })
     check('Undo -> 200', undone.status === 200, JSON.stringify(undone.body))
     const fine = await request('/admin/overview/looks-fine', { method: 'POST', bearer: adminAToken, body: { matchId: m1Id, reason: 'shutout' } })
@@ -3206,6 +3209,20 @@ async function main() {
     check('the owner narrowed to that facility gets the same sessions',
       pastOwnerA.status === 200 && JSON.stringify((pastOwnerA.body.sessions ?? []).map((s) => s.id)) === JSON.stringify(pastAIds),
       JSON.stringify(pastOwnerA.body).slice(0, 120))
+    const pastAAskingForB = await request(`/admin/overview/past-sessions?facilityId=${facilityBId}`, { bearer: adminAToken })
+    check("a manager who asks for another facility's sessions still gets only their own",
+      pastAAskingForB.status === 200 &&
+      JSON.stringify((pastAAskingForB.body.sessions ?? []).map((s) => s.id)) === JSON.stringify(pastAIds),
+      JSON.stringify(pastAAskingForB.body).slice(0, 120))
+    const session2Voided = await request(`/sessions/${session2Id}/void`, { method: 'POST', bearer: umpAToken, body: { reason: 'smoke test' } })
+    const pastWithoutVoided = await request('/admin/overview/past-sessions', { bearer: adminAToken })
+    check('a voided session is not a past session',
+      session2Voided.status === 200 && pastWithoutVoided.status === 200 &&
+      !(pastWithoutVoided.body.sessions ?? []).some((s) => s.id === session2Id) &&
+      (pastWithoutVoided.body.sessions ?? []).some((s) => s.id === sessionAId),
+      `${session2Voided.status} ${JSON.stringify(pastWithoutVoided.body).slice(0, 100)}`)
+    const session2Restored = await request(`/sessions/${session2Id}/void`, { method: 'POST', bearer: umpAToken, body: { voided: false } })
+    check('restoring the session puts it back -> 200', session2Restored.status === 200, String(session2Restored.status))
 
     const wrongName = await request('/admin/overview/merge', {
       method: 'POST', bearer: fOwnerToken, body: { keepId: jonId, removeId: johnId, confirmName: 'nope' },
