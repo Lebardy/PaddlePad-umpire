@@ -425,8 +425,11 @@ export async function loadPastSessions(queryFn, filter, before) {
   const { rows } = await queryFn(
     `SELECT p.* FROM (
        SELECT s.id, s.name, u.name AS opened_by,
-              COALESCE((SELECT min(m.started_at) FROM matches m WHERE m.session_id = s.id AND m.voided_at IS NULL),
-                       s.created_at) AS started_at,
+              -- To the millisecond, which is all the cursor carries: finer, and a
+              -- session in the same millisecond as a page's last row is skipped.
+              date_trunc('milliseconds', COALESCE(
+                (SELECT min(m.started_at) FROM matches m WHERE m.session_id = s.id AND m.voided_at IS NULL),
+                s.created_at)) AS started_at,
               (SELECT count(*)::int FROM matches m WHERE m.session_id = s.id AND m.voided_at IS NULL) AS matches,
               (SELECT count(*)::int FROM session_players sp WHERE sp.session_id = s.id) AS players
          FROM sessions s

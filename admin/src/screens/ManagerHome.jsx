@@ -8,7 +8,7 @@ import { AllClear, LeftOpenTable, MatchTable } from '../components/WorthALook'
 import { fetchFacility, listPastSessions } from '../lib/api'
 import { clockText, dayHeading, timeOfDay } from '../lib/format'
 import {
-  allTimeLine, missingLine, needsFlag, placeFacts, sessionLine, sessionNeeds, umpireLastText, umpireWeekText, waitingCount,
+  allTimeLine, missingLine, needsFlag, placeFacts, sessionLine, sessionNeeds, umpireLine, waitingCount,
 } from '../lib/managerHome'
 import { Link } from '../lib/router'
 
@@ -77,6 +77,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
   const umpires = data?.umpires ?? []
   const noUmpires = data != null && umpires.length === 0
   const missing = facility && missingLine(facility)
+  const allTime = data && allTimeLine(data.totals)
   const filters = [
     { id: 'all', label: 'Everything' },
     { id: 'needs', label: 'Needs you', count: waiting },
@@ -134,13 +135,16 @@ export default function ManagerHome({ me, data, error, now, actions }) {
                     {umpires.map((umpire) => (
                       <div className="detail-fact" key={umpire.id}>
                         <strong><Link to={`/umpires/${umpire.id}`} className="row-link">{umpire.name}</Link>{umpire.paused && ' · Paused'}</strong>
-                        <div className="cell-sub">{umpireWeekText(umpire)} · {umpireLastText(umpire, now)}</div>
+                        <div className="cell-sub">{umpireLine(umpire, now)}</div>
                       </div>
                     ))}
                   </div>
                 )}
-                <Link to="/umpires/invites" className="btn-primary btn-small home-gap"><Icon name="plus" size={15} />Make an invite code</Link>
-                <p className="hint home-gap">{allTimeLine(data.totals)}</p>
+                {/* With no umpires the feed's Needs-you notice carries this button; the Sessions filter hides that notice. */}
+                {(!noUmpires || show === 'sessions') && (
+                  <Link to="/umpires/invites" className="btn-primary btn-small home-gap"><Icon name="plus" size={15} />Make an invite code</Link>
+                )}
+                {allTime && <p className="hint home-gap">{allTime}</p>}
               </>
             )}
           </div>
@@ -191,7 +195,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
                     <caption className="sr-only">Finished sessions, newest first</caption>
                     <tbody>
                       {past.sessions.map((session, index) => {
-                        const flag = needsFlag(sessionNeeds(session.id, data?.warnings ?? []))
+                        const needs = sessionNeeds(session.id, data?.warnings ?? [])
                         const day = dayHeading(session.startedAt, now)
                         const newDay = index === 0 || day !== dayHeading(past.sessions[index - 1].startedAt, now)
                         return (
@@ -201,9 +205,18 @@ export default function ManagerHome({ me, data, error, now, actions }) {
                               <td className="col-when">{timeOfDay(session.startedAt)}</td>
                               <td>
                                 <span className="cell-main"><strong>{session.name}</strong></span>
-                                <span className="cell-sub">{sessionLine(session)}</span>
+                                <span className="cell-sub">
+                                  {sessionLine(session)}
+                                  {session.openedBy && <> · <Icon name="clipboard" size={14} /><span className="sr-only">run by </span>{session.openedBy}</>}
+                                </span>
                               </td>
-                              <td>{flag && <span className="reason amber">{flag}</span>}</td>
+                              <td className="home-flag">
+                                {needs > 0 && (
+                                  <span className="reason amber" role="img" aria-label={needsFlag(needs)} title={needsFlag(needs)}>
+                                    <Icon name="alert" size={15} />{needs}
+                                  </span>
+                                )}
+                              </td>
                             </tr>
                           </Fragment>
                         )

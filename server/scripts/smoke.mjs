@@ -3224,6 +3224,22 @@ async function main() {
     const session2Restored = await request(`/sessions/${session2Id}/void`, { method: 'POST', bearer: umpAToken, body: { voided: false } })
     check('restoring the session puts it back -> 200', session2Restored.status === 200, String(session2Restored.status))
 
+    // --- A real second page: four more ended sessions make six, one more than a page holds ---
+    for (let i = 3; i <= 6; i += 1) {
+      const id = uuid()
+      await request('/sessions', { method: 'POST', bearer: umpAToken, body: { id, name: `Smoke Overview Session A${i} ${stamp}` } })
+      await request(`/sessions/${id}/end`, { method: 'POST', bearer: umpAToken, body: {} })
+    }
+    const pastPage1 = await request('/admin/overview/past-sessions', { bearer: adminAToken })
+    const page1Ids = (pastPage1.body.sessions ?? []).map((s) => s.id)
+    check('six ended sessions: the first page holds five and points at an older one',
+      page1Ids.length === 5 && Boolean(pastPage1.body.next), `${page1Ids.length} ${pastPage1.body.next}`)
+    const pastPage2 = await request(`/admin/overview/past-sessions?before=${encodeURIComponent(pastPage1.body.next)}`, { bearer: adminAToken })
+    // Session A is the oldest: it is dated by M1, which was backdated.
+    check('the older page holds the sixth session, repeats none, and is the last',
+      JSON.stringify((pastPage2.body.sessions ?? []).map((s) => s.id)) === JSON.stringify([sessionAId]) &&
+      !page1Ids.includes(sessionAId) && pastPage2.body.next === null, JSON.stringify(pastPage2.body).slice(0, 160))
+
     const wrongName = await request('/admin/overview/merge', {
       method: 'POST', bearer: fOwnerToken, body: { keepId: jonId, removeId: johnId, confirmName: 'nope' },
     })
