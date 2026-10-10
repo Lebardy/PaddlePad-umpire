@@ -4,6 +4,7 @@ import { migrate, pool } from './db.js'
 import { RATE_LIMITS_DISABLED, rateLimit } from './ratelimit.js'
 import { requestLog } from './requestlog.js'
 import authRoutes from './routes/auth.js'
+import playerAuthRoutes from './routes/player-auth.js'
 // Umpire-facing: search, create and manage the player registry.
 import playerAdminRoutes from './routes/players.js'
 import sessionRoutes from './routes/sessions.js'
@@ -191,6 +192,7 @@ app.use('/admin/auth/me/backup-codes', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/admin', rateLimit({ max: 120, windowMs: 60_000 }))
 
 app.use('/auth', authRoutes)
+app.use('/auth', playerAuthRoutes)
 app.use('/players', playerAdminRoutes)
 app.use('/sessions', sessionRoutes)
 app.use('/matches', matchRoutes)
