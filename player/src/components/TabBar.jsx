@@ -11,7 +11,7 @@
 // ============================================================
 
 import Icon from './Icon'
-import { Link } from '../lib/router'
+import { Link } from './Link'
 
 const TABS = [
   { to: '/', label: 'Overview', icon: 'overview' },

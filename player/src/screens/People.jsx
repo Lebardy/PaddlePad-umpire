@@ -25,7 +25,7 @@
 // ============================================================
 
 import { useState } from 'react'
-import { Link } from '../lib/router'
+import { Link } from '../components/Link'
 import { usePlayerData } from '../lib/PlayerData'
 import { peopleSummary, peopleTogether } from '../lib/derive'
 import { lastPlayedLabel } from '../lib/format'

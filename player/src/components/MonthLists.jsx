@@ -7,7 +7,7 @@
 
 import { useState } from 'react'
 import { usePlayerData } from '../lib/PlayerData'
-import { Link } from '../lib/router'
+import { Link } from './Link'
 import { STEP_UP_WORDS, namesList, shortDate, stepUpFigure } from '../lib/leaderboard'
 import Icon from './Icon'
 

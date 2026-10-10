@@ -12,7 +12,7 @@
 // ============================================================
 
 import { useId, useState } from 'react'
-import { Link } from '../lib/router'
+import { Link } from './Link'
 import { groupMatches, matchLine } from '../lib/nights'
 import Icon from './Icon'
 

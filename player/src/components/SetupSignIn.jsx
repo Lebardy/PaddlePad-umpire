@@ -26,7 +26,7 @@ import { useEffect, useRef, useState } from 'react'
 import { dismissSetup, isSetupDismissed, setCredentials } from '../lib/api'
 import { suggestUsername } from '../lib/username'
 import { canReturnUnaided } from '../lib/account'
-import { Link } from '../lib/router'
+import { Link } from './Link'
 import Icon from './Icon'
 
 /**
