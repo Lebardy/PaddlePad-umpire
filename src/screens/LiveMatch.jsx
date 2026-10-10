@@ -186,6 +186,14 @@ function LiveMatch({ matchId, onBack }) {
   const [showHistory, setShowHistory] = useState(false)
   // The ending picked by the first tap, waiting for the player.
   const [pending, setPending] = useState(null)
+  // A half-finished pick must not survive into a different match, or
+  // outlive the match finishing underneath it (another device, say).
+  const pickScope = `${matchId}|${match?.status}`
+  const [pendingScope, setPendingScope] = useState(pickScope)
+  if (pendingScope !== pickScope) {
+    setPendingScope(pickScope)
+    setPending(null)
+  }
   // The team drawn at the near (bottom) end of the court picture.
   const [nearEnd, setNearEnd] = useState(() => readNearEnd(matchId))
   const knownPlayers = usePlayers()
@@ -230,12 +238,6 @@ function LiveMatch({ matchId, onBack }) {
       if (timer) clearTimeout(timer)
     }
   }, [matchId, isScorer])
-
-  // A half-finished pick must not survive into a different match, or
-  // outlive the match finishing underneath it (another device, say).
-  useEffect(() => {
-    setPending(null)
-  }, [matchId, match?.status])
 
   function name(id) {
     return knownPlayers.find((p) => p.id === id)?.name ?? '?'
