@@ -4,6 +4,7 @@ import { requireAdminAccount } from '../auth.js'
 import { ACTIONS } from '../admin-rules.js'
 import { facilityFilterFor, scopeCondition } from '../facility-rules.js'
 import { listFacilities } from '../facility-store.js'
+import { likePattern } from '../people-rules.js'
 import { isUuid } from '../validate.js'
 
 // Read-only on purpose: there is no route that changes or deletes an entry.
@@ -22,7 +23,7 @@ router.get('/', async (req, res) => {
   // entries; an admin who belongs to no facility sees none at all --
   // `{ none }` is its own fixed FALSE condition, never "no filter".
   const filter = facilityFilterFor(req.admin, isUuid(req.query.facilityId) ? req.query.facilityId : null)
-  const params = [before, adminId, action]
+  const params = [before, adminId, action, likePattern(req.query.q)]
   const facilityFilter = scopeCondition(filter, params, 'e.facility_id')
   params.push(PAGE + 1)
 
@@ -36,6 +37,7 @@ router.get('/', async (req, res) => {
       WHERE ($1::bigint IS NULL OR e.id < $1::bigint)
         AND ($2::uuid IS NULL OR e.admin_id = $2::uuid)
         AND ($3::text IS NULL OR e.action = $3::text)
+        AND ($4::text IS NULL OR lower(e.summary) LIKE $4 ESCAPE '\\' OR lower(a.name) LIKE $4 ESCAPE '\\')
         AND (${facilityFilter})
       ORDER BY e.id DESC
       LIMIT $${params.length}`,

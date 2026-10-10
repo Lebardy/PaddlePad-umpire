@@ -58,6 +58,11 @@ export default function App() {
     setAdmin(next)
   }
 
+  // The owner's site is PaddlePad Admin; a manager's is PaddlePad Manager.
+  useEffect(() => {
+    document.title = admin && admin.role !== 'owner' ? 'PaddlePad Manager' : 'PaddlePad Admin'
+  }, [admin])
+
   function signOut() {
     clearSession()
     setAdmin(null)
@@ -73,7 +78,7 @@ export default function App() {
   } else {
     let screen
     if (path === '/') screen = <Overview me={admin} facilityLabel={facilityLabel(admin, facilities ?? [])} />
-    else if (path === '/admins' && admin.role === 'owner') screen = <Admins me={admin} />
+    else if (path === '/managers' && admin.role === 'owner') screen = <Admins me={admin} />
     else if (path === '/activity') screen = <Activity me={admin} />
     else if (path === '/account') screen = <Account admin={admin} onAdminChange={updateAdmin} />
     else if (moved) screen = null
@@ -96,8 +101,8 @@ export default function App() {
   return (
     <>
       <div className="narrow-screen" role="note">
-        <p className="brand-mark">PaddlePad<span>Admin</span></p>
-        <p>The admin site is made for a laptop or tablet. Open it on a bigger screen.</p>
+        <p className="brand-mark">PaddlePad<span>{admin && admin.role !== 'owner' ? 'Manager' : 'Admin'}</span></p>
+        <p>This site is made for a laptop or tablet. Open it on a bigger screen.</p>
       </div>
       <div className="wide-screen">{content}</div>
     </>

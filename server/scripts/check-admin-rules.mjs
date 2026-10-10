@@ -155,7 +155,7 @@ section('which tokens each guard lets through')
   check('the player guard refuses an admin token', (await run(auth.requirePlayer, adminToken)).status, 403)
 
   check('the owner guard lets the owner through', (await run(auth.requireOwner, null, { admin: { role: 'owner' } })).status, 'next')
-  check('the owner guard refuses an admin', (await run(auth.requireOwner, null, { admin: { role: 'admin' } })).status, 403)
+  check('the owner guard refuses a manager', (await run(auth.requireOwner, null, { admin: { role: 'manager' } })).status, 403)
 
   // requireActiveUmpire / requireActivePlayer (Task 2) must run after
   // requireAuth / requirePlayer, so they read req.umpire.id / req.player.id

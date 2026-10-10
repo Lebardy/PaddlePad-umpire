@@ -30,7 +30,7 @@ check('an open code with days left', inviteStatusText({ status: 'open', expires_
 check('one day, not one days', inviteStatusText({ status: 'open', expires_at: '2026-09-15T20:00:00Z' }, now), 'Open · 1 day left')
 
 check('made by an admin', madeByText({ created_by_name: 'Jan', made_before_admin_site: false }), 'Jan')
-check('made by an umpire before the admin site', madeByText({ created_by_name: 'Ump', made_before_admin_site: true }), 'Ump (before the admin site)')
+check('made by an umpire before this site', madeByText({ created_by_name: 'Ump', made_before_admin_site: true }), 'Ump (before this site)')
 check('made by someone since removed', madeByText({ created_by_name: null }), '—')
 
 check('password and Google', signInMethods({ hasPassword: true, googleEmail: 'a@gmail.com' }), 'Password · Google (a@gmail.com)')
@@ -41,7 +41,7 @@ check('no time is a dash', formatWhen(null), '—')
 
 check('actions read as words', actionLabel('invite.created'), 'Made an invite code')
 check('an unknown action falls back to its name', actionLabel('something.new'), 'something.new')
-check('an admin move reads as words', actionLabel('admin.moved'), 'Moved an admin')
+check('a manager move reads as words', actionLabel('admin.moved'), 'Moved a manager')
 check('an umpire move reads as words', actionLabel('umpire.moved'), 'Moved an umpire')
 check('a facility being made reads as words', actionLabel('facility.created'), 'Made a facility')
 check('a facility being edited reads as words', actionLabel('facility.updated'), 'Updated a facility')
@@ -84,10 +84,10 @@ check('a different name does not match', confirmNameMatches('Ana', 'Ana Reyes'),
 check('an empty or blank typed name never matches', confirmNameMatches('   ', 'Ana Reyes'), false)
 
 check('the owner sees every facility', facilityLabel({ role: 'owner', facilityId: null }, []), 'All facilities')
-check('a facility admin sees their own facility’s name',
-  facilityLabel({ role: 'admin', facilityId: 'f1' }, [{ id: 'f1', name: 'Cebu IT Park' }]), 'Cebu IT Park')
-check('a facility admin whose facility hasn’t loaded yet shows nothing',
-  facilityLabel({ role: 'admin', facilityId: 'f1' }, []), null)
+check('a manager sees their own facility’s name',
+  facilityLabel({ role: 'manager', facilityId: 'f1' }, [{ id: 'f1', name: 'Cebu IT Park' }]), 'Cebu IT Park')
+check('a manager whose facility hasn’t loaded yet shows nothing',
+  facilityLabel({ role: 'manager', facilityId: 'f1' }, []), null)
 
 check('a day heading this year has no year', dayHeading('2026-09-18T01:00:00Z', Date.parse('2026-09-18T12:00:00Z')), 'Friday, Sep 18')
 check('a day heading from a past year gets one', dayHeading('2025-12-31T15:00:00Z', Date.parse('2026-09-18T12:00:00Z')), 'Wednesday, Dec 31, 2025')

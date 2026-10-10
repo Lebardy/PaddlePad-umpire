@@ -1668,7 +1668,7 @@ async function main() {
     check('a short password is refused -> 400', short.status === 400, String(short.status))
     const ADMIN_PASSWORD = `smoke-${uuid()}`
     const setUp = await request(`/admin/auth/setup/${link}`, { method: 'POST', body: { password: ADMIN_PASSWORD } })
-    check('finishing setup signs the admin in -> 200', setUp.status === 200 && setUp.body.admin?.role === 'admin',
+    check('finishing setup signs the admin in -> 200', setUp.status === 200 && setUp.body.admin?.role === 'manager',
       JSON.stringify(setUp.body).slice(0, 80))
     const again = await request(`/admin/auth/setup/${link}`, { method: 'POST', body: { password: ADMIN_PASSWORD } })
     check('the link works only once -> 410', again.status === 410, String(again.status))
@@ -2667,6 +2667,31 @@ async function main() {
     const namesFilterB = (activityFilterB.body.entries ?? []).map((e) => e.facilityName)
     check("the owner's filter by B shows only B's entries",
       namesFilterB.length > 0 && namesFilterB.every((n) => n === nameFacB), JSON.stringify([...new Set(namesFilterB)]))
+
+    // --- 7a: searching the activity record ---
+    const searchActivity = async (q, bearer, extra = '') =>
+      (await request(`/admin/activity?q=${encodeURIComponent(q)}${extra}`, { bearer })).body.entries ?? []
+    const summaries = (entries) => JSON.stringify(entries.map((e) => e.summary)).slice(0, 160)
+
+    const byDetails = await searchActivity(`MADE FACILITY ${nameFacA.toLowerCase()}`, fOwnerToken)
+    check('a search finds an entry by its details, whatever the capitals',
+      byDetails.length === 1 && byDetails[0].summary === `Made facility ${nameFacA}`, summaries(byDetails))
+
+    const adminAName = `Smoke Facility Admin A ${fStamp}`
+    const byWho = await searchActivity(adminAName, fOwnerToken, '&action=invite.created')
+    check('a search finds entries by who did them, together with a What filter',
+      byWho.length > 0 && byWho.every((e) => e.adminName === adminAName && e.action === 'invite.created' && !e.summary.includes(adminAName)),
+      summaries(byWho))
+
+    const anyOneCharacter = await searchActivity(`_${fStamp}`, fOwnerToken)
+    const anyCharacters = await searchActivity(`%${fStamp}`, fOwnerToken)
+    check('_ and % in a search are plain characters, not wildcards',
+      anyOneCharacter.length === 0 && anyCharacters.length === 0, `${anyOneCharacter.length} and ${anyCharacters.length} entries`)
+
+    const bSeenByOwner = await searchActivity(nameFacB, fOwnerToken)
+    const bSeenByA = await searchActivity(nameFacB, adminAToken)
+    check("a manager's search stays inside their own facility",
+      bSeenByOwner.length > 0 && bSeenByA.length === 0, `owner ${bSeenByOwner.length}, manager A ${bSeenByA.length}`)
 
     // --- 7b: the umpire app sees only its own facility ---
     // A's umpire and B's umpire were registered above through real

@@ -12,6 +12,7 @@ const MOVED = [
   [/^\/people\/players\/([^/]+)$/, (id) => `/players/${id}`],
   [/^\/people\/umpires\/([^/]+)$/, (id) => `/umpires/${id}`],
   [/^\/invites$/, () => '/umpires/invites'],
+  [/^\/admins$/, () => '/managers'],
 ]
 
 /** The new address for an old one, or null when `path` has not moved. */

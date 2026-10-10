@@ -47,7 +47,7 @@ router.post('/', async (req, res) => {
   try {
     const { admin, setupLink } = await withTransaction(async (client) => {
       const created = await createAdmin(client, {
-        name, email, role: 'admin', createdBy: req.admin.id, facilityId: facility.id,
+        name, email, role: 'manager', createdBy: req.admin.id, facilityId: facility.id,
       })
       const link = await createSetupLink(client, { adminId: created.id, createdBy: req.admin.id })
       await recordActivity(client, {
@@ -59,19 +59,19 @@ router.post('/', async (req, res) => {
     res.status(201).json({ admin: adminPayload(admin), setupLink })
   } catch (error) {
     if (error.code === '23505') {
-      return res.status(409).json({ error: 'An admin with that email already exists' })
+      return res.status(409).json({ error: 'Someone with that email already has an account' })
     }
     throw error
   }
 })
 
 router.post('/:id/setup-link', async (req, res) => {
-  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such admin' })
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such manager' })
   try {
     const setupLink = await withTransaction(async (client) => {
       const { rows } = await client.query('SELECT id, name, deactivated_at FROM admins WHERE id = $1 FOR UPDATE', [req.params.id])
-      if (!rows[0]) throw refusal(404, 'No such admin')
-      if (rows[0].deactivated_at) throw refusal(409, 'Switch this admin back on before making them a link')
+      if (!rows[0]) throw refusal(404, 'No such manager')
+      if (rows[0].deactivated_at) throw refusal(409, 'Resume this manager before making them a link')
       const link = await createSetupLink(client, { adminId: rows[0].id, createdBy: req.admin.id })
       await recordActivity(client, {
         adminId: req.admin.id, action: 'admin.setup_link_created', targetType: 'admin', targetId: rows[0].id,
@@ -93,14 +93,14 @@ router.post('/:id/setup-link', async (req, res) => {
  */
 function switchRoute(on) {
   return async (req, res) => {
-    if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such admin' })
+    if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such manager' })
     try {
       const row = await withTransaction(async (client) => {
         const { rows } = await client.query(`SELECT ${ADMIN_COLUMNS} FROM admins WHERE id = $1 FOR UPDATE`, [req.params.id])
         const target = rows[0]
-        if (!target) throw refusal(404, 'No such admin')
+        if (!target) throw refusal(404, 'No such manager')
         if (target.role === 'owner') throw refusal(409, "You can't pause the owner")
-        if (Boolean(target.deactivated_at) === !on) throw refusal(409, `This admin is already ${on ? 'active' : 'paused'}`)
+        if (Boolean(target.deactivated_at) === !on) throw refusal(409, `This manager is already ${on ? 'active' : 'paused'}`)
 
         const { rows: updated } = await client.query(
           `UPDATE admins SET deactivated_at = ${on ? 'NULL' : 'now()'} WHERE id = $1 RETURNING ${ADMIN_COLUMNS}`,
@@ -120,7 +120,7 @@ function switchRoute(on) {
         await recordActivity(client, {
           adminId: req.admin.id, action: on ? 'admin.switched_on' : 'admin.switched_off',
           targetType: 'admin', targetId: target.id,
-          summary: `${on ? 'Resumed' : 'Paused'} admin ${target.name}`,
+          summary: `${on ? 'Resumed' : 'Paused'} manager ${target.name}`,
         })
         return updated[0]
       })
@@ -136,12 +136,12 @@ router.post('/:id/switch-on', switchRoute(true))
 
 /** Moves an admin to another facility. The owner belongs to no facility, so it can never be moved. */
 router.post('/:id/move', async (req, res) => {
-  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such admin' })
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such manager' })
   try {
     const moved = await withTransaction(async (client) => {
       const { rows } = await client.query(`SELECT ${ADMIN_COLUMNS} FROM admins WHERE id = $1 FOR UPDATE`, [req.params.id])
       const target = rows[0]
-      if (!target) throw refusal(404, 'No such admin')
+      if (!target) throw refusal(404, 'No such manager')
       if (target.role === 'owner') throw refusal(409, "The owner doesn't belong to a facility")
 
       const facility = isUuid(req.body?.facilityId) ? await findFacility(client.query.bind(client), req.body.facilityId) : null
@@ -154,7 +154,7 @@ router.post('/:id/move', async (req, res) => {
       )
       await recordActivity(client, {
         adminId: req.admin.id, action: 'admin.moved', targetType: 'admin', targetId: target.id,
-        summary: `Moved admin ${target.name} to ${facility.name}`,
+        summary: `Moved manager ${target.name} to ${facility.name}`,
       })
       return updated[0]
     })

@@ -81,7 +81,7 @@ try {
   console.log(`Open this link within 24 hours to finish setting up. It works once:\n\n  ${link.url}\n`)
 } catch (error) {
   if (error.expected) console.error(error.message)
-  else if (error.code === '23505') console.error('An owner, or an admin with that email, already exists. Nothing was created.')
+  else if (error.code === '23505') console.error('An owner, or a manager with that email, already exists. Nothing was created.')
   else console.error('Could not create the owner:', error.message)
   process.exitCode = 1
 } finally {

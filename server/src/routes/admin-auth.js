@@ -63,7 +63,7 @@ async function googleProfile(req, res) {
   }
 }
 
-const REPROOF_REFUSAL = 'Sign in with the Google account connected to your admin account'
+const REPROOF_REFUSAL = 'Sign in with the Google account connected to your account'
 
 /**
  * Proof that the person making a sign-in change is really the admin,
@@ -144,7 +144,7 @@ router.post('/login', async (req, res) => {
   }
   // Said only after the right password, so it reveals nothing to a guesser.
   if (found.deactivated_at) {
-    return res.status(403).json({ error: 'Your admin access has been paused' })
+    return res.status(403).json({ error: 'Your access has been paused' })
   }
 
   res.json(await completeSignIn(found.id))
@@ -163,7 +163,7 @@ router.post('/google', async (req, res) => {
     [profile.sub, profile.email],
   )
   if (!rows[0]) {
-    return res.status(401).json({ error: "That Google account isn't connected to an admin account" })
+    return res.status(401).json({ error: "That Google account isn't connected to an account here" })
   }
   res.json(await completeSignIn(rows[0].id))
 })
@@ -172,7 +172,7 @@ router.post('/google', async (req, res) => {
 async function findLink(secret) {
   const { rows } = await query(
     `SELECT l.used_at, l.cancelled_at, l.expires_at,
-            a.id AS admin_id, a.name, a.email, a.deactivated_at
+            a.id AS admin_id, a.name, a.email, a.role, a.deactivated_at
        FROM admin_setup_links l
        JOIN admins a ON a.id = l.admin_id
       WHERE l.secret_hash = $1`,
@@ -186,7 +186,7 @@ router.get('/setup/:secret', async (req, res) => {
   if (setupLinkState(link) !== 'usable' || link.deactivated_at) {
     return res.status(410).json({ error: LINK_GONE })
   }
-  res.json({ admin: { name: link.name, email: link.email }, googleConfigured: googleConfigured() })
+  res.json({ admin: { name: link.name, email: link.email, role: link.role }, googleConfigured: googleConfigured() })
 })
 
 router.post('/setup/:secret', async (req, res) => {
@@ -261,7 +261,7 @@ router.post('/setup/:secret', async (req, res) => {
   } catch (error) {
     if (error.statusCode === 410) return res.status(410).json({ error: LINK_GONE })
     if (error.code === '23505') {
-      return res.status(409).json({ error: 'That Google account is already connected to another admin' })
+      return res.status(409).json({ error: 'That Google account is already connected to another account' })
     }
     throw error
   }
@@ -351,7 +351,7 @@ router.post('/me/google/connect', async (req, res) => {
     res.json({ token: signAdminToken(row, resetAt), admin: adminPayload(row), viaBackupCode: false })
   } catch (error) {
     if (error.code === '23505') {
-      return res.status(409).json({ error: 'That Google account is already connected to another admin' })
+      return res.status(409).json({ error: 'That Google account is already connected to another account' })
     }
     throw error
   }

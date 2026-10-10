@@ -223,7 +223,7 @@ export default function Account({ admin, onAdminChange }) {
       {viaBackupCode && <p className="notice" role="status">{USED_BACKUP_CODE_NOTICE}</p>}
       <PageBoard title="Account" intro={<><strong>{admin.name}</strong> · {admin.email}</>}>
         <div className="facts">
-          <div className="fact"><span className="tally-label">Role</span><strong>{admin.role === 'owner' ? 'Owner' : 'Admin'}</strong></div>
+          <div className="fact"><span className="tally-label">Role</span><strong>{admin.role === 'owner' ? 'Owner' : 'Manager'}</strong></div>
           <div className="fact"><span className="tally-label">Signs in with</span><strong>{signInMethods(admin)}</strong></div>
         </div>
       </PageBoard>

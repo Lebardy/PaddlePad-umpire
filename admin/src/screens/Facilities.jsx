@@ -68,7 +68,7 @@ export default function Facilities({ me }) {
     <section>
       <PageBoard
         title="Facilities"
-        intro="Where matches are scored. Open one to see its umpires, admins and details."
+        intro="Where matches are scored. Open one to see its umpires, managers and details."
       >
         <div className="tally">
           <TallyCell figure={facilities ? facilities.length : '–'} label="Facilities" />
@@ -123,7 +123,7 @@ export default function Facilities({ me }) {
                   <th>Area</th>
                   <th>Fees</th>
                   <th className="col-when">Umpires</th>
-                  <th className="col-when">Admins</th>
+                  <th className="col-when">Managers</th>
                 </tr>
               </thead>
               <tbody>
