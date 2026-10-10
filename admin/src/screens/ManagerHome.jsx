@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import FacilityLogo from '../components/FacilityLogo'
 import Icon from '../components/Icon'
 import PageBoard, { TallyCell } from '../components/PageBoard'
@@ -29,22 +29,41 @@ export default function ManagerHome({ me, data, error, now, actions }) {
     fetchFacility(me.facilityId).then((found) => setFacility(found.facility)).catch((err) => setFacilityError(err.message))
   }, [me.facilityId])
 
-  // The list starts again when a session closes or ends, or a match is
-  // voided or restored. The 30-second refresh alone leaves "Show older
-  // sessions" where the manager left it.
-  const sessionsKey = data ? `${data.sessions.length}:${data.leftOpen.length}:${data.warnings.filter((w) => w.voided).length}` : null
+  // Which sessions are live or left open and which matches are voided. When
+  // that changes the list starts again; the 30-second refresh alone leaves
+  // "Show older sessions" where the manager left it.
+  const sessionsKey = data
+    ? [data.sessions.map((s) => s.id), data.leftOpen.map((s) => s.sessionId), data.warnings.filter((w) => w.voided).map((w) => w.matchId)].join('|')
+    : null
+  const loadedKey = useRef(null)
+  const request = useRef(0)
+
+  function loadPast() {
+    const id = ++request.current
+    listPastSessions()
+      .then((page) => { if (request.current === id) { setPast(page); setPastError(null) } })
+      .catch((err) => { if (request.current === id) setPastError(err.message) })
+  }
+
+  // The list does not wait for the Overview: it loads as the page opens.
+  useEffect(loadPast, [])
+
   useEffect(() => {
     if (sessionsKey === null) return
-    listPastSessions().then((page) => { setPast(page); setPastError(null) }).catch((err) => setPastError(err.message))
+    // The first Overview answer only sets the starting point; a later change reloads.
+    if (loadedKey.current !== null && loadedKey.current !== sessionsKey) loadPast()
+    loadedKey.current = sessionsKey
   }, [sessionsKey])
 
   async function showOlder() {
+    const id = request.current
     setLoadingOlder(true)
     try {
       const page = await listPastSessions({ before: past.next })
+      if (request.current !== id) return
       setPast((current) => ({ sessions: [...current.sessions, ...page.sessions], next: page.next }))
     } catch (err) {
-      setPastError(err.message)
+      if (request.current === id) setPastError(err.message)
     } finally {
       setLoadingOlder(false)
     }
@@ -102,6 +121,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
 
           <div>
             <h2 className="section-title"><Icon name="clipboard" />Your umpires</h2>
+            {error && !data && <p className="form-error" role="alert">{error}</p>}
             {data && (
               <>
                 {noUmpires && <p className="hint">No umpires yet.</p>}
@@ -152,47 +172,50 @@ export default function ManagerHome({ me, data, error, now, actions }) {
                   {!noUmpires && data.leftOpen.length === 0 && data.warnings.length === 0 && <AllClear title="All clear" text="" />}
                 </div>
               )}
+            </>
+          )}
 
-              {show !== 'needs' && (
-                <div>
-                  <h2 className="section-title"><Icon name="calendar" />Sessions</h2>
-                  {pastError && <p className="form-error" role="alert">{pastError}</p>}
-                  {past?.sessions.length === 0 && <p className="empty">No sessions yet.</p>}
-                  {past?.sessions.length > 0 && (
-                    <div className="table-wrap">
-                      <table className="table log">
-                        <caption className="sr-only">Finished sessions, newest first</caption>
-                        <tbody>
-                          {past.sessions.map((session) => {
-                            const flag = needsFlag(sessionNeeds(session.id, data.warnings))
-                            return (
-                              <Fragment key={session.id}>
-                                <tr className="day-row"><th colSpan={3} scope="colgroup">{dayHeading(session.startedAt, now)}</th></tr>
-                                <tr>
-                                  <td className="col-when">{timeOfDay(session.startedAt)}</td>
-                                  <td>
-                                    <span className="cell-main"><strong>{session.name}</strong></span>
-                                    <span className="cell-sub">{sessionLine(session)}</span>
-                                  </td>
-                                  <td>{flag && <span className="reason amber">{flag}</span>}</td>
-                                </tr>
-                              </Fragment>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                      {past.next && (
-                        <div className="table-foot">
-                          <button type="button" className="btn-quiet btn-small" onClick={showOlder} disabled={loadingOlder}>
-                            {loadingOlder ? 'Loading…' : 'Show older sessions'}
-                          </button>
-                        </div>
-                      )}
+          {show !== 'needs' && (
+            <div>
+              <h2 className="section-title"><Icon name="calendar" />Sessions</h2>
+              {pastError && <p className="form-error" role="alert">{pastError}</p>}
+              {!past && !pastError && <p className="empty">Loading…</p>}
+              {past?.sessions.length === 0 && <p className="empty">No sessions yet.</p>}
+              {past?.sessions.length > 0 && (
+                <div className="table-wrap">
+                  <table className="table log">
+                    <caption className="sr-only">Finished sessions, newest first</caption>
+                    <tbody>
+                      {past.sessions.map((session, index) => {
+                        const flag = needsFlag(sessionNeeds(session.id, data?.warnings ?? []))
+                        const day = dayHeading(session.startedAt, now)
+                        const newDay = index === 0 || day !== dayHeading(past.sessions[index - 1].startedAt, now)
+                        return (
+                          <Fragment key={session.id}>
+                            {newDay && <tr className="day-row"><th colSpan={3} scope="colgroup">{day}</th></tr>}
+                            <tr>
+                              <td className="col-when">{timeOfDay(session.startedAt)}</td>
+                              <td>
+                                <span className="cell-main"><strong>{session.name}</strong></span>
+                                <span className="cell-sub">{sessionLine(session)}</span>
+                              </td>
+                              <td>{flag && <span className="reason amber">{flag}</span>}</td>
+                            </tr>
+                          </Fragment>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                  {past.next && (
+                    <div className="table-foot">
+                      <button type="button" className="btn-quiet btn-small" onClick={showOlder} disabled={loadingOlder}>
+                        {loadingOlder ? 'Loading…' : 'Show older sessions'}
+                      </button>
                     </div>
                   )}
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
       </div>
