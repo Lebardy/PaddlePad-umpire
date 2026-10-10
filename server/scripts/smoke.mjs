@@ -3068,6 +3068,17 @@ async function main() {
     check('the live board counts the open session', ovAsA.body.live?.sessions >= 1, JSON.stringify(ovAsA.body.live))
     check('umpire A counts as active (their session is going on)', ovAsA.body.totals?.umpires?.active >= 1,
       JSON.stringify(ovAsA.body.totals?.umpires))
+    check('a warning names its session', m1Warning?.sessionId === sessionAId, String(m1Warning?.sessionId))
+    const umpARow = ovAsA.body.umpires?.find((u) => u.id === umpireAId)
+    check("a manager's Overview lists their umpire with this week's matches and a last-scored time",
+      umpARow?.weekMatches >= 1 && Boolean(umpARow?.lastScoredAt) && umpARow?.paused === false,
+      JSON.stringify(ovAsA.body.umpires)?.slice(0, 160))
+    check("a manager's umpire list has nobody from another facility",
+      Array.isArray(ovAsA.body.umpires) && !ovAsA.body.umpires.some((u) => u.id === umpireBId))
+    const pastWhileOpen = await request('/admin/overview/past-sessions', { bearer: adminAToken })
+    check('a session still open is not a past session',
+      pastWhileOpen.status === 200 && Array.isArray(pastWhileOpen.body.sessions) &&
+      !pastWhileOpen.body.sessions.some((s) => s.id === sessionAId), JSON.stringify(pastWhileOpen.body).slice(0, 120))
     const ovAsOwnerB = await request(`/admin/overview?facilityId=${facilityBId}`, { bearer: fOwnerToken })
     check('the owner narrowed to B sees M2 and not M1',
       Array.isArray(ovAsOwnerB.body.warnings) &&
@@ -3168,6 +3179,33 @@ async function main() {
 
     const session2End = await request(`/sessions/${session2Id}/end`, { method: 'POST', bearer: umpAToken, body: {} })
     check('umpire A ends the second session too -> 200', session2End.status === 200, String(session2End.status))
+    // --- A manager's past sessions: both of A's are ended by now ---
+    const pastA = await request('/admin/overview/past-sessions', { bearer: adminAToken })
+    const pastAIds = (pastA.body.sessions ?? []).map((s) => s.id)
+    check("a manager's past sessions hold both ended sessions and none of another facility's",
+      pastAIds.includes(sessionAId) && pastAIds.includes(session2Id) && !pastAIds.includes(sessionBId), JSON.stringify(pastAIds))
+    const pastRowA = (pastA.body.sessions ?? []).find((s) => s.id === sessionAId)
+    // M1 was backdated 20 minutes, so its start is earlier than this
+    // section's own start; the session itself was opened after it.
+    check('a past session is dated by its first match, not by when it was opened',
+      Date.parse(pastRowA?.startedAt) < stamp, `${pastRowA?.startedAt} vs ${new Date(stamp).toISOString()}`)
+    check('a past session carries its name, its counts and who ran it',
+      pastRowA?.name === `Smoke Overview Session A ${stamp}` && pastRowA?.matches >= 1 && pastRowA?.players >= 1 &&
+      pastRowA?.openedBy === umpAName, JSON.stringify(pastRowA))
+    const newestPast = pastA.body.sessions?.[0]
+    const pastOlder = await request(
+      `/admin/overview/past-sessions?before=${encodeURIComponent(`${newestPast?.startedAt}|${newestPast?.id}`)}`, { bearer: adminAToken })
+    const olderIds = (pastOlder.body.sessions ?? []).map((s) => s.id)
+    check('asking for sessions before the newest leaves it out and keeps the rest',
+      pastOlder.status === 200 && !olderIds.includes(newestPast?.id) && olderIds.length === pastAIds.length - 1, JSON.stringify(olderIds))
+    const pastAsB = await request('/admin/overview/past-sessions', { bearer: adminBToken })
+    check("another facility's manager gets none of them",
+      pastAsB.status === 200 && !(pastAsB.body.sessions ?? []).some((s) => pastAIds.includes(s.id)),
+      JSON.stringify(pastAsB.body).slice(0, 120))
+    const pastOwnerA = await request(`/admin/overview/past-sessions?facilityId=${facilityAId}`, { bearer: fOwnerToken })
+    check('the owner narrowed to that facility gets the same sessions',
+      pastOwnerA.status === 200 && JSON.stringify((pastOwnerA.body.sessions ?? []).map((s) => s.id)) === JSON.stringify(pastAIds),
+      JSON.stringify(pastOwnerA.body).slice(0, 120))
 
     const wrongName = await request('/admin/overview/merge', {
       method: 'POST', bearer: fOwnerToken, body: { keepId: jonId, removeId: johnId, confirmName: 'nope' },

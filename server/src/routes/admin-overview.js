@@ -8,7 +8,7 @@ import {
   hasSignIn, mergeRefusal, pairKey, readVoidReason,
 } from '../overview-rules.js'
 import {
-  closeSession, loadMatchForAction, loadOverview, loadSessionForAction, matchLabel, matchReasonsNow, mergePlayers, sessionLabel,
+  closeSession, loadMatchForAction, loadOverview, loadPastSessions, loadSessionForAction, matchLabel, matchReasonsNow, mergePlayers, sessionLabel,
   sessionLeftOpenNow,
 } from '../overview-store.js'
 import { confirmNameMatches } from '../people-rules.js'
@@ -51,6 +51,12 @@ const REASON_WORDS = {
 router.get('/', async (req, res) => {
   const filter = facilityFilterFor(req.admin, isUuid(req.query.facilityId) ? req.query.facilityId : null)
   res.json(await loadOverview(query, filter, { isOwner: req.admin.role === 'owner', adminId: req.admin.id }))
+})
+
+/** Finished sessions, five at a time, for a manager's home page. Read-only. */
+router.get('/past-sessions', async (req, res) => {
+  const filter = facilityFilterFor(req.admin, isUuid(req.query.facilityId) ? req.query.facilityId : null)
+  res.json(await loadPastSessions(query, filter, req.query.before))
 })
 
 router.post('/looks-fine', async (req, res) => {

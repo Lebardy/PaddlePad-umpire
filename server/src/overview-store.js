@@ -7,6 +7,7 @@
 
 import { deriveMatchState, eventFromRow } from './pickleball.js'
 import { scopeCondition } from './facility-rules.js'
+import { makeCursor, readCursor } from './people-rules.js'
 import {
   PLAYER_ID_KEYS, WINDOW_DAYS, duplicatePairs, hasSignIn, leftOpenReason, matchReasons, pairKey, sameDayPairs, sharedMatchPairs,
 } from './overview-rules.js'
@@ -294,6 +295,7 @@ async function loadWarnings(queryFn, filter, { now, adminId }) {
   const names = await namesOf(queryFn, flagged.flatMap(({ row }) => [...row.team_a, ...row.team_b]))
   return flagged.map(({ row, reasons, voided, score }) => ({
     matchId: row.id,
+    sessionId: row.session_id,
     sessionName: row.session_name,
     facilityName: row.facility_name,
     teamA: row.team_a.map((id) => names.get(id) ?? 'Someone'),
@@ -378,6 +380,73 @@ export async function mergePlayers(client, keepId, removeId) {
   return { movedMatches: movedIds.length }
 }
 
+/**
+ * A facility's umpires for its manager's page: how many matches each
+ * scored here in the last 7 days, and when they last scored. Closed
+ * accounts are left out; voided matches and sessions are not counted.
+ */
+async function loadUmpireWeek(queryFn, facilityId) {
+  const { rows } = await queryFn(
+    `SELECT u.id, u.name, u.paused_at,
+            count(m.id) FILTER (WHERE m.started_at > ${WEEK})::int AS week_matches,
+            max(m.started_at) AS last_scored_at
+       FROM umpires u
+       LEFT JOIN matches m ON m.recorded_by = u.id AND m.voided_at IS NULL
+        AND EXISTS (SELECT 1 FROM sessions s
+                     WHERE s.id = m.session_id AND s.voided_at IS NULL AND s.facility_id = u.facility_id)
+      WHERE u.facility_id = $1 AND u.closed_at IS NULL
+      GROUP BY u.id
+      ORDER BY max(m.started_at) DESC NULLS LAST, u.name`,
+    [facilityId],
+  )
+  return rows.map((row) => ({
+    id: row.id, name: row.name, paused: Boolean(row.paused_at), weekMatches: row.week_matches, lastScoredAt: row.last_scored_at,
+  }))
+}
+
+export const PAST_SESSIONS_PAGE = 5
+
+/**
+ * A page of finished sessions, newest first. A session is dated by its
+ * first match, or by when it was opened if nobody played in it. Open
+ * sessions are left out: the Overview shows those as live or left open.
+ */
+export async function loadPastSessions(queryFn, filter, before) {
+  const params = []
+  const scope = scopeCondition(filter, params, 's.facility_id')
+  const cursor = readCursor(before)
+  let older = 'TRUE'
+  if (cursor) {
+    params.push(cursor.createdAt, cursor.id)
+    older = `(p.started_at, p.id) < ($${params.length - 1}::timestamptz, $${params.length}::uuid)`
+  }
+  params.push(PAST_SESSIONS_PAGE + 1)
+  // One more than a page, to know whether there is an older page.
+  const { rows } = await queryFn(
+    `SELECT p.* FROM (
+       SELECT s.id, s.name, u.name AS opened_by,
+              COALESCE((SELECT min(m.started_at) FROM matches m WHERE m.session_id = s.id AND m.voided_at IS NULL),
+                       s.created_at) AS started_at,
+              (SELECT count(*)::int FROM matches m WHERE m.session_id = s.id AND m.voided_at IS NULL) AS matches,
+              (SELECT count(*)::int FROM session_players sp WHERE sp.session_id = s.id) AS players
+         FROM sessions s
+         LEFT JOIN umpires u ON u.id = s.created_by
+        WHERE s.ended_at IS NOT NULL AND s.voided_at IS NULL AND ${scope}) p
+      WHERE ${older}
+      ORDER BY p.started_at DESC, p.id DESC
+      LIMIT $${params.length}`,
+    params,
+  )
+  const page = rows.slice(0, PAST_SESSIONS_PAGE)
+  const last = page[page.length - 1]
+  return {
+    sessions: page.map((row) => ({
+      id: row.id, name: row.name, startedAt: row.started_at, matches: row.matches, players: row.players, openedBy: row.opened_by,
+    })),
+    next: rows.length > PAST_SESSIONS_PAGE ? makeCursor({ created_at: last.started_at, id: last.id }) : null,
+  }
+}
+
 /** Everything the Overview page shows, for one facilityFilterFor() result. */
 export async function loadOverview(queryFn, filter, { isOwner, adminId, now = Date.now() }) {
   const rightNow = await loadRightNow(queryFn, filter, now)
@@ -389,9 +458,12 @@ export async function loadOverview(queryFn, filter, { isOwner, adminId, now = Da
   const facilityName = filter?.id
     ? (await queryFn('SELECT name FROM facilities WHERE id = $1', [filter.id])).rows[0]?.name ?? null
     : null
+  // Only a page about one facility lists its umpires.
+  const umpires = filter?.id ? await loadUmpireWeek(queryFn, filter.id) : null
   return {
     asOf: new Date(now).toISOString(),
     facilityName,
+    umpires,
     live: rightNow.live,
     sessions: rightNow.sessions,
     leftOpen: rightNow.leftOpen,
