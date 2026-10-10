@@ -13,10 +13,9 @@
 // are only correct while nothing is paginated.
 // ============================================================
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchMatches, fetchMe } from './api'
-
-const PlayerDataContext = createContext(null)
+import { PlayerDataContext } from './PlayerData'
 
 // How stale the data may be before returning to the app refetches it.
 // Short enough that a match finishing while the phone is pocketed shows
@@ -137,10 +136,4 @@ export function PlayerDataProvider({ children }) {
       {children}
     </PlayerDataContext.Provider>
   )
-}
-
-export function usePlayerData() {
-  const value = useContext(PlayerDataContext)
-  if (!value) throw new Error('usePlayerData must be used inside PlayerDataProvider')
-  return value
 }

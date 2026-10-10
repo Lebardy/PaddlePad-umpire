@@ -241,7 +241,7 @@ ALTER TABLE players ADD COLUMN IF NOT EXISTS name_visible BOOLEAN NOT NULL DEFAU
 -- days, so a closed account needs something for requireActivePlayer to
 -- read.
 --
--- Claiming a fresh code REVIVES the account (see routes/auth.js), the
+-- Claiming a fresh code REVIVES the account (see routes/player-auth.js), the
 -- same trusted-human recovery path as the forgotten password above: an
 -- umpire mints a new code with GET /players/:id/claim-code, which mints
 -- lazily and so works on a row whose code was just wiped.

@@ -7,7 +7,7 @@
 // than waiting for a population to exist.
 // ============================================================
 
-import { Link } from '../lib/router'
+import { Link } from './Link'
 import Icon from './Icon'
 
 function PersonalBests({ bests }) {

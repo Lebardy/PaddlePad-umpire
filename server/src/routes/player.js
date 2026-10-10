@@ -393,7 +393,7 @@ router.post('/link', async (req, res) => {
 
     // A player who already has an account can still be given a code:
     // an umpire making a new one is the whole forgotten-password path
-    // (see routes/auth.js). Holding one is therefore NOT permission to
+    // (see routes/player-auth.js). Holding one is therefore NOT permission to
     // absorb a real account.
     //
     // google_sub counts as a real account for exactly the same reason a

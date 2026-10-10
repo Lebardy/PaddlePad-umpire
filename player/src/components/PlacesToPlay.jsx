@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { fetchFacilities } from '../lib/api'
-import { Link } from '../lib/router'
+import { Link } from './Link'
 import FacilityLogo from './FacilityLogo'
 import Icon from './Icon'
 

@@ -8,7 +8,7 @@
 // ============================================================
 
 import { useEffect, useState } from 'react'
-import { Link } from '../lib/router'
+import { Link } from '../components/Link'
 import { usePlayerData } from '../lib/PlayerData'
 import { fetchLeaderboard } from '../lib/api'
 import { personalBests, rollingWinRate } from '../lib/derive'

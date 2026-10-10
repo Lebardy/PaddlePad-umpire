@@ -12,7 +12,7 @@
 
 import { formatDate } from '../lib/format'
 import { changeClass, changeIcon, changeWords, weekView } from '../lib/ratingGraph'
-import { Link } from '../lib/router'
+import { Link } from './Link'
 import { useCountUp } from '../lib/motion'
 import { ordinal } from '../lib/leaderboard'
 import Icon from './Icon'

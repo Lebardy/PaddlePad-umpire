@@ -14,7 +14,8 @@
 // ============================================================
 
 import { useEffect, useState } from 'react'
-import { Link, navigate } from '../lib/router'
+import { Link } from '../components/Link'
+import { navigate } from '../lib/router'
 import { usePlayerData } from '../lib/PlayerData'
 import { fetchMatchGame } from '../lib/api'
 import { longestRun, matchStory, turningPoint } from '../lib/story'
