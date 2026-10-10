@@ -29,6 +29,8 @@ export default function Activity({ me }) {
   const [adminId, setAdminId] = useState('')
   const [action, setAction] = useState('')
   const [facilityId, setFacilityId] = useState('')
+  const [typed, setTyped] = useState('')
+  const [q, setQ] = useState('')
   const [error, setError] = useState(null)
   const [loadingMore, setLoadingMore] = useState(false)
 
@@ -41,10 +43,16 @@ export default function Activity({ me }) {
     activityFilters().then(setFilters).catch(() => {})
   }, [])
 
-  // A new filter starts again from the newest entry.
+  // Waits until typing stops before searching, the way People does.
+  useEffect(() => {
+    const timer = setTimeout(() => setQ(typed.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [typed])
+
+  // A new filter or search starts again from the newest entry.
   useEffect(() => {
     const id = ++requestId.current
-    listActivity({ adminId, action, facilityId })
+    listActivity({ adminId, action, facilityId, q })
       .then((data) => {
         if (requestId.current !== id) return
         setEntries(data.entries)
@@ -52,7 +60,7 @@ export default function Activity({ me }) {
         setError(null)
       })
       .catch((err) => { if (requestId.current === id) setError(err.message) })
-  }, [adminId, action, facilityId])
+  }, [adminId, action, facilityId, q])
 
   function choose(set, value) {
     setEntries(null)
@@ -63,7 +71,7 @@ export default function Activity({ me }) {
     const id = requestId.current
     setLoadingMore(true)
     try {
-      const data = await listActivity({ before: nextBefore, adminId, action, facilityId })
+      const data = await listActivity({ before: nextBefore, adminId, action, facilityId, q })
       if (requestId.current !== id) return
       setEntries((current) => [...(current ?? []), ...data.entries])
       setNextBefore(data.nextBefore)
@@ -78,6 +86,10 @@ export default function Activity({ me }) {
     <section>
       <PageBoard title="Activity" intro="Everything done on this site, newest first. Entries can’t be changed or deleted.">
         <div className="board-fields">
+          <label className="board-field">
+            <span>Search</span>
+            <input type="search" value={typed} placeholder="Details or who" onChange={(e) => setTyped(e.target.value)} />
+          </label>
           <label className="board-field">
             <span>Who</span>
             <select value={adminId} onChange={(e) => choose(setAdminId, e.target.value)}>
@@ -99,7 +111,7 @@ export default function Activity({ me }) {
       <div className="sheet">
         {error && <p className="form-error" role="alert">{error}</p>}
         {entries === null && !error && <p className="empty">Loading…</p>}
-        {entries?.length === 0 && <p className="empty">Nothing recorded for this choice.</p>}
+        {entries?.length === 0 && <p className="empty">{q ? `No entries match “${q}”.` : 'Nothing recorded for this choice.'}</p>}
 
         {entries?.length > 0 && (
           <div className="table-wrap">

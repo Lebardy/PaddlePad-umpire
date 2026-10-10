@@ -200,8 +200,9 @@ export function logoSrc(logoUrl, { small = false } = {}) {
 
 // Activity
 
-export function listActivity({ before, adminId, action, facilityId } = {}) {
+export function listActivity({ before, adminId, action, facilityId, q } = {}) {
   const params = new URLSearchParams()
+  if (q) params.set('q', q)
   if (before) params.set('before', before)
   if (adminId) params.set('adminId', adminId)
   if (action) params.set('action', action)

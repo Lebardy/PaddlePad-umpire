@@ -269,11 +269,11 @@ button.tally-cell:focus-visible { outline: 2px solid var(--lamp); outline-offset
 .board-fields { display: flex; gap: 0.75rem; }
 .board-field { display: grid; gap: 0.35rem; }
 .board-field > span { font-size: 0.85rem; color: var(--board-muted); }
-.board-field select {
+.board-field select, .board-field input {
   min-height: 2.75rem; min-width: 14rem; max-width: 20rem; padding: 0.4rem 0.7rem;
   background: var(--board-raised); color: var(--board-ink); border: 1px solid var(--board-rule); border-radius: var(--radius-sm);
 }
-.board-field select:focus-visible { outline: 2px solid var(--lamp); outline-offset: 1px; }
+.board-field select:focus-visible, .board-field input:focus-visible { outline: 2px solid var(--lamp); outline-offset: 1px; }
 
 /* --- The sheet below the board --- */
 .page { min-width: 0; color: var(--text); padding-bottom: 4rem; }
