@@ -88,11 +88,17 @@ export function readFacility(body = {}, { partial = false } = {}) {
       values[field.column] = text
     }
   }
+  // Read only when sent, when creating as well: a new facility that
+  // says nothing gets the column's own default, which is off.
+  if (Object.prototype.hasOwnProperty.call(body, 'filmsMatches')) {
+    if (typeof body.filmsMatches !== 'boolean') return { error: 'Films matches must be on or off' }
+    values.films_matches = body.filmsMatches
+  }
   return { values }
 }
 
 /** The only columns a facility create/update may ever set from caller-supplied values. */
-const FACILITY_VALUE_COLUMNS = ['name', 'area', 'location_url', 'opening_hours', 'hourly_fee_centavos', 'umpire_fee_centavos', 'details']
+const FACILITY_VALUE_COLUMNS = ['name', 'area', 'location_url', 'opening_hours', 'hourly_fee_centavos', 'umpire_fee_centavos', 'details', 'films_matches']
 
 /**
  * Keeps only the fixed, known facility columns present in `values`,
@@ -224,6 +230,7 @@ export function facilityPayload(row) {
     // Unlike the court fee, an unset umpire fee is simply left out.
     umpireFeeText: row.umpire_fee_centavos == null ? null : feeText(row.umpire_fee_centavos),
     details: row.details ?? null,
+    filmsMatches: row.films_matches === true,
     logoUrl: logoPath(row.id, row.logo_updated_at ?? null),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -277,7 +284,8 @@ export function readLogoUpload(body = {}) {
 // "Fee not set" is for admins; a player page just leaves it out.
 const playerFee = (centavos) => (centavos == null ? null : feeText(centavos))
 
-export function playerFacilitySummary(row) {
+/** `videoOn`: video is set up on this server; without it nothing films. */
+export function playerFacilitySummary(row, videoOn) {
   return {
     id: row.id,
     name: row.name,
@@ -287,10 +295,11 @@ export function playerFacilitySummary(row) {
     openingHours: row.opening_hours ?? null,
     feeText: playerFee(row.hourly_fee_centavos),
     umpireFeeText: playerFee(row.umpire_fee_centavos),
+    filmsMatches: videoOn === true && row.films_matches === true,
   }
 }
 
-export function playerFacilityPage(row) {
+export function playerFacilityPage(row, videoOn) {
   return {
     id: row.id,
     name: row.name,
@@ -301,5 +310,6 @@ export function playerFacilityPage(row) {
     locationUrl: row.location_url ?? null,
     details: row.details ?? null,
     logoUrl: logoPath(row.id, row.logo_updated_at ?? null),
+    filmsMatches: videoOn === true && row.films_matches === true,
   }
 }

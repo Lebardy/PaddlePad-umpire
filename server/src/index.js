@@ -1,6 +1,6 @@
 import cors from 'cors'
 import express from 'express'
-import { migrate, pool } from './db.js'
+import { migrate, pool, query } from './db.js'
 import { RATE_LIMITS_DISABLED, rateLimit } from './ratelimit.js'
 import { requestLog } from './requestlog.js'
 import authRoutes from './routes/auth.js'
@@ -24,6 +24,9 @@ import adminFacilitiesRoutes from './routes/admin-facilities.js'
 import adminOverviewRoutes from './routes/admin-overview.js'
 import { adminPlayersRoutes, adminUmpiresRoutes } from './routes/admin-people.js'
 import logoRoutes from './routes/logos.js'
+import videoRoutes from './routes/video.js'
+import { bucketConfig } from './bucket.js'
+import { tidyVideos } from './video-tidy.js'
 
 const app = express()
 
@@ -191,11 +194,16 @@ app.use('/admin/auth/me/google', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/admin/auth/me/backup-codes', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/admin', rateLimit({ max: 120, windowMs: 60_000 }))
 
+// A camera beats every 2 seconds and a tablet asks every 5, and one
+// facility's courts share an address: eight courts are about 340 a
+// minute. Well clear of that, and still a ceiling.
+app.use('/video', rateLimit({ max: 900, windowMs: 60_000 }))
 app.use('/auth', authRoutes)
 app.use('/auth', playerAuthRoutes)
 app.use('/players', playerAdminRoutes)
 app.use('/sessions', sessionRoutes)
 app.use('/matches', matchRoutes)
+app.use('/video', videoRoutes)
 app.use('/player', playerSelfRoutes)
 // Staging only: the smoke test removing what it made. Unset anywhere
 // else, so on production the path is simply not there.
@@ -236,6 +244,16 @@ migrate()
     app.listen(port, () => {
       console.log(`PaddlePad API listening on :${port}`)
     })
+    // Old and abandoned match videos, once a day, and once shortly
+    // after a start so a server that restarts daily still gets to it.
+    // Nothing is scheduled where there is no bucket.
+    if (bucketConfig()) {
+      const tidy = () => tidyVideos({ query, config: bucketConfig() })
+        .then((removed) => console.log('video clean-up', JSON.stringify(removed)))
+        .catch((error) => console.error('video clean-up failed:', error.message))
+      setTimeout(tidy, 5 * 60_000).unref()
+      setInterval(tidy, 24 * 60 * 60_000).unref()
+    }
   })
   .catch((error) => {
     console.error('Failed to apply schema:', error)

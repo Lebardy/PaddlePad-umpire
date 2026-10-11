@@ -1,6 +1,7 @@
 // Umpire sign-in and account routes, mounted at /auth. A player's are in
 // routes/player-auth.js, mounted at the same place.
 
+import { bucketConfig } from '../bucket.js'
 import { randomUUID } from 'node:crypto'
 import { Router } from 'express'
 import { query, withTransaction } from '../db.js'
@@ -47,6 +48,11 @@ function umpirePayload(row) {
     // the account screen; null only on a database old enough to still
     // allow an umpire without one.
     facilityName: row.facility_name ?? null,
+    // Whether this app offers its Camera screen: video is set up on
+    // this server and the umpire's facility films its matches. Only
+    // GET /auth/me reads the column, so every other answer says no and
+    // the app asks /auth/me after signing in.
+    camera: Boolean(bucketConfig()) && row.films_matches === true,
   }
 }
 
@@ -500,7 +506,7 @@ router.post('/login', async (req, res) => {
 router.get('/me', requireAuth, requireActiveUmpire(query), async (req, res) => {
   const { rows } = await query(
     `SELECT u.id, u.email, u.name, u.password_hash, u.google_email,
-            f.name AS facility_name
+            f.name AS facility_name, f.films_matches
        FROM umpires u
        LEFT JOIN facilities f ON f.id = u.facility_id
       WHERE u.id = $1`,

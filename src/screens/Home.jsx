@@ -34,7 +34,7 @@ function SessionList({ sessions, onOpenSession, showOwner = false }) {
   )
 }
 
-function Home({ onOpenSession, onOpenGuide, onOpenPlayers, umpire }) {
+function Home({ onOpenSession, onOpenGuide, onOpenPlayers, onOpenCamera, umpire }) {
   // Subscribed rather than read during render: previously this never
   // updated after a write, and only looked correct because navigating
   // away unmounted the screen.
@@ -150,6 +150,15 @@ function Home({ onOpenSession, onOpenGuide, onOpenPlayers, umpire }) {
                 <span className="tool-note">Show a player their sign-in code</span>
               </button>
             </li>
+            {/* Only where the facility films its matches; sign-in says so. */}
+            {umpire?.camera && onOpenCamera && (
+              <li>
+                <button className="export-btn" onClick={onOpenCamera}>
+                  <span><Icon name="camera" />Camera</span>
+                  <span className="tool-note">Film matches with this phone</span>
+                </button>
+              </li>
+            )}
           </ul>
         </>
       )}

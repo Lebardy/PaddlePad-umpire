@@ -12,6 +12,7 @@ import {
   getPlayerMatches,
   getRatingState,
   pointEndings,
+  pointRallyOrder,
   scoreProgression,
   summarisePlayer,
 } from '../player-stats.js'
@@ -26,6 +27,8 @@ import { getLeaderboard, getLeaderboardOpen } from '../leaderboard-store.js'
 import { rallyRatingFor, ratingHistoryFor } from '../rally-rating.js'
 import { findFacility, listFacilities } from '../facility-store.js'
 import { playerFacilityPage, playerFacilitySummary } from '../facility-rules.js'
+import { bucketConfig, signedReadUrl } from '../bucket.js'
+import { rallySeconds } from '../video-times.js'
 
 const router = Router()
 
@@ -165,6 +168,39 @@ router.get('/leaderboard', async (req, res) => {
 })
 
 /**
+ * A match's video for the point boxes, or null when it has none or
+ * video is not set up here: a link good for two hours, and for each
+ * POINT the second its rally starts at -- null for a point the video
+ * does not show. `row` is the match, `events` its rows in play order
+ * (with `at`), `log` the same events as the scoring engine reads them.
+ */
+async function pointVideo(row, events, log) {
+  const config = bucketConfig()
+  if (!config) return null
+  const { rows } = await query(
+    `SELECT file_key, duration_ms, width, height, first_frame_at
+       FROM match_videos WHERE match_id = $1 AND state = 'ready'`,
+    [row.id],
+  )
+  const video = rows[0]
+  if (!video) return null
+  const everyRally = rallySeconds({
+    startedAtMs: new Date(row.started_at).getTime(),
+    offsetMs: row.clock_offset_ms,
+    firstFrameAtMs: new Date(video.first_frame_at).getTime(),
+    durationMs: video.duration_ms,
+    rallies: events.filter((e) => e.type === 'rally').map((e) => ({ atMs: new Date(e.at).getTime() })),
+  })
+  return {
+    url: signedReadUrl(config, video.file_key),
+    durationMs: video.duration_ms,
+    width: video.width,
+    height: video.height,
+    seconds: pointRallyOrder(row, log).map((rally) => everyRally[rally] ?? null),
+  }
+}
+
+/**
  * How one of this player's own matches went, point by point.
  *
  * Its own call rather than part of /player/matches: a reading like this
@@ -182,7 +218,8 @@ router.get('/matches/:id/game', async (req, res) => {
 
   const { rows } = await query(
     `SELECT m.id, m.team_a, m.team_b, m.first_server_team, m.first_server_player,
-            m.right_start_a, m.right_start_b, m.point_target
+            m.right_start_a, m.right_start_b, m.point_target,
+            m.started_at, m.clock_offset_ms
        FROM matches m
        JOIN sessions s ON s.id = m.session_id
       WHERE m.id = $1
@@ -197,7 +234,7 @@ router.get('/matches/:id/game', async (req, res) => {
   if (!row) return res.status(404).json({ error: 'No such match' })
 
   const { rows: events } = await query(
-    `SELECT type, payload FROM match_events WHERE match_id = $1 ORDER BY seq`,
+    `SELECT type, payload, at FROM match_events WHERE match_id = $1 ORDER BY seq`,
     [row.id],
   )
   const log = events.map((e) => ({ type: e.type, ...e.payload }))
@@ -218,7 +255,7 @@ router.get('/matches/:id/game', async (req, res) => {
     byYou: by === req.player.id,
   }))
 
-  res.json({ margins, game: readGame(margins, row.point_target), points })
+  res.json({ margins, game: readGame(margins, row.point_target), points, video: await pointVideo(row, events, log) })
 })
 
 /**
@@ -608,7 +645,8 @@ router.get('/matches', async (req, res) => {
 /** Every place to play on PaddlePad, by name, for the People tab. */
 router.get('/facilities', async (req, res) => {
   const rows = await listFacilities(query, { all: true })
-  res.json({ facilities: rows.map(playerFacilitySummary) })
+  const videoOn = Boolean(bucketConfig())
+  res.json({ facilities: rows.map((row) => playerFacilitySummary(row, videoOn)) })
 })
 
 /** One place to play: what it is, where, when it's open and what it costs. */
@@ -616,7 +654,7 @@ router.get('/facilities/:id', async (req, res) => {
   if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such place' })
   const row = await findFacility(query, req.params.id)
   if (!row) return res.status(404).json({ error: 'No such place' })
-  res.json({ facility: playerFacilityPage(row) })
+  res.json({ facility: playerFacilityPage(row, Boolean(bucketConfig())) })
 })
 
 export default router

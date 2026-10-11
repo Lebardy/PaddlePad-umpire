@@ -13,6 +13,7 @@ import {
 import { useMatch, usePlayers } from '../lib/useLocalStore'
 import NotFound from './NotFound'
 import TakeoverNotice from '../components/TakeoverNotice'
+import MatchVideo from '../components/MatchVideo'
 import * as sync from '../lib/sync'
 import { getDeviceId } from '../lib/outbox'
 import { deriveMatchState, currentServerPlayerId, courtSides } from '../lib/pickleball'
@@ -553,6 +554,11 @@ function LiveMatch({ matchId, onBack }) {
             </button>
           </section>
         </>
+      )}
+
+      {/* Nothing shows when the match has no video, or video is off here. */}
+      {match.status === 'completed' && (
+        <MatchVideo matchId={matchId} events={match.events} describe={(event) => describeEvent(event, name)} />
       )}
 
       {match.status === 'completed' && (

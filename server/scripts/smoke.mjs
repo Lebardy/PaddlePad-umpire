@@ -2406,6 +2406,254 @@ async function main() {
     console.log('  ...  disconnecting Google when it is the only way in is covered by the offline canDisconnectGoogle checks')
   }
 
+  section('match video')
+  if (!ADMIN_SECTION || !OWNER_EMAIL || !OWNER_PASSWORD) {
+    console.log('  skip (needs a staging or local server, SMOKE_OWNER_EMAIL and SMOKE_OWNER_PASSWORD)')
+  } else {
+    const vOwner = (await request('/admin/auth/login', { method: 'POST', body: { email: OWNER_EMAIL, password: OWNER_PASSWORD } })).body.token
+    const vMe = await request('/auth/me', { bearer: token })
+    const vFacilities = (await request('/admin/facilities', { bearer: vOwner })).body.facilities ?? []
+    const vFacility = vFacilities.find((f) => f.name === vMe.body.umpire?.facilityName)
+    const vOther = vFacilities.find((f) => f.id !== vFacility?.id)
+    check("the smoke umpire's facility is found, and another one", Boolean(vFacility && vOther), JSON.stringify([vFacility?.name, vOther?.name]))
+    const vFilmedBefore = vFacility?.filmsMatches === true
+    const vStatusOff = await request('/video/camera/status', { bearer: token })
+    if (vStatusOff.status === 404 && vStatusOff.body.error === 'Video is not set up here') {
+      console.log('  skip (this server has no video bucket)')
+    } else {
+      const device = `smoke-camera-${Date.now()}`
+      const vSession = crypto.randomUUID()
+      const vOtherBefore = vOther.filmsMatches === true
+      let vStrangerNight = null   // [the stranger's token, their night], ended in the finally
+      // Whatever happens below, the facility goes back to how it was and the night is closed.
+      try {
+        const beat = (body, bearer = token) => request('/video/camera/beat', { method: 'POST', bearer, body: { deviceId: device, ...body } })
+
+        check('no token on a video route -> 401', (await request('/video/camera/status')).status === 401)
+        await request(`/admin/facilities/${vFacility.id}`, { method: 'PATCH', bearer: vOwner, body: { filmsMatches: false } })
+        check('where the facility does not film, sign-in offers no camera',
+          (await request('/auth/me', { bearer: token })).body.umpire?.camera === false)
+        await request(`/admin/facilities/${vFacility.id}`, { method: 'PATCH', bearer: vOwner, body: { filmsMatches: true } })
+        check('where it films, sign-in offers the camera',
+          (await request('/auth/me', { bearer: token })).body.umpire?.camera === true)
+
+        // A night of its own, so nothing else in this run is disturbed.
+        const vPlayers = []
+        for (const name of ['Smoke Video One', 'Smoke Video Two']) {
+          vPlayers.push((await request('/players', { method: 'POST', bearer: token, body: { name: `${name} ${Date.now()}` } })).body.player.id)
+        }
+        await request('/sessions', { method: 'POST', bearer: token, body: { id: vSession, name: `Smoke video ${Date.now()}` } })
+        await request(`/sessions/${vSession}/players`, { method: 'PUT', bearer: token, body: { playerIds: vPlayers } })
+
+        const quiet = await beat({ state: 'ready' })
+        // Earlier sections leave matches in progress for this umpire, so the beat may name one of those.
+        check('a beat is answered -> 200, with the time',
+          quiet.status === 200 && Math.abs(quiet.body.now - Date.now()) < 60_000, JSON.stringify(quiet.body).slice(0, 100))
+        check('the tablet then sees a ready camera', (await request('/video/camera/status', { bearer: token })).body.camera === 'ready')
+
+        const vMatch = crypto.randomUUID()
+        const startedAt = Date.now() - 60_000
+        const started = await request('/matches', {
+          method: 'POST', bearer: token,
+          body: { id: vMatch, sessionId: vSession, teamA: [vPlayers[0]], teamB: [vPlayers[1]], stacking: { A: false, B: false },
+            firstServer: { team: 'A', playerId: vPlayers[0] }, pointTarget: 11, startedAt },
+        })
+        check('a match is started -> 201', started.status === 201, JSON.stringify(started.body).slice(0, 100))
+        const named = await beat({ state: 'ready' })
+        check('the next beat names it, with who is playing',
+          named.body.match?.id === vMatch && named.body.match?.teamA?.length === 1 && /^Smoke Video One/.test(named.body.match.teamA[0]),
+          JSON.stringify(named.body.match))
+
+        const noDevice = await request(`/video/matches/${vMatch}/claim`, { method: 'POST', bearer: token, body: {} })
+        check('a claim with no device -> 400', noDevice.status === 400, String(noDevice.status))
+        const claim = await request(`/video/matches/${vMatch}/claim`, { method: 'POST', bearer: token, body: { deviceId: device } })
+        check('the camera claims the match -> 201', claim.status === 201, JSON.stringify(claim.body))
+        check('claiming it again from the same phone is fine -> 201',
+          (await request(`/video/matches/${vMatch}/claim`, { method: 'POST', bearer: token, body: { deviceId: device } })).status === 201)
+        check('another phone cannot -> 409',
+          (await request(`/video/matches/${vMatch}/claim`, { method: 'POST', bearer: token, body: { deviceId: 'another-phone' } })).status === 409)
+        await beat({ state: 'filming', matchId: vMatch })
+        check('the tablet sees it filming', (await request('/video/camera/status', { bearer: token })).body.camera === 'filming')
+        check('another phone on the same account is not told to film this match',
+          (await request('/video/camera/beat', { method: 'POST', bearer: token, body: { deviceId: 'another-phone', state: 'ready' } })).body.match?.id !== vMatch)
+        check('while it is being filmed there is nothing to watch yet',
+          (await request(`/video/matches/${vMatch}`, { bearer: token })).body.video?.state === 'filming')
+
+        // Three rallies, stamped by a tablet whose clock is 5 s behind the server.
+        const lag = 5000
+        const tapped = [20_000, 35_000, 50_000].map((ms) => startedAt + ms)
+        // The receiving side wins the first rally (a side-out, no point), so two of the three rallies are points.
+        const events = tapped.map((at, seq) => ({
+          id: crypto.randomUUID(), seq, type: 'rally', at, actingPlayerId: vPlayers[1], outcome: 'winner', zone: 'baseline',
+        }))
+        const logged = await request(`/matches/${vMatch}/log`, {
+          method: 'PUT', bearer: token,
+          body: { deviceId: 'smoke-tablet', events, sentAt: Date.now() - lag, endedEarly: true, endedEarlyAt: Date.now() - lag },
+        })
+        check('the tablet saves three rallies with its clock and stops the match -> 200',
+          logged.status === 200 && logged.body.match?.status === 'completed', JSON.stringify(logged.body).slice(0, 120))
+
+        const meta = { deviceId: device, width: 1920, height: 1080, durationMs: 120_000, firstFrameAt: startedAt + lag + 4000, repacked: true }
+        check('a video over 2 GB -> 413',
+          (await request(`/video/matches/${vMatch}/upload`, { method: 'POST', bearer: token, body: { ...meta, bytes: 2 * 1024 ** 3 + 1 } })).status === 413)
+        check('a video with no size -> 400',
+          (await request(`/video/matches/${vMatch}/upload`, { method: 'POST', bearer: token, body: { ...meta, bytes: 0 } })).status === 400)
+        check('another phone cannot send for it -> 409',
+          (await request(`/video/matches/${vMatch}/upload`, { method: 'POST', bearer: token, body: { ...meta, deviceId: 'another-phone', bytes: 1024 } })).status === 409)
+        const up = await request(`/video/matches/${vMatch}/upload`, { method: 'POST', bearer: token, body: { ...meta, bytes: 1024 } })
+        check('the camera asks to send 1024 bytes -> 200 with a form for the bucket',
+          up.status === 200 && /^https:\/\//.test(up.body.form?.url ?? '') && up.body.form?.fields?.['Content-Type'] === 'video/mp4', String(up.status))
+        check('saying done before sending -> 409',
+          (await request(`/video/matches/${vMatch}/done`, { method: 'POST', bearer: token, body: { deviceId: device } })).status === 409)
+        const clip = new Uint8Array(1024).map((_, i) => i % 251)
+        const form = new FormData()
+        for (const [name, value] of Object.entries(up.body.form?.fields ?? {})) form.append(name, value)
+        form.append('file', new Blob([clip], { type: 'video/mp4' }), 'clip.mp4')
+        const stored = await fetch(up.body.form.url, { method: 'POST', body: form })
+        check('the bucket takes the file straight from here', stored.status >= 200 && stored.status < 300, String(stored.status))
+        const done = await request(`/video/matches/${vMatch}/done`, { method: 'POST', bearer: token, body: { deviceId: device } })
+        check('done -> 200', done.status === 200, JSON.stringify(done.body))
+        check('done again is fine -> 200',
+          (await request(`/video/matches/${vMatch}/done`, { method: 'POST', bearer: token, body: { deviceId: device } })).status === 200)
+
+        const watch = await request(`/video/matches/${vMatch}`, { bearer: token })
+        const v = watch.body.video
+        check('the umpire can now watch: ready, lined up by the clock, with its size',
+          v?.state === 'ready' && v.linedUpBy === 'clock' && v.repacked === true && v.durationMs === 120_000 && v.width === 1920 && v.height === 1080,
+          JSON.stringify({ ...v, url: v?.url ? '[link]' : null }).slice(0, 200))
+        // First picture 4 s after the start. Rally ends at 20, 35, 50 s -> they start at 0 (before the video), 16 and 31.
+        // Within a second: the offset the server worked out includes however long the save took to arrive.
+        const secondsSeen = v?.rallies?.map((r) => r.second) ?? []
+        check('each rally has its second, in play order, with the tablet clock corrected',
+          secondsSeen.length === 3 && typeof secondsSeen[0] === 'number' && secondsSeen[0] <= 1 && Math.abs(secondsSeen[1] - 16) <= 1 && Math.abs(secondsSeen[2] - 31) <= 1
+            && v.rallies.every((r, i) => r.id === events[i].id),
+          JSON.stringify(secondsSeen))
+        const played = await fetch(v.url)
+        check('the link plays the file from the bucket', played.status === 200 && (await played.arrayBuffer()).byteLength === 1024, String(played.status))
+
+        // A player who was in the match watches it.
+        const vCode = await request(`/players/${vPlayers[0]}/claim-code`, { bearer: token })
+        const vPlayerToken = (await asPlayer('/auth/player/claim', { method: 'POST', body: { code: vCode.body.claimCode } })).body.token
+        const vGame = await asPlayer(`/player/matches/${vMatch}/game`, { bearer: vPlayerToken })
+        const pv = vGame.body.video
+        check("the player's match read carries the video: a link, its length and its picture size",
+          vGame.status === 200 && /^https:\/\//.test(pv?.url ?? '') && pv.durationMs === 120_000 && pv.width === 1920 && pv.height === 1080,
+          JSON.stringify({ ...pv, url: pv?.url ? '[link]' : null }).slice(0, 160))
+        // The first rally was a side-out, so the two points are the second and third rallies, not the first two.
+        check('one second for each point, the same as the rallies they were',
+          vGame.body.points?.length === 2 && pv?.seconds?.length === 2
+            && pv.seconds[0] === v.rallies[1].second && pv.seconds[1] === v.rallies[2].second
+            && pv.seconds[0] !== v.rallies[0].second,
+          JSON.stringify(pv?.seconds))
+        const pPlayed = await fetch(pv.url)
+        check("the player's link plays the file", pPlayed.status === 200 && (await pPlayed.arrayBuffer()).byteLength === 1024, String(pPlayed.status))
+        const vList = await asPlayer('/player/matches', { bearer: vPlayerToken })
+        check("the player's match list marks it as having a video",
+          (vList.body.matches ?? []).find((m) => m.id === vMatch)?.hasVideo === true, JSON.stringify((vList.body.matches ?? []).map((m) => m.hasVideo)))
+        const vPlaces = await asPlayer('/player/facilities', { bearer: vPlayerToken })
+        check('Places to play says which facility films',
+          (vPlaces.body.facilities ?? []).find((f) => f.id === vFacility.id)?.filmsMatches === true
+            && (vPlaces.body.facilities ?? []).every((f) => typeof f.filmsMatches === 'boolean'),
+          JSON.stringify((vPlaces.body.facilities ?? []).map((f) => f.filmsMatches)))
+        check("and so does the facility's page",
+          (await asPlayer(`/player/facilities/${vFacility.id}`, { bearer: vPlayerToken })).body.facility?.filmsMatches === true)
+        const vOutsider = (await request('/players', { method: 'POST', bearer: token, body: { name: `Smoke Video Outsider ${Date.now()}` } })).body.player.id
+        const vOutsiderToken = (await asPlayer('/auth/player/claim', {
+          method: 'POST', body: { code: (await request(`/players/${vOutsider}/claim-code`, { bearer: token })).body.claimCode },
+        })).body.token
+        check('a player who was not in the match cannot read it -> 404',
+          (await asPlayer(`/player/matches/${vMatch}/game`, { bearer: vOutsiderToken })).status === 404)
+
+        const vStranger = await request('/admin/invites', { method: 'POST', bearer: vOwner, body: { note: 'smoke video', facilityId: vOther.id } })
+        const strangerIn = await request('/auth/register', {
+          method: 'POST', body: { email: `smoke.video.${Date.now()}@example.com`, name: 'Smoke Video Stranger', password: 'smoke-video-pass-1', invite: vStranger.body.invite?.code },
+        })
+        check("an umpire from another facility is made", strangerIn.status === 201, String(strangerIn.status))
+        check("and cannot watch this match's video -> 404",
+          (await request(`/video/matches/${vMatch}`, { bearer: strangerIn.body.token })).status === 404)
+        check('nor remove it -> 404',
+          (await request(`/video/matches/${vMatch}`, { method: 'DELETE', bearer: strangerIn.body.token })).status === 404)
+        check('nor claim it -> 404',
+          (await request(`/video/matches/${vMatch}/claim`, { method: 'POST', bearer: strangerIn.body.token, body: { deviceId: 'x' } })).status === 404)
+
+        // The stranger has no matches of their own, so a beat as them sees only what is made here.
+        await request(`/admin/facilities/${vOther.id}`, { method: 'PATCH', bearer: vOwner, body: { filmsMatches: true } })
+        const sBearer = strangerIn.body.token
+        const sPlayers = []
+        for (const name of ['Smoke Video Three', 'Smoke Video Four']) {
+          sPlayers.push((await request('/players', { method: 'POST', bearer: sBearer, body: { name: `${name} ${Date.now()}` } })).body.player.id)
+        }
+        const sSession = crypto.randomUUID()
+        vStrangerNight = [sBearer, sSession]
+        await request('/sessions', { method: 'POST', bearer: sBearer, body: { id: sSession, name: `Smoke video left open ${Date.now()}` } })
+        await request(`/sessions/${sSession}/players`, { method: 'PUT', bearer: sBearer, body: { playerIds: sPlayers } })
+        const sMatch = crypto.randomUUID()
+        await request('/matches', {
+          method: 'POST', bearer: sBearer,
+          body: { id: sMatch, sessionId: sSession, teamA: [sPlayers[0]], teamB: [sPlayers[1]], stacking: { A: false, B: false },
+            firstServer: { team: 'A', playerId: sPlayers[0] }, pointTarget: 11, startedAt: Date.now() - 20 * 60_000 },
+        })
+        const sBeat = () => request('/video/camera/beat', { method: 'POST', bearer: sBearer, body: { deviceId: 'smoke-stranger-phone', state: 'ready' } })
+        const leftOpen = await sBeat()
+        check('a match left open for 20 minutes does not start a camera', leftOpen.status === 200 && leftOpen.body.match === null, JSON.stringify(leftOpen.body.match))
+        const saved = await request(`/matches/${sMatch}/log`, {
+          method: 'PUT', bearer: sBearer,
+          body: { deviceId: 'smoke-stranger-tablet', events: [{ id: crypto.randomUUID(), seq: 0, type: 'rally', at: Date.now(), actingPlayerId: sPlayers[0], outcome: 'winner', zone: 'baseline' }], sentAt: Date.now() },
+        })
+        check('the same match, once it is being scored, does -> 200', saved.status === 200, JSON.stringify(saved.body).slice(0, 100))
+        check('and the next beat names it', (await sBeat()).body.match?.id === sMatch)
+
+        check('fix timing with no second -> 400',
+          (await request(`/video/matches/${vMatch}/line-up`, { method: 'POST', bearer: token, body: { eventId: events[1].id, second: null } })).status === 400)
+        check('fix timing with a rally that is not in the match -> 400',
+          (await request(`/video/matches/${vMatch}/line-up`, { method: 'POST', bearer: token, body: { eventId: crypto.randomUUID(), second: 10 } })).status === 400)
+        // "The rally that was logged at 35 s ended at video second 40."
+        const fixed = await request(`/video/matches/${vMatch}/line-up`, { method: 'POST', bearer: token, body: { eventId: events[1].id, second: 40 } })
+        // Exact this time: the tablet's offset is on both sides of the sum and cancels.
+        check('fix timing -> 200, lined up by the umpire, and every rally moved with it',
+          fixed.status === 200 && fixed.body.video?.linedUpBy === 'umpire' && JSON.stringify(fixed.body.video.rallies.map((r) => r.second)) === '[5,25,40]',
+          JSON.stringify(fixed.body.video?.rallies?.map((r) => r.second)))
+
+        const gone = await request(`/video/matches/${vMatch}`, { method: 'DELETE', bearer: token })
+        check('the umpire removes the video -> 204', gone.status === 204, String(gone.status))
+        check('then there is none', (await request(`/video/matches/${vMatch}`, { bearer: token })).body.video === null)
+        const vGameAfter = await asPlayer(`/player/matches/${vMatch}/game`, { bearer: vPlayerToken })
+        check('once removed, the player sees the match with no video',
+          vGameAfter.status === 200 && vGameAfter.body.video === null && vGameAfter.body.points?.length === 2, `video is null: ${vGameAfter.body.video === null}`)
+        check('and the list no longer marks it',
+          ((await asPlayer('/player/matches', { bearer: vPlayerToken })).body.matches ?? []).find((m) => m.id === vMatch)?.hasVideo === false)
+        check('and the link no longer plays', (await fetch(v.url)).status === 404)
+        check('removing it again is fine -> 204', (await request(`/video/matches/${vMatch}`, { method: 'DELETE', bearer: token })).status === 204)
+
+        // A match cancelled while a video is held takes the video with it.
+        const vMatch2 = crypto.randomUUID()
+        await request('/matches', {
+          method: 'POST', bearer: token,
+          body: { id: vMatch2, sessionId: vSession, teamA: [vPlayers[0]], teamB: [vPlayers[1]], stacking: { A: false, B: false },
+            firstServer: { team: 'A', playerId: vPlayers[0] }, pointTarget: 11, startedAt: Date.now() },
+        })
+        await request(`/video/matches/${vMatch2}/claim`, { method: 'POST', bearer: token, body: { deviceId: device } })
+        const up2 = await request(`/video/matches/${vMatch2}/upload`, { method: 'POST', bearer: token, body: { ...meta, firstFrameAt: Date.now(), bytes: 1024 } })
+        const form2 = new FormData()
+        for (const [name, value] of Object.entries(up2.body.form?.fields ?? {})) form2.append(name, value)
+        form2.append('file', new Blob([clip], { type: 'video/mp4' }), 'clip.mp4')
+        await fetch(up2.body.form.url, { method: 'POST', body: form2 })
+        await request(`/video/matches/${vMatch2}/done`, { method: 'POST', bearer: token, body: { deviceId: device } })
+        const link2 = (await request(`/video/matches/${vMatch2}`, { bearer: token })).body.video?.url
+        check('a second match has its video', (await fetch(link2)).status === 200)
+        check('cancelling that match -> 204', (await request(`/matches/${vMatch2}`, { method: 'DELETE', bearer: token })).status === 204)
+        check('and its file is gone from the bucket', (await fetch(link2)).status === 404)
+
+      } finally {
+        // Each on its own, so one failing does not leave the facilities filming.
+        if (vStrangerNight) await request(`/sessions/${vStrangerNight[1]}/end`, { method: 'POST', bearer: vStrangerNight[0], body: {} }).catch(() => {})
+        await request(`/admin/facilities/${vOther.id}`, { method: 'PATCH', bearer: vOwner, body: { filmsMatches: vOtherBefore } }).catch(() => {})
+        await request(`/sessions/${vSession}/end`, { method: 'POST', bearer: token, body: {} }).catch(() => {})
+        await request(`/admin/facilities/${vFacility.id}`, { method: 'PATCH', bearer: vOwner, body: { filmsMatches: vFilmedBefore } }).catch(() => {})
+      }
+    }
+  }
+
   section('admin site — facilities')
   if (!ADMIN_SECTION || !OWNER_EMAIL || !OWNER_PASSWORD) {
     console.log('  skip (needs a staging or local server, SMOKE_OWNER_EMAIL and SMOKE_OWNER_PASSWORD)')
@@ -2633,6 +2881,39 @@ async function main() {
     const afterFacUpdatedNoChange = await countByAction('facility.updated', facilityAId, fOwnerToken)
     check('a save with no actual change writes no facility.updated entry',
       afterFacUpdatedNoChange === afterFacUpdated, `${afterFacUpdated} -> ${afterFacUpdatedNoChange}`)
+
+    // --- the "Films matches" switch ---
+    check('a new facility does not film', pageA.body.facility?.filmsMatches === false, String(pageA.body.facility?.filmsMatches))
+    const filmBAsA = await request(`/admin/facilities/${facilityBId}`, {
+      method: 'PATCH', bearer: adminAToken, body: { filmsMatches: true },
+    })
+    check("admin A switching on facility B's filming -> 404", filmBAsA.status === 404, String(filmBAsA.status))
+    const filmBad = await request(`/admin/facilities/${facilityAId}`, {
+      method: 'PATCH', bearer: adminAToken, body: { filmsMatches: 'yes' },
+    })
+    check('a switch that is neither on nor off -> 400',
+      filmBad.status === 400 && filmBad.body.error === 'Films matches must be on or off', JSON.stringify(filmBad.body).slice(0, 100))
+    const beforeFilm = await countByAction('facility.updated', facilityAId, fOwnerToken)
+    const filmOn = await request(`/admin/facilities/${facilityAId}`, {
+      method: 'PATCH', bearer: adminAToken, body: { filmsMatches: true },
+    })
+    check("admin A switches on facility A's filming -> 200, and the answer says so",
+      filmOn.status === 200 && filmOn.body.facility?.filmsMatches === true, JSON.stringify(filmOn.body).slice(0, 120))
+    const filmActivity = await request('/admin/activity?action=facility.updated', { bearer: fOwnerToken })
+    const filmEntry = (filmActivity.body.entries ?? []).find((e) => e.targetId === facilityAId)
+    check('Activity records it as a change to match filming',
+      (await countByAction('facility.updated', facilityAId, fOwnerToken)) === beforeFilm + 1
+        && /^Changed match filming for /.test(filmEntry?.summary ?? ''), String(filmEntry?.summary))
+    const filmList = await request('/admin/facilities', { bearer: fOwnerToken })
+    check('the facility list says which facility films',
+      (filmList.body.facilities ?? []).find((f) => f.id === facilityAId)?.filmsMatches === true
+        && (filmList.body.facilities ?? []).find((f) => f.id === facilityBId)?.filmsMatches === false,
+      JSON.stringify((filmList.body.facilities ?? []).filter((f) => [facilityAId, facilityBId].includes(f.id)).map((f) => f.filmsMatches)))
+    const filmOff = await request(`/admin/facilities/${facilityAId}`, {
+      method: 'PATCH', bearer: fOwnerToken, body: { filmsMatches: false },
+    })
+    check('the owner switches it off again -> 200', filmOff.status === 200 && filmOff.body.facility?.filmsMatches === false,
+      JSON.stringify(filmOff.body).slice(0, 120))
 
     // --- 6: pausing players stays the owner's alone ---
     const plName = `Smoke Facility Player ${fStamp}`

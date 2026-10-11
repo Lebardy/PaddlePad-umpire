@@ -62,7 +62,12 @@ function FacilityPage({ id }) {
           <FacilityLogo name={place.name} logoUrl={place.logoUrl} size="lg" />
         </div>
         <div className="place-main">
-          <h1>{place.name}</h1>
+          <h1>
+            {place.name}
+            {place.filmsMatches && (
+              <span className="place-video" role="img" aria-label="Films matches"><Icon name="camera" size={18} /></span>
+            )}
+          </h1>
           {place.area && <p className="place-where">{place.area}</p>}
         </div>
         <div className="place-figures">

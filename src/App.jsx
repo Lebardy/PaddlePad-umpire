@@ -8,9 +8,11 @@ import Guide from './screens/Guide'
 import Players from './screens/Players'
 import Account from './screens/Account'
 import CouldntSync from './screens/CouldntSync'
+import Camera from './screens/Camera'
 import { clearSession, fetchCurrentUmpire, getStoredUmpire, subscribeSessionEnded } from './lib/api'
 import SyncIndicator from './components/SyncIndicator'
 import UpdateNotice from './components/UpdateNotice'
+import CameraIcon from './components/CameraIcon'
 import * as sync from './lib/sync'
 import { clearLocalData, migrateLegacyData } from './lib/storage'
 import { pendingCount } from './lib/outbox'
@@ -132,6 +134,12 @@ function App() {
     setView({ name: 'home' })
   }
 
+  // The sign-in and account answers come without the facility's filming flag, so ask again straight away.
+  function handleSignedIn(fresh) {
+    setUmpire(fresh)
+    fetchCurrentUmpire().then((current) => { if (current) setUmpire(current) }).catch(() => {})
+  }
+
   const signedIn = Boolean(umpire)
 
   return (
@@ -150,6 +158,8 @@ function App() {
         {signedIn && (
           <div className="header-right">
             <UpdateNotice />
+            {/* Only while scoring, and only where the facility films. */}
+            {view.name === 'match' && umpire.camera && <CameraIcon />}
             <SyncIndicator onOpenSync={() => setView({ name: 'sync' })} />
             {/* Permanent, not a one-time tour. Most of what the guide
                 explains is as useful on the second night as the first,
@@ -204,7 +214,11 @@ function App() {
       >
         {!signedIn && !authChecked && <p className="empty">Checking sign-in…</p>}
 
-        {!signedIn && authChecked && <Login onSignedIn={setUmpire} />}
+        {/* Signing in answers before the server has looked up whether
+            this umpire's facility films, so ask again straight away. */}
+        {!signedIn && authChecked && (
+          <Login onSignedIn={handleSignedIn} />
+        )}
 
         {signedIn && (
           <>
@@ -214,8 +228,10 @@ function App() {
                 onOpenGuide={() => setView({ name: 'guide' })}
                 umpire={umpire}
                 onOpenPlayers={() => setView({ name: 'players' })}
+                onOpenCamera={() => setView({ name: 'camera' })}
               />
             )}
+            {view.name === 'camera' && <Camera onBack={goHome} />}
             {view.name === 'guide' && <Guide onBack={goHome} />}
             {view.name === 'players' && <Players onBack={goHome} />}
             {view.name === 'sync' && <CouldntSync onBack={goHome} />}
@@ -223,7 +239,7 @@ function App() {
             {view.name === 'account' && (
               <Account
                 umpire={umpire}
-                onUmpireChange={setUmpire}
+                onUmpireChange={handleSignedIn}
                 onBack={goHome}
                 onSignOut={handleSignOut}
               />

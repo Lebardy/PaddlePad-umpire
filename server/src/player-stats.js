@@ -49,6 +49,7 @@ export async function getPlayerMatches(query, playerId, ratings = null) {
             m.ended_at,
             m.ended_early,
             s.name AS session_name,
+            EXISTS (SELECT 1 FROM match_videos v WHERE v.match_id = m.id AND v.state = 'ready') AS has_video,
             row_number() OVER (ORDER BY m.ended_at) AS match_number
        FROM matches m
        JOIN sessions s ON s.id = m.session_id
@@ -129,6 +130,9 @@ export async function getPlayerMatches(query, playerId, ratings = null) {
       endedAt: row.ended_at,
       startedAt: row.started_at,
       endedEarly: row.ended_early,
+      // A camera icon on the row and the match page; the video itself
+      // comes with the point-by-point read.
+      hasVideo: row.has_video === true,
       isDoubles: row.team_a.length === 2,
       pointTarget: row.point_target,
       // From this player's point of view, not team A's.
@@ -205,6 +209,19 @@ export function rallyCounts(teamA, teamB, events, playerId) {
     if (event.outcome !== 'winner' && event.actingPlayerId === playerId) ownMistakes += 1
   }
   return { rallies, sideWon, ownMistakes }
+}
+
+/**
+ * For each point, which of the match's rallies it was: 0 for the first
+ * rally played, 1 for the second, and so on. One entry per POINT, lined
+ * up with scoreProgression() and pointEndings(), since all three come
+ * from the same replay. A rally that only changed the serve is no
+ * point, so its number is skipped. This is what lets a point be found
+ * in a match's video, where every rally has a place.
+ */
+export function pointRallyOrder(row, events) {
+  const rallies = events.filter((event) => event.type === 'rally')
+  return scoringRallies(row, events).map(({ event }) => rallies.indexOf(event))
 }
 
 /** Every rally that put a point on the board, with the score after it. */
