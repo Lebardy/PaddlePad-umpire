@@ -12,6 +12,7 @@ import Camera from './screens/Camera'
 import { clearSession, fetchCurrentUmpire, getStoredUmpire, subscribeSessionEnded } from './lib/api'
 import SyncIndicator from './components/SyncIndicator'
 import UpdateNotice from './components/UpdateNotice'
+import CameraIcon from './components/CameraIcon'
 import * as sync from './lib/sync'
 import { clearLocalData, migrateLegacyData } from './lib/storage'
 import { pendingCount } from './lib/outbox'
@@ -151,6 +152,8 @@ function App() {
         {signedIn && (
           <div className="header-right">
             <UpdateNotice />
+            {/* Only while scoring, and only where the facility films. */}
+            {view.name === 'match' && umpire.camera && <CameraIcon />}
             <SyncIndicator onOpenSync={() => setView({ name: 'sync' })} />
             {/* Permanent, not a one-time tour. Most of what the guide
                 explains is as useful on the second night as the first,
