@@ -37,8 +37,8 @@ const remembered = () => { try { return localStorage.getItem(CAMERA_KEY) } catch
 const remember = (id) => { try { if (id) localStorage.setItem(CAMERA_KEY, id); else localStorage.removeItem(CAMERA_KEY) } catch { /* private mode */ } }
 const recordType = () => pickType((type) => MediaRecorder.isTypeSupported(type))
 
-// Whether this browser can film at all; the Tools entry and open() both ask.
-export const canFilm = () => !!(navigator.mediaDevices?.getUserMedia && window.MediaRecorder && recordType())
+// Whether this browser can film at all. The Tools entry shows either way, so the Camera screen can say why not.
+const canFilm = () => !!(navigator.mediaDevices?.getUserMedia && window.MediaRecorder && recordType())
 
 export function createCameraSession({ deviceId, onChange }) {
   let state = {
