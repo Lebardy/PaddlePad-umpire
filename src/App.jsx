@@ -134,6 +134,12 @@ function App() {
     setView({ name: 'home' })
   }
 
+  // The sign-in and account answers come without the facility's filming flag, so ask again straight away.
+  function handleSignedIn(fresh) {
+    setUmpire(fresh)
+    fetchCurrentUmpire().then((current) => { if (current) setUmpire(current) }).catch(() => {})
+  }
+
   const signedIn = Boolean(umpire)
 
   return (
@@ -211,12 +217,7 @@ function App() {
         {/* Signing in answers before the server has looked up whether
             this umpire's facility films, so ask again straight away. */}
         {!signedIn && authChecked && (
-          <Login
-            onSignedIn={(fresh) => {
-              setUmpire(fresh)
-              fetchCurrentUmpire().then((current) => { if (current) setUmpire(current) }).catch(() => {})
-            }}
-          />
+          <Login onSignedIn={handleSignedIn} />
         )}
 
         {signedIn && (
@@ -238,7 +239,7 @@ function App() {
             {view.name === 'account' && (
               <Account
                 umpire={umpire}
-                onUmpireChange={setUmpire}
+                onUmpireChange={handleSignedIn}
                 onBack={goHome}
                 onSignOut={handleSignOut}
               />

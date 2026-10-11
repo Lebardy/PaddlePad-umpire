@@ -84,7 +84,7 @@ function Camera({ onBack }) {
         <div className="camera-upright">
           <button className="back-link" onClick={leave}>&larr; Back</button>
           <div className="camera-upright-body">
-            <span className="camera-turn" aria-hidden="true"><Icon name="rotate" size={72} /></span>
+            <span className="camera-turn" aria-hidden="true"><Icon name="retry" size={72} /></span>
             <h2>Turn the phone sideways</h2>
             <p>The camera starts once the picture is wide.</p>
           </div>

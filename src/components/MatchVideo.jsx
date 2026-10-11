@@ -34,7 +34,10 @@ function MatchVideo({ matchId, events, describe }) {
         setVideo(found)
         if (found && found.state !== 'ready') timer = setTimeout(ask, 10_000)
       })
-      .catch(() => { /* no video service, or offline: the match reads as it always did */ })
+      .catch((error) => {
+        // No video service reads as no video; any other failure (a wifi blip) is asked again.
+        if (live && error.status !== 404) timer = setTimeout(ask, 10_000)
+      })
     ask()
     return () => { live = false; clearTimeout(timer) }
   }, [matchId])
@@ -117,7 +120,7 @@ function MatchVideo({ matchId, events, describe }) {
             {fixing ? (
               <>
                 <span className="video-rally-words">{describe(byId.get(rally.id))}</span>
-                <button className="video-this" onClick={() => lineUp(rally.id)} disabled={busy}>This one</button>
+                <button className="video-this" onClick={() => lineUp(rally.id)} disabled={busy || at === 0}>This one</button>
               </>
             ) : (
               <button className="video-rally" onClick={() => jump(rally.second)} disabled={rally.second === null}>

@@ -152,6 +152,8 @@
 
 @media (max-width: 560px) {
   .umpire-name, .umpire-facility { display: none; }
+  /* With the camera pill beside it there is no room for the tag, and a cut tag reads worse than none. */
+  .app-header:has(.camera-pill) .app-brand-sub { display: none; }
 }
 
 .account-btn:hover .umpire-name { color: var(--primary); }
