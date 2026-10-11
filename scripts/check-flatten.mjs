@@ -65,7 +65,9 @@ function piece(sequence, runs) {
   const build = (offsets) => box('moof', full('mfhd', 0, 0, u32(sequence)), ...runs.map((run, i) => box('traf',
     full('tfhd', 0, 0x020020, u32(run.track.id), u32(run.track.restFlags)),
     full('tfdt', 1, 0, u64(run.time)),
-    run.track === VIDEO
+    run.track === VIDEO && run.samples[0]?.offset !== undefined
+      ? full('trun', 1, 0xB05, u32(run.samples.length), u32(offsets[i]), u32(KEY_FLAGS), ...run.samples.flatMap((s) => [u32(s.duration), u32(s.size), u32(s.offset)]))
+      : run.track === VIDEO
       ? full('trun', 1, 0x305, u32(run.samples.length), u32(offsets[i]), u32(KEY_FLAGS), ...run.samples.flatMap((s) => [u32(s.duration), u32(s.size)]))
       : full('trun', 1, 0x301, u32(run.samples.length), u32(offsets[i]), ...run.samples.flatMap((s) => [u32(s.duration), u32(s.size)])))))
   const moofSize = build(runs.map(() => 0)).length
@@ -99,18 +101,19 @@ function readBack(buf) {
       const from = b.pos + 12; const n = (b.pos + b.size - from) / width
       return Array.from({ length: n }, (_, i) => (width === 8 ? Number(buf.readBigUInt64BE(from + i * 8)) : buf.readUInt32BE(from + i * 4))) }
     const stts = list('stts').slice(1); const stsc = list('stsc').slice(1); const stsz = list('stsz').slice(2)
-    // Positions are 32-bit ("stco"), or 64-bit ("co64") in a file too big for that: a 32-bit count, then 64-bit numbers.
-    const wide = child(buf, stbl, 'co64')
-    const stco = wide
-      ? Array.from({ length: buf.readUInt32BE(wide.pos + 12) }, (_, i) => Number(buf.readBigUInt64BE(wide.pos + 16 + i * 8)))
-      : list('stco').slice(1)
+    const stco = list('stco').slice(1)
+    // Picture offsets (signed): [count, offset] pairs, spread out to one per sample.
+    const cttsBox = child(buf, stbl, 'ctts'); const offsets = []
+    if (cttsBox) for (let i = 0; i < buf.readUInt32BE(cttsBox.pos + 12); i++) {
+      for (let n = 0; n < buf.readUInt32BE(cttsBox.pos + 16 + i * 8); n++) offsets.push(buf.readInt32BE(cttsBox.pos + 20 + i * 8))
+    }
     const durations = []; for (let i = 0; i < stts.length; i += 2) for (let n = 0; n < stts[i]; n++) durations.push(stts[i + 1])
     // samples per chunk, spread over the chunks
     const perChunk = stco.map((_, c) => { let count = 0; for (let i = 0; i < stsc.length; i += 3) if (stsc[i] <= c + 1) count = stsc[i + 1]; return count })
     const where = []; let n = 0
     stco.forEach((offset, c) => { let at = offset; for (let i = 0; i < perChunk[c]; i++) { where.push(at); at += stsz[n++] } })
     tracks[buf.readUInt32BE(tkhd.pos + 28)] = {
-      sizes: stsz, durations, where, keys: list('stss')?.slice(1) ?? null, widePositions: Boolean(wide),
+      sizes: stsz, durations, where, keys: list('stss')?.slice(1) ?? null, offsets: cttsBox ? offsets : null,
       mediaLength: Number(buf.readBigUInt64BE(mdhd.pos + 32)), trackLength: Number(buf.readBigUInt64BE(tkhd.pos + 36)),
     }
   }
@@ -144,6 +147,19 @@ section('an ordinary recording: two pieces, picture and sound in each')
   check('what it reports', { pieces: info.pieces, seconds: info.seconds, tracks: info.tracks },
     { pieces: 2, seconds: 0.2, tracks: { 1: { samples: 6, runs: 2, keys: 2 }, 2: { samples: 8, runs: 2, keys: 8 } } })
   check('the file grew only by the bigger header and one 16-byte box header', out.length - input.length, info.headerBytes + 16 - (oldHeader - 28))
+}
+
+section('pictures shown later or earlier than they are stored (picture offsets, some negative)')
+{
+  const withOffsets = (count, duration, size, offsets) => samples(count, duration, size).map((s, n) => ({ ...s, offset: offsets[n] }))
+  const input = Buffer.concat([header(),
+    piece(1, [{ track: VIDEO, time: 0, firstNumber: 0, samples: withOffsets(3, 1000, 50, [2000, -1000, -1000]) }, { track: SOUND, time: 0, firstNumber: 0, samples: samples(4, 1024, 20) }]),
+    piece(2, [{ track: VIDEO, time: 3000, firstNumber: 3, samples: withOffsets(3, 1000, 60, [0, 3000, -2000]) }, { track: SOUND, time: 4096, firstNumber: 4, samples: samples(4, 1024, 30) }])])
+  const { out } = await repack(input)
+  const back = readBack(out)
+  check('the repacked picture offsets are exactly those, negatives included', back.tracks[1].offsets, [2000, -1000, -1000, 0, 3000, -2000])
+  check('sound has none', back.tracks[2].offsets, null)
+  check('and the bytes are still right', marksRight(out, back.tracks[1], 1), true)
 }
 
 section('a gap between pieces is kept as time, not lost')
@@ -184,34 +200,6 @@ section('a recording cut off inside its last piece')
   check('lengths are what was kept', [back.tracks[1].mediaLength, back.tracks[2].mediaLength], [4000, 4096])
 }
 
-section('a recording too big for 32-bit positions (over 4 GB)')
-{
-  // Nobody can make a 5 GB file in a check, so this is a small recording whose last data box SAYS it runs to
-  // 5 GB, behind a stand-in that reports that size. What is being checked is that the tables switch to 64-bit
-  // positions and still point at the right bytes.
-  const FIVE_GB = 5_000_000_000
-  const head = header()
-  const first = piece(1, [{ track: VIDEO, time: 0, firstNumber: 0, samples: samples(3, 1000, 50) }, { track: SOUND, time: 0, firstNumber: 0, samples: samples(4, 1024, 20) }])
-  const last = piece(2, [{ track: VIDEO, time: 3000, firstNumber: 3, samples: samples(3, 1000, 60) }, { track: SOUND, time: 4096, firstNumber: 4, samples: samples(4, 1024, 30) }])
-  const mdatAt = last.indexOf('mdat') - 4
-  const lastStart = head.length + first.length + mdatAt
-  // The same box with a 64-bit size in front: its data moves 8 bytes on, so the piece's own offsets must too.
-  const longLast = Buffer.concat([last.subarray(0, mdatAt), u32(1), Buffer.from('mdat', 'latin1'), u64(FIVE_GB - lastStart), last.subarray(mdatAt + 8)])
-  for (const at of [...longLast.subarray(0, mdatAt).toString('latin1').matchAll(/trun/g)].map((m) => m.index)) {
-    longLast.writeUInt32BE(longLast.readUInt32BE(at + 12) + 8, at + 12)
-  }
-  const real = new Blob([head, first, longLast])
-  const big = { size: FIVE_GB, slice: (from = 0, to = FIVE_GB) => real.slice(Math.min(from, real.size), Math.min(to, real.size)) }
-  const { blob } = await flattenMp4(big)
-  const out = Buffer.from(await blob.arrayBuffer())
-  const back = readBack(out)
-  check('positions are written as 64-bit', [back.tracks[1].widePositions, back.tracks[2].widePositions], [true, true])
-  check('and still point at the right bytes', [marksRight(out, back.tracks[1], 1), marksRight(out, back.tracks[2], 2)], [true, true])
-  check('nothing was dropped', [back.tracks[1].sizes.length, back.tracks[2].sizes.length], [6, 8])
-  const mdat = boxesIn(out, 0, 64 * 1024).find((b) => b.kind === 'mdat')
-  check('the one data box says it holds everything after the new header', mdat.size, 16 + FIVE_GB - head.length)
-}
-
 section('what it refuses')
 {
   const refused = async (bytes) => { try { await repack(bytes); return 'accepted' } catch (error) { return error.message } }
@@ -222,6 +210,8 @@ section('what it refuses')
   check('a file that is already ordinary', await refused(header({ fragmented: false })), 'this file is already an ordinary MP4')
   check('something that is not a video', await refused(Buffer.from('not a video at all')), 'expected the file to open with ftyp then moov')
   check('a header with nothing after it', await refused(header()), 'a track with nothing recorded')
+  // Positions would wrap at 4 GB; the size alone is enough to refuse, so a stand-in is all it takes.
+  check('a recording of 5 GB', await flattenMp4({ size: 5_000_000_000 }).then(() => 'accepted', (error) => error.message), 'this recording is too big to repack')
 }
 
 section("the trial's real recordings")

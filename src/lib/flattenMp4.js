@@ -22,6 +22,7 @@
 
 export async function flattenMp4(recording) {
   const total = recording.size
+  if (total + (1 << 20) > 0xFFFFFFFF) throw new Error('this recording is too big to repack')
   const read = async (from, to) => new Uint8Array(await recording.slice(from, Math.min(to, total)).arrayBuffer())
   const view = (u8) => new DataView(u8.buffer, u8.byteOffset, u8.byteLength)
   const kindAt = (u8, at) => String.fromCharCode(u8[at], u8[at + 1], u8[at + 2], u8[at + 3])
@@ -53,21 +54,15 @@ export async function flattenMp4(recording) {
     out.set(body, 8)
     return out
   }
-  // A full box whose body is a list of numbers: 32-bit each, or, when `wide`, a 32-bit count followed by
-  // 64-bit numbers. With `signedFrom`, every second number from that index on is written as signed
-  // (a picture offset can be negative).
-  const numbers = (kind, version, list, wide = false, signedFrom = -1) => {
-    const out = new Uint8Array(4 + (wide ? 4 + (list.length - 1) * 8 : list.length * 4)); const dv = view(out)
+  // A full box whose body is a list of 32-bit numbers. With `signedFrom`, every second number from that
+  // index on is written as signed (a picture offset can be negative).
+  const numbers = (kind, version, list, signedFrom = -1) => {
+    const out = new Uint8Array(4 + list.length * 4); const dv = view(out)
     dv.setUint32(0, version << 24)
-    if (wide) {
-      dv.setUint32(4, list[0])
-      for (let i = 1; i < list.length; i++) dv.setBigUint64(8 + (i - 1) * 8, BigInt(list[i]))
-    } else {
-      for (let i = 0; i < list.length; i++) {
-        const signed = signedFrom >= 0 && i >= signedFrom && (i - signedFrom) % 2 === 1
-        if (signed) dv.setInt32(4 + i * 4, list[i])
-        else dv.setUint32(4 + i * 4, list[i])
-      }
+    for (let i = 0; i < list.length; i++) {
+      const signed = signedFrom >= 0 && i >= signedFrom && (i - signedFrom) % 2 === 1
+      if (signed) dv.setInt32(4 + i * 4, list[i])
+      else dv.setUint32(4 + i * 4, list[i])
     }
     return box(kind, [out])
   }
@@ -156,24 +151,24 @@ export async function flattenMp4(recording) {
     }
   }
 
-  function tables(track, isVideo, shift, wide) {
+  function tables(track, isVideo, shift) {
     const n = track.times.length; const parts = []
     const durations = track.times.map((t, i) => (i + 1 < n ? track.times[i + 1] : track.end) - t)
     if (durations.some((d) => d < 0)) throw new Error('the times in this recording go backwards')
     const stts = runs(durations)
     parts.push(numbers('stts', 0, [stts.length, ...stts.flat()]))
-    if (track.offsets.some((o) => o)) { const ctts = runs(track.offsets); parts.push(numbers('ctts', 1, [ctts.length, ...ctts.flat()], false, 1)) }
+    if (track.offsets.some((o) => o)) { const ctts = runs(track.offsets); parts.push(numbers('ctts', 1, [ctts.length, ...ctts.flat()], 1)) }
     if (isVideo && !track.keys.every((k) => k)) { const keys = []; track.keys.forEach((k, i) => { if (k) keys.push(i + 1) }); parts.push(numbers('stss', 0, [keys.length, ...keys])) }
     const stsc = []
     track.chunks.forEach(([, count], i) => { if (!stsc.length || stsc[stsc.length - 1][1] !== count) stsc.push([i + 1, count, 1]) })
     parts.push(numbers('stsc', 0, [stsc.length, ...stsc.flat()]))
     parts.push(numbers('stsz', 0, [0, n, ...track.sizes]))
-    parts.push(numbers(wide ? 'co64' : 'stco', 0, [track.chunks.length, ...track.chunks.map(([start]) => start + shift)], wide))
+    parts.push(numbers('stco', 0, [track.chunks.length, ...track.chunks.map(([start]) => start + shift)]))
     return { parts, mediaLength: durations.reduce((a, b) => a + b, 0) }
   }
 
   // 3. The new header. `shift` = how far the kept bytes move (new position - old position).
-  function build(shift, wide) {
+  function build(shift) {
     const lengths = {}
     const trak = (t) => {
       const kids = boxes(moov, t.pos + 8, t.pos + t.size)
@@ -188,7 +183,7 @@ export async function flattenMp4(recording) {
       const minfParts = boxes(moov, minf.pos + 8, minf.pos + minf.size).map((b) => {
         if (b.kind !== 'stbl') return moov.subarray(b.pos, b.pos + b.size)
         const stsd = boxes(moov, b.pos + 8, b.pos + b.size).filter((s) => s.kind === 'stsd').map((s) => moov.subarray(s.pos, s.pos + s.size))
-        const made = tables(tracks[trackId], isVideo, shift, wide); mediaLength = made.mediaLength
+        const made = tables(tracks[trackId], isVideo, shift); mediaLength = made.mediaLength
         return box('stbl', [...stsd, ...made.parts])
       })
       const movieLength = Math.floor(mediaLength * movieScale / scale)
@@ -203,12 +198,11 @@ export async function flattenMp4(recording) {
   }
 
   // The header's size does not depend on the positions written in it, so build once to learn it, then for real.
-  const wide = total + (1 << 20) > 0xFFFFFFFF
-  const draft = build(0, wide).header
+  const draft = build(0).header
   const dataHeader = new Uint8Array(16); const dh = view(dataHeader)
   dh.setUint32(0, 1); dataHeader.set([0x6d, 0x64, 0x61, 0x74], 4); dh.setBigUint64(8, BigInt(16 + total - oldEnd))
   const shift = ftyp.size + draft.length + dataHeader.length - oldEnd
-  const { header, movie } = build(shift, wide)
+  const { header, movie } = build(shift)
   if (header.length !== draft.length) throw new Error('the header changed size')
   const blob = new Blob([recording.slice(0, ftyp.size), header, dataHeader, recording.slice(oldEnd)], { type: 'video/mp4' })
   const info = { pieces, reads, headerBytes: header.length, seconds: movie / movieScale, tracks: {} }
