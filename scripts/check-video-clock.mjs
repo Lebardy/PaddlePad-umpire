@@ -5,7 +5,7 @@
 //   node scripts/check-video-clock.mjs
 // ============================================================
 
-import { START_LATE_MS, beatAction, clockText, firstFrameAt, isWide, noteBeatTiming, pickBitrate, pickType } from '../src/lib/videoClock.js'
+import { START_LATE_MS, beatAction, clockText, firstFrameAt, isWholeBeat, isWide, noteBeatTiming, pickBitrate, pickType } from '../src/lib/videoClock.js'
 
 let pass = 0
 let fail = 0
@@ -27,6 +27,8 @@ section("the server's clock, from the beats")
   check('a slower one does not', noteBeatTiming(better, { sentAt: 5000, receivedAt: 5900, serverNow: 8700 }), better)
   check('an answer with no time is ignored', noteBeatTiming(better, { sentAt: 1, receivedAt: 2, serverNow: undefined }), better)
   check('so is a clock that ran backwards', noteBeatTiming(null, { sentAt: 10, receivedAt: 5, serverNow: 100 }), null)
+  check('an answer with the time is whole', isWholeBeat({ now: 4200, match: null }), true)
+  check('one cut off on the way, read as empty, is not', isWholeBeat({}), false)
 }
 
 section('when the first picture was taken')

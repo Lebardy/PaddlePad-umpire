@@ -23,7 +23,7 @@
 import * as api from './api'
 import { flattenMp4 } from './flattenMp4'
 import { sendToBucket } from './videoUpload'
-import { beatAction, firstFrameAt, isWide, noteBeatTiming, pickBitrate, pickType } from './videoClock'
+import { beatAction, firstFrameAt, isWholeBeat, isWide, noteBeatTiming, pickBitrate, pickType } from './videoClock'
 
 const BEAT_MS = 2_000
 const RETRY_MS = 15_000
@@ -126,6 +126,8 @@ export function createCameraSession({ deviceId, onChange }) {
       const answer = await api.cameraBeat({
         deviceId, state: filming ? 'filming' : state.sending ? 'sending' : 'ready', matchId: filming?.matchId,
       })
+      // A cut-off answer says nothing about the match: without this it would read as "no match" and stop the recording.
+      if (!isWholeBeat(answer)) throw new Error('cut-off beat')
       timing = noteBeatTiming(timing, { sentAt, receivedAt: Date.now(), serverNow: answer.now })
       const action = beatAction(filming?.matchId ?? null, answer.match?.id ?? null, filmed.has(answer.match?.id))
       if (action === 'start' && state.wide) await startFilming(answer.match)

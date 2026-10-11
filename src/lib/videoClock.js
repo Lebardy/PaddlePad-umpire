@@ -19,6 +19,11 @@ export function noteBeatTiming(timing, { sentAt, receivedAt, serverNow }) {
   return { offsetMs: Math.round(serverNow - (sentAt + receivedAt) / 2), roundTripMs }
 }
 
+/** Every real answer to a beat carries the server's time; one cut off on the way is read as empty and has none. */
+export function isWholeBeat(answer) {
+  return Number.isFinite(answer?.now)
+}
+
 /** When the first picture was taken, in the server's time. */
 export function firstFrameAt(recorderStartedAt, timing) {
   return Math.round(recorderStartedAt - START_LATE_MS + (timing?.offsetMs ?? 0))
