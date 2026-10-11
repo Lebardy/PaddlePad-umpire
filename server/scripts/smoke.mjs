@@ -2423,6 +2423,8 @@ async function main() {
     } else {
       const device = `smoke-camera-${Date.now()}`
       const vSession = crypto.randomUUID()
+      const vOtherBefore = vOther.filmsMatches === true
+      let vStrangerNight = null   // [the stranger's token, their night], ended in the finally
       // Whatever happens below, the facility goes back to how it was and the night is closed.
       try {
         const beat = (body, bearer = token) => request('/video/camera/beat', { method: 'POST', bearer, body: { deviceId: device, ...body } })
@@ -2461,16 +2463,6 @@ async function main() {
         check('the next beat names it, with who is playing',
           named.body.match?.id === vMatch && named.body.match?.teamA?.length === 1 && /^Smoke Video One/.test(named.body.match.teamA[0]),
           JSON.stringify(named.body.match))
-
-        // A match started 20 minutes ago and not saved since is left open, not being played.
-        const vStale = crypto.randomUUID()
-        await request('/matches', {
-          method: 'POST', bearer: token,
-          body: { id: vStale, sessionId: vSession, teamA: [vPlayers[0]], teamB: [vPlayers[1]], stacking: { A: false, B: false },
-            firstServer: { team: 'A', playerId: vPlayers[0] }, pointTarget: 11, startedAt: Date.now() - 20 * 60_000 },
-        })
-        check('a match left open for 20 minutes is not offered to a camera',
-          (await request('/video/camera/beat', { method: 'POST', bearer: token, body: { deviceId: 'stale-probe', state: 'ready' } })).body.match?.id !== vStale)
 
         const noDevice = await request(`/video/matches/${vMatch}/claim`, { method: 'POST', bearer: token, body: {} })
         check('a claim with no device -> 400', noDevice.status === 400, String(noDevice.status))
@@ -2548,6 +2540,33 @@ async function main() {
         check('nor claim it -> 404',
           (await request(`/video/matches/${vMatch}/claim`, { method: 'POST', bearer: strangerIn.body.token, body: { deviceId: 'x' } })).status === 404)
 
+        // The stranger has no matches of their own, so a beat as them sees only what is made here.
+        await request(`/admin/facilities/${vOther.id}`, { method: 'PATCH', bearer: vOwner, body: { filmsMatches: true } })
+        const sBearer = strangerIn.body.token
+        const sPlayers = []
+        for (const name of ['Smoke Video Three', 'Smoke Video Four']) {
+          sPlayers.push((await request('/players', { method: 'POST', bearer: sBearer, body: { name: `${name} ${Date.now()}` } })).body.player.id)
+        }
+        const sSession = crypto.randomUUID()
+        vStrangerNight = [sBearer, sSession]
+        await request('/sessions', { method: 'POST', bearer: sBearer, body: { id: sSession, name: `Smoke video left open ${Date.now()}` } })
+        await request(`/sessions/${sSession}/players`, { method: 'PUT', bearer: sBearer, body: { playerIds: sPlayers } })
+        const sMatch = crypto.randomUUID()
+        await request('/matches', {
+          method: 'POST', bearer: sBearer,
+          body: { id: sMatch, sessionId: sSession, teamA: [sPlayers[0]], teamB: [sPlayers[1]], stacking: { A: false, B: false },
+            firstServer: { team: 'A', playerId: sPlayers[0] }, pointTarget: 11, startedAt: Date.now() - 20 * 60_000 },
+        })
+        const sBeat = () => request('/video/camera/beat', { method: 'POST', bearer: sBearer, body: { deviceId: 'smoke-stranger-phone', state: 'ready' } })
+        const leftOpen = await sBeat()
+        check('a match left open for 20 minutes does not start a camera', leftOpen.status === 200 && leftOpen.body.match === null, JSON.stringify(leftOpen.body.match))
+        const saved = await request(`/matches/${sMatch}/log`, {
+          method: 'PUT', bearer: sBearer,
+          body: { deviceId: 'smoke-stranger-tablet', events: [{ id: crypto.randomUUID(), seq: 0, type: 'rally', at: Date.now(), actingPlayerId: sPlayers[0], outcome: 'winner', zone: 'baseline' }], sentAt: Date.now() },
+        })
+        check('the same match, once it is being scored, does -> 200', saved.status === 200, JSON.stringify(saved.body).slice(0, 100))
+        check('and the next beat names it', (await sBeat()).body.match?.id === sMatch)
+
         check('fix timing with no second -> 400',
           (await request(`/video/matches/${vMatch}/line-up`, { method: 'POST', bearer: token, body: { eventId: events[1].id, second: null } })).status === 400)
         check('fix timing with a rally that is not in the match -> 400',
@@ -2585,6 +2604,8 @@ async function main() {
         check('and its file is gone from the bucket', (await fetch(link2)).status === 404)
 
       } finally {
+        if (vStrangerNight) await request(`/sessions/${vStrangerNight[1]}/end`, { method: 'POST', bearer: vStrangerNight[0], body: {} })
+        await request(`/admin/facilities/${vOther.id}`, { method: 'PATCH', bearer: vOwner, body: { filmsMatches: vOtherBefore } })
         await request(`/sessions/${vSession}/end`, { method: 'POST', bearer: token, body: {} })
         await request(`/admin/facilities/${vFacility.id}`, { method: 'PATCH', bearer: vOwner, body: { filmsMatches: vFilmedBefore } })
       }
