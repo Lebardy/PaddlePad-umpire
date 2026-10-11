@@ -419,7 +419,10 @@ export function pushMatch(match) {
 export function pushMatchLog(matchId, { deviceId, events, endedEarly, endedEarlyAt }) {
   return apiFetch(`/matches/${matchId}/log`, {
     method: 'PUT',
-    body: { deviceId, events, endedEarly, endedEarlyAt },
+    // sentAt is this device's clock as the save leaves. The server
+    // compares it with its own to learn how far this clock is out,
+    // which is what lines a match's video up with these taps.
+    body: { deviceId, events, endedEarly, endedEarlyAt, sentAt: Date.now() },
   }).then((d) => d.match)
 }
 
@@ -468,4 +471,49 @@ export function setSessionEnded(sessionId, { ended = true } = {}) {
     method: 'POST',
     body: { ended },
   }).then((d) => d.session)
+}
+
+// ============================================================
+// Match video
+//
+// The server signs and keeps track; the video itself goes from the
+// phone straight to storage (lib/videoUpload.js) and is played straight
+// from it. Every call here answers 404 where video is not set up.
+// ============================================================
+
+/** The Camera screen's 2-second "I am here". Answers with the server's time and the match to film, if any. */
+export function cameraBeat({ deviceId, state, matchId }) {
+  return apiFetch('/video/camera/beat', { method: 'POST', body: { deviceId, state, matchId } })
+}
+
+/** What the scoring screen's camera icon shows: 'none', 'ready' or 'filming'. */
+export function fetchCameraStatus({ signal } = {}) {
+  return apiFetch('/video/camera/status', { signal }).then((d) => d.camera)
+}
+
+export function claimMatchVideo(matchId, deviceId) {
+  return apiFetch(`/video/matches/${matchId}/claim`, { method: 'POST', body: { deviceId } })
+}
+
+/** `meta` is { deviceId, bytes, width, height, durationMs, firstFrameAt, repacked }. Answers with the form to send the file through. */
+export function startVideoUpload(matchId, meta) {
+  return apiFetch(`/video/matches/${matchId}/upload`, { method: 'POST', body: meta }).then((d) => d.form)
+}
+
+export function finishVideoUpload(matchId, deviceId) {
+  return apiFetch(`/video/matches/${matchId}/done`, { method: 'POST', body: { deviceId } })
+}
+
+/** A match's video as the server describes it, or null when it has none. */
+export function fetchMatchVideo(matchId, { signal } = {}) {
+  return apiFetch(`/video/matches/${matchId}`, { signal }).then((d) => d.video)
+}
+
+/** Fix timing: this rally ended at this second of the video. */
+export function lineUpMatchVideo(matchId, eventId, second) {
+  return apiFetch(`/video/matches/${matchId}/line-up`, { method: 'POST', body: { eventId, second } }).then((d) => d.video)
+}
+
+export function removeMatchVideo(matchId) {
+  return apiFetch(`/video/matches/${matchId}`, { method: 'DELETE' })
 }
