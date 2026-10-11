@@ -294,6 +294,7 @@ export function playerFacilitySummary(row) {
     openingHours: row.opening_hours ?? null,
     feeText: playerFee(row.hourly_fee_centavos),
     umpireFeeText: playerFee(row.umpire_fee_centavos),
+    filmsMatches: row.films_matches === true,
   }
 }
 
@@ -308,5 +309,6 @@ export function playerFacilityPage(row) {
     locationUrl: row.location_url ?? null,
     details: row.details ?? null,
     logoUrl: logoPath(row.id, row.logo_updated_at ?? null),
+    filmsMatches: row.films_matches === true,
   }
 }

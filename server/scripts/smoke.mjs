@@ -2486,9 +2486,11 @@ async function main() {
           id: crypto.randomUUID(), seq, type: 'rally', at, actingPlayerId: vPlayers[0], outcome: 'winner', zone: 'baseline',
         }))
         const logged = await request(`/matches/${vMatch}/log`, {
-          method: 'PUT', bearer: token, body: { deviceId: 'smoke-tablet', events, sentAt: Date.now() - lag },
+          method: 'PUT', bearer: token,
+          body: { deviceId: 'smoke-tablet', events, sentAt: Date.now() - lag, endedEarly: true, endedEarlyAt: Date.now() - lag },
         })
-        check('the tablet saves three rallies with its clock -> 200', logged.status === 200, JSON.stringify(logged.body).slice(0, 120))
+        check('the tablet saves three rallies with its clock and stops the match -> 200',
+          logged.status === 200 && logged.body.match?.status === 'completed', JSON.stringify(logged.body).slice(0, 120))
 
         const meta = { deviceId: device, width: 1920, height: 1080, durationMs: 120_000, firstFrameAt: startedAt + lag + 4000, repacked: true }
         check('a video over 2 GB -> 413',
@@ -2527,6 +2529,38 @@ async function main() {
           JSON.stringify(secondsSeen))
         const played = await fetch(v.url)
         check('the link plays the file from the bucket', played.status === 200 && (await played.arrayBuffer()).byteLength === 1024, String(played.status))
+
+        // A player who was in the match watches it.
+        const vCode = await request(`/players/${vPlayers[0]}/claim-code`, { bearer: token })
+        const vPlayerToken = (await asPlayer('/auth/player/claim', { method: 'POST', body: { code: vCode.body.claimCode } })).body.token
+        const vGame = await asPlayer(`/player/matches/${vMatch}/game`, { bearer: vPlayerToken })
+        const pv = vGame.body.video
+        check("the player's match read carries the video: a link, its length and its picture size",
+          vGame.status === 200 && /^https:\/\//.test(pv?.url ?? '') && pv.durationMs === 120_000 && pv.width === 1920 && pv.height === 1080,
+          JSON.stringify({ ...pv, url: pv?.url ? '[link]' : null }).slice(0, 160))
+        // The server served every rally and won it, so every rally was a point: the same seconds the umpire saw.
+        check('one second for each point, the same as the rallies they were',
+          pv?.seconds?.length === vGame.body.points?.length && pv.seconds.length === 3
+            && pv.seconds[0] <= 1 && Math.abs(pv.seconds[1] - 16) <= 1 && Math.abs(pv.seconds[2] - 31) <= 1,
+          JSON.stringify(pv?.seconds))
+        const pPlayed = await fetch(pv.url)
+        check("the player's link plays the file", pPlayed.status === 200 && (await pPlayed.arrayBuffer()).byteLength === 1024, String(pPlayed.status))
+        const vList = await asPlayer('/player/matches', { bearer: vPlayerToken })
+        check("the player's match list marks it as having a video",
+          (vList.body.matches ?? []).find((m) => m.id === vMatch)?.hasVideo === true, JSON.stringify((vList.body.matches ?? []).map((m) => m.hasVideo)))
+        const vPlaces = await asPlayer('/player/facilities', { bearer: vPlayerToken })
+        check('Places to play says which facility films',
+          (vPlaces.body.facilities ?? []).find((f) => f.id === vFacility.id)?.filmsMatches === true
+            && (vPlaces.body.facilities ?? []).every((f) => typeof f.filmsMatches === 'boolean'),
+          JSON.stringify((vPlaces.body.facilities ?? []).map((f) => f.filmsMatches)))
+        check("and so does the facility's page",
+          (await asPlayer(`/player/facilities/${vFacility.id}`, { bearer: vPlayerToken })).body.facility?.filmsMatches === true)
+        const vOutsider = (await request('/players', { method: 'POST', bearer: token, body: { name: `Smoke Video Outsider ${Date.now()}` } })).body.player.id
+        const vOutsiderToken = (await asPlayer('/auth/player/claim', {
+          method: 'POST', body: { code: (await request(`/players/${vOutsider}/claim-code`, { bearer: token })).body.claimCode },
+        })).body.token
+        check('a player who was not in the match cannot read it -> 404',
+          (await asPlayer(`/player/matches/${vMatch}/game`, { bearer: vOutsiderToken })).status === 404)
 
         const vStranger = await request('/admin/invites', { method: 'POST', bearer: vOwner, body: { note: 'smoke video', facilityId: vOther.id } })
         const strangerIn = await request('/auth/register', {
@@ -2581,6 +2615,11 @@ async function main() {
         const gone = await request(`/video/matches/${vMatch}`, { method: 'DELETE', bearer: token })
         check('the umpire removes the video -> 204', gone.status === 204, String(gone.status))
         check('then there is none', (await request(`/video/matches/${vMatch}`, { bearer: token })).body.video === null)
+        const vGameAfter = await asPlayer(`/player/matches/${vMatch}/game`, { bearer: vPlayerToken })
+        check('once removed, the player sees the match with no video',
+          vGameAfter.status === 200 && vGameAfter.body.video === null && vGameAfter.body.points?.length === 3, JSON.stringify(vGameAfter.body.video))
+        check('and the list no longer marks it',
+          ((await asPlayer('/player/matches', { bearer: vPlayerToken })).body.matches ?? []).find((m) => m.id === vMatch)?.hasVideo === false)
         check('and the link no longer plays', (await fetch(v.url)).status === 404)
         check('removing it again is fine -> 204', (await request(`/video/matches/${vMatch}`, { method: 'DELETE', bearer: token })).status === 204)
 

@@ -290,18 +290,20 @@ section('what players see of a facility')
   }
   check('the list row', rules.playerFacilitySummary(row),
     { id: 'f1', name: 'Riverside Courts', area: 'Lahug', logoUrl: `/logos/f1?v=${at.getTime()}`,
-      openingHours: '6 AM – 10 PM', feeText: '₱150 per hour', umpireFeeText: '₱100 per hour' })
+      openingHours: '6 AM – 10 PM', feeText: '₱150 per hour', umpireFeeText: '₱100 per hour', filmsMatches: false })
   check('the page', rules.playerFacilityPage(row), {
     id: 'f1', name: 'Riverside Courts', area: 'Lahug', openingHours: '6 AM – 10 PM', feeText: '₱150 per hour',
     umpireFeeText: '₱100 per hour',
-    locationUrl: 'https://maps.example/x', details: 'Four courts', logoUrl: `/logos/f1?v=${at.getTime()}`,
+    locationUrl: 'https://maps.example/x', details: 'Four courts', logoUrl: `/logos/f1?v=${at.getTime()}`, filmsMatches: false,
   })
   const bare = { id: 'f2', name: 'New Place' }
   check('an empty facility has only its name', rules.playerFacilityPage(bare), {
     id: 'f2', name: 'New Place', area: null, openingHours: null, feeText: null, umpireFeeText: null,
-    locationUrl: null, details: null, logoUrl: null,
+    locationUrl: null, details: null, logoUrl: null, filmsMatches: false,
   })
   check('a free facility says so', rules.playerFacilityPage({ ...bare, hourly_fee_centavos: 0 }).feeText, 'Free')
+  check('a facility that films says so in the list', rules.playerFacilitySummary({ ...bare, films_matches: true }).filmsMatches, true)
+  check('and on its page', rules.playerFacilityPage({ ...bare, films_matches: true }).filmsMatches, true)
 }
 
 section('films matches')
