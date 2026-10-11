@@ -12,6 +12,8 @@ import { rallyEndingProblem } from '../rally-endings.js'
 import { invalidateRallyRatings } from '../rally-rating-store.js'
 import { umpireScope } from '../facility-rules.js'
 import { LEASE_MINUTES, heldByAnotherDevice } from '../scoring-lease.js'
+import { bucketConfig, deleteFile } from '../bucket.js'
+import { clockOffsetMs } from '../video-times.js'
 
 const router = Router()
 router.use(requireAuth, requireActiveUmpire(query))
@@ -438,7 +440,10 @@ router.put('/:id/log', async (req, res) => {
               ended_early = $4,
               ended_at = CASE WHEN $2 = 'completed' THEN COALESCE($5::timestamptz, now()) END,
               scoring_device = $6,
-              scoring_claimed_at = now()
+              scoring_claimed_at = now(),
+              -- How far this tablet's clock is from ours, for lining a
+              -- video up with these taps. Kept when a save sends none.
+              clock_offset_ms = COALESCE($7, clock_offset_ms)
         WHERE id = $1`,
       [
         req.params.id,
@@ -447,6 +452,7 @@ router.put('/:id/log', async (req, res) => {
         endedEarly && !derived.completed,
         completed && endedAtSource ? new Date(endedAtSource).toISOString() : null,
         deviceId,
+        clockOffsetMs(Date.now(), Number(req.body?.sentAt ?? NaN)),
       ],
     )
   })
@@ -495,8 +501,15 @@ router.delete('/:id', async (req, res) => {
     })
   }
 
+  // The video's row goes with the match; its file has to be asked for.
+  const video = await query('SELECT file_key FROM match_videos WHERE match_id = $1', [req.params.id])
   await query('DELETE FROM matches WHERE id = $1', [req.params.id])
   invalidateRallyRatings()
+  const config = bucketConfig()
+  if (config && video.rows[0]?.file_key) {
+    // Best effort: a file left behind is swept by the daily clean-up.
+    await deleteFile(config, video.rows[0].file_key).catch((error) => console.error('could not delete a cancelled match\'s video', error.message))
+  }
   res.status(204).end()
 })
 

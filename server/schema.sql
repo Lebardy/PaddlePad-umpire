@@ -835,3 +835,39 @@ UPDATE admin_activity
 -- only where this is on; where it is off, a player in a match may film
 -- it themselves.
 ALTER TABLE facilities ADD COLUMN IF NOT EXISTS films_matches BOOLEAN NOT NULL DEFAULT false;
+
+-- How far the scoring tablet's clock is from this server's, in
+-- milliseconds: add it to a rally's `at` to get the server's time. The
+-- umpire app sends its own clock with every save of a match's log.
+-- Null until it has, and for matches from before this existed.
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS clock_offset_ms INTEGER;
+
+-- A match's video. The file itself is in the bucket, sent there by the
+-- phone that filmed it; this row says whose it is, where it is, and
+-- when its first picture was taken, which is all that lining it up with
+-- the rallies needs. One per match, gone with the match.
+CREATE TABLE IF NOT EXISTS match_videos (
+    match_id        UUID PRIMARY KEY REFERENCES matches (id) ON DELETE CASCADE,
+    -- A facility's phone on an umpire's account, or a player's own.
+    source          TEXT NOT NULL CHECK (source IN ('facility', 'player')),
+    umpire_id       UUID REFERENCES umpires (id) ON DELETE SET NULL,
+    player_id       UUID REFERENCES players (id) ON DELETE SET NULL,
+    -- Which phone holds it, so a second phone on the same account
+    -- neither films the match again nor sends over the first one's file.
+    device_id       TEXT NOT NULL,
+    state           TEXT NOT NULL DEFAULT 'filming' CHECK (state IN ('filming', 'sending', 'ready')),
+    file_key        TEXT,
+    bytes           BIGINT,
+    width           INTEGER,
+    height          INTEGER,
+    duration_ms     INTEGER,
+    -- In this server's time, not the phone's.
+    first_frame_at  TIMESTAMPTZ,
+    lined_up_by     TEXT NOT NULL DEFAULT 'clock' CHECK (lined_up_by IN ('clock', 'umpire')),
+    -- False when the page could not repack the recording and sent it
+    -- as filmed: it plays, but some browsers cannot jump in it.
+    repacked        BOOLEAN NOT NULL DEFAULT true,
+    seen_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    ready_at        TIMESTAMPTZ
+);

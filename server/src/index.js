@@ -24,6 +24,7 @@ import adminFacilitiesRoutes from './routes/admin-facilities.js'
 import adminOverviewRoutes from './routes/admin-overview.js'
 import { adminPlayersRoutes, adminUmpiresRoutes } from './routes/admin-people.js'
 import logoRoutes from './routes/logos.js'
+import videoRoutes from './routes/video.js'
 
 const app = express()
 
@@ -191,11 +192,16 @@ app.use('/admin/auth/me/google', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/admin/auth/me/backup-codes', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/admin', rateLimit({ max: 120, windowMs: 60_000 }))
 
+// A camera beats every 2 seconds and a tablet asks every 5, and one
+// facility's courts share an address: eight courts are about 340 a
+// minute. Well clear of that, and still a ceiling.
+app.use('/video', rateLimit({ max: 900, windowMs: 60_000 }))
 app.use('/auth', authRoutes)
 app.use('/auth', playerAuthRoutes)
 app.use('/players', playerAdminRoutes)
 app.use('/sessions', sessionRoutes)
 app.use('/matches', matchRoutes)
+app.use('/video', videoRoutes)
 app.use('/player', playerSelfRoutes)
 // Staging only: the smoke test removing what it made. Unset anywhere
 // else, so on production the path is simply not there.
