@@ -28,7 +28,7 @@ export function bucketConfig(env = process.env) {
   const region = env.VIDEO_BUCKET_REGION
   const keyId = env.VIDEO_BUCKET_KEY_ID
   const secret = env.VIDEO_BUCKET_SECRET
-  if (!bucket || !endpoint || !region || !keyId || !secret) return null
+  if (!bucket || !endpoint || !region || !keyId || !secret || !URL.canParse(endpoint)) return null
   const host = `${bucket}.${new URL(endpoint).host}`
   return { bucket, region, keyId, secret, host, origin: `https://${host}` }
 }
@@ -112,6 +112,7 @@ async function ask(config, method, path, params = {}) {
   const { scope, signature } = sign(config, at, canonical)
   return fetch(`${config.origin}${path}${query ? `?${query}` : ''}`, {
     method,
+    signal: AbortSignal.timeout(20_000),
     headers: {
       'x-amz-content-sha256': EMPTY_BODY,
       'x-amz-date': at.time,

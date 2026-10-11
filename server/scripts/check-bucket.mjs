@@ -39,6 +39,7 @@ section('settings')
     check(`without ${key} video is off`, bucketConfig({ ...amazon, [key]: '' }), null)
   }
   check('nothing set at all is off', bucketConfig({}), null)
+  check('an endpoint that is not a full address is off', bucketConfig({ ...amazon, VIDEO_BUCKET_ENDPOINT: 'storage.example.com' }), null)
   check('the size limit is 2 GB', MAX_VIDEO_BYTES, 2147483648)
 }
 
