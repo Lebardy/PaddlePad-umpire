@@ -9,7 +9,7 @@
 // file's name, and may take a long while to finish sending.
 // ============================================================
 
-import { KEEP_DAYS, orphanKeys } from '../src/video-tidy.js'
+import { KEEP_DAYS, orphanKeys, tidyVideos } from '../src/video-tidy.js'
 
 let pass = 0
 let fail = 0
@@ -34,6 +34,35 @@ check('only the old file nobody names', orphanKeys(files, ['videos/m1/a.mp4'], N
 check('a set works as well as a list', orphanKeys(files, new Set(['videos/m1/a.mp4', 'videos/m2/b.mp4']), NOW), [])
 check('with no rows at all, every old file', orphanKeys(files, [], NOW), ['videos/m1/a.mp4', 'videos/m2/b.mp4'])
 check('an empty bucket', orphanKeys([], ['videos/m1/a.mp4'], NOW), [])
+
+// One file the bucket refuses to delete must not stop the others.
+const config = { bucket: 'b', region: 'r', keyId: 'k', secret: 's', host: 'b.example.test', origin: 'https://b.example.test' }
+const realFetch = globalThis.fetch
+globalThis.fetch = async (url, { method }) => {
+  if (method === 'DELETE') return new Response(null, { status: String(url).includes('bad') ? 500 : 204 })
+  return new Response('<ListBucketResult><IsTruncated>false</IsTruncated></ListBucketResult>', { status: 200 })
+}
+const removedRows = []
+const stubQuery = async (text, params) => {
+  if (text.startsWith('SELECT match_id')) {
+    return { rows: ['one', 'bad', 'three'].map((name) => ({ match_id: name, file_key: `videos/${name}/v.mp4`, state: 'ready' })) }
+  }
+  if (text.startsWith('DELETE')) removedRows.push(params[0])
+  return { rows: [] }
+}
+const realError = console.error
+console.error = () => {}
+let result
+try {
+  result = await tidyVideos({ query: stubQuery, config, now: new Date(NOW) })
+} catch (error) {
+  result = `threw: ${error.message}`
+} finally {
+  globalThis.fetch = realFetch
+  console.error = realError
+}
+check('a refused delete does not end the run', result, { expired: 2, unfinished: 0, orphans: 0 })
+check('only the good rows were removed', removedRows, ['one', 'three'])
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail === 0 ? 0 : 1)
