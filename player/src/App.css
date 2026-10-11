@@ -2545,3 +2545,33 @@
 .endings-lead strong { color: var(--text); }
 .endings-nums { white-space: nowrap; }
 .endings-untagged { font-size: 0.85rem; color: var(--text-muted); }
+
+/* ============ Match video ============ */
+
+/* The match's video, inside "Point by point", above the boxes. The
+   browser's own controls; nothing is loaded until play is pressed. */
+.match-video { display: block; width: 100%; aspect-ratio: 16 / 9; margin: 0 0 0.75rem; border-radius: var(--radius); background: var(--board); }
+
+/* With a video, the line that names the picked point becomes a strip of
+   the scoreboard under the picture, and the picked box -- the one being
+   played -- is ringed in lamp amber. */
+.ribbon.is-watching .ribbon-readout { padding: 0.65rem 0.8rem; border-radius: var(--radius); background: var(--board); color: var(--board-ink); }
+.ribbon.is-watching .ribbon-at { color: var(--lamp); }
+.ribbon.is-watching .ribbon-hint,
+.ribbon.is-watching .ribbon-tags { color: var(--board-muted); }
+.ribbon.is-watching .ribbon-kind { background: var(--board-raised); }
+.ribbon.is-watching .ribbon-kind.is-winner { color: var(--win-lamp); }
+.ribbon.is-watching .ribbon-kind.is-mistake { color: var(--loss-lamp); }
+.ribbon.is-watching .ribbon-block.is-selected { outline: 4px solid var(--lamp); outline-offset: 1px; }
+
+/* A camera, wherever something has video or films: lamp on board,
+   never a word. Each carries its own aria-label. */
+.chip.chip-video { background: var(--board); border-color: var(--board); color: var(--lamp); }
+.chip.chip-video svg { color: inherit; }
+.mrow.has-video { grid-template-columns: 1.75rem minmax(0, 1fr) auto auto; }
+.mrow-video,
+.ticket-video,
+.place-video { display: inline-grid; place-items: center; border-radius: var(--radius-sm); background: var(--board); color: var(--lamp); flex: none; }
+.mrow-video { width: 1.75rem; height: 1.75rem; }
+.ticket-video { width: 1.4rem; height: 1.4rem; margin-left: 0.4rem; vertical-align: -0.25rem; }
+.place-video { width: 1.9rem; height: 1.9rem; margin-left: 0.5rem; vertical-align: 0.1rem; }

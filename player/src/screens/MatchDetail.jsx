@@ -13,7 +13,7 @@
 // bottom; nothing above waits for it.
 // ============================================================
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from '../components/Link'
 import { navigate } from '../lib/router'
 import { usePlayerData } from '../lib/PlayerData'
@@ -181,6 +181,10 @@ function MatchDetail({ id }) {
           <li className="chip"><Icon name="target" size={14} />To {match.pointTarget}</li>
         )}
         {mins !== null && <li className="chip"><Icon name="clock" size={14} />{mins} min</li>}
+        {/* An icon and no word: the video itself is further down. */}
+        {match.hasVideo && (
+          <li className="chip chip-video" aria-label="Has video"><Icon name="camera" size={14} /></li>
+        )}
         {match.usedStacking && <li className="chip">Stacked</li>}
         {match.endedEarly && <li className="chip">Stopped early</li>}
         <li className="chip chip-quiet">Match #{match.matchNumber}</li>
@@ -306,34 +310,77 @@ function MatchDetail({ id }) {
 }
 
 /**
- * Every point of this match, once it has been asked for.
+ * Every point of this match, once it has been asked for -- and the
+ * match's video above them, when it has one.
  *
  * Renders nothing at all until the reading arrives, and nothing ever if
  * it fails: the page above it is already complete without this, and an
  * error box for a nice-to-have would be worse than its absence.
+ *
+ * With a video, the boxes and the player follow each other. Tapping a
+ * box jumps the video to that point's rally and plays; as the video
+ * plays, the box of the point being played becomes the picked one, so
+ * the line under the video always names what is on screen. A point the
+ * video does not show still says how it was won; it just does not jump.
+ * Nothing is asked of the video's storage until play is pressed.
  */
 function PointByPoint({ id, match, selected, onSelect }) {
   // Kept with the id it belongs to, rather than cleared and refetched:
   // opening the next match from the arrows at the foot of this page
   // swaps the id, and a stale ribbon must not show under a new match.
   const [loaded, setLoaded] = useState(null)
+  // The video's link lasts two hours. If it has run out by the time
+  // play is pressed, the match is asked for once more, for a fresh one.
+  const [asked, setAsked] = useState({ id, times: 0 })
+  const player = useRef(null)
+  const times = asked.id === id ? asked.times : 0
 
   useEffect(() => {
     const controller = new AbortController()
     fetchMatchGame(id, { signal: controller.signal })
-      .then((data) => setLoaded({ id, game: data.game, points: data.points }))
+      .then((data) => setLoaded({ id, game: data.game, points: data.points, video: data.video ?? null }))
       .catch(() => {})
     return () => controller.abort()
-  }, [id])
+  }, [id, times])
 
   const game = loaded?.id === id ? loaded.game : null
   const points = loaded?.id === id ? loaded.points : null
+  const video = loaded?.id === id ? loaded.video : null
   if (!game || game.moments.length === 0) return null
+
+  function pick(index) {
+    onSelect(index)
+    const second = video?.seconds?.[index]
+    if (!player.current || second === null || second === undefined) return
+    player.current.currentTime = second
+    player.current.play().catch(() => {})
+  }
+
+  // The point being played: the last one whose rally has started.
+  function follow(event) {
+    const at = event.currentTarget.currentTime
+    let playing = null
+    video.seconds.forEach((second, index) => { if (second !== null && second <= at + 0.25) playing = index })
+    if (playing !== null && playing !== selected) onSelect(playing)
+  }
 
   const theirs = match.opponents.join(' & ')
   return (
     <section className="detail-shape" aria-label="Point by point">
       <h2>Point by point</h2>
+      {video && (
+        <video
+          ref={player}
+          className="match-video"
+          src={video.url}
+          controls
+          playsInline
+          preload="none"
+          aria-label="Video of this match"
+          onTimeUpdate={follow}
+          onError={() => { if (times < 1) setAsked({ id, times: times + 1 }) }}
+        />
+      )}
       <MomentumRibbon
         moments={game.moments}
         path={game.path}
@@ -345,7 +392,9 @@ function PointByPoint({ id, match, selected, onSelect }) {
         losers={theirs}
         lowIndex={game.lowPoint ? game.lowPoint.index : null}
         selected={selected}
-        onSelect={onSelect}
+        onSelect={video ? pick : onSelect}
+        hint={video ? 'Tap a point to watch it' : undefined}
+        watching={Boolean(video)}
       />
     </section>
   )

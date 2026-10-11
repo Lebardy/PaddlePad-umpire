@@ -50,8 +50,13 @@ function momentsOf(moment, i, { last, lowIndex }) {
  * @param {number | null} props.lowIndex - the winners' lowest point
  * @param {number | null} props.selected - the picked box, if any
  * @param {(i: number) => void} props.onSelect
+ * @param {string} [props.hint] - what the line above the boxes says before a box is picked
+ * @param {boolean} [props.watching] - the match has a video: the picked box is the one being played
  */
-function MomentumRibbon({ moments, path, points, asShown, winners, losers, lowIndex, selected, onSelect }) {
+function MomentumRibbon({
+  moments, path, points, asShown, winners, losers, lowIndex, selected, onSelect,
+  hint = 'Tap a point to see how it was won', watching = false,
+}) {
   const ref = useRef(null)
   const inView = useInView(ref)
   const buttons = useRef([])
@@ -78,7 +83,7 @@ function MomentumRibbon({ moments, path, points, asShown, winners, losers, lowIn
     event.preventDefault()
   }
 
-  let readout = <span className="ribbon-hint">Tap a point to see how it was won</span>
+  let readout = <span className="ribbon-hint">{hint}</span>
   if (selected !== null) {
     const moment = moments[selected]
     const point = points?.[selected]
@@ -99,7 +104,7 @@ function MomentumRibbon({ moments, path, points, asShown, winners, losers, lowIn
   }
 
   return (
-    <div ref={ref} className={`ribbon${inView ? ' is-in' : ''}`}>
+    <div ref={ref} className={`ribbon${inView ? ' is-in' : ''}${watching ? ' is-watching' : ''}`}>
       <div className="ribbon-legend">
         <span><i className="ribbon-swatch is-winners" aria-hidden="true" />{winners}</span>
         <span><i className="ribbon-swatch is-losers" aria-hidden="true" />{losers}</span>
