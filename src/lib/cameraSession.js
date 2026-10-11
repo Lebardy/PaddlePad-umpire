@@ -128,11 +128,9 @@ export function createCameraSession({ deviceId, onChange }) {
       if (action === 'start' && state.wide) await startFilming(answer.match)
       if (action === 'stop') stopFilming()
       if (state.offline) set({ offline: false })
-    } catch (error) {
-      // Video switched off on the server: nothing more to do, unless a recording or a send would be lost (a restarting service also answers 404).
-      if (error.status === 404 && !isBusy()) { set({ phase: 'unsupported' }); close() }
-      // Anything else is a dropped beat. A match being filmed carries on; the next beat tries again.
-      else set({ offline: true })
+    } catch {
+      // Any failed beat is a dropped one (a restarting server answers 404 too); filming carries on and the next beat tries again.
+      set({ offline: true })
     } finally {
       beating = false
     }
