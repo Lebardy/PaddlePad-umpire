@@ -645,7 +645,8 @@ router.get('/matches', async (req, res) => {
 /** Every place to play on PaddlePad, by name, for the People tab. */
 router.get('/facilities', async (req, res) => {
   const rows = await listFacilities(query, { all: true })
-  res.json({ facilities: rows.map(playerFacilitySummary) })
+  const videoOn = Boolean(bucketConfig())
+  res.json({ facilities: rows.map((row) => playerFacilitySummary(row, videoOn)) })
 })
 
 /** One place to play: what it is, where, when it's open and what it costs. */
@@ -653,7 +654,7 @@ router.get('/facilities/:id', async (req, res) => {
   if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such place' })
   const row = await findFacility(query, req.params.id)
   if (!row) return res.status(404).json({ error: 'No such place' })
-  res.json({ facility: playerFacilityPage(row) })
+  res.json({ facility: playerFacilityPage(row, Boolean(bucketConfig())) })
 })
 
 export default router

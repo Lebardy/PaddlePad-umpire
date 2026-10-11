@@ -2482,8 +2482,9 @@ async function main() {
         // Three rallies, stamped by a tablet whose clock is 5 s behind the server.
         const lag = 5000
         const tapped = [20_000, 35_000, 50_000].map((ms) => startedAt + ms)
+        // The receiving side wins the first rally (a side-out, no point), so two of the three rallies are points.
         const events = tapped.map((at, seq) => ({
-          id: crypto.randomUUID(), seq, type: 'rally', at, actingPlayerId: vPlayers[0], outcome: 'winner', zone: 'baseline',
+          id: crypto.randomUUID(), seq, type: 'rally', at, actingPlayerId: vPlayers[1], outcome: 'winner', zone: 'baseline',
         }))
         const logged = await request(`/matches/${vMatch}/log`, {
           method: 'PUT', bearer: token,
@@ -2524,7 +2525,7 @@ async function main() {
         // Within a second: the offset the server worked out includes however long the save took to arrive.
         const secondsSeen = v?.rallies?.map((r) => r.second) ?? []
         check('each rally has its second, in play order, with the tablet clock corrected',
-          secondsSeen.length === 3 && secondsSeen[0] <= 1 && Math.abs(secondsSeen[1] - 16) <= 1 && Math.abs(secondsSeen[2] - 31) <= 1
+          secondsSeen.length === 3 && typeof secondsSeen[0] === 'number' && secondsSeen[0] <= 1 && Math.abs(secondsSeen[1] - 16) <= 1 && Math.abs(secondsSeen[2] - 31) <= 1
             && v.rallies.every((r, i) => r.id === events[i].id),
           JSON.stringify(secondsSeen))
         const played = await fetch(v.url)
@@ -2538,10 +2539,11 @@ async function main() {
         check("the player's match read carries the video: a link, its length and its picture size",
           vGame.status === 200 && /^https:\/\//.test(pv?.url ?? '') && pv.durationMs === 120_000 && pv.width === 1920 && pv.height === 1080,
           JSON.stringify({ ...pv, url: pv?.url ? '[link]' : null }).slice(0, 160))
-        // The server served every rally and won it, so every rally was a point: the same seconds the umpire saw.
+        // The first rally was a side-out, so the two points are the second and third rallies, not the first two.
         check('one second for each point, the same as the rallies they were',
-          pv?.seconds?.length === vGame.body.points?.length && pv.seconds.length === 3
-            && pv.seconds[0] <= 1 && Math.abs(pv.seconds[1] - 16) <= 1 && Math.abs(pv.seconds[2] - 31) <= 1,
+          vGame.body.points?.length === 2 && pv?.seconds?.length === 2
+            && pv.seconds[0] === v.rallies[1].second && pv.seconds[1] === v.rallies[2].second
+            && pv.seconds[0] !== v.rallies[0].second,
           JSON.stringify(pv?.seconds))
         const pPlayed = await fetch(pv.url)
         check("the player's link plays the file", pPlayed.status === 200 && (await pPlayed.arrayBuffer()).byteLength === 1024, String(pPlayed.status))
@@ -2617,7 +2619,7 @@ async function main() {
         check('then there is none', (await request(`/video/matches/${vMatch}`, { bearer: token })).body.video === null)
         const vGameAfter = await asPlayer(`/player/matches/${vMatch}/game`, { bearer: vPlayerToken })
         check('once removed, the player sees the match with no video',
-          vGameAfter.status === 200 && vGameAfter.body.video === null && vGameAfter.body.points?.length === 3, JSON.stringify(vGameAfter.body.video))
+          vGameAfter.status === 200 && vGameAfter.body.video === null && vGameAfter.body.points?.length === 2, `video is null: ${vGameAfter.body.video === null}`)
         check('and the list no longer marks it',
           ((await asPlayer('/player/matches', { bearer: vPlayerToken })).body.matches ?? []).find((m) => m.id === vMatch)?.hasVideo === false)
         check('and the link no longer plays', (await fetch(v.url)).status === 404)

@@ -284,7 +284,8 @@ export function readLogoUpload(body = {}) {
 // "Fee not set" is for admins; a player page just leaves it out.
 const playerFee = (centavos) => (centavos == null ? null : feeText(centavos))
 
-export function playerFacilitySummary(row) {
+/** `videoOn`: video is set up on this server; without it nothing films. */
+export function playerFacilitySummary(row, videoOn) {
   return {
     id: row.id,
     name: row.name,
@@ -294,11 +295,11 @@ export function playerFacilitySummary(row) {
     openingHours: row.opening_hours ?? null,
     feeText: playerFee(row.hourly_fee_centavos),
     umpireFeeText: playerFee(row.umpire_fee_centavos),
-    filmsMatches: row.films_matches === true,
+    filmsMatches: videoOn === true && row.films_matches === true,
   }
 }
 
-export function playerFacilityPage(row) {
+export function playerFacilityPage(row, videoOn) {
   return {
     id: row.id,
     name: row.name,
@@ -309,6 +310,6 @@ export function playerFacilityPage(row) {
     locationUrl: row.location_url ?? null,
     details: row.details ?? null,
     logoUrl: logoPath(row.id, row.logo_updated_at ?? null),
-    filmsMatches: row.films_matches === true,
+    filmsMatches: videoOn === true && row.films_matches === true,
   }
 }
