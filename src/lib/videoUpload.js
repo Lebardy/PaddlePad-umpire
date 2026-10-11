@@ -22,7 +22,7 @@ export function sendToBucket(form, blob, onProgress) {
     }
     request.onload = () => {
       if (request.status >= 200 && request.status < 300) resolve()
-      else reject(new Error(`The storage refused the video (${request.status})`))
+      else reject(Object.assign(new Error(`The storage refused the video (${request.status})`), { refused: request.status >= 400 && request.status < 500 }))
     }
     request.onerror = () => reject(new Error('The connection dropped while sending'))
     request.open('POST', form.url)

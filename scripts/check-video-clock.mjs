@@ -40,6 +40,8 @@ section('what a beat means')
 {
   check('waiting, nothing on court', beatAction(null, null), 'stay')
   check('waiting, a match has started', beatAction(null, 'm1'), 'start')
+  check('waiting, the match was already filmed', beatAction(null, 'm1', true), 'stay')
+  check('waiting, a match not yet filmed', beatAction(null, 'm2', false), 'start')
   check('filming, the same match goes on', beatAction('m1', 'm1'), 'stay')
   check('filming, the match is over', beatAction('m1', null), 'stop')
   check('filming, and a different match is named', beatAction('m1', 'm2'), 'stop')

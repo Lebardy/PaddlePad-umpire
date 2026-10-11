@@ -27,6 +27,7 @@ import { beatAction, firstFrameAt, isWide, noteBeatTiming, pickBitrate, pickType
 
 const BEAT_MS = 2_000
 const RETRY_MS = 15_000
+const REFUSED_RETRY_MS = 5 * 60_000
 const CAMERA_KEY = 'paddlepad.camera'
 const MAX_VIDEO_BYTES = 2 * 1024 ** 3
 // Stop filming a little short of the limit, so what was filmed can still be sent.
@@ -51,6 +52,8 @@ export function createCameraSession({ deviceId, onChange }) {
   let beating = false
   let sendingNow = false
   let closed = false
+  const filmed = new Set()  // matches whose recording was queued, so none is filmed twice
+  // shortcut: unsent videos wait here with no cap, upgrade if a court's wifi is ever down for whole evenings
   const queue = []          // videos waiting to go: { matchId, blob, meta }
 
   function set(changes) {
@@ -59,14 +62,17 @@ export function createCameraSession({ deviceId, onChange }) {
   }
 
   async function keepAwake() {
-    try { wakeLock = await navigator.wakeLock?.request('screen') } catch { /* the phone's own setting decides then */ }
+    try {
+      wakeLock = await navigator.wakeLock?.request('screen')
+      if (closed) wakeLock?.release?.().catch(() => {})
+    } catch { /* the phone's own setting decides then */ }
   }
   // The lock is dropped whenever the page is hidden; take it again on return.
   const onVisible = () => { if (document.visibilityState === 'visible' && !closed) keepAwake() }
 
   async function open(cameraId = remembered()) {
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder || !recordType()) return set({ phase: 'unsupported' })
-    stream?.getTracks().forEach((track) => track.stop())
+    const previous = stream
     const video = {
       width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 },
       ...(cameraId ? { deviceId: { exact: cameraId } } : { facingMode: { ideal: 'environment' } }),
@@ -78,9 +84,11 @@ export function createCameraSession({ deviceId, onChange }) {
       if (cameraId) { remember(null); return open(null) }
       return set({ phase: error.name === 'NotAllowedError' || error.name === 'SecurityError' ? 'denied' : 'unsupported' })
     }
+    previous?.getTracks().forEach((track) => track.stop())
     if (closed) { stream.getTracks().forEach((track) => track.stop()); return undefined }
     const settings = stream.getVideoTracks()[0].getSettings()
     const all = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === 'videoinput')
+    if (closed) { stream.getTracks().forEach((track) => track.stop()); return undefined }
     const back = all.filter((device) => !/front/i.test(device.label))
     set({
       phase: 'waiting', stream,
@@ -116,13 +124,13 @@ export function createCameraSession({ deviceId, onChange }) {
         deviceId, state: filming ? 'filming' : state.sending ? 'sending' : 'ready', matchId: filming?.matchId,
       })
       timing = noteBeatTiming(timing, { sentAt, receivedAt: Date.now(), serverNow: answer.now })
-      const action = beatAction(filming?.matchId ?? null, answer.match?.id ?? null)
+      const action = beatAction(filming?.matchId ?? null, answer.match?.id ?? null, filmed.has(answer.match?.id))
       if (action === 'start' && state.wide) await startFilming(answer.match)
       if (action === 'stop') stopFilming()
       if (state.offline) set({ offline: false })
     } catch (error) {
-      // Video switched off on the server, or the facility stopped filming: nothing more to do here.
-      if (error.status === 404) { set({ phase: 'unsupported' }); close() }
+      // Video switched off on the server: nothing more to do, unless a recording or a send would be lost (a restarting service also answers 404).
+      if (error.status === 404 && !isBusy()) { set({ phase: 'unsupported' }); close() }
       // Anything else is a dropped beat. A match being filmed carries on; the next beat tries again.
       else set({ offline: true })
     } finally {
@@ -175,6 +183,7 @@ export function createCameraSession({ deviceId, onChange }) {
       // Not sure of the tables, so nothing is rewritten: it goes as filmed and is marked so.
       repacked = false
     }
+    filmed.add(mine.matchId)
     queue.push({
       matchId: mine.matchId, blob,
       meta: {
@@ -210,7 +219,7 @@ export function createCameraSession({ deviceId, onChange }) {
       sendingNow = false
       if (error.final) { queue.shift(); pump(); return }
       report(state.sending?.percent ?? 0, true)
-      retryTimer = setTimeout(pump, RETRY_MS)
+      retryTimer = setTimeout(pump, error.refused ? REFUSED_RETRY_MS : RETRY_MS)
     }
   }
 

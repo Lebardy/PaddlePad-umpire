@@ -27,10 +27,11 @@ export function firstFrameAt(recorderStartedAt, timing) {
 /**
  * What a beat's answer means for a camera that is, or is not, filming.
  * `filmingId` is the match being filmed (or null); `beatMatchId` is the
- * match the server named (or null).
+ * match the server named (or null);
+ * `alreadyFilmed` is true when this session has filmed that match.
  */
-export function beatAction(filmingId, beatMatchId) {
-  if (!filmingId) return beatMatchId ? 'start' : 'stay'
+export function beatAction(filmingId, beatMatchId, alreadyFilmed = false) {
+  if (!filmingId) return beatMatchId && !alreadyFilmed ? 'start' : 'stay'
   return beatMatchId === filmingId ? 'stay' : 'stop'
 }
 
