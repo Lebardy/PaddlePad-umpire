@@ -174,9 +174,9 @@ export default function FacilityDetail({ id, me }) {
                     label, and the heading above them is only a heading. */}
                 <div className="field"><span>Films matches</span>
                   <label className="switch-row">
-                    <input type="checkbox" aria-label="Films matches" checked={fields.filmsMatches}
+                    <input type="checkbox" aria-label="Films matches" aria-describedby="films-note" checked={fields.filmsMatches}
                       onChange={(e) => setFields({ ...fields, filmsMatches: e.target.checked })} />
-                    <span>Needs wifi at the courts and a phone in a holder.</span>
+                    <span id="films-note">Needs wifi at the courts and a phone in a holder.</span>
                   </label>
                 </div>
               </div>
