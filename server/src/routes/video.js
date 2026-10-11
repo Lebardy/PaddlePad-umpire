@@ -34,6 +34,9 @@ const BEAT_STATES = ['ready', 'filming', 'sending']
 const CLAIM_SILENT_SECONDS = 60
 const MAX_DURATION_MS = 6 * 60 * 60 * 1000
 
+// A phone's own name for itself: text, and not a book.
+const deviceName = (value) => (typeof value === 'string' && value.length >= 1 && value.length <= 100 ? value : '')
+
 function refusal(statusCode, message) {
   const error = new Error(message)
   error.statusCode = statusCode
@@ -90,14 +93,14 @@ async function videoAnswer(match, config) {
 }
 
 router.post('/camera/beat', async (req, res) => {
-  const deviceId = String(req.body?.deviceId ?? '')
+  const deviceId = deviceName(req.body?.deviceId)
   if (!deviceId) return res.status(400).json({ error: 'A deviceId is required' })
   const state = BEAT_STATES.includes(req.body?.state) ? req.body.state : 'ready'
   noteBeat(req.umpire.id, deviceId, state)
   if (isUuid(req.body?.matchId)) {
     await query(
-      `UPDATE match_videos SET seen_at = now() WHERE match_id = $1 AND device_id = $2 AND state = 'filming'`,
-      [req.body.matchId, deviceId],
+      `UPDATE match_videos SET seen_at = now() WHERE match_id = $1 AND device_id = $2 AND umpire_id = $3 AND state = 'filming'`,
+      [req.body.matchId, deviceId, req.umpire.id],
     )
   }
 
@@ -111,7 +114,10 @@ router.post('/camera/beat', async (req, res) => {
        LEFT JOIN match_videos v ON v.match_id = m.id
       WHERE m.recorded_by = $1 AND s.facility_id = $2 AND f.films_matches
         AND m.status = 'in_progress' AND m.started_at > now() - interval '3 hours'
-        AND (v.match_id IS NULL OR v.source = 'player' OR (v.state = 'filming' AND v.device_id = $3))
+        -- A match left open would otherwise be filmed once the real one ends.
+        AND ((v.state = 'filming' AND v.device_id = $3)
+             OR ((v.match_id IS NULL OR v.source = 'player')
+                 AND GREATEST(m.started_at, m.scoring_claimed_at) > now() - interval '15 minutes'))
       ORDER BY m.started_at DESC
       LIMIT 1`,
     [req.umpire.id, req.umpire.facilityId, deviceId],
@@ -133,7 +139,7 @@ router.get('/camera/status', (req, res) => {
 router.post('/matches/:id/claim', async (req, res) => {
   const match = await ownMatch(req)
   if (!match || !match.films_matches) return res.status(404).json({ error: 'No such match' })
-  const deviceId = String(req.body?.deviceId ?? '')
+  const deviceId = deviceName(req.body?.deviceId)
   if (!deviceId) return res.status(400).json({ error: 'A deviceId is required' })
 
   let replacedKey = null
@@ -164,6 +170,8 @@ router.post('/matches/:id/claim', async (req, res) => {
     })
   } catch (error) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message })
+    // Two phones claimed a match with no video at the same moment; the other one got there first.
+    if (error.code === '23505') return res.status(409).json({ error: 'This match already has a video' })
     throw error
   }
   if (replacedKey) await deleteFile(bucketConfig(), replacedKey).catch((error) => console.error('could not delete a replaced video', error.message))
@@ -188,13 +196,15 @@ router.post('/matches/:id/upload', async (req, res) => {
   }
   // Trying again after a failed send reuses the name, so nothing is left behind.
   const key = video.file_key ?? `videos/${match.id}/${randomBytes(8).toString('hex')}.mp4`
-  await query(
+  const claimed = await query(
     `UPDATE match_videos
         SET state = 'sending', file_key = $2, bytes = $3, width = $4, height = $5, duration_ms = $6,
             first_frame_at = to_timestamp($7::double precision / 1000), repacked = $8, seen_at = now()
-      WHERE match_id = $1`,
-    [match.id, key, bytes, width, height, durationMs, firstFrameAt, req.body?.repacked !== false],
+      WHERE match_id = $1 AND device_id = $9`,
+    [match.id, key, bytes, width, height, durationMs, firstFrameAt, req.body?.repacked !== false, video.device_id],
   )
+  // The claim was taken over since it was read.
+  if (claimed.rowCount === 0) return res.status(409).json({ error: 'This phone is not filming that match' })
   res.json({ form: signedUploadForm(bucketConfig(), key, { bytes }) })
 })
 
@@ -210,7 +220,11 @@ router.post('/matches/:id/done', async (req, res) => {
   // Believe the bucket, not the phone.
   const size = await fileSize(bucketConfig(), video.file_key)
   if (size !== Number(video.bytes)) return res.status(409).json({ error: 'The video has not arrived in full' })
-  await query(`UPDATE match_videos SET state = 'ready', ready_at = now() WHERE match_id = $1`, [match.id])
+  const marked = await query(
+    `UPDATE match_videos SET state = 'ready', ready_at = now() WHERE match_id = $1 AND device_id = $2 AND state = 'sending'`,
+    [match.id, video.device_id],
+  )
+  if (marked.rowCount === 0) return res.status(409).json({ error: 'This phone is not filming that match' })
   res.json({ ok: true })
 })
 
@@ -223,13 +237,13 @@ router.get('/matches/:id', async (req, res) => {
 router.post('/matches/:id/line-up', async (req, res) => {
   const match = await ownMatch(req)
   if (!match) return res.status(404).json({ error: 'No such match' })
-  const second = Number(req.body?.second)
+  const second = req.body?.second
   const video = await findVideo(match.id)
   if (!video || video.state !== 'ready') return res.status(409).json({ error: 'This match has no video to line up' })
   const { rows } = isUuid(req.body?.eventId)
     ? await query(`SELECT at FROM match_events WHERE id = $1 AND match_id = $2 AND type = 'rally'`, [req.body.eventId, match.id])
     : { rows: [] }
-  if (!rows[0] || !Number.isFinite(second) || second < 0 || second * 1000 > video.duration_ms) {
+  if (!rows[0] || typeof second !== 'number' || second < 0 || second * 1000 > video.duration_ms) {
     return res.status(400).json({ error: 'Pick a rally of this match and a moment inside the video' })
   }
   const firstFrame = firstFrameFromLineUp({

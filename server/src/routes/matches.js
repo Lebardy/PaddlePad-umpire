@@ -442,8 +442,9 @@ router.put('/:id/log', async (req, res) => {
               scoring_device = $6,
               scoring_claimed_at = now(),
               -- How far this tablet's clock is from ours, for lining a
-              -- video up with these taps. Kept when a save sends none.
-              clock_offset_ms = COALESCE($7, clock_offset_ms)
+              -- video up with these taps. The smallest seen, since a slow
+              -- request only makes it look bigger; kept when a save sends none.
+              clock_offset_ms = LEAST($7::integer, clock_offset_ms)
         WHERE id = $1`,
       [
         req.params.id,
