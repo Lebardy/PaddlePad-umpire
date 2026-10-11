@@ -53,7 +53,7 @@ function Camera({ onBack }) {
   }, [state.phase])
 
   function leave() {
-    if (session.current?.isBusy() && !confirm('A video is still being filmed or sent. Leaving now loses it.\n\nLeave anyway?')) return
+    if (session.current?.isBusy() && !confirm('Leave? A video still being filmed or sent will be lost.')) return
     onBack()
   }
 
@@ -72,7 +72,7 @@ function Camera({ onBack }) {
   }
 
   const filming = state.phase === 'filming'
-  const upright = state.phase === 'waiting' && !state.wide
+  const upright = state.phase === 'waiting' && !state.wide && !state.sending
   const quality = Math.min(state.picture.width, state.picture.height) >= 1080 ? '1080P' : '720P'
   const names = state.match ? [state.match.teamA.join(' & '), state.match.teamB.join(' & ')] : []
 

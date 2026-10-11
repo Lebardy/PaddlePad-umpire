@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Icon from '../components/Icon'
 import { createSession } from '../lib/storage'
 import { useSessions } from '../lib/useLocalStore'
+import { canFilm } from '../lib/cameraSession'
 
 // Landing screen: create and open sessions.
 const GUIDE_NUDGE_KEY = 'paddlepad.umpire.guideDismissed'
@@ -151,7 +152,7 @@ function Home({ onOpenSession, onOpenGuide, onOpenPlayers, onOpenCamera, umpire 
               </button>
             </li>
             {/* Only where the facility films its matches; sign-in says so. */}
-            {umpire?.camera && onOpenCamera && (
+            {umpire?.camera && onOpenCamera && canFilm() && (
               <li>
                 <button className="export-btn" onClick={onOpenCamera}>
                   <span><Icon name="camera" />Camera</span>

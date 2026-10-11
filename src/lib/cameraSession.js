@@ -37,6 +37,9 @@ const remembered = () => { try { return localStorage.getItem(CAMERA_KEY) } catch
 const remember = (id) => { try { if (id) localStorage.setItem(CAMERA_KEY, id); else localStorage.removeItem(CAMERA_KEY) } catch { /* private mode */ } }
 const recordType = () => pickType((type) => MediaRecorder.isTypeSupported(type))
 
+// Whether this browser can film at all; the Tools entry and open() both ask.
+export const canFilm = () => !!(navigator.mediaDevices?.getUserMedia && window.MediaRecorder && recordType())
+
 export function createCameraSession({ deviceId, onChange }) {
   let state = {
     phase: 'opening', stream: null, cameras: [], cameraId: null, picture: { width: 0, height: 0 }, wide: false,
@@ -71,7 +74,7 @@ export function createCameraSession({ deviceId, onChange }) {
   const onVisible = () => { if (document.visibilityState === 'visible' && !closed) keepAwake() }
 
   async function open(cameraId = remembered()) {
-    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder || !recordType()) return set({ phase: 'unsupported' })
+    if (!canFilm()) return set({ phase: 'unsupported' })
     const previous = stream
     const video = {
       width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 },
