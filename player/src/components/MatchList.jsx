@@ -23,13 +23,16 @@ function MatchRow({ match, dated }) {
   const result = resultOf(match)
   return (
     <li>
-      <Link className="mrow" to={`/matches/${match.id}`}>
+      <Link className={`mrow${match.hasVideo ? ' has-video' : ''}`} to={`/matches/${match.id}`}>
         {/* The letter carries the result; the colour only reinforces it. */}
         <span className={`mrow-res res-${result}`}>{letterOf(match)}</span>
         <span className="mrow-main">
           <span className="mrow-vs">{(match.opponents ?? []).join(' & ')}</span>
           <span className="mrow-sub">{matchLine(match, { dated })}</span>
         </span>
+        {match.hasVideo && (
+          <span className="mrow-video" role="img" aria-label="Has video"><Icon name="camera" size={15} /></span>
+        )}
         <span className="mrow-score" aria-label={`${match.yourScore} to ${match.theirScore}`}>
           {match.yourScore}
           <span className="mrow-theirs">&ndash;{match.theirScore}</span>

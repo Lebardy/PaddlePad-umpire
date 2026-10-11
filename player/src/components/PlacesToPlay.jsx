@@ -24,7 +24,12 @@ function Ticket({ place }) {
           <FacilityLogo name={place.name} logoUrl={place.logoUrl} size="lg" />
         </span>
         <span className="ticket-stub">
-          <span className="ticket-name">{place.name}</span>
+          <span className="ticket-name">
+            {place.name}
+            {place.filmsMatches && (
+              <span className="ticket-video" role="img" aria-label="Films matches"><Icon name="camera" size={13} /></span>
+            )}
+          </span>
           {place.area && <span className="ticket-area">{place.area}</span>}
           {facts.length > 0 && (
             <span className="ticket-facts">
