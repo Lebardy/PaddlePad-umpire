@@ -2604,10 +2604,11 @@ async function main() {
         check('and its file is gone from the bucket', (await fetch(link2)).status === 404)
 
       } finally {
-        if (vStrangerNight) await request(`/sessions/${vStrangerNight[1]}/end`, { method: 'POST', bearer: vStrangerNight[0], body: {} })
-        await request(`/admin/facilities/${vOther.id}`, { method: 'PATCH', bearer: vOwner, body: { filmsMatches: vOtherBefore } })
-        await request(`/sessions/${vSession}/end`, { method: 'POST', bearer: token, body: {} })
-        await request(`/admin/facilities/${vFacility.id}`, { method: 'PATCH', bearer: vOwner, body: { filmsMatches: vFilmedBefore } })
+        // Each on its own, so one failing does not leave the facilities filming.
+        if (vStrangerNight) await request(`/sessions/${vStrangerNight[1]}/end`, { method: 'POST', bearer: vStrangerNight[0], body: {} }).catch(() => {})
+        await request(`/admin/facilities/${vOther.id}`, { method: 'PATCH', bearer: vOwner, body: { filmsMatches: vOtherBefore } }).catch(() => {})
+        await request(`/sessions/${vSession}/end`, { method: 'POST', bearer: token, body: {} }).catch(() => {})
+        await request(`/admin/facilities/${vFacility.id}`, { method: 'PATCH', bearer: vOwner, body: { filmsMatches: vFilmedBefore } }).catch(() => {})
       }
     }
   }

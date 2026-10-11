@@ -60,8 +60,8 @@ async function ownMatch(req) {
   return rows[0] ?? null
 }
 
-async function findVideo(matchId, db = { query }) {
-  const { rows } = await db.query('SELECT * FROM match_videos WHERE match_id = $1', [matchId])
+async function findVideo(matchId) {
+  const { rows } = await query('SELECT * FROM match_videos WHERE match_id = $1', [matchId])
   return rows[0] ?? null
 }
 
@@ -69,6 +69,8 @@ async function findVideo(matchId, db = { query }) {
 async function videoAnswer(match, config) {
   const video = await findVideo(match.id)
   if (!video) return null
+  // A phone closed mid-match leaves the row unfinished until the clean-up; after an hour of silence nothing is coming.
+  if (video.state !== 'ready' && Date.now() - new Date(video.seen_at).getTime() > 60 * 60_000) return null
   const base = { state: video.state, linedUpBy: video.lined_up_by, repacked: video.repacked }
   if (video.state !== 'ready') return base
   const { rows: events } = await query(
