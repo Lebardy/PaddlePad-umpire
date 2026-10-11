@@ -65,7 +65,7 @@ function Camera({ onBack }) {
         <p>
           {state.phase === 'denied'
             ? 'Allow the camera and the microphone for PaddlePad in the browser’s settings, then open this screen again.'
-            : 'Filming needs a recent Chrome on Android.'}
+            : 'Filming needs a recent Chrome browser.'}
         </p>
       </div>
     )
