@@ -483,30 +483,30 @@ export function setSessionEnded(sessionId, { ended = true } = {}) {
 
 /** The Camera screen's 2-second "I am here". Answers with the server's time and the match to film, if any. */
 export function cameraBeat({ deviceId, state, matchId }) {
-  return apiFetch('/video/camera/beat', { method: 'POST', body: { deviceId, state, matchId } })
+  return apiFetch('/video/camera/beat', { method: 'POST', body: { deviceId, state, matchId }, signal: AbortSignal.timeout(10_000) })
 }
 
 /** What the scoring screen's camera icon shows: 'none', 'ready' or 'filming'. */
-export function fetchCameraStatus({ signal } = {}) {
-  return apiFetch('/video/camera/status', { signal }).then((d) => d.camera)
+export function fetchCameraStatus() {
+  return apiFetch('/video/camera/status').then((d) => d.camera)
 }
 
 export function claimMatchVideo(matchId, deviceId) {
-  return apiFetch(`/video/matches/${matchId}/claim`, { method: 'POST', body: { deviceId } })
+  return apiFetch(`/video/matches/${matchId}/claim`, { method: 'POST', body: { deviceId }, signal: AbortSignal.timeout(10_000) })
 }
 
 /** `meta` is { deviceId, bytes, width, height, durationMs, firstFrameAt, repacked }. Answers with the form to send the file through. */
 export function startVideoUpload(matchId, meta) {
-  return apiFetch(`/video/matches/${matchId}/upload`, { method: 'POST', body: meta }).then((d) => d.form)
+  return apiFetch(`/video/matches/${matchId}/upload`, { method: 'POST', body: meta, signal: AbortSignal.timeout(20_000) }).then((d) => d.form)
 }
 
 export function finishVideoUpload(matchId, deviceId) {
-  return apiFetch(`/video/matches/${matchId}/done`, { method: 'POST', body: { deviceId } })
+  return apiFetch(`/video/matches/${matchId}/done`, { method: 'POST', body: { deviceId }, signal: AbortSignal.timeout(20_000) })
 }
 
 /** A match's video as the server describes it, or null when it has none. */
-export function fetchMatchVideo(matchId, { signal } = {}) {
-  return apiFetch(`/video/matches/${matchId}`, { signal }).then((d) => d.video)
+export function fetchMatchVideo(matchId) {
+  return apiFetch(`/video/matches/${matchId}`).then((d) => d.video)
 }
 
 /** Fix timing: this rally ended at this second of the video. */

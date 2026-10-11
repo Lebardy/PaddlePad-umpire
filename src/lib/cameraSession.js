@@ -157,9 +157,9 @@ export function createCameraSession({ deviceId, onChange }) {
     }
     made.onstart = () => { mine.startedAt = Date.now(); set({ startedAt: mine.startedAt }) }
     made.onstop = () => finish(mine, parts)
+    made.start(4_000)
     filming = mine
     recorder = made
-    made.start(4_000)
     set({ phase: 'filming', match, startedAt: null })
   }
 
