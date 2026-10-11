@@ -10,18 +10,22 @@
 
 const SILENT_AFTER_MS = 10_000
 
-const beats = new Map()   // umpire id -> { state, at }
+const beats = new Map()   // umpire id -> Map(device id -> { state, at })
 
 /** `state` is what the Camera screen said it is doing: 'ready', 'filming' or 'sending'. */
-export function noteBeat(umpireId, state, now = Date.now()) {
-  beats.set(umpireId, { state, at: now })
+export function noteBeat(umpireId, deviceId, state, now = Date.now()) {
+  const phones = beats.get(umpireId) ?? new Map()
+  // Forget phones gone silent, so made-up device ids cannot pile up.
+  for (const [id, beat] of phones) if (now - beat.at > SILENT_AFTER_MS) phones.delete(id)
+  phones.set(deviceId, { state, at: now })
+  beats.set(umpireId, phones)
 }
 
 /** What the tablet's icon shows. A camera that is sending will film the next match, so it counts as ready. */
 export function cameraStatus(umpireId, now = Date.now()) {
-  const beat = beats.get(umpireId)
-  if (!beat || now - beat.at > SILENT_AFTER_MS) return 'none'
-  return beat.state === 'filming' ? 'filming' : 'ready'
+  const heard = [...(beats.get(umpireId)?.values() ?? [])].filter((beat) => now - beat.at <= SILENT_AFTER_MS)
+  if (heard.length === 0) return 'none'
+  return heard.some((beat) => beat.state === 'filming') ? 'filming' : 'ready'
 }
 
 export function forgetBeats() {

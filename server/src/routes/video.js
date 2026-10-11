@@ -93,7 +93,7 @@ router.post('/camera/beat', async (req, res) => {
   const deviceId = String(req.body?.deviceId ?? '')
   if (!deviceId) return res.status(400).json({ error: 'A deviceId is required' })
   const state = BEAT_STATES.includes(req.body?.state) ? req.body.state : 'ready'
-  noteBeat(req.umpire.id, state)
+  noteBeat(req.umpire.id, deviceId, state)
   if (isUuid(req.body?.matchId)) {
     await query(
       `UPDATE match_videos SET seen_at = now() WHERE match_id = $1 AND device_id = $2 AND state = 'filming'`,
