@@ -2555,7 +2555,7 @@
 /* With a video, the line that names the picked point becomes a strip of
    the scoreboard under the picture, and the picked box -- the one being
    played -- is ringed in lamp amber. */
-.ribbon.is-watching .ribbon-readout { padding: 0.65rem 0.8rem; border-radius: var(--radius); background: var(--board); color: var(--board-ink); }
+.ribbon.is-watching .ribbon-readout { min-height: 6.9rem; padding: 0.65rem 0.8rem; border-radius: var(--radius); background: var(--board); color: var(--board-ink); }
 .ribbon.is-watching .ribbon-at { color: var(--lamp); }
 .ribbon.is-watching .ribbon-hint,
 .ribbon.is-watching .ribbon-tags { color: var(--board-muted); }

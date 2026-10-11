@@ -351,16 +351,20 @@ function PointByPoint({ id, match, selected, onSelect }) {
   function pick(index) {
     onSelect(index)
     const second = video?.seconds?.[index]
-    if (!player.current || second === null || second === undefined) return
+    if (!player.current) return
+    if (second === null || second === undefined) return player.current.pause()
     player.current.currentTime = second
     player.current.play().catch(() => {})
   }
 
   // The point being played: the last one whose rally has started.
   function follow(event) {
+    if (event.currentTarget.paused) return
     const at = event.currentTarget.currentTime
     let playing = null
-    video.seconds.forEach((second, index) => { if (second !== null && second <= at + 0.25) playing = index })
+    video.seconds.forEach((second, index) => {
+      if (second !== null && second <= at + 0.25 && index < game.moments.length) playing = index
+    })
     if (playing !== null && playing !== selected) onSelect(playing)
   }
 
