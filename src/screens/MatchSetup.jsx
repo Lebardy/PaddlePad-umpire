@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Icon from '../components/Icon'
 import { DEFAULT_POINT_TARGET, POINT_TARGETS } from '../lib/pickleball'
 import { createMatch } from '../lib/storage'
+import * as sync from '../lib/sync'
 import { useSession, usePlayers } from '../lib/useLocalStore'
 import NotFound from './NotFound'
 
@@ -98,6 +99,9 @@ function MatchSetup({ sessionId, onBack, onStart }) {
         : null,
       pointTarget,
     })
+    // Sent now rather than after the usual 2-second wait: a camera
+    // starts filming when the server hears of this match.
+    sync.flush()
     onStart(match.id)
   }
 

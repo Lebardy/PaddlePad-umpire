@@ -8,6 +8,7 @@ import Guide from './screens/Guide'
 import Players from './screens/Players'
 import Account from './screens/Account'
 import CouldntSync from './screens/CouldntSync'
+import Camera from './screens/Camera'
 import { clearSession, fetchCurrentUmpire, getStoredUmpire, subscribeSessionEnded } from './lib/api'
 import SyncIndicator from './components/SyncIndicator'
 import UpdateNotice from './components/UpdateNotice'
@@ -204,7 +205,16 @@ function App() {
       >
         {!signedIn && !authChecked && <p className="empty">Checking sign-in…</p>}
 
-        {!signedIn && authChecked && <Login onSignedIn={setUmpire} />}
+        {/* Signing in answers before the server has looked up whether
+            this umpire's facility films, so ask again straight away. */}
+        {!signedIn && authChecked && (
+          <Login
+            onSignedIn={(fresh) => {
+              setUmpire(fresh)
+              fetchCurrentUmpire().then((current) => { if (current) setUmpire(current) }).catch(() => {})
+            }}
+          />
+        )}
 
         {signedIn && (
           <>
@@ -214,8 +224,10 @@ function App() {
                 onOpenGuide={() => setView({ name: 'guide' })}
                 umpire={umpire}
                 onOpenPlayers={() => setView({ name: 'players' })}
+                onOpenCamera={() => setView({ name: 'camera' })}
               />
             )}
+            {view.name === 'camera' && <Camera onBack={goHome} />}
             {view.name === 'guide' && <Guide onBack={goHome} />}
             {view.name === 'players' && <Players onBack={goHome} />}
             {view.name === 'sync' && <CouldntSync onBack={goHome} />}

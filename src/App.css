@@ -1690,3 +1690,89 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
    the button is no taller for it. */
 .ending-btn { flex-direction: row; gap: 0.5rem; }
 .ending-label { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+
+/* ============================================================
+   Match video: the Camera screen, the scoring screen's camera icon,
+   and a finished match's Video block.
+   ============================================================ */
+
+/* The Camera screen covers everything: the phone in the holder shows
+   the court and one line of status, nothing else. */
+.camera { position: fixed; inset: 0; z-index: 1000; background: #101815; color: #fff; overflow: hidden; }
+.camera-picture { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #101815; }
+.camera-over {
+  position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; align-items: center;
+  padding: max(1rem, env(safe-area-inset-top)) max(1.25rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1.25rem, env(safe-area-inset-left));
+}
+.camera-top { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.camera-top-right { display: flex; align-items: center; gap: 0.6rem; }
+.camera-round, .camera-chip, .camera-tag, .camera-choice, .camera-status { background: rgba(12, 19, 17, 0.82); color: #fff; }
+.camera-round { width: 3rem; height: 3rem; border-radius: 50%; border: 0; display: grid; place-items: center; cursor: pointer; }
+.camera-back-icon { transform: rotate(180deg); }
+.camera-chip { display: flex; align-items: center; gap: 0.5rem; min-height: 3rem; padding: 0 1rem; border-radius: 999px; font-size: 0.95rem; }
+.camera-tag { padding: 0.35rem 0.6rem; border-radius: var(--radius-sm); font: 700 0.9rem var(--label); letter-spacing: 0.09em; display: flex; align-items: center; gap: 0.35rem; }
+.camera-tag--warn { background: var(--danger); }
+.camera-also { align-self: center; margin-top: 0.5rem; }
+.camera-choice { position: relative; display: flex; align-items: center; gap: 0.5rem; min-height: 3rem; padding: 0 0.9rem; border-radius: 999px; }
+.camera-choice select { max-width: 11rem; min-height: 3rem; border: 0; background: transparent; color: #fff; font: inherit; font-weight: 600; }
+.camera-choice option { color: #14201b; }
+.camera-status { display: flex; align-items: center; gap: 1.1rem; padding: 0.8rem 1.5rem; border-radius: var(--radius-md); }
+.camera-line { display: flex; align-items: center; gap: 0.75rem; }
+.camera-line strong, .camera-clock { font: 800 1.9rem/1 var(--display); letter-spacing: 0.02em; }
+.camera-clock { font-variant-numeric: tabular-nums; color: #ffd0ca; }
+.camera-names { padding-left: 1.1rem; border-left: 1px solid rgba(255, 255, 255, 0.24); font-size: 0.92rem; line-height: 1.25; color: #dfe7e2; }
+.camera-dot { width: 1.1rem; height: 1.1rem; border-radius: 50%; background: #ff5a4a; box-shadow: 0 0 0 5px rgba(255, 90, 74, 0.28); flex: none; }
+.camera-sending { display: grid; gap: 0.7rem; min-width: min(26rem, 78vw); }
+.camera-sending .camera-line { justify-content: space-between; }
+.camera-sending .camera-clock { color: #7ad6a8; margin-left: auto; }
+.camera-bar { display: block; height: 0.5rem; border-radius: 4px; background: rgba(255, 255, 255, 0.2); overflow: hidden; }
+.camera-bar > span { display: block; height: 100%; background: #4cc38a; }
+.camera-keep { display: flex; align-items: center; gap: 0.5rem; font-size: 0.92rem; color: #dfe7e2; }
+.camera-again { margin-left: auto; min-height: 2.75rem; padding: 0 0.9rem; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: var(--radius-sm); background: none; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+
+/* Upright: the picture is hidden behind a plain page that says one thing. */
+.camera-upright {
+  position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--bg); color: var(--text);
+  padding: max(1.25rem, env(safe-area-inset-top)) 1.25rem max(1.75rem, env(safe-area-inset-bottom));
+}
+.camera-upright .back-link { align-self: flex-start; min-height: 2.75rem; }
+.camera-upright-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.25rem; text-align: center; padding: 0 0.75rem; }
+.camera-upright-body h2 { margin: 0; font: 800 2.75rem/1 var(--display); }
+.camera-upright-body p { margin: 0; color: var(--text-muted); }
+.camera-turn { width: 12.5rem; height: 12.5rem; border-radius: 50%; background: var(--primary-soft); color: var(--primary); display: grid; place-items: center; }
+.camera-hint { display: flex; align-items: center; gap: 0.75rem; margin: 0; padding: 0.85rem 1rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-elevated); color: var(--text-muted); font-size: 0.92rem; }
+.camera-hint strong { color: var(--text); font-weight: 600; }
+.camera-note { display: grid; gap: 0.75rem; justify-items: start; }
+.camera-note h2, .camera-note p { margin: 0; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* The scoring screen's camera icon: shape and colour both say which. */
+.camera-pill { display: inline-flex; align-items: center; gap: 0.4rem; height: 2.25rem; padding: 0 0.7rem; border-radius: 999px; border: 1px solid var(--border); background: var(--bg); color: var(--text-muted); flex: none; }
+.camera-pill--ready { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
+.camera-pill--filming { border-color: var(--danger); background: var(--danger-soft); color: var(--danger); }
+.camera-pill .camera-dot { width: 0.6rem; height: 0.6rem; background: var(--danger); box-shadow: none; }
+
+/* A finished match's video. */
+.match-video { display: grid; gap: 0.65rem; margin-bottom: 1.25rem; }
+.match-video h3 { display: flex; align-items: center; gap: 0.45rem; margin: 0; font: 700 0.85rem var(--label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.match-video-player { width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius-md); background: #101815; }
+.video-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.video-actions button, .video-fix button, .video-this {
+  display: flex; align-items: center; justify-content: center; gap: 0.45rem; min-height: 3rem; padding: 0 0.9rem;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-elevated); color: var(--text); font: inherit; font-weight: 600; cursor: pointer;
+}
+.video-actions .video-remove { border-color: var(--danger); color: var(--danger); }
+.video-fix { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.75rem 0.9rem; border-radius: var(--radius-md); background: var(--primary-soft); }
+.video-fix ol { margin: 0; padding-left: 1.3rem; display: grid; gap: 0.3rem; }
+.video-rallies { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-elevated); max-height: 22rem; overflow-y: auto; }
+.video-rallies > li { display: flex; align-items: center; gap: 0.75rem; }
+.video-rallies > li + li { border-top: 1px solid var(--border); }
+.video-rallies > li.is-playing { background: var(--primary-soft); box-shadow: inset 4px 0 0 var(--primary); }
+.video-rally { flex: 1; display: flex; align-items: center; gap: 0.75rem; min-height: 3.5rem; padding: 0 1rem; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.video-rally:disabled { color: var(--text-muted); cursor: default; }
+.video-rally-words { flex: 1; padding: 0.5rem 0; }
+.video-rallies > li > .video-rally-words { padding-left: 1rem; }
+.video-rally-at { font-size: 0.88rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.video-rally .icon { color: var(--primary); }
+.video-this { margin: 0.4rem 0.6rem 0.4rem 0; border-color: var(--primary); background: var(--primary); color: var(--primary-contrast); }
+.video-coming { display: flex; align-items: center; gap: 0.45rem; margin: 0 0 1.25rem; color: var(--text-muted); }
