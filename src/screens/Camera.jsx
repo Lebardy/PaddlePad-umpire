@@ -61,7 +61,7 @@ function Camera({ onBack }) {
     return (
       <div className="camera-note">
         <button className="back-link" onClick={onBack}>&larr; Back</button>
-        <h2>{state.phase === 'denied' ? 'The camera is not allowed' : "This phone can't film here"}</h2>
+        <h2>{state.phase === 'denied' ? 'The camera is not allowed' : "This browser can't film here"}</h2>
         <p>
           {state.phase === 'denied'
             ? 'Allow the camera and the microphone for PaddlePad in the browser’s settings, then open this screen again.'
