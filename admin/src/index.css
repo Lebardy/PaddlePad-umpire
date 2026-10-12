@@ -811,7 +811,8 @@ tr.is-voided .reason { opacity: 0.6; }
 }
 .is-compact .tally-cell:nth-child(2) { grid-row: 2; border-top: 1px solid var(--board-rule); }
 .is-compact .tally-cell:nth-child(n + 3) { grid-row: 1 / span 2; }
-.is-compact .tally-figure-score { font-size: 3.2rem; min-width: 2ch; text-align: right; }
+/* A full line each: at the board's tight 0.85 the two scores' letter boxes touch when each side is one name. */
+.is-compact .tally-figure-score { font-size: 3.2rem; line-height: 1; min-width: 2ch; text-align: right; }
 /* The names take the title's place, in its lettering. */
 .is-compact .tally-cell:has(.tally-figure-score) .tally-label {
   font-family: var(--display); font-weight: 900; font-size: 1.5rem; line-height: 1; letter-spacing: 0.01em; color: var(--board-ink);
