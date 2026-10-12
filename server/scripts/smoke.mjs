@@ -2735,7 +2735,6 @@ async function main() {
         check('cancelling that match -> 204', (await request(`/matches/${vMatch2}`, { method: 'DELETE', bearer: token })).status === 204)
         check('and its file is gone from the bucket', (await fetch(link3)).status === 404)
 
-
         // ---- A player films, where the facility does not ----
         const pPhone = `smoke-player-phone-${Date.now()}`
         const pOtherPhone = `smoke-other-player-phone-${Date.now()}`
@@ -2782,7 +2781,15 @@ async function main() {
         const pBack = await pClaim(vPlayerToken, pPhone)
         check('and the first phone is then the one refused, by name -> 409',
           pBack.status === 409 && /^Smoke Video Two/.test(pBack.body.covered?.name ?? ''), JSON.stringify(pBack.body))
-        check("a beat that names the match keeps the holder's claim alive -> 200", (await asPlayer('/player/video/camera/beat', { method: 'POST', bearer: pTwoToken, body: { deviceId: pOtherPhone, state: 'filming', matchId: pMatch } })).status === 200)
+        console.log('  (waiting 35 s, then the holder beats)')
+        await new Promise((resolve) => setTimeout(resolve, 35_000))
+        const pKeep = await asPlayer('/player/video/camera/beat', { method: 'POST', bearer: pTwoToken, body: { deviceId: pOtherPhone, state: 'filming', matchId: pMatch } })
+        check("a beat that names the match answers 200 and names it", pKeep.status === 200 && pKeep.body.match?.id === pMatch, JSON.stringify(pKeep.body).slice(0, 120))
+        console.log('  (waiting 35 s more, 70 s since the takeover)')
+        await new Promise((resolve) => setTimeout(resolve, 35_000))
+        const pStill = await pClaim(vPlayerToken, pPhone)
+        check('a holder that keeps beating keeps the match: 70 s after taking it over, the other phone is still refused -> 409',
+          pStill.status === 409 && /^Smoke Video Two/.test(pStill.body.covered?.name ?? ''), JSON.stringify(pStill.body))
 
         const pEvents = [20_000, 35_000].map((ms, seq) => ({
           id: crypto.randomUUID(), seq, type: 'rally', at: pStartedAt + ms, actingPlayerId: vPlayers[1], outcome: 'winner', zone: 'baseline',
@@ -2825,9 +2832,8 @@ async function main() {
         check('a player outside the match cannot remove it -> 404', (await pRemove(vOutsiderToken)).status === 404)
         check('the player who filmed it removes it -> 204', (await pRemove(pTwoToken)).status === 204)
         check('then nobody has a video of that match', (await pGame(pTwoToken)) === null && (await request(`/video/matches/${pMatch}`, { bearer: token })).body.video === null)
-        check('and its file is gone from the bucket', (await fetch(pSeenByFilmer.url)).status >= 400)
+        check('and its file is gone from the bucket', (await fetch(pSeenByFilmer.url)).status === 404)
         check('removing it again -> 404', (await pRemove(pTwoToken)).status === 404)
-
       } finally {
         // Each on its own, so one failing does not leave the facilities filming.
         for (const manager of [vManager, vManagerOther]) {
