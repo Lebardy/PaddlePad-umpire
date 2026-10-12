@@ -282,6 +282,8 @@ button.tally-cell:focus-visible { outline: 2px solid var(--lamp); outline-offset
 .sheet { padding: 1.5rem 1.5rem 0; display: grid; gap: 1.25rem; align-content: start; }
 .empty { color: var(--text-muted); padding: 1.5rem 0; margin: 0; }
 .missing { padding: 3rem 1.5rem; }
+/* The sheet already keeps the page's margin: a second one would set this line in from the way back under it. */
+.sheet > .missing { padding-inline: 0; }
 
 /* --- Forms and buttons --- */
 .form-strip {
@@ -370,6 +372,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .name-line { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .table a.row-link, .home-rail a.row-link { color: inherit; text-decoration: none; }
 .table a.row-link:hover, .table a.row-link:focus-visible, .home-rail a.row-link:hover, .home-rail a.row-link:focus-visible { text-decoration: underline; }
+/* A link that opens a match shows it without a hover, which a tablet does not have: underlined, in the link colour. */
+.table a.match-link { color: var(--primary); text-decoration: underline; text-underline-offset: 0.2em; }
 .table tr.row-clickable { cursor: pointer; }
 .table tr.row-clickable:hover td { background: var(--surface-sunken); }
 .nowrap { white-space: nowrap; }

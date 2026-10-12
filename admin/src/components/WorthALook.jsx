@@ -48,8 +48,9 @@ function WarningRow({ warning, showFacility, now, actions }) {
     <tr className={warning.voided ? 'is-voided' : undefined}>
       <td>
         <span className="cell-main">
-          <Link to={`/matches/${warning.matchId}`} className="row-link"><strong>{warning.teamA.join(' & ')}</strong> vs {warning.teamB.join(' & ')}</Link>
-          {warning.hasVideo && <VideoMark />}
+          <Link to={`/matches/${warning.matchId}`} className="row-link match-link">
+            <strong>{warning.teamA.join(' & ')}</strong> vs {warning.teamB.join(' & ')}{warning.hasVideo && <VideoMark />}
+          </Link>
         </span>
         <span className="cell-sub">
           {warning.sessionName} · {warning.status === 'in_progress' ? 'still in progress' : `finished ${warning.score.A}–${warning.score.B}`}

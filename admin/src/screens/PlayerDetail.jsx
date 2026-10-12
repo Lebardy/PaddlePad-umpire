@@ -132,9 +132,8 @@ export default function PlayerDetail({ id, me }) {
                     <tr key={m.id}>
                       <td className="col-when">
                         {mayOpenMatch(me, m.facilityId)
-                          ? <Link to={`/matches/${m.id}`} className="row-link">{formatWhen(m.endedAt)}</Link>
+                          ? <Link to={`/matches/${m.id}`} className="row-link match-link">{formatWhen(m.endedAt)}{m.hasVideo && <VideoMark />}</Link>
                           : formatWhen(m.endedAt)}
-                        {m.hasVideo && <VideoMark />}
                       </td>
                       <td>{m.sessionName}</td>
                       <td>{m.isDoubles ? m.partner : 'Singles'}</td>
