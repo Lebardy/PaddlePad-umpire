@@ -41,6 +41,7 @@ check('a round figure keeps its decimal', sizeText(2e9), '2.0 GB')
 
 console.log('\nthe point a playing video is on')
 check('the last point whose rally has started', playingIndex([0, null, 16, 31], 20), 2)
+check('a rally at second 0 counts', playingIndex([0, 16], 3), 0)
 check('a quarter second early still counts', playingIndex([0, null, 16, 31], 15.8), 2)
 check('before the first rally', playingIndex([4, 9], 1), null)
 check('a video that shows no point', playingIndex([null, null], 5), null)

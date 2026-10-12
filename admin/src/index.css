@@ -774,6 +774,8 @@ tr.is-voided .reason { opacity: 0.6; }
 /* The video on a black stage as wide as the sheet, so on a laptop it
    sits in the middle rather than against one edge. */
 .match-watch { display: grid; gap: 0.6rem; }
+/* "Couldn't load the video." and Try again, level with each other. */
+.match-watch .actions-row { align-items: center; }
 .match-stage { background: var(--board); border-radius: var(--radius); overflow: hidden; }
 .match-video { display: block; width: 100%; max-width: 960px; aspect-ratio: 16 / 9; margin-inline: auto; background: var(--board); }
 

@@ -26,18 +26,21 @@ export default function MatchDetail({ id }) {
   // already answered.
   const [result, setResult] = useState(null)
   // The video's link lasts two hours. If it has run out by the time
-  // play is pressed, the match is asked for once more, for a fresh one.
-  const [asked, setAsked] = useState({ id, times: 0 })
-  const times = asked.id === id ? asked.times : 0
+  // play is pressed, the match is asked for once more by itself, for a
+  // fresh one. If the video still cannot be loaded the page says so and
+  // waits for "Try again": it never keeps asking by itself.
+  const [asked, setAsked] = useState({ id, times: 0, retried: false, failed: false })
+  const { times, retried, failed } = asked.id === id ? asked : { times: 0, retried: false, failed: false }
 
   useEffect(() => {
     let live = true
     fetchMatch(id)
       .then((match) => { if (live) setResult({ id, match }) })
       .catch((err) => {
-        // A second ask that fails leaves the page as it stands.
-        if (!live || times > 0) return
-        if (err.status === 404) setResult({ id, notFound: true })
+        if (!live) return
+        // A later ask that fails leaves the page as it stands: only the video is said to have failed.
+        if (times > 0) setAsked({ id, times, retried: true, failed: true })
+        else if (err.status === 404) setResult({ id, notFound: true })
         else setResult({ id, error: err.message })
       })
     return () => { live = false }
@@ -46,9 +49,22 @@ export default function MatchDetail({ id }) {
   const loading = !result || result.id !== id
   const match = loading ? null : result.match
 
+  function handleVideoError() {
+    setAsked(retried ? { id, times, retried, failed: true } : { id, times: times + 1, retried: true, failed: false })
+  }
+
   async function handleRemoveVideo() {
-    await removeMatchVideo(id)
-    setResult({ id, match: await fetchMatch(id) })
+    // A 404 says the video, or the whole match, is already gone: the page is behind, so it reads again and says no error.
+    const removed = await removeMatchVideo(id).then(() => true, (err) => { if (err.status !== 404) throw err; return false })
+    // Gone on the server whatever the next read says, so gone from the page at once.
+    if (removed) setResult({ id, match: { ...match, video: null, mayRemoveVideo: false } })
+    try {
+      setResult({ id, match: await fetchMatch(id) })
+    } catch (err) {
+      if (removed) return
+      if (err.status !== 404) throw err
+      setResult({ id, notFound: true })
+    }
   }
 
   if (loading) return <section className="sheet"><p className="empty">Loading…</p></section>
@@ -91,7 +107,9 @@ export default function MatchDetail({ id }) {
         <Link to="/" className="back-link">← Overview</Link>
         <PointByPoint
           match={match}
-          onVideoError={() => { if (times < 1) setAsked({ id, times: times + 1 }) }}
+          videoFailed={failed}
+          onVideoError={handleVideoError}
+          onTryAgain={() => setAsked({ id, times: times + 1, retried: false, failed: false })}
           onRemoveVideo={handleRemoveVideo}
         />
       </div>
@@ -111,7 +129,7 @@ export default function MatchDetail({ id }) {
  * Mounted afresh for each match (the page reads "Loading…" in between),
  * so the point lit never carries over from another match.
  */
-function PointByPoint({ match, onVideoError, onRemoveVideo }) {
+function PointByPoint({ match, videoFailed, onVideoError, onTryAgain, onRemoveVideo }) {
   const { points, video } = match
   const player = useRef(null)
   const [playing, setPlaying] = useState(null)
@@ -143,6 +161,12 @@ function PointByPoint({ match, onVideoError, onRemoveVideo }) {
               onError={onVideoError}
             />
           </div>
+          {videoFailed && (
+            <div className="actions-row">
+              <p className="form-error" role="alert">Couldn’t load the video.</p>
+              <button type="button" className="btn-quiet btn-small" onClick={onTryAgain}>Try again</button>
+            </div>
+          )}
           {match.mayRemoveVideo && (
             <div className="row-actions">
               <RowConfirm
