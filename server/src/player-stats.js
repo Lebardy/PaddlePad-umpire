@@ -189,6 +189,11 @@ export function pointEndings(row, events) {
   }))
 }
 
+/** The score after each point, one entry per POINT: lined up with pointEndings() and pointRallyOrder(). */
+export function pointScores(row, events) {
+  return scoringRallies(row, events).map(({ score }) => ({ a: score.A, b: score.B }))
+}
+
 /**
  * How one player's rallies went in one match: how many were played, how
  * many their side won, and how many ended with their own mistake.
