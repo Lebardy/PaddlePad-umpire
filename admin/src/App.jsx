@@ -89,7 +89,7 @@ export default function App() {
     else if (path === '/umpires/invites') screen = <Invites me={admin} />
     else if (matchPath('/players/:id', path)) screen = <PlayerDetail id={matchPath('/players/:id', path).id} me={admin} />
     else if (matchPath('/umpires/:id', path)) screen = <UmpireDetail id={matchPath('/umpires/:id', path).id} me={admin} />
-    else if (matchPath('/matches/:id', path)) screen = <MatchDetail id={matchPath('/matches/:id', path).id} />
+    else if (matchPath('/matches/:id', path)) screen = <MatchDetail key={matchPath('/matches/:id', path).id} id={matchPath('/matches/:id', path).id} />
     else if (path === '/facilities') screen = <Facilities me={admin} />
     else if (matchPath('/facilities/:id', path)) screen = <FacilityDetail id={matchPath('/facilities/:id', path).id} me={admin} />
     else screen = <p className="empty missing">There’s no page here.</p>

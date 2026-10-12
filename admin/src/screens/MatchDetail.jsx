@@ -192,7 +192,7 @@ function PointByPoint({ match, videoFailed, onVideoError, onTryAgain, onRemoveVi
           {video && <span className="section-count"><Icon name="camera" size={16} />Tap a point to watch it</span>}
         </div>
         {points.length === 0 ? (
-          <p className="empty">No points yet.</p>
+          <p className="empty">{match.status === 'in_progress' ? 'No points yet.' : 'No points.'}</p>
         ) : (
           <>
             {/* The key to the bars: the first side's points are barred on the left, the other side's on the right. */}
