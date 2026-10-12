@@ -2547,6 +2547,9 @@ async function main() {
         const vTotalsOther = (await request(`/admin/overview?facilityId=${vOther.id}`, { bearer: vOwner })).body.totals?.videos
         check('scoped to another facility, the count leaves this video out',
           typeof vTotalsOther?.count === 'number' && vTotalsOther.count < vTotalsAll?.count, JSON.stringify([vTotalsOther, vTotalsAll]))
+        const vTotalsHere = (await request(`/admin/overview?facilityId=${vFacility.id}`, { bearer: vOwner })).body.totals?.videos
+        check('scoped to the facility that filmed it, the video is counted',
+          vTotalsHere?.count >= 1 && vTotalsHere?.bytes >= 1024, JSON.stringify(vTotalsHere))
 
         // The admin site's match page. A manager is made the way the admin sections make one.
         const makeManager = async (facilityId, label) => {
@@ -2584,6 +2587,9 @@ async function main() {
         const vTotalsOtherManager = (await request('/admin/overview', { bearer: vManagerOther[0] })).body.totals?.videos
         check("the other facility's manager sees the same video count as the owner scoped to it",
           typeof vTotalsOther?.count === 'number' && vTotalsOtherManager?.count === vTotalsOther.count, JSON.stringify([vTotalsOtherManager, vTotalsOther]))
+        const vTotalsManager = (await request('/admin/overview', { bearer: vManager[0] })).body.totals?.videos
+        check("that facility's manager sees its video counted",
+          vTotalsManager?.count >= 1 && vTotalsManager.count === vTotalsHere?.count, JSON.stringify([vTotalsManager, vTotalsHere]))
 
         // A player who was in the match watches it.
         const vCode = await request(`/players/${vPlayers[0]}/claim-code`, { bearer: token })
