@@ -13,6 +13,7 @@ import Admins from './screens/Admins'
 import Facilities from './screens/Facilities'
 import FacilityDetail from './screens/FacilityDetail'
 import Invites from './screens/Invites'
+import MatchDetail from './screens/MatchDetail'
 import Overview from './screens/Overview'
 import People from './screens/People'
 import PlayerDetail from './screens/PlayerDetail'
@@ -76,6 +77,8 @@ export default function App() {
   } else if (!admin) {
     content = <SignIn onSignedIn={setAdmin} />
   } else {
+    // Read once: a match's id is both its screen's key and its prop.
+    const match = matchPath('/matches/:id', path)
     let screen
     if (path === '/') screen = <Overview me={admin} facilityLabel={facilityLabel(admin, facilities ?? [])} />
     else if (path === '/managers' && admin.role === 'owner') screen = <Admins me={admin} />
@@ -88,6 +91,7 @@ export default function App() {
     else if (path === '/umpires/invites') screen = <Invites me={admin} />
     else if (matchPath('/players/:id', path)) screen = <PlayerDetail id={matchPath('/players/:id', path).id} me={admin} />
     else if (matchPath('/umpires/:id', path)) screen = <UmpireDetail id={matchPath('/umpires/:id', path).id} me={admin} />
+    else if (match) screen = <MatchDetail key={match.id} id={match.id} />
     else if (path === '/facilities') screen = <Facilities me={admin} />
     else if (matchPath('/facilities/:id', path)) screen = <FacilityDetail id={matchPath('/facilities/:id', path).id} me={admin} />
     else screen = <p className="empty missing">There’s no page here.</p>

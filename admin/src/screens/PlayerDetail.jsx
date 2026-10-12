@@ -8,6 +8,8 @@ import StatusTag from '../components/StatusTag'
 import { fetchPlayer, newClaimCode } from '../lib/api'
 import { formatWhen, lastSignedInText, playstyleText, pprText, signInMethodsText } from '../lib/format'
 import { Link } from '../lib/router'
+import { mayOpenMatch } from '../lib/matches'
+import VideoMark from '../components/VideoMark'
 
 /** One player's page: their details, their recent matches, and what an admin can do about their account. */
 export default function PlayerDetail({ id, me }) {
@@ -128,7 +130,11 @@ export default function PlayerDetail({ id, me }) {
                 <tbody>
                   {player.matches.map((m) => (
                     <tr key={m.id}>
-                      <td className="col-when">{formatWhen(m.endedAt)}</td>
+                      <td className="col-when">
+                        {mayOpenMatch(me, m.facilityId)
+                          ? <Link to={`/matches/${m.id}`} className="row-link match-link">{formatWhen(m.endedAt)}{m.hasVideo && <VideoMark />}</Link>
+                          : formatWhen(m.endedAt)}
+                      </td>
                       <td>{m.sessionName}</td>
                       <td>{m.isDoubles ? m.partner : 'Singles'}</td>
                       <td>{m.opponents.join(' & ')}</td>

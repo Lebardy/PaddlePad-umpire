@@ -120,10 +120,10 @@ const RECENT = 20
 export async function playerDetail(queryFn, row) {
   const matches = await getPlayerMatches(queryFn, row.id)
   const recent = matches.slice(0, RECENT)
-  const [matchesInProgress, rating, scoredBy, rallyRatings] = await Promise.all([
+  const [matchesInProgress, rating, extras, rallyRatings] = await Promise.all([
     countMatchesInProgress(queryFn, row.id),
     getRatingState(queryFn, row.id, matches.length),
-    scoringUmpireNames(queryFn, recent),
+    matchExtras(queryFn, recent),
     getRallyRatings(queryFn),
   ])
   const ppr = rallyRatingFor(rallyRatings, row.id)
@@ -139,7 +139,9 @@ export async function playerDetail(queryFn, row) {
     matches: recent.map((m) => ({
       id: m.id, endedAt: m.endedAt, sessionName: m.sessionName, isDoubles: m.isDoubles,
       partner: m.partner, opponents: m.opponents, yourScore: m.yourScore, theirScore: m.theirScore, won: m.won,
-      scoredBy: scoredBy.get(m.id) ?? 'Unknown',
+      scoredBy: extras.get(m.id)?.name ?? 'Unknown',
+      facilityId: extras.get(m.id)?.facilityId ?? null,
+      hasVideo: extras.get(m.id)?.hasVideo ?? false,
     })),
     matchesInProgress,
     // The PPR the player sees; `rating` below is the nightly run's
@@ -154,22 +156,24 @@ export async function playerDetail(queryFn, row) {
 }
 
 /**
- * Which umpire scored each of these matches, by match id.
+ * For each of these matches, by match id: the scoring umpire's name, the
+ * facility it was played at, and whether it has a ready video.
  *
- * getPlayerMatches doesn't carry recorded_by -- it is built for the
+ * getPlayerMatches doesn't carry any of these -- it is built for the
  * player's own history screen, which has no reason to name the umpire.
  * The admin page does, so this is one small extra lookup rather than a
  * change to a function several other screens share.
  */
-async function scoringUmpireNames(queryFn, matches) {
+async function matchExtras(queryFn, matches) {
   if (matches.length === 0) return new Map()
   const { rows } = await queryFn(
-    `SELECT m.id, u.name
-       FROM matches m LEFT JOIN umpires u ON u.id = m.recorded_by
+    `SELECT m.id, u.name, s.facility_id,
+            EXISTS (SELECT 1 FROM match_videos v WHERE v.match_id = m.id AND v.state = 'ready') AS has_video
+       FROM matches m JOIN sessions s ON s.id = m.session_id LEFT JOIN umpires u ON u.id = m.recorded_by
       WHERE m.id = ANY($1::uuid[])`,
     [matches.map((m) => m.id)],
   )
-  return new Map(rows.map((r) => [r.id, r.name ?? null]))
+  return new Map(rows.map((r) => [r.id, { name: r.name ?? null, facilityId: r.facility_id ?? null, hasVideo: r.has_video === true }]))
 }
 
 /** Everything the umpire page shows. */
@@ -178,7 +182,8 @@ export async function umpireDetail(queryFn, row) {
     queryFn('SELECT code, note FROM invites WHERE used_by = $1 ORDER BY used_at DESC LIMIT 1', [row.id]),
     queryFn(
       `SELECT m.id, m.team_a, m.team_b, m.first_server_team, m.first_server_player, m.right_start_a, m.right_start_b,
-              m.point_target, m.status, m.winner, m.started_at, m.ended_at, s.name AS session_name
+              m.point_target, m.status, m.winner, m.started_at, m.ended_at, s.name AS session_name, s.facility_id,
+              EXISTS (SELECT 1 FROM match_videos v WHERE v.match_id = m.id AND v.state = 'ready') AS has_video
          FROM matches m JOIN sessions s ON s.id = m.session_id
         WHERE m.recorded_by = $1 AND m.voided_at IS NULL AND s.voided_at IS NULL
         ORDER BY m.started_at DESC LIMIT ${RECENT}`,
@@ -224,6 +229,7 @@ export async function umpireDetail(queryFn, row) {
         id: m.id, sessionName: m.session_name, startedAt: m.started_at, endedAt: m.ended_at, status: m.status, winner: m.winner,
         teamA: m.team_a.map((id) => nameOf.get(id) ?? 'Unknown'), teamB: m.team_b.map((id) => nameOf.get(id) ?? 'Unknown'),
         scoreA: derived.score.A, scoreB: derived.score.B,
+        facilityId: m.facility_id, hasVideo: m.has_video === true,
       }
     })
   }

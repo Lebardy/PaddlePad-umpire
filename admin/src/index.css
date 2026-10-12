@@ -282,6 +282,8 @@ button.tally-cell:focus-visible { outline: 2px solid var(--lamp); outline-offset
 .sheet { padding: 1.5rem 1.5rem 0; display: grid; gap: 1.25rem; align-content: start; }
 .empty { color: var(--text-muted); padding: 1.5rem 0; margin: 0; }
 .missing { padding: 3rem 1.5rem; }
+/* The sheet already keeps the page's margin: a second one would set this line in from the way back under it. */
+.sheet > .missing { padding-inline: 0; }
 
 /* --- Forms and buttons --- */
 .form-strip {
@@ -370,6 +372,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .name-line { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .table a.row-link, .home-rail a.row-link { color: inherit; text-decoration: none; }
 .table a.row-link:hover, .table a.row-link:focus-visible, .home-rail a.row-link:hover, .home-rail a.row-link:focus-visible { text-decoration: underline; }
+/* A link that opens a match shows it without a hover, which a tablet does not have: underlined, in the link colour. */
+.table a.match-link { color: var(--primary); text-decoration: underline; text-underline-offset: 0.2em; }
 .table tr.row-clickable { cursor: pointer; }
 .table tr.row-clickable:hover td { background: var(--surface-sunken); }
 .nowrap { white-space: nowrap; }
@@ -596,7 +600,8 @@ td.table-foot { display: table-cell; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .btn-primary, .btn-quiet, .btn-danger, .btn-lamp, .btn-board { transition: none; }
+  .btn-primary, .btn-quiet, .btn-danger, .btn-lamp, .btn-board, .match-play { transition: none; }
+  .match-filmed .match-points { scroll-behavior: auto; }
 }
 .setting-body p { margin: 0; }
 
@@ -701,6 +706,12 @@ a.btn-quiet { color: var(--text); }
 .totals-head { margin-top: 2rem; }
 .totals-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
 .totals-row .total + .total { border-top: 0; border-left: 1px solid var(--border); }
+/* Six do not fit one row on a 1024 screen: two rows of three, the figures keep their size. */
+@media (max-width: 1180px) {
+  .totals-six { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .totals-row.totals-six > :nth-child(n + 4) { border-top: 1px solid var(--border); }
+  .totals-row.totals-six > :nth-child(4) { border-left: 0; }
+}
 .total-new b { color: var(--status-good); font-weight: 700; }
 :root[data-theme='dark'] .total-new b { color: var(--win-lamp); }
 .total-rating { padding: 0.9rem 1rem; background: var(--board); color: var(--board-ink); }
@@ -758,12 +769,164 @@ tr.is-voided .reason { opacity: 0.6; }
 .logo-actions .confirm { justify-items: start; }
 .logo-actions .row-actions > .row-error { text-align: left; }
 
+/* --- One match: the score lit on the board, its video, every point --- */
+
+/* Four names do not fit beside a tally, so the title takes the board's
+   whole width and the tally hangs under it at every width. */
+.page-board:has(> .match-tally) { grid-template-columns: minmax(0, 1fr); align-items: start; }
+.match-tally { justify-self: start; max-width: 100%; }
+.match-vs { color: var(--board-muted); }
+.tally-figure-score { font-size: 5.5rem; line-height: 0.85; text-shadow: 0 0 26px var(--lamp-glow); }
+/* A voided match: a lit red mark with its reason beside it, and the score put out and struck through. */
+.page-board .status-voided {
+  align-items: center; gap: 0.3rem; padding: 0.1rem 0.5rem 0.1rem 0.4rem; border-radius: 3px;
+  background: var(--loss-lamp); color: var(--loss-ink);
+}
+.status-voided::before { content: none; }
+.void-reason { margin-left: 0.6rem; }
+.match-tally.is-voided .tally-figure-score {
+  color: var(--board-muted); text-shadow: none;
+  /* Longhands: Safari drops the shorthand when it carries a thickness. */
+  text-decoration-line: line-through; text-decoration-color: var(--loss-lamp); text-decoration-thickness: 0.07em;
+}
+.match-tally .tally-label { white-space: normal; overflow-wrap: anywhere; }
+.match-tally .tally-label > span { display: block; }
+/* Only the score is lit. */
+.match-tally .tally-figure-text { color: var(--board-ink); }
+
+/* A filmed match: the video leads, so the board closes up into a
+   scoreboard. A row a side, its names then its score, the way a board
+   at the end of a court reads; when, where and the umpire beside them. */
+.page-board.is-compact { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1.5rem; padding-block: 1rem; }
+/* The title is not drawn, so its wrapper steps aside: the status stands after the scoreboard. */
+.page-board.is-compact > :first-child { display: contents; }
+.page-board.is-compact .page-board-intro { order: 1; margin: 0; }
+.is-compact .match-tally { display: grid; grid-template-columns: repeat(4, auto); }
+.is-compact .tally-cell { align-content: center; }
+/* Long names get the room before a long place does. */
+.is-compact .tally-figure-text { max-width: 11rem; }
+.is-compact .tally-cell:has(.tally-figure-score) {
+  grid-column: 1; display: flex; flex-direction: row-reverse; justify-content: space-between; align-items: center; gap: 1.75rem;
+  padding-block: 0.45rem; border-left: 0;
+}
+.is-compact .tally-cell:nth-child(2) { grid-row: 2; border-top: 1px solid var(--board-rule); }
+.is-compact .tally-cell:nth-child(n + 3) { grid-row: 1 / span 2; }
+/* A full line each: at the board's tight 0.85 the two scores' letter boxes touch when each side is one name. */
+.is-compact .tally-figure-score { font-size: 3.2rem; line-height: 1; min-width: 2ch; text-align: right; }
+/* The names take the title's place, in its lettering. */
+.is-compact .tally-cell:has(.tally-figure-score) .tally-label {
+  font-family: var(--display); font-weight: 900; font-size: 1.5rem; line-height: 1; letter-spacing: 0.01em; color: var(--board-ink);
+}
+
+/* A tapped point and its video are always seen together. On a narrow
+   screen the video stays at the top, short enough that some points show
+   under it; beside the points (below) nothing but the points moves. */
+.match-watch { position: sticky; top: 0; z-index: 1; display: grid; gap: 0.6rem; padding-bottom: 0.6rem; background: var(--bg); }
+/* "Couldn't load the video." and Try again, level with each other. */
+.match-watch .actions-row { align-items: center; }
+/* Under the video: the way back on the left, the owner's Remove video on the right. */
+.match-watch .row-actions { align-items: center; }
+/* Both are pressed with a finger on a tablet: a full fingertip tall. */
+.match-watch .back-link { display: inline-flex; align-items: center; min-height: 2.75rem; margin: 0 auto 0 0; }
+.match-watch .btn-small { min-height: 2.75rem; }
+.match-stage { position: relative; background: var(--board); border-radius: var(--radius); overflow: hidden; }
+.match-video { display: block; width: 100%; max-height: 40vh; aspect-ratio: 16 / 9; background: var(--board); }
+/* Until the video is played it is a black screen: the one lamp on it is the way in. */
+.match-play {
+  position: absolute; inset: 0; margin: auto; width: 5.5rem; height: 5.5rem; display: grid; place-items: center;
+  border: 0; border-radius: 50%; background: var(--lamp); color: #15181d; cursor: pointer;
+  box-shadow: 0 0 2.5rem var(--lamp-glow); transition: transform 0.15s ease-out;
+}
+.match-play .icon { fill: currentColor; }
+.match-play:hover { transform: scale(1.08); }
+.match-play:active { transform: scale(0.96); }
+.match-play:focus-visible { outline: 2px solid var(--board-ink); outline-offset: 4px; }
+/* Beside the points from the width where the unfilmed points take two
+   columns. The video takes the larger share and the points the rest,
+   never less than a point's line needs.
+
+   The page is as tall as the window and no taller: the scoreboard, the
+   video and the points' heading stay where they are, and only the points
+   move, in a pane of their own. Finding a point never takes the video
+   or the score off the screen. The top bar is 3.75rem and the scoreboard
+   ends about 14rem down, so the video is no taller than what is left of
+   the window under them. Each height is given twice: a tablet's browser
+   bars come and go, and dvh is the window as it is now. */
+@media (min-width: 900px) {
+  .page:has(.match-filmed) { padding-bottom: 0; }
+  section:has(> .match-filmed) { display: flex; flex-direction: column; height: calc(100vh - 3.75rem); height: calc(100dvh - 3.75rem); }
+  .match-filmed {
+    flex: 1; min-height: 20rem; padding-bottom: 1rem; column-gap: 1.5rem; grid-template-rows: minmax(0, 1fr);
+    grid-template-columns: minmax(0, min(58%, calc((100vh - 20.5rem) * 16 / 9))) minmax(27rem, 1fr);
+    grid-template-columns: minmax(0, min(58%, calc((100dvh - 20.5rem) * 16 / 9))) minmax(27rem, 1fr);
+  }
+  .match-watch { top: 1rem; align-self: start; padding-bottom: 0; }
+  .match-video { max-height: none; }
+  .match-filmed > :last-child { display: flex; flex-direction: column; min-height: 0; }
+  .match-filmed .match-points {
+    /* Positioned, so each row's words for a screen reader scroll inside the pane and do not lengthen the page. */
+    position: relative; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-behavior: smooth;
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  }
+}
+
+/* Whose point: the first side's are barred on the left, the other
+   side's on the right, so the side never rests on the colour alone.
+   The rows touch, so a run of points reads as one long bar. */
+.match-sides { display: flex; justify-content: space-between; gap: 1.5rem; margin: 0 0 0.5rem; }
+.match-side {
+  padding-inline: 0.6rem; border-inline: 5px solid transparent; color: var(--text-secondary); overflow-wrap: anywhere; text-wrap: balance;
+  font-family: var(--label); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.92rem;
+}
+.match-side.is-a { border-left-color: var(--series-1); }
+.match-side.is-b { border-right-color: var(--series-2); text-align: right; }
+
+.match-points { list-style: none; margin: 0; padding: 0; display: grid; column-gap: 1.5rem; }
+/* Down the first column, then down the second. */
+@media (min-width: 900px) {
+  .match-points { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: column; grid-template-rows: repeat(var(--point-rows), auto); }
+  /* Beside a video the points keep to one column. */
+  .match-filmed .match-points { display: block; }
+}
+.match-point {
+  /* The bar and the rule under a row are shadows, not borders: borders would notch the bar at every row. */
+  --rule: inset 0 -1px 0 var(--border);
+  display: flex; min-height: 2.75rem; padding-inline: 5px; background: var(--surface); box-shadow: var(--rule);
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+.match-point.is-a { box-shadow: inset 5px 0 0 var(--series-1), var(--rule); }
+.match-point.is-b { box-shadow: inset -5px 0 0 var(--series-2), var(--rule); }
+.match-point > span, .match-point > button { flex: 1; display: flex; align-items: center; padding: 0.4rem 0.85rem; }
+.match-point > button {
+  justify-content: space-between; gap: 0.75rem; background: none; border: 0; text-align: left; cursor: pointer;
+}
+.match-point > button .icon { color: var(--primary); }
+.match-point > button:hover { background: var(--surface-sunken); }
+.match-point > button:focus-visible { outline-offset: -3px; }
+/* How each point ended, down the left of the list: a tick on a solid
+   disc for a winning shot, a cross in a ring for a mistake. Two shapes,
+   filled and open, at one weight: the run of a match reads without its
+   words, and a mistake is marked as plainly as a winner. */
+.point-line { display: flex; align-items: center; gap: 0.7rem; }
+.match-point .icon.point-mark { box-sizing: border-box; padding: 0.2rem; margin: 0; border-radius: 50%; color: var(--text); stroke-width: 3; }
+.match-point .icon.point-mark.is-x { box-shadow: inset 0 0 0 2px currentColor; }
+.match-point .icon.point-mark.is-check { background: var(--text); color: var(--surface); }
+/* The point on screen, lit the way the site lights whatever is chosen. */
+.match-point > button[aria-current='true'] { background: var(--button); color: var(--button-ink); box-shadow: inset 0 0 0 2px var(--lamp); }
+.match-point > button[aria-current='true'] .icon { color: inherit; }
+.match-point > button[aria-current='true'] .icon.point-mark.is-check { background: var(--button-ink); color: var(--button); }
+.match-point > button[aria-current='true']:focus-visible { outline-color: var(--button-ink); }
+
 /* ============ Icons ============ */
 
 /* Beside a label everywhere; a section's heading opens with a lit badge,
    the mark the player app uses for its bands. */
 .icon { flex: none; vertical-align: -0.2em; margin-right: 0.4em; }
 .icon-solo { margin-right: 0; }
+.icon-video { margin-left: 0.5em; margin-right: 0; color: var(--primary); }
+/* In a match row the camera takes no width of its own (the cell keeps room for it), so it cannot wrap away from the last word. */
+.cell-main:has(.icon-video) { padding-right: calc(16px + 0.5em); }
+.cell-main .icon-video { margin-right: calc(-16px - 0.5em); }
 .section-title .icon,
 .form-strip-title .icon {
   box-sizing: border-box; width: 1.6rem; height: 1.6rem; padding: 0.25rem; margin-right: 0.5rem;

@@ -8,6 +8,8 @@ import StatusTag from '../components/StatusTag'
 import { fetchUmpire, moveUmpire } from '../lib/api'
 import { formatWhen, lastSignedInText, signInMethodsText } from '../lib/format'
 import { Link } from '../lib/router'
+import { mayOpenMatch } from '../lib/matches'
+import VideoMark from '../components/VideoMark'
 
 const inviteText = (invite) => (invite ? `${invite.code}${invite.note ? ` (${invite.note})` : ''}` : 'Unknown')
 const matchStatusText = (status) => (status === 'completed' ? 'Finished' : 'In progress')
@@ -125,7 +127,11 @@ export default function UmpireDetail({ id, me }) {
                 <tbody>
                   {umpire.matches.map((m) => (
                     <tr key={m.id}>
-                      <td className="col-when">{formatWhen(m.startedAt)}</td>
+                      <td className="col-when">
+                        {mayOpenMatch(me, m.facilityId)
+                          ? <Link to={`/matches/${m.id}`} className="row-link match-link">{formatWhen(m.startedAt)}{m.hasVideo && <VideoMark />}</Link>
+                          : formatWhen(m.startedAt)}
+                      </td>
                       <td>{m.sessionName}</td>
                       <td>{m.teamA.join(' & ')}</td>
                       <td>{m.teamB.join(' & ')}</td>

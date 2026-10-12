@@ -22,7 +22,7 @@
 // ============================================================
 
 import { randomUUID } from 'node:crypto'
-import { pointEndings, scoreProgression } from '../src/player-stats.js'
+import { pointEndings, pointScores, scoreProgression } from '../src/player-stats.js'
 import { rallyEnding } from '../src/rally-endings.js'
 
 let pass = 0
@@ -98,6 +98,19 @@ section('Only points, never serve changes')
       { how: 'winner', ending: 'dink_winner', by: A },
     ],
     'A winning shot names the player who hit it; a mistake names the player who made it, whose side did not score.',
+  )
+  const scores = pointScores(row(), log)
+  check(
+    'one score per point, none for a side-out',
+    scores.length,
+    3,
+    'The match page lines scores up with endings, so a side-out must add no entry.',
+  )
+  check(
+    'the last score is the final score',
+    scores[scores.length - 1],
+    { a: 3, b: 0 },
+    'The scores come from the same replay that decides the result.',
   )
 }
 

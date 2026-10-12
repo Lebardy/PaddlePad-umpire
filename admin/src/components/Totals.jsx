@@ -1,4 +1,5 @@
 import { formatWhen } from '../lib/format'
+import { sizeText } from '../lib/matches'
 
 /** "<b>+9</b> new this week", or the plain "none this week" once there's nothing to boast about. */
 function newLine(n, word) {
@@ -10,7 +11,7 @@ function newLine(n, word) {
 export default function Totals({ totals, facilityName, row = false }) {
   return (
     <>
-      <div className={row ? 'totals totals-row' : 'totals'}>
+      <div className={row ? `totals totals-row${totals.videos ? ' totals-six' : ''}` : 'totals'}>
         <div className="total">
           <span className="total-label">Players</span>
           <span className="total-figure">{totals.players.count.toLocaleString()}</span>
@@ -31,6 +32,13 @@ export default function Totals({ totals, facilityName, row = false }) {
           <span className="total-figure">{totals.umpires.active.toLocaleString()}</span>
           <span className="total-new">{totals.umpires.notActive} not scoring</span>
         </div>
+        {totals.videos && (
+          <div className="total">
+            <span className="total-label">Videos</span>
+            <span className="total-figure">{totals.videos.count.toLocaleString()}</span>
+            <span className="total-new">{sizeText(totals.videos.bytes)}</span>
+          </div>
+        )}
         <div className="total-rating">
           <span className="total-label">Ratings last worked out</span>
           <strong>{totals.ratings ? formatWhen(totals.ratings.computedAt) : 'Not yet'}</strong>

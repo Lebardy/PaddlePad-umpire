@@ -12,7 +12,6 @@ import {
   getPlayerMatches,
   getRatingState,
   pointEndings,
-  pointRallyOrder,
   scoreProgression,
   summarisePlayer,
 } from '../player-stats.js'
@@ -27,8 +26,8 @@ import { getLeaderboard, getLeaderboardOpen } from '../leaderboard-store.js'
 import { rallyRatingFor, ratingHistoryFor } from '../rally-rating.js'
 import { findFacility, listFacilities } from '../facility-store.js'
 import { playerFacilityPage, playerFacilitySummary } from '../facility-rules.js'
-import { bucketConfig, signedReadUrl } from '../bucket.js'
-import { rallySeconds } from '../video-times.js'
+import { bucketConfig } from '../bucket.js'
+import { pointVideo } from '../point-video.js'
 
 const router = Router()
 
@@ -166,39 +165,6 @@ router.get('/board/match/:id', async (req, res) => {
 router.get('/leaderboard', async (req, res) => {
   res.json({ leaderboard: await getLeaderboard(query, req.player.id) })
 })
-
-/**
- * A match's video for the point boxes, or null when it has none or
- * video is not set up here: a link good for two hours, and for each
- * POINT the second its rally starts at -- null for a point the video
- * does not show. `row` is the match, `events` its rows in play order
- * (with `at`), `log` the same events as the scoring engine reads them.
- */
-async function pointVideo(row, events, log) {
-  const config = bucketConfig()
-  if (!config) return null
-  const { rows } = await query(
-    `SELECT file_key, duration_ms, width, height, first_frame_at
-       FROM match_videos WHERE match_id = $1 AND state = 'ready'`,
-    [row.id],
-  )
-  const video = rows[0]
-  if (!video) return null
-  const everyRally = rallySeconds({
-    startedAtMs: new Date(row.started_at).getTime(),
-    offsetMs: row.clock_offset_ms,
-    firstFrameAtMs: new Date(video.first_frame_at).getTime(),
-    durationMs: video.duration_ms,
-    rallies: events.filter((e) => e.type === 'rally').map((e) => ({ atMs: new Date(e.at).getTime() })),
-  })
-  return {
-    url: signedReadUrl(config, video.file_key),
-    durationMs: video.duration_ms,
-    width: video.width,
-    height: video.height,
-    seconds: pointRallyOrder(row, log).map((rally) => everyRally[rally] ?? null),
-  }
-}
 
 /**
  * How one of this player's own matches went, point by point.

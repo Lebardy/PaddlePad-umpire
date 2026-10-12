@@ -51,7 +51,8 @@ async function namesOf(queryFn, ids) {
 const MATCH_COLUMNS = `m.id, m.session_id, m.team_a, m.team_b, m.first_server_team, m.first_server_player,
   m.right_start_a, m.right_start_b, m.point_target, m.status, m.started_at, m.ended_at, m.ended_early,
   m.voided_at, m.void_reason, m.voided_by_admin, m.recorded_by AS recorded_by_id, u.name AS umpire_name, s.name AS session_name,
-  s.facility_id, f.name AS facility_name, va.name AS voided_by_admin_name, s.voided_at AS session_voided_at`
+  s.facility_id, f.name AS facility_name, va.name AS voided_by_admin_name, s.voided_at AS session_voided_at,
+  EXISTS (SELECT 1 FROM match_videos v WHERE v.match_id = m.id AND v.state = 'ready') AS has_video`
 
 const MATCH_FROM = `FROM matches m
   JOIN sessions s ON s.id = m.session_id
@@ -210,13 +211,13 @@ async function loadRightNow(queryFn, filter, now) {
   }
 }
 
-async function loadTotals(queryFn, filter, activeUmpireIds) {
+async function loadTotals(queryFn, filter, activeUmpireIds, videoOn) {
   const params = []
   const scope = scopeCondition(filter, params, 's.facility_id')
   const umpireParams = []
   const umpireScope = scopeCondition(filter, umpireParams, 'u.facility_id')
 
-  const [players, matches, sessions, umpires, ratings] = await Promise.all([
+  const [players, matches, sessions, umpires, ratings, videos] = await Promise.all([
     filter?.all
       ? queryFn(`SELECT count(*)::int AS count, count(*) FILTER (WHERE created_at > ${WEEK})::int AS new_this_week
                    FROM players WHERE deactivated_at IS NULL`)
@@ -248,6 +249,14 @@ async function loadTotals(queryFn, filter, activeUmpireIds) {
     queryFn(
       `SELECT computed_at, player_count FROM rating_runs WHERE status = 'completed' ORDER BY computed_at DESC LIMIT 1`,
     ),
+    videoOn
+      ? queryFn(
+        `SELECT count(*)::int AS count, coalesce(sum(v.bytes), 0)::bigint AS bytes
+           FROM match_videos v JOIN matches m ON m.id = v.match_id JOIN sessions s ON s.id = m.session_id
+          WHERE v.state = 'ready' AND ${scope}`,
+        params,
+      )
+      : null,
   ])
   const active = new Set(activeUmpireIds)
   const umpireIds = umpires.rows.map((r) => r.id)
@@ -258,6 +267,8 @@ async function loadTotals(queryFn, filter, activeUmpireIds) {
     matches: pick(matches),
     sessions: pick(sessions),
     umpires: { active: activeCount, notActive: umpireIds.length - activeCount },
+    // Postgres hands bigint back as a string.
+    videos: videos ? { count: videos.rows[0].count, bytes: Number(videos.rows[0].bytes) } : null,
     ratings: ratings.rows[0] ? { computedAt: ratings.rows[0].computed_at, playerCount: ratings.rows[0].player_count } : null,
   }
 }
@@ -303,6 +314,7 @@ async function loadWarnings(queryFn, filter, { now, adminId }) {
     score,
     status: row.status,
     umpireName: row.umpire_name,
+    hasVideo: row.has_video === true,
     startedAt: row.started_at,
     reasons,
     voided,
@@ -451,10 +463,10 @@ export async function loadPastSessions(queryFn, filter, before) {
 }
 
 /** Everything the Overview page shows, for one facilityFilterFor() result. */
-export async function loadOverview(queryFn, filter, { isOwner, adminId, now = Date.now() }) {
+export async function loadOverview(queryFn, filter, { isOwner, adminId, videoOn, now = Date.now() }) {
   const rightNow = await loadRightNow(queryFn, filter, now)
   const [totals, warnings, duplicates] = await Promise.all([
-    loadTotals(queryFn, filter, rightNow.activeUmpires),
+    loadTotals(queryFn, filter, rightNow.activeUmpires, videoOn),
     loadWarnings(queryFn, filter, { now, adminId }),
     isOwner ? loadDuplicates(queryFn, now) : Promise.resolve(null),
   ])

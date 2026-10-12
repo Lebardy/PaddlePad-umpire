@@ -23,6 +23,7 @@ import adminActivityRoutes from './routes/admin-activity.js'
 import adminFacilitiesRoutes from './routes/admin-facilities.js'
 import adminOverviewRoutes from './routes/admin-overview.js'
 import { adminPlayersRoutes, adminUmpiresRoutes } from './routes/admin-people.js'
+import adminMatchesRoutes from './routes/admin-matches.js'
 import logoRoutes from './routes/logos.js'
 import videoRoutes from './routes/video.js'
 import { bucketConfig } from './bucket.js'
@@ -217,6 +218,7 @@ app.use('/admin/facilities', adminFacilitiesRoutes)
 app.use('/admin/overview', adminOverviewRoutes)
 app.use('/admin/players', adminPlayersRoutes)
 app.use('/admin/umpires', adminUmpiresRoutes)
+app.use('/admin/matches', adminMatchesRoutes)
 app.use('/logos', logoRoutes)
 
 // An id that is not an id (Postgres code 22P02), or a date that is not
