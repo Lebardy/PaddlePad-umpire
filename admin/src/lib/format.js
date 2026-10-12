@@ -97,6 +97,7 @@ const ACTION_LABELS = {
   'match.looks_fine': 'Marked a match as fine',
   'match.voided': 'Voided a match',
   'match.restored': 'Undid a void',
+  'match.video_removed': 'Removed a match video',
   'player.not_duplicate': 'Marked players as different people',
   'player.merged': 'Merged two players',
   'session.closed': 'Closed a session',

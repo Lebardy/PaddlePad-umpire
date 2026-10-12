@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import Icon from './Icon'
+import VideoMark from './VideoMark'
+import { Link } from '../lib/router'
 import { agoText, countWord, formatWhen } from '../lib/format'
 import DuplicatePlayers from './DuplicatePlayers'
 import PanelTabs from './PanelTabs'
@@ -45,7 +47,10 @@ function WarningRow({ warning, showFacility, now, actions }) {
   return (
     <tr className={warning.voided ? 'is-voided' : undefined}>
       <td>
-        <span className="cell-main"><strong>{warning.teamA.join(' & ')}</strong> vs {warning.teamB.join(' & ')}</span>
+        <span className="cell-main">
+          <Link to={`/matches/${warning.matchId}`} className="row-link"><strong>{warning.teamA.join(' & ')}</strong> vs {warning.teamB.join(' & ')}</Link>
+          {warning.hasVideo && <VideoMark />}
+        </span>
         <span className="cell-sub">
           {warning.sessionName} · {warning.status === 'in_progress' ? 'still in progress' : `finished ${warning.score.A}–${warning.score.B}`}
         </span>
