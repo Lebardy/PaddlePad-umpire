@@ -71,6 +71,9 @@
 .gate h1,
 .empty-head h1,
 .board-match h1,
+.film-notes h1,
+.camera-upright h2,
+.camera-note h2,
 .crash h1 {
   font-family: var(--display);
   font-weight: 800;
@@ -85,6 +88,9 @@
 .standing h1,
 .graph-page h1,
 .leaderboard-screen h1,
+.film-notes h1,
+.camera-upright h2,
+.camera-note h2,
 .section-head h1 { font-size: clamp(2.4rem, 11vw, 3rem); }
 .people-screen > h1,
 .standing h1,
@@ -444,6 +450,7 @@
 .you-details,
 .setup-card,
 .link-code,
+.film-note,
 .error-state {
   background: var(--surface);
   margin-inline: calc(var(--gutter) * -1);
@@ -464,6 +471,7 @@
 .you-details > h2,
 .setup-card > h2,
 .link-code > h2,
+.film-note > h2,
 .rating > .section-head,
 .recent > .section-head,
 .month-band > .section-head,
@@ -525,6 +533,7 @@
   .you-details,
   .setup-card,
   .link-code,
+  .film-note,
   .error-state,
   .person-list {
     margin-inline: 0;
@@ -1612,6 +1621,7 @@
 .trend-head h2 { display: flex; align-items: center; min-width: 0; }
 .bests > h2,
 .link-code > h2,
+.film-note > h2,
 .trend-early > h2 { justify-content: flex-start; gap: 0; }
 .you-section p,
 .you-line { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.55; margin: 0 0 0.7rem; }
@@ -2115,6 +2125,7 @@
   .tabbar::before,
   .tab-icon,
   .filter-row::before,
+  .film-open,
   .fold {
     transition: none;
   }
@@ -2575,3 +2586,205 @@
 .mrow-video { width: 1.75rem; height: 1.75rem; }
 .ticket-video { width: 1.4rem; height: 1.4rem; margin-left: 0.4rem; vertical-align: -0.25rem; }
 .place-video { width: 1.9rem; height: 1.9rem; margin-left: 0.5rem; vertical-align: 0.1rem; }
+
+/* ============ Filming a match ============ */
+
+/* The way to the camera: a row of the board itself, ruled off under the
+   record, with the camera in a lit square. */
+.film-go {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-height: 4rem;
+  padding: 0 var(--gutter);
+  border-top: 1px solid var(--board-rule);
+  background: var(--board-raised);
+  color: var(--lamp);
+  font: 800 1.5rem/1 var(--display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.film-go:active { background: var(--board-rule); }
+.film-go:focus-visible { outline-color: var(--lamp); outline-offset: -3px; }
+.film-go-mark {
+  flex: none;
+  width: 2.75rem;
+  height: 2.75rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--lamp);
+  color: #15181d;
+}
+.film-go-words { flex: 1; }
+.film-go > svg { flex: none; }
+/* On the first screen of a player with no match yet, the row closes the board. */
+.empty-head .film-go { margin: 1.25rem calc(var(--gutter) * -1) -1.4rem; }
+
+/* Before you film. As tall as the window, so "Open camera" sits at the
+   foot; on a short phone the notes scroll behind it. */
+.film-notes {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 1.25rem);
+  min-height: calc(100dvh - 1.25rem);
+  /* Takes back the room the page leaves for the tab bar: the foot below
+     carries it instead. */
+  margin-bottom: calc(-5rem - env(safe-area-inset-bottom));
+}
+.film-notes .back-link { align-self: flex-start; }
+.film-notes h1 { margin-bottom: 0.75rem; }
+.film-note { margin-bottom: 0.75rem; }
+.film-angle { display: flex; align-items: center; gap: 1rem; }
+/* The drawing grows with the phone: small enough for a short screen,
+   never larger than it reads well. */
+.film-court {
+  flex: none;
+  width: auto;
+  height: clamp(9.5rem, calc(100vh - 31rem), 17rem);
+  height: clamp(9.5rem, calc(100dvh - 31rem), 17rem);
+}
+.film-court-view { fill: var(--lamp); fill-opacity: 0.3; stroke: var(--primary); stroke-width: 1.5; stroke-linejoin: round; }
+.film-court-floor { fill: var(--series-1); }
+.film-court-lines { fill: none; stroke: var(--surface); stroke-width: 2; }
+/* The net is edged in the lines' colour: on its own it is too close to the floor's blue. */
+.film-court-net-edge { stroke: var(--surface); stroke-width: 7; }
+.film-court-net { stroke: var(--text); stroke-width: 3; }
+.film-court-corners { fill: var(--lamp); stroke: #15181d; stroke-width: 2; }
+.film-court-phone { fill: var(--text); }
+.film-court-lens { fill: var(--surface); }
+.film-angle ul { display: grid; gap: 0.9rem; min-width: 0; }
+.film-angle li,
+.film-connection p { display: flex; align-items: center; gap: 0.6rem; line-height: 1.3; }
+.film-angle li svg,
+.film-connection svg { flex: none; color: var(--primary); }
+.film-connection { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.film-connection .film-size { flex-direction: column; align-items: flex-end; gap: 0.15rem; white-space: nowrap; }
+.film-size strong { font: 900 2.2rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.film-size span { font: 700 0.85rem/1 var(--label); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-secondary); }
+.film-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin: auto calc(var(--gutter) * -1) 0;
+  padding: 0.75rem var(--gutter) calc(5rem + env(safe-area-inset-bottom));
+  background: var(--bg);
+}
+/* A short phone: the same notes a notch closer together, so both are
+   read without scrolling. */
+@media (max-height: 700px) {
+  .film-notes .back-link { margin-bottom: 0; }
+  .film-notes h1 { margin-bottom: 0.5rem; }
+  .film-note { margin-bottom: 0.5rem; padding-bottom: 0.85rem; }
+  .film-note > h2 { margin-bottom: 0.75rem; }
+  .film-angle ul { gap: 0.65rem; }
+  .film-foot { padding-top: 0.5rem; }
+}
+/* The app's one filled button, at scoreboard size. */
+.film-open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 3.75rem;
+  border-radius: var(--radius);
+  background: var(--button);
+  color: var(--button-ink);
+  font: 800 1.5rem/1 var(--display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: transform 0.08s ease, filter 0.08s ease;
+}
+.film-open:active { transform: scale(0.97); filter: brightness(0.94); }
+
+/* The camera covers everything: a phone on a tripod shows the court and
+   one line of status, nothing else. Board-black in both themes. */
+.camera {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--board);
+  color: var(--board-ink);
+  overflow: hidden;
+}
+.camera-picture { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: var(--board); }
+.camera-picture--dim { opacity: 0.38; }
+.camera-over {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+  padding: max(1rem, env(safe-area-inset-top)) max(1.25rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1.25rem, env(safe-area-inset-left));
+}
+/* The page's burnt amber does not show on black. */
+.camera-over :focus-visible { outline-color: var(--lamp); }
+.camera-top { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.camera-top-right { display: flex; align-items: center; gap: 0.6rem; }
+/* Words never sit straight on the picture: each has a nearly solid panel. */
+.camera-round, .camera-chip, .camera-tag, .camera-choice, .camera-status { background: rgba(18, 22, 28, 0.86); color: var(--board-ink); }
+.camera-round { width: 3rem; height: 3rem; border-radius: var(--radius); border: 0; display: grid; place-items: center; cursor: pointer; }
+.camera-back-icon { transform: rotate(180deg); }
+.camera-chip { display: flex; align-items: center; gap: 0.5rem; min-height: 3rem; padding: 0 1rem; border-radius: var(--radius); font-size: 0.95rem; }
+.camera-tag { padding: 0.35rem 0.6rem; border-radius: var(--radius-sm); font: 700 0.9rem var(--label); letter-spacing: 0.09em; display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+.camera-tag--warn { background: var(--loss-lamp); color: var(--loss-ink); }
+.camera-also { align-self: center; margin-top: 0.5rem; }
+.camera-choice { position: relative; display: flex; align-items: center; gap: 0.5rem; min-height: 3rem; padding: 0 0.9rem; border-radius: var(--radius); }
+.camera-choice select { max-width: 11rem; min-height: 3rem; border: 0; background: transparent; color: var(--board-ink); font: inherit; font-weight: 600; text-overflow: ellipsis; }
+.camera-choice option { color: var(--text); }
+/* The status keeps to the foot of the picture, whatever else is showing. */
+.camera-status { display: flex; align-items: center; gap: 1.1rem; max-width: 100%; margin-top: auto; padding: 0.8rem 1.5rem; border-radius: var(--radius); }
+.camera-line { display: flex; align-items: center; gap: 0.75rem; white-space: nowrap; }
+.camera-line strong, .camera-clock { font: 800 1.9rem/1 var(--display); letter-spacing: 0.02em; }
+.camera-clock { font-variant-numeric: tabular-nums; color: var(--lamp); }
+/* A long name wraps inside its own side; a cut name could hide whose match this is. */
+.camera-names { display: grid; gap: 0.3rem; min-width: 0; padding-left: 1.1rem; border-left: 1px solid rgba(255, 255, 255, 0.24); font-size: 0.92rem; line-height: 1.2; color: var(--board-muted); }
+.camera-dot { width: 1.1rem; height: 1.1rem; border-radius: 50%; background: var(--loss-lamp); box-shadow: 0 0 0 5px rgba(255, 111, 94, 0.28); flex: none; }
+.camera-sending { display: grid; gap: 0.7rem; min-width: min(26rem, 78vw); }
+.camera-sending .camera-line { justify-content: space-between; }
+.camera-sending .camera-clock { color: var(--win-lamp); margin-left: auto; }
+.camera-bar { display: block; height: 0.5rem; border-radius: 2px; background: rgba(255, 255, 255, 0.2); overflow: hidden; }
+.camera-bar > span { display: block; height: 100%; background: var(--win-lamp); }
+.camera-keep { display: flex; align-items: center; gap: 0.5rem; font-size: 0.92rem; }
+.camera-keep svg { flex: none; color: var(--lamp); }
+.camera-again {
+  margin-left: auto; min-height: 2.75rem; padding: 0 0.9rem; border: 2px solid var(--board-ink); border-radius: var(--radius-sm);
+  background: none; color: var(--board-ink); font: 700 1rem var(--label); letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+}
+
+/* Someone else is filming: the picture dims and one board says who. */
+.camera-covered { display: flex; align-items: center; gap: 1.25rem; max-width: 32rem; }
+.camera-covered-mark,
+.camera-note-mark { flex: none; width: 4rem; height: 4rem; border-radius: var(--radius-sm); display: grid; place-items: center; }
+.camera-covered-mark { background: var(--lamp); color: #15181d; }
+.camera-covered-words { display: grid; gap: 0.3rem; min-width: 0; }
+.camera-covered-words strong { font: 800 1.6rem/1 var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
+.camera-covered-words span { font-size: 1.05rem; line-height: 1.3; overflow-wrap: anywhere; }
+.camera-covered-words small { font-size: 0.92rem; line-height: 1.35; color: var(--board-muted); }
+/* Square along the lamp strip, as every board is. */
+.camera-status:has(.camera-covered) { margin-block: auto; background: var(--board); border: 1px solid var(--board-rule); border-bottom: 4px solid var(--lamp); border-radius: var(--radius) var(--radius) 0 0; padding: 1.25rem 1.5rem; }
+
+/* Upright: the picture is hidden behind a plain page that says one thing. */
+.camera-upright {
+  position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--bg); color: var(--text);
+  padding: max(1.25rem, env(safe-area-inset-top)) max(1.25rem, env(safe-area-inset-right)) max(1.75rem, env(safe-area-inset-bottom)) max(1.25rem, env(safe-area-inset-left));
+}
+.camera-upright .back-link { align-self: flex-start; }
+.camera-upright-body { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(0.5rem, 3vh, 1.25rem); gap: clamp(0.5rem, 3dvh, 1.25rem); text-align: center; padding: 0 0.75rem 0.5rem; }
+.camera-upright-body p { color: var(--text-muted); }
+/* A board tile with the lamp on it, like a player's initials. */
+.camera-turn,
+.camera-note-mark { background: var(--board); color: var(--lamp); }
+.camera-turn { width: clamp(5.5rem, 24vh, 12.5rem); width: clamp(5.5rem, 24dvh, 12.5rem); aspect-ratio: 1; border-radius: var(--radius); display: grid; place-items: center; }
+.camera-hint { padding: 0.85rem 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text-secondary); font-size: 0.92rem; }
+.camera-hint svg { float: left; margin: 0.15rem 0.75rem 0 0; }
+.camera-hint strong { color: var(--text); font-weight: 600; }
+/* The camera is not allowed, or this browser cannot film: an ordinary
+   page, set out as the app's other "not here" pages are. */
+.camera-note { display: grid; gap: 0.75rem; justify-items: center; text-align: center; }
+.camera-note .back-link { justify-self: start; }
+.camera-note-mark { margin-top: clamp(0rem, 12vh - 2.5rem, 3rem); margin-top: clamp(0rem, 12dvh - 2.5rem, 3rem); }
+.camera-note p { max-width: 30rem; color: var(--text-secondary); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

@@ -7,8 +7,9 @@ import Icon from './Icon'
  *
  * A win-loss record is two headline values, so it is two lit figures in
  * their own cells rather than a chart -- a two-bar chart of the same
- * thing would be slower to read and say less. `children` is the row of
- * headline statistics, which hangs off the bottom of the same board.
+ * thing would be slower to read and say less. `children` are the rows
+ * that hang off the bottom of the same board: the way to the camera,
+ * then the headline statistics.
  */
 function Hero({ player, summary, matches, children }) {
   const form = recentForm(matches)
