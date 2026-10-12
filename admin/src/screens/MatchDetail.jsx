@@ -4,7 +4,7 @@ import PageBoard, { TallyCell } from '../components/PageBoard'
 import RowConfirm from '../components/RowConfirm'
 import { fetchMatch, removeMatchVideo } from '../lib/api'
 import { formatWhen } from '../lib/format'
-import { playingIndex, pointLine, pointMark, pointSaid } from '../lib/matches'
+import { followScroll, playingIndex, pointLine, pointMark, pointSaid } from '../lib/matches'
 import { Link } from '../lib/router'
 
 const namesOf = (team) => team.map((player) => player.name).join(' & ')
@@ -90,7 +90,9 @@ export default function MatchDetail({ id }) {
   const status = oddStatus(match)
   return (
     <section>
+      {/* The video leads a filmed match, so its board is only the scoreboard. */}
       <PageBoard
+        compact={Boolean(match.video)}
         title={<>{namesOf(match.teamA)} <span className="match-vs">vs</span> {namesOf(match.teamB)}</>}
         intro={status && (
           <>
@@ -128,10 +130,12 @@ export default function MatchDetail({ id }) {
  *
  * With a video the two follow each other: tapping a point jumps the
  * video to that point's rally and plays, and as the video plays the
- * point on screen is the one lit. The video stays put while the points
- * scroll, so the two are always seen together. A point the video does
+ * point on screen is the one lit. Beside the video the points scroll in
+ * a pane of their own, which keeps up with the lit point until the list
+ * is scrolled away from it by hand. A point the video does
  * not show still says how it was won; it just is not a button. Nothing
- * is asked of the video's storage until play is pressed.
+ * is asked of the video's storage until play is pressed, so until then
+ * the video is a black screen: a lit play button stands on it.
  *
  * Mounted afresh for each match (the page reads "Loading…" in between),
  * so the point lit never carries over from another match.
@@ -140,6 +144,22 @@ function PointByPoint({ match, videoFailed, onVideoError, onTryAgain, onRemoveVi
   const { points, video } = match
   const player = useRef(null)
   const [playing, setPlaying] = useState(null)
+  const [started, setStarted] = useState(false)
+  const list = useRef(null)
+  const litBefore = useRef(null)
+
+  useEffect(() => {
+    const pane = list.current
+    const before = litBefore.current
+    litBefore.current = playing
+    if (playing === null || !pane) return
+    const rowAt = (index) => {
+      const row = pane.children[index].getBoundingClientRect()
+      return { top: row.top - pane.getBoundingClientRect().top + pane.scrollTop, height: row.height }
+    }
+    const to = followScroll({ top: pane.scrollTop, height: pane.clientHeight }, rowAt(playing), before === null ? null : rowAt(before))
+    if (to !== null) pane.scrollTop = to
+  }, [playing])
   const [confirming, setConfirming] = useState(false)
   const names = { A: namesOf(match.teamA), B: namesOf(match.teamB) }
 
@@ -162,9 +182,21 @@ function PointByPoint({ match, videoFailed, onVideoError, onTryAgain, onRemoveVi
               playsInline
               preload="none"
               aria-label="Video of this match"
+              onPlay={() => setStarted(true)}
               onTimeUpdate={(event) => setPlaying(playingIndex(video.seconds, event.currentTarget.currentTime))}
               onError={onVideoError}
             />
+            {!started && (
+              <button
+                type="button"
+                className="match-play"
+                aria-label="Play the video"
+                // The button goes once the video plays, so the keyboard's place moves to the video first.
+                onClick={() => { player.current.focus(); player.current.play().catch(() => {}) }}
+              >
+                <Icon name="play" size={36} className="icon-solo" />
+              </button>
+            )}
           </div>
           {videoFailed && (
             <div className="actions-row">
@@ -206,7 +238,7 @@ function PointByPoint({ match, videoFailed, onVideoError, onTryAgain, onRemoveVi
               <span className="match-side is-a">{names.A}</span>
               <span className="match-side is-b">{names.B}</span>
             </p>
-            <ol className="match-points" style={{ '--point-rows': Math.ceil(points.length / 2) }}>
+            <ol ref={list} className="match-points" style={{ '--point-rows': Math.ceil(points.length / 2) }}>
               {points.map((point, index) => {
                 const mark = pointMark(point)
                 // The bar and the mark are seen, not heard: a screen reader is told the side and how the point ended in words.

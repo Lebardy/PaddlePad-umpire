@@ -1,9 +1,14 @@
-/** The black board at the head of each page: its title, what it is for, and its numbers. */
-export default function PageBoard({ title, intro, children }) {
+/**
+ * The black board at the head of each page: its title, what it is for, and its numbers.
+ *
+ * A `compact` board is only its numbers: the title is still the page's
+ * heading for a screen reader, but it is not drawn.
+ */
+export default function PageBoard({ title, intro, children, compact }) {
   return (
-    <header className="page-board board-texture">
+    <header className={`page-board board-texture${compact ? ' is-compact' : ''}`}>
       <div>
-        <h1>{title}</h1>
+        <h1 className={compact ? 'sr-only' : undefined}>{title}</h1>
         {intro && <p className="page-board-intro">{intro}</p>}
       </div>
       {children}

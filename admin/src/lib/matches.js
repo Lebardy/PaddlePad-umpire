@@ -45,3 +45,17 @@ export function playingIndex(seconds, at) {
   })
   return playing
 }
+
+/**
+ * Where the points' pane scrolls to so the point the video is on is in
+ * view (in the middle), or null to leave it. It keeps up only while the
+ * point lit before was still in view: once the list has been scrolled
+ * away to look for another point, it is left where the hand put it.
+ * `pane` is { top, height } (top is how far it is scrolled); a row is
+ * { top, height } measured inside the pane's whole list.
+ */
+export function followScroll(pane, row, before) {
+  const inView = (r) => r.top >= pane.top && r.top + r.height <= pane.top + pane.height
+  if (inView(row) || (before && !inView(before))) return null
+  return Math.max(0, row.top - (pane.height - row.height) / 2)
+}

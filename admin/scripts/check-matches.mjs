@@ -8,7 +8,7 @@
 // video is stored, and which point a playing video is on.
 // ============================================================
 
-import { mayOpenMatch, playingIndex, pointLine, pointMark, pointSaid, sizeText } from '../src/lib/matches.js'
+import { followScroll, mayOpenMatch, playingIndex, pointLine, pointMark, pointSaid, sizeText } from '../src/lib/matches.js'
 
 let pass = 0
 let fail = 0
@@ -55,6 +55,15 @@ check('a rally at second 0 counts', playingIndex([0, 16], 3), 0)
 check('a quarter second early still counts', playingIndex([0, null, 16, 31], 15.8), 2)
 check('before the first rally', playingIndex([4, 9], 1), null)
 check('a video that shows no point', playingIndex([null, null], 5), null)
+
+console.log('\nthe points keeping up with the video')
+const pane = { top: 0, height: 400 }
+const rowAt = (index) => ({ top: index * 44, height: 44 })
+check('a lit point already in view moves nothing', followScroll(pane, rowAt(3), rowAt(2)), null)
+check('a lit point that runs off the foot is brought to the middle', followScroll(pane, rowAt(9), rowAt(8)), 218)
+check('the first point played is found wherever the list is', followScroll({ top: 900, height: 400 }, rowAt(0), null), 0)
+check('a list scrolled away from the lit point is left alone', followScroll({ top: 1200, height: 400 }, rowAt(9), rowAt(8)), null)
+check('a jump to a point far down still follows, from a lit point in view', followScroll(pane, rowAt(30), rowAt(2)), 1142)
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
