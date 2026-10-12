@@ -758,6 +758,61 @@ tr.is-voided .reason { opacity: 0.6; }
 .logo-actions .confirm { justify-items: start; }
 .logo-actions .row-actions > .row-error { text-align: left; }
 
+/* --- One match: the score lit on the board, its video, every point --- */
+
+/* Four names do not fit beside a tally, so the title takes the board's
+   whole width and the tally hangs under it at every width. */
+.page-board:has(> .match-tally) { grid-template-columns: minmax(0, 1fr); align-items: start; }
+.match-tally { justify-self: start; max-width: 100%; }
+.match-vs { color: var(--board-muted); }
+.tally-figure-score { font-size: 5.5rem; line-height: 0.85; text-shadow: 0 0 26px var(--lamp-glow); }
+.match-tally .tally-label { white-space: normal; overflow-wrap: anywhere; }
+.match-tally .tally-label > span { display: block; }
+/* Only the score is lit. */
+.match-tally .tally-figure-text { color: var(--board-ink); }
+
+/* The video on a black stage as wide as the sheet, so on a laptop it
+   sits in the middle rather than against one edge. */
+.match-watch { display: grid; gap: 0.6rem; }
+.match-stage { background: var(--board); border-radius: var(--radius); overflow: hidden; }
+.match-video { display: block; width: 100%; max-width: 960px; aspect-ratio: 16 / 9; margin-inline: auto; background: var(--board); }
+
+/* Whose point: the first side's are barred on the left, the other
+   side's on the right, so the side never rests on the colour alone.
+   The rows touch, so a run of points reads as one long bar. */
+.match-sides { display: flex; justify-content: space-between; gap: 1.5rem; margin: 0 0 0.5rem; }
+.match-side {
+  padding-inline: 0.6rem; border-inline: 5px solid transparent; color: var(--text-secondary); overflow-wrap: anywhere;
+  font-family: var(--label); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.92rem;
+}
+.match-side.is-a { border-left-color: var(--series-1); }
+.match-side.is-b { border-right-color: var(--series-2); text-align: right; }
+
+.match-points { list-style: none; margin: 0; padding: 0; display: grid; column-gap: 1.5rem; }
+/* Down the first column, then down the second. */
+@media (min-width: 900px) {
+  .match-points { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: column; grid-template-rows: repeat(var(--point-rows), auto); }
+}
+.match-point {
+  /* The bar and the rule under a row are shadows, not borders: borders would notch the bar at every row. */
+  --rule: inset 0 -1px 0 var(--border);
+  display: flex; min-height: 2.75rem; padding-inline: 5px; background: var(--surface); box-shadow: var(--rule);
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+.match-point.is-a { box-shadow: inset 5px 0 0 var(--series-1), var(--rule); }
+.match-point.is-b { box-shadow: inset -5px 0 0 var(--series-2), var(--rule); }
+.match-point > span, .match-point > button { flex: 1; display: flex; align-items: center; padding: 0.4rem 0.85rem; }
+.match-point > button {
+  justify-content: space-between; gap: 0.75rem; background: none; border: 0; text-align: left; cursor: pointer;
+}
+.match-point > button .icon { color: var(--primary); }
+.match-point > button:hover { background: var(--surface-sunken); }
+.match-point > button:focus-visible { outline-offset: -3px; }
+/* The point on screen, lit the way the site lights whatever is chosen. */
+.match-point > button[aria-current='true'] { background: var(--button); color: var(--button-ink); box-shadow: inset 0 0 0 2px var(--lamp); }
+.match-point > button[aria-current='true'] .icon { color: inherit; }
+.match-point > button[aria-current='true']:focus-visible { outline-color: var(--button-ink); }
+
 /* ============ Icons ============ */
 
 /* Beside a label everywhere; a section's heading opens with a lit badge,

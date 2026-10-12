@@ -235,6 +235,11 @@ export const closePerson = (kind, id, { reason, confirmName }) => post(`/admin/$
 export const newClaimCode = (id) => post(`/admin/players/${id}/claim-code`).then((d) => d.claimCode)
 export const moveUmpire = (id, facilityId) => post(`/admin/umpires/${id}/move`, { facilityId }).then((d) => d.umpire)
 
+// One match
+
+export const fetchMatch = (id) => apiFetch(`/admin/matches/${id}`).then((d) => d.match)
+export const removeMatchVideo = (id) => apiFetch(`/admin/matches/${id}/video`, { method: 'DELETE' })
+
 // --- Overview ---
 export function fetchOverview({ facilityId } = {}) {
   const query = facilityId ? `?facilityId=${encodeURIComponent(facilityId)}` : ''
