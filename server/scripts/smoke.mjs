@@ -2533,6 +2533,21 @@ async function main() {
         const played = await fetch(v.url)
         check('the link plays the file from the bucket', played.status === 200 && (await played.arrayBuffer()).byteLength === 1024, String(played.status))
 
+        // Rows the admin site lists can link to the match page and show a camera.
+        const listedRow = (rows) => (rows ?? []).find((m) => m.id === vMatch)
+        const vPlayerRow = listedRow((await request(`/admin/players/${vPlayers[0]}`, { bearer: vOwner })).body.player?.matches)
+        check("the player's page row says it has a video, and where",
+          vPlayerRow?.hasVideo === true && vPlayerRow?.facilityId === vFacility.id, JSON.stringify([vPlayerRow?.hasVideo, vPlayerRow?.facilityId]))
+        const vUmpireRow = listedRow((await request(`/admin/umpires/${vMe.body.umpire?.id}`, { bearer: vOwner })).body.umpire?.matches)
+        check("the umpire's page row says it has a video, and where",
+          vUmpireRow?.hasVideo === true && vUmpireRow?.facilityId === vFacility.id, JSON.stringify([vUmpireRow?.hasVideo, vUmpireRow?.facilityId]))
+        const vTotalsAll = (await request('/admin/overview', { bearer: vOwner })).body.totals?.videos
+        check('the Overview counts the stored videos and their size',
+          vTotalsAll?.count >= 1 && vTotalsAll?.bytes >= 1024, JSON.stringify(vTotalsAll))
+        const vTotalsOther = (await request(`/admin/overview?facilityId=${vOther.id}`, { bearer: vOwner })).body.totals?.videos
+        check('scoped to another facility, the count leaves this video out',
+          typeof vTotalsOther?.count === 'number' && vTotalsOther.count < vTotalsAll?.count, JSON.stringify([vTotalsOther, vTotalsAll]))
+
         // The admin site's match page. A manager is made the way the admin sections make one.
         const makeManager = async (facilityId, label) => {
           const added = await request('/admin/admins', {
@@ -2656,6 +2671,8 @@ async function main() {
         const gone = await request(`/video/matches/${vMatch}`, { method: 'DELETE', bearer: token })
         check('the umpire removes the video -> 204', gone.status === 204, String(gone.status))
         check('then there is none', (await request(`/video/matches/${vMatch}`, { bearer: token })).body.video === null)
+        check("and the player's page row no longer says it has one",
+          listedRow((await request(`/admin/players/${vPlayers[0]}`, { bearer: vOwner })).body.player?.matches)?.hasVideo === false)
         const vGameAfter = await asPlayer(`/player/matches/${vMatch}/game`, { bearer: vPlayerToken })
         check('once removed, the player sees the match with no video',
           vGameAfter.status === 200 && vGameAfter.body.video === null && vGameAfter.body.points?.length === 2, `video is null: ${vGameAfter.body.video === null}`)

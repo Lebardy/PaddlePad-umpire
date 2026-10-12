@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { query, withTransaction } from '../db.js'
 import { requireAdminAccount } from '../auth.js'
 import { facilityFilterFor } from '../facility-rules.js'
+import { bucketConfig } from '../bucket.js'
 import { recordActivity } from '../admin-activity.js'
 import {
   CONFIRM_MERGE_MESSAGE, NOT_FLAGGED_MESSAGE, NOT_LEFT_OPEN_MESSAGE, NOT_OVERVIEW_VOID_MESSAGE, REASONS, SESSION_REASON_MESSAGE,
@@ -50,7 +51,7 @@ const REASON_WORDS = {
 
 router.get('/', async (req, res) => {
   const filter = facilityFilterFor(req.admin, isUuid(req.query.facilityId) ? req.query.facilityId : null)
-  res.json(await loadOverview(query, filter, { isOwner: req.admin.role === 'owner', adminId: req.admin.id }))
+  res.json(await loadOverview(query, filter, { isOwner: req.admin.role === 'owner', adminId: req.admin.id, videoOn: Boolean(bucketConfig()) }))
 })
 
 /** Finished sessions, five at a time, for a manager's home page. Read-only. */
