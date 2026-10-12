@@ -8,13 +8,14 @@ import { pointRallyOrder } from './player-stats.js'
  * video is not set up here: a link good for two hours, and for each
  * POINT the second its rally starts at -- null for a point the video
  * does not show. `row` is the match, `events` its rows in play order
- * (with `at`), `log` the same events as the scoring engine reads them.
+ * (with `at`), `log` the same events as the scoring engine reads them,
+ * and whether this player may remove it: only the one who filmed it.
  */
-export async function pointVideo(row, events, log) {
+export async function pointVideo(row, events, log, playerId) {
   const config = bucketConfig()
   if (!config) return null
   const { rows } = await query(
-    `SELECT file_key, duration_ms, width, height, first_frame_at
+    `SELECT source, player_id, file_key, duration_ms, width, height, first_frame_at
        FROM match_videos WHERE match_id = $1 AND state = 'ready'`,
     [row.id],
   )
@@ -32,6 +33,7 @@ export async function pointVideo(row, events, log) {
     durationMs: video.duration_ms,
     width: video.width,
     height: video.height,
+    mayRemove: video.source === 'player' && video.player_id === playerId,
     seconds: pointRallyOrder(row, log).map((rally) => everyRally[rally] ?? null),
   }
 }

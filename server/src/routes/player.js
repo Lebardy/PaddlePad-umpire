@@ -94,6 +94,8 @@ router.get('/me', async (req, res) => {
     rating,
     rallyRating,
     leaderboardOpen,
+    // For "Film my next match": off wherever video is not set up.
+    videoOn: Boolean(bucketConfig()),
   })
 })
 
@@ -221,7 +223,7 @@ router.get('/matches/:id/game', async (req, res) => {
     byYou: by === req.player.id,
   }))
 
-  res.json({ margins, game: readGame(margins, row.point_target), points, video: await pointVideo(row, events, log) })
+  res.json({ margins, game: readGame(margins, row.point_target), points, video: await pointVideo(row, events, log, req.player.id) })
 })
 
 /**

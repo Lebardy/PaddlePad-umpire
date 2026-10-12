@@ -11,6 +11,7 @@ import sessionRoutes from './routes/sessions.js'
 import matchRoutes from './routes/matches.js'
 // Player-facing: a claimed player reading their OWN history.
 import playerSelfRoutes from './routes/player.js'
+import playerVideoRoutes from './routes/player-video.js'
 // Service-to-service: the ML pipeline reading match logs and writing
 // back a ratings snapshot. Guarded by a shared key, not by a token.
 import internalRoutes from './routes/internal.js'
@@ -171,7 +172,9 @@ app.use('/auth/player/google', rateLimit({ max: 10, windowMs: 60_000 }))
 app.use('/player/link', rateLimit({ max: 10, windowMs: 60_000 }))
 // Sized for a whole venue on one wifi address opening the app in the
 // same minute, a few requests each -- not for one phone.
-app.use('/player', rateLimit({ max: 300, windowMs: 60_000 }))
+// A player's camera beats every 2 seconds, and one court's players share
+// an address: four phones filming are 120 a minute before anyone opens a page.
+app.use('/player', rateLimit({ max: 600, windowMs: 60_000 }))
 // One caller, a handful of calls per run. Tight enough that a leaked
 // key cannot be used to scrape the whole match log repeatedly,
 // loose enough for a nightly run plus a few manual triggers in a demo.
@@ -205,6 +208,7 @@ app.use('/players', playerAdminRoutes)
 app.use('/sessions', sessionRoutes)
 app.use('/matches', matchRoutes)
 app.use('/video', videoRoutes)
+app.use('/player', playerVideoRoutes)
 app.use('/player', playerSelfRoutes)
 // Staging only: the smoke test removing what it made. Unset anywhere
 // else, so on production the path is simply not there.
