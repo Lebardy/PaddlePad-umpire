@@ -48,6 +48,7 @@ export const ACTIONS = [
   'match.looks_fine',
   'match.voided',
   'match.restored',
+  'match.video_removed',
   'session.closed',
   'player.not_duplicate',
   'player.merged',

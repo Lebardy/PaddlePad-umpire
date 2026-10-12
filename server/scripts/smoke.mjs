@@ -2680,6 +2680,17 @@ async function main() {
         await request(`/video/matches/${vMatch2}/done`, { method: 'POST', bearer: token, body: { deviceId: device } })
         const link2 = (await request(`/video/matches/${vMatch2}`, { bearer: token })).body.video?.url
         check('a second match has its video', (await fetch(link2)).status === 200)
+        check('a manager cannot remove a video -> 403',
+          (await request(`/admin/matches/${vMatch2}/video`, { method: 'DELETE', bearer: vManager[0] })).status === 403)
+        const ownerRemoved = await request(`/admin/matches/${vMatch2}/video`, { method: 'DELETE', bearer: vOwner })
+        check('the owner removes it -> 204', ownerRemoved.status === 204, String(ownerRemoved.status))
+        check('its file is gone from the bucket', (await fetch(link2)).status === 404)
+        const afterRemoval = (await request(`/admin/matches/${vMatch2}`, { bearer: vOwner })).body.match
+        check('the match page then has no video, and nothing to remove',
+          afterRemoval?.video === null && afterRemoval?.mayRemoveVideo === false, JSON.stringify({ v: afterRemoval?.video, m: afterRemoval?.mayRemoveVideo }))
+        check('removing it again -> 404', (await request(`/admin/matches/${vMatch2}/video`, { method: 'DELETE', bearer: vOwner })).status === 404)
+        const removedLog = await request('/admin/activity?action=match.video_removed', { bearer: vOwner })
+        check('Activity records it', removedLog.body.entries?.some((e) => e.targetId === vMatch2) === true, String(removedLog.status))
         check('cancelling that match -> 204', (await request(`/matches/${vMatch2}`, { method: 'DELETE', bearer: token })).status === 204)
         check('and its file is gone from the bucket', (await fetch(link2)).status === 404)
 

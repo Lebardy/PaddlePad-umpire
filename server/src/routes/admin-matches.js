@@ -5,7 +5,10 @@
 // ============================================================
 
 import { Router } from 'express'
-import { query } from '../db.js'
+import { query, withTransaction } from '../db.js'
+import { bucketConfig, deleteFile } from '../bucket.js'
+import { recordActivity } from '../admin-activity.js'
+import { matchLabel } from '../overview-store.js'
 import { requireAdminAccount } from '../auth.js'
 import { facilityFilterFor } from '../facility-rules.js'
 import { deriveMatchState } from '../pickleball.js'
@@ -62,6 +65,26 @@ router.get('/:id', async (req, res) => {
       names, score, hasVideoRow: held.length > 0, isOwner: req.admin.role === 'owner',
     }),
   })
+})
+
+router.delete('/:id/video', async (req, res) => {
+  const config = bucketConfig()
+  if (!config) return res.status(404).json({ error: 'Video is not set up here' })
+  if (req.admin.role !== 'owner') return res.status(403).json({ error: 'Only the owner can remove a video' })
+  const row = await matchInScope(req)
+  if (!row) return res.status(404).json(NO_MATCH)
+  const { rows } = await query('SELECT file_key FROM match_videos WHERE match_id = $1', [row.id])
+  if (!rows[0]) return res.status(404).json({ error: 'This match has no video' })
+  // File first, then the row: a row with no file would offer a video that cannot play.
+  if (rows[0].file_key) await deleteFile(config, rows[0].file_key)
+  await withTransaction(async (client) => {
+    await client.query('DELETE FROM match_videos WHERE match_id = $1', [row.id])
+    await recordActivity(client, {
+      adminId: req.admin.id, action: 'match.video_removed', targetType: 'match', targetId: row.id, facilityId: row.facility_id,
+      summary: `Removed the video of ${await matchLabel(client.query.bind(client), row)}`,
+    })
+  })
+  res.status(204).end()
 })
 
 export default router
