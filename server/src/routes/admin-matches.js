@@ -78,7 +78,8 @@ router.delete('/:id/video', async (req, res) => {
   // File first, then the row: a row with no file would offer a video that cannot play.
   if (rows[0].file_key) await deleteFile(config, rows[0].file_key)
   await withTransaction(async (client) => {
-    await client.query('DELETE FROM match_videos WHERE match_id = $1', [row.id])
+    const removed = await client.query('DELETE FROM match_videos WHERE match_id = $1', [row.id])
+    if (removed.rowCount === 0) return // a second, overlapping removal: the first one records it
     await recordActivity(client, {
       adminId: req.admin.id, action: 'match.video_removed', targetType: 'match', targetId: row.id, facilityId: row.facility_id,
       summary: `Removed the video of ${await matchLabel(client.query.bind(client), row)}`,

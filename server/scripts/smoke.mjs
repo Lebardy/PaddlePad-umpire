@@ -2581,6 +2581,9 @@ async function main() {
         check('a manager of that facility reads it -> 200, but may not remove the video',
           mgrRead.status === 200 && mgrRead.body.match?.mayRemoveVideo === false, `${mgrRead.status} ${mgrRead.body.match?.mayRemoveVideo}`)
         check('a manager of another facility -> 404', (await request(`/admin/matches/${vMatch}`, { bearer: vManagerOther[0] })).status === 404)
+        const vTotalsOtherManager = (await request('/admin/overview', { bearer: vManagerOther[0] })).body.totals?.videos
+        check("the other facility's manager sees the same video count as the owner scoped to it",
+          typeof vTotalsOther?.count === 'number' && vTotalsOtherManager?.count === vTotalsOther.count, JSON.stringify([vTotalsOtherManager, vTotalsOther]))
 
         // A player who was in the match watches it.
         const vCode = await request(`/players/${vPlayers[0]}/claim-code`, { bearer: token })
@@ -2688,28 +2691,43 @@ async function main() {
           body: { id: vMatch2, sessionId: vSession, teamA: [vPlayers[0]], teamB: [vPlayers[1]], stacking: { A: false, B: false },
             firstServer: { team: 'A', playerId: vPlayers[0] }, pointTarget: 11, startedAt: Date.now() },
         })
-        await request(`/video/matches/${vMatch2}/claim`, { method: 'POST', bearer: token, body: { deviceId: device } })
-        const up2 = await request(`/video/matches/${vMatch2}/upload`, { method: 'POST', bearer: token, body: { ...meta, firstFrameAt: Date.now(), bytes: 1024 } })
-        const form2 = new FormData()
-        for (const [name, value] of Object.entries(up2.body.form?.fields ?? {})) form2.append(name, value)
-        form2.append('file', new Blob([clip], { type: 'video/mp4' }), 'clip.mp4')
-        await fetch(up2.body.form.url, { method: 'POST', body: form2 })
-        await request(`/video/matches/${vMatch2}/done`, { method: 'POST', bearer: token, body: { deviceId: device } })
-        const link2 = (await request(`/video/matches/${vMatch2}`, { bearer: token })).body.video?.url
+        const film = async (matchId) => {
+          await request(`/video/matches/${matchId}/claim`, { method: 'POST', bearer: token, body: { deviceId: device } })
+          const up = await request(`/video/matches/${matchId}/upload`, { method: 'POST', bearer: token, body: { ...meta, firstFrameAt: Date.now(), bytes: 1024 } })
+          const form = new FormData()
+          for (const [name, value] of Object.entries(up.body.form?.fields ?? {})) form.append(name, value)
+          form.append('file', new Blob([clip], { type: 'video/mp4' }), 'clip.mp4')
+          await fetch(up.body.form.url, { method: 'POST', body: form })
+          await request(`/video/matches/${matchId}/done`, { method: 'POST', bearer: token, body: { deviceId: device } })
+          return (await request(`/video/matches/${matchId}`, { bearer: token })).body.video?.url
+        }
+        const link2 = await film(vMatch2)
         check('a second match has its video', (await fetch(link2)).status === 200)
         check('a manager cannot remove a video -> 403',
           (await request(`/admin/matches/${vMatch2}/video`, { method: 'DELETE', bearer: vManager[0] })).status === 403)
-        const ownerRemoved = await request(`/admin/matches/${vMatch2}/video`, { method: 'DELETE', bearer: vOwner })
-        check('the owner removes it -> 204', ownerRemoved.status === 204, String(ownerRemoved.status))
+        check('a manager of another facility cannot remove it -> 403, before any lookup',
+          (await request(`/admin/matches/${vMatch2}/video`, { method: 'DELETE', bearer: vManagerOther[0] })).status === 403)
+        check('a manager asking about a match that is not there -> 403, not 404',
+          (await request(`/admin/matches/${crypto.randomUUID()}/video`, { method: 'DELETE', bearer: vManager[0] })).status === 403)
+        // Two removals at once: both may answer, but Activity says it once.
+        const removals = await Promise.all([1, 2].map(() => request(`/admin/matches/${vMatch2}/video`, { method: 'DELETE', bearer: vOwner })))
+        const removalStatuses = removals.map((r) => r.status)
+        check('the owner removes it, twice at once -> 204 or 404, at least one 204',
+          removalStatuses.every((s) => s === 204 || s === 404) && removalStatuses.includes(204), JSON.stringify(removalStatuses))
         check('its file is gone from the bucket', (await fetch(link2)).status === 404)
         const afterRemoval = (await request(`/admin/matches/${vMatch2}`, { bearer: vOwner })).body.match
         check('the match page then has no video, and nothing to remove',
           afterRemoval?.video === null && afterRemoval?.mayRemoveVideo === false, JSON.stringify({ v: afterRemoval?.video, m: afterRemoval?.mayRemoveVideo }))
-        check('removing it again -> 404', (await request(`/admin/matches/${vMatch2}/video`, { method: 'DELETE', bearer: vOwner })).status === 404)
+        const removedAgain = await request(`/admin/matches/${vMatch2}/video`, { method: 'DELETE', bearer: vOwner })
+        check('removing it again -> 404', removedAgain.status === 404 && removedAgain.body.error === 'This match has no video', JSON.stringify([removedAgain.status, removedAgain.body]))
         const removedLog = await request('/admin/activity?action=match.video_removed', { bearer: vOwner })
-        check('Activity records it', removedLog.body.entries?.some((e) => e.targetId === vMatch2) === true, String(removedLog.status))
+        const removedEntries = (removedLog.body.entries ?? []).filter((e) => e.targetId === vMatch2)
+        check('Activity records it exactly once', removedEntries.length === 1, `${removedLog.status}: ${removedEntries.length}`)
+        // The removal emptied it: film it again so the cancel below has a file to take away.
+        const link3 = await film(vMatch2)
+        check('filmed again, it has a video once more', (await fetch(link3)).status === 200)
         check('cancelling that match -> 204', (await request(`/matches/${vMatch2}`, { method: 'DELETE', bearer: token })).status === 204)
-        check('and its file is gone from the bucket', (await fetch(link2)).status === 404)
+        check('and its file is gone from the bucket', (await fetch(link3)).status === 404)
 
       } finally {
         // Each on its own, so one failing does not leave the facilities filming.
