@@ -46,6 +46,13 @@ section('Three rallies: a put-away, a net mistake, a side-out')
   check('the second is Ben\'s mistake', points[1], { a: 2, b: 0, team: 'A', how: 'mistake', label: 'Into the net', by: 'Ben' })
 }
 
+section('A point scored by B')
+{
+  // A serves and nets: side-out. B serves and wins with a put-away: 0-1.
+  const points = matchPagePoints(row, [ended(A, 'net'), ended(B, 'putaway')], nameOf)
+  check('B\'s point reads team B', points, [{ a: 0, b: 1, team: 'B', how: 'winner', label: 'Put-away', by: 'Ben' }])
+}
+
 section('Rallies without an ending, and strangers')
 {
   const old = (id, outcome) => ({ type: 'rally', id: randomUUID(), actingPlayerId: id, outcome, zone: 'open' })
