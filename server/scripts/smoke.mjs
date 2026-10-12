@@ -2425,6 +2425,8 @@ async function main() {
       const vSession = crypto.randomUUID()
       const vOtherBefore = vOther.filmsMatches === true
       let vStrangerNight = null   // [the stranger's token, their night], ended in the finally
+      let vManager = null         // [token, id] of a manager at vFacility; paused in the finally
+      let vManagerOther = null    // the same, at vOther
       // Whatever happens below, the facility goes back to how it was and the night is closed.
       try {
         const beat = (body, bearer = token) => request('/video/camera/beat', { method: 'POST', bearer, body: { deviceId: device, ...body } })
@@ -2531,6 +2533,40 @@ async function main() {
         const played = await fetch(v.url)
         check('the link plays the file from the bucket', played.status === 200 && (await played.arrayBuffer()).byteLength === 1024, String(played.status))
 
+        // The admin site's match page. A manager is made the way the admin sections make one.
+        const makeManager = async (facilityId, label) => {
+          const added = await request('/admin/admins', {
+            method: 'POST', bearer: vOwner, body: { name: `Smoke Video Manager ${label}`, email: `smoke.video.${label}.${Date.now()}@example.com`, facilityId },
+          })
+          const secret = (added.body.setupLink?.url ?? '').split('/setup/')[1]
+          const setup = await request(`/admin/auth/setup/${secret}`, { method: 'POST', body: { password: `smoke-${crypto.randomUUID()}` } })
+          return [setup.body.token, added.body.admin?.id]
+        }
+        vManager = await makeManager(vFacility.id, 'same')
+        vManagerOther = await makeManager(vOther.id, 'other')
+        const pageRead = await request(`/admin/matches/${vMatch}`, { bearer: vOwner })
+        const pm = pageRead.body.match
+        check('the owner reads the match page -> 200', pageRead.status === 200, String(pageRead.status))
+        check('it has the score, who played, where and the umpire',
+          pm?.scoreA + pm?.scoreB === pm?.points?.length && pm.teamA?.[0]?.id === vPlayers[0] && pm.facilityId === vFacility.id
+            && typeof pm.umpireName === 'string' && pm.umpireName !== '' && pm.status === 'completed',
+          JSON.stringify({ a: pm?.scoreA, b: pm?.scoreB, n: pm?.points?.length, umpire: pm?.umpireName, status: pm?.status }))
+        const lastPoint = pm?.points?.[pm.points.length - 1]
+        check('every point has its score, its side and how it ended',
+          pm?.points?.length > 0 && pm.points.every((p) => Number.isInteger(p.a) && Number.isInteger(p.b) && ['A', 'B'].includes(p.team) && p.label)
+            && lastPoint.a === pm.scoreA && lastPoint.b === pm.scoreB,
+          JSON.stringify(pm?.points))
+        const pagePlayed = await fetch(pm?.video?.url ?? 'http://localhost:1/none').catch(() => ({ status: 0 }))
+        check("the page's link plays the file", pagePlayed.status === 200, String(pagePlayed.status))
+        check('the owner may remove the video', pm?.mayRemoveVideo === true)
+        check('no token -> 401', (await request(`/admin/matches/${vMatch}`)).status === 401)
+        check('a made-up id -> 404', (await request(`/admin/matches/${crypto.randomUUID()}`, { bearer: vOwner })).status === 404)
+        check('not a uuid -> 404', (await request('/admin/matches/not-a-uuid', { bearer: vOwner })).status === 404)
+        const mgrRead = await request(`/admin/matches/${vMatch}`, { bearer: vManager[0] })
+        check('a manager of that facility reads it -> 200, but may not remove the video',
+          mgrRead.status === 200 && mgrRead.body.match?.mayRemoveVideo === false, `${mgrRead.status} ${mgrRead.body.match?.mayRemoveVideo}`)
+        check('a manager of another facility -> 404', (await request(`/admin/matches/${vMatch}`, { bearer: vManagerOther[0] })).status === 404)
+
         // A player who was in the match watches it.
         const vCode = await request(`/players/${vPlayers[0]}/claim-code`, { bearer: token })
         const vPlayerToken = (await asPlayer('/auth/player/claim', { method: 'POST', body: { code: vCode.body.claimCode } })).body.token
@@ -2545,6 +2581,9 @@ async function main() {
             && pv.seconds[0] === v.rallies[1].second && pv.seconds[1] === v.rallies[2].second
             && pv.seconds[0] !== v.rallies[0].second,
           JSON.stringify(pv?.seconds))
+        check('and one video second for each point, the same as the player sees',
+          pm?.video?.seconds?.length > 0 && pm.video.seconds.length === pm.points?.length && JSON.stringify(pm.video.seconds) === JSON.stringify(pv?.seconds),
+          JSON.stringify([pm?.video?.seconds, pv?.seconds]))
         const pPlayed = await fetch(pv.url)
         check("the player's link plays the file", pPlayed.status === 200 && (await pPlayed.arrayBuffer()).byteLength === 1024, String(pPlayed.status))
         const vList = await asPlayer('/player/matches', { bearer: vPlayerToken })
@@ -2646,6 +2685,9 @@ async function main() {
 
       } finally {
         // Each on its own, so one failing does not leave the facilities filming.
+        for (const manager of [vManager, vManagerOther]) {
+          if (manager) await request(`/admin/admins/${manager[1]}/switch-off`, { method: 'POST', bearer: vOwner }).catch(() => {})
+        }
         if (vStrangerNight) await request(`/sessions/${vStrangerNight[1]}/end`, { method: 'POST', bearer: vStrangerNight[0], body: {} }).catch(() => {})
         await request(`/admin/facilities/${vOther.id}`, { method: 'PATCH', bearer: vOwner, body: { filmsMatches: vOtherBefore } }).catch(() => {})
         await request(`/sessions/${vSession}/end`, { method: 'POST', bearer: token, body: {} }).catch(() => {})

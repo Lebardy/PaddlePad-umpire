@@ -19,3 +19,17 @@ export function matchPagePoints(row, log, nameOf) {
     }
   })
 }
+
+/** The match page's whole answer. `row` is the route's query row; the rest is what the route gathered. */
+export function pageMatch(row, { points, video, names, score, hasVideoRow, isOwner }) {
+  const side = (ids) => ids.map((id) => ({ id, name: names.get(id) ?? 'Someone' }))
+  return {
+    id: row.id, status: row.status, endedEarly: row.ended_early === true,
+    voided: row.voided_at ? { at: row.voided_at, reason: row.void_reason ?? null } : null,
+    sessionName: row.session_name, facilityId: row.facility_id, facilityName: row.facility_name ?? null,
+    umpireId: row.recorded_by ?? null, umpireName: row.umpire_name ?? null,
+    startedAt: row.started_at, endedAt: row.ended_at, pointTarget: row.point_target, winner: row.winner ?? null,
+    teamA: side(row.team_a), teamB: side(row.team_b), scoreA: score.A, scoreB: score.B,
+    points, video, mayRemoveVideo: isOwner && hasVideoRow,
+  }
+}

@@ -7,7 +7,7 @@
 // ============================================================
 
 import { randomUUID } from 'node:crypto'
-import { matchPagePoints } from '../src/match-page.js'
+import { matchPagePoints, pageMatch } from '../src/match-page.js'
 import { rallyEnding } from '../src/rally-endings.js'
 
 let pass = 0
@@ -59,6 +59,25 @@ section('Rallies without an ending, and strangers')
   const points = matchPagePoints(row, [old(A, 'winner'), old(B, 'error')], nameOf)
   check('no detail reads Winning shot / Mistake', points.map((p) => p.label), ['Winning shot', 'Mistake'])
   check('a player missing from the names gives no name', matchPagePoints(row, [old(A, 'winner')], new Map())[0].by, null)
+}
+
+section('The page answer')
+{
+  const C = randomUUID()
+  const D = randomUUID()
+  const names = new Map([[A, 'Ana'], [B, 'Ben'], [C, 'Cy']])
+  const full = { id: 'm1', status: 'completed', ended_early: false, team_a: [A, C], team_b: [B, D], winner: 'A', point_target: 11,
+    session_name: 'Night', facility_id: 'f1', voided_at: null }
+  const score = { A: 11, B: 7 }
+  const video = { url: 'u', durationMs: 1, width: 2, height: 3, seconds: [1] }
+  const page = pageMatch(full, { points: [], video, names, score, hasVideoRow: true, isOwner: true })
+  check('both sides in order, a stranger is Someone', [page.teamA, page.teamB], [[{ id: A, name: 'Ana' }, { id: C, name: 'Cy' }], [{ id: B, name: 'Ben' }, { id: D, name: 'Someone' }]])
+  check('winner and score', [page.winner, page.scoreA, page.scoreB, page.voided], ['A', 11, 7, null])
+  check('the video passes through untouched', page.video, video)
+  const voided = pageMatch({ ...full, voided_at: 'then', void_reason: 'test' }, { points: [], video: null, names, score, hasVideoRow: false, isOwner: false })
+  check('a voided match carries when and why', voided.voided, { at: 'then', reason: 'test' })
+  const may = (hasVideoRow, isOwner) => pageMatch(full, { points: [], video: null, names, score, hasVideoRow, isOwner }).mayRemoveVideo
+  check('removal only for the owner AND a video row', [may(true, true), may(true, false), may(false, true), may(false, false)], [true, false, false, false])
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
