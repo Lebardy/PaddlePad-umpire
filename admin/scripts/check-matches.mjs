@@ -4,11 +4,11 @@
 //
 //   node admin/scripts/check-matches.mjs
 //
-// Who may open a match, how one point reads, how much video is
-// stored, and which point a playing video is on.
+// Who may open a match, how one point reads and is marked, how much
+// video is stored, and which point a playing video is on.
 // ============================================================
 
-import { mayOpenMatch, playingIndex, pointLine, sizeText } from '../src/lib/matches.js'
+import { mayOpenMatch, playingIndex, pointLine, pointMark, pointSaid, sizeText } from '../src/lib/matches.js'
 
 let pass = 0
 let fail = 0
@@ -32,6 +32,16 @@ check('a match with no facility is not a manager’s', mayOpenMatch({ role: 'adm
 console.log('\none point, in a line')
 check('with who did it', pointLine({ a: 12, b: 9, team: 'A', how: 'winner', label: 'Put-away', by: 'Jan' }), '12–9 · Put-away · Jan')
 check('with nobody named', pointLine({ a: 12, b: 9, team: 'A', how: 'winner', label: 'Put-away', by: null }), '12–9 · Put-away')
+
+console.log('\nhow a point ended, as a mark and in words')
+check('a winning shot is ticked', pointMark({ how: 'winner' }), 'check')
+check('a mistake is crossed', pointMark({ how: 'mistake' }), 'x')
+check('anything that is not a winning shot is a mistake', pointMark({ how: 'fault' }), 'x')
+check('a winning shot, said', pointSaid({ a: 12, b: 9, team: 'A', how: 'winner', label: 'Put-away', by: 'Jan' }, 'Jan & Bea'), 'Jan & Bea: 12–9, Put-away, winning shot by Jan')
+check('a mistake, said: the name is who made it', pointSaid({ a: 0, b: 1, team: 'B', how: 'mistake', label: 'Into the net', by: 'Jan' }, 'Cho & Ria'), 'Cho & Ria: 0–1, Into the net, mistake by Jan')
+check('with nobody named', pointSaid({ a: 0, b: 1, team: 'B', how: 'mistake', label: 'Into the net', by: null }, 'Cho'), 'Cho: 0–1, Into the net, mistake')
+check('a point labelled only "Mistake" says it once', pointSaid({ a: 0, b: 1, team: 'B', how: 'mistake', label: 'Mistake', by: 'Jan' }, 'Cho'), 'Cho: 0–1, mistake by Jan')
+check('and one labelled only "Winning shot"', pointSaid({ a: 1, b: 0, team: 'A', how: 'winner', label: 'Winning shot', by: 'Jan' }, 'Jan'), 'Jan: 1–0, winning shot by Jan')
 
 console.log('\nhow much video is stored')
 check('nothing', sizeText(0), '0 GB')

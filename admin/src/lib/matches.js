@@ -13,6 +13,19 @@ export function pointLine(point) {
   return [`${point.a}–${point.b}`, point.label, point.by].filter(Boolean).join(' · ')
 }
 
+/** The icon on a point's row: a tick for a winning shot, a cross for a mistake. */
+export function pointMark(point) {
+  return point.how === 'winner' ? 'check' : 'x'
+}
+
+/** A point as a screen reader is told it, in place of its bar and mark: whose it was, the score, and how it ended, by whom. */
+export function pointSaid(point, side) {
+  const how = point.how === 'winner' ? 'winning shot' : 'mistake'
+  // "Mistake" and "Winning shot" are labels too: said once.
+  const label = point.label?.toLowerCase() === how ? null : point.label
+  return [`${side}: ${point.a}–${point.b}`, label, point.by ? `${how} by ${point.by}` : how].filter(Boolean).join(', ')
+}
+
 /** Stored video in GB to one decimal; anything at all shows as at least 0.1, so "some" never reads as none. */
 export function sizeText(bytes) {
   if (bytes === 0) return '0 GB'

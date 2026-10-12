@@ -4,7 +4,7 @@ import PageBoard, { TallyCell } from '../components/PageBoard'
 import RowConfirm from '../components/RowConfirm'
 import { fetchMatch, removeMatchVideo } from '../lib/api'
 import { formatWhen } from '../lib/format'
-import { playingIndex, pointLine } from '../lib/matches'
+import { playingIndex, pointLine, pointMark, pointSaid } from '../lib/matches'
 import { Link } from '../lib/router'
 
 const namesOf = (team) => team.map((player) => player.name).join(' & ')
@@ -13,7 +13,7 @@ const nameLines = (team) => team.map((player) => <span key={player.id}>{player.n
 
 /** The lamp and word for a match that is not an ordinary finished one, or null. */
 function oddStatus(match) {
-  if (match.voided) return { lamp: 'closed', word: 'Voided' }
+  if (match.voided) return { lamp: 'voided', word: 'Voided', icon: 'ban' }
   if (match.status === 'in_progress') return { lamp: 'active', word: 'In progress' }
   if (match.endedEarly) return { lamp: 'paused', word: 'Ended early' }
   return null
@@ -92,9 +92,14 @@ export default function MatchDetail({ id }) {
     <section>
       <PageBoard
         title={<>{namesOf(match.teamA)} <span className="match-vs">vs</span> {namesOf(match.teamB)}</>}
-        intro={status && <span className={`status-tag status-${status.lamp}`}>{status.word}</span>}
+        intro={status && (
+          <>
+            <span className={`status-tag status-${status.lamp}`}>{status.icon && <Icon name={status.icon} size={14} className="icon-solo" />}{status.word}</span>
+            {match.voided?.reason && <span className="void-reason">{match.voided.reason}</span>}
+          </>
+        )}
       >
-        <div className="tally match-tally">
+        <div className={`tally match-tally${match.voided ? ' is-voided' : ''}`}>
           <TallyCell figure={match.scoreA} label={nameLines(match.teamA)} variant="score" />
           <TallyCell figure={match.scoreB} label={nameLines(match.teamB)} variant="score" />
           <TallyCell figure={formatWhen(match.endedAt ?? match.startedAt)} label={<><Icon name="calendar" size={14} />When</>} variant="text" />
@@ -103,8 +108,9 @@ export default function MatchDetail({ id }) {
         </div>
       </PageBoard>
 
-      <div className="sheet">
-        <Link to="/" className="back-link">← Overview</Link>
+      <div className={match.video ? 'sheet match-filmed' : 'sheet'}>
+        {/* A filmed match keeps the way back under its video, so the video starts as high as it can. */}
+        {!match.video && <Link to="/" className="back-link">← Overview</Link>}
         <PointByPoint
           match={match}
           videoFailed={failed}
@@ -118,13 +124,14 @@ export default function MatchDetail({ id }) {
 }
 
 /**
- * The match's video, when it has one, and every point under it.
+ * The match's video, when it has one, and every point beside it.
  *
  * With a video the two follow each other: tapping a point jumps the
  * video to that point's rally and plays, and as the video plays the
- * point on screen is the one lit. A point the video does not show still
- * says how it was won; it just is not a button. Nothing is asked of the
- * video's storage until play is pressed.
+ * point on screen is the one lit. The video stays put while the points
+ * scroll, so the two are always seen together. A point the video does
+ * not show still says how it was won; it just is not a button. Nothing
+ * is asked of the video's storage until play is pressed.
  *
  * Mounted afresh for each match (the page reads "Loading…" in between),
  * so the point lit never carries over from another match.
@@ -140,8 +147,6 @@ function PointByPoint({ match, videoFailed, onVideoError, onTryAgain, onRemoveVi
     setPlaying(index)
     player.current.currentTime = video.seconds[index]
     player.current.play().catch(() => {})
-    // A long match's last points sit a screen or two below the video.
-    player.current.scrollIntoView({ block: 'nearest' })
   }
 
   return (
@@ -167,8 +172,9 @@ function PointByPoint({ match, videoFailed, onVideoError, onTryAgain, onRemoveVi
               <button type="button" className="btn-quiet btn-small" onClick={onTryAgain}>Try again</button>
             </div>
           )}
-          {match.mayRemoveVideo && (
-            <div className="row-actions">
+          <div className="row-actions">
+            <Link to="/" className="back-link">← Overview</Link>
+            {match.mayRemoveVideo && (
               <RowConfirm
                 label="Remove video"
                 className="btn-danger btn-small"
@@ -181,8 +187,8 @@ function PointByPoint({ match, videoFailed, onVideoError, onTryAgain, onRemoveVi
                 onClose={() => setConfirming(false)}
                 onConfirm={onRemoveVideo}
               />
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 
@@ -202,8 +208,15 @@ function PointByPoint({ match, videoFailed, onVideoError, onTryAgain, onRemoveVi
             </p>
             <ol className="match-points" style={{ '--point-rows': Math.ceil(points.length / 2) }}>
               {points.map((point, index) => {
-                // The bar is seen, not heard: a screen reader is told the side by name.
-                const line = <span><span className="sr-only">{names[point.team]}: </span>{pointLine(point)}</span>
+                const mark = pointMark(point)
+                // The bar and the mark are seen, not heard: a screen reader is told the side and how the point ended in words.
+                const line = (
+                  <span className="point-line">
+                    <span className="sr-only">{pointSaid(point, names[point.team])}</span>
+                    <Icon name={mark} size={22} className={`point-mark is-${mark}`} />
+                    <span aria-hidden="true">{pointLine(point)}</span>
+                  </span>
+                )
                 return (
                   <li key={index} className={`match-point is-${point.team.toLowerCase()}`}>
                     {video && video.seconds[index] != null ? (

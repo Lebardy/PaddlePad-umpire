@@ -4,6 +4,7 @@
 
 const PATHS = {
   alert: 'M12 3l10 18H2zM12 10v5M12 18v.01',
+  ban: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM5.6 5.6l12.8 12.8',
   calendar: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
   camera: 'M3 7h12v10H3zM15 10l6-3v10l-6-3',
   check: 'M5 12l5 5 9-10',
