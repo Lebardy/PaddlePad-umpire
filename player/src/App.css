@@ -2801,3 +2801,16 @@
 .camera-note-mark { margin-top: auto; }
 .camera-note p { max-width: 30rem; margin-bottom: auto; color: var(--text-secondary); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Remove video, on the match page of the player who filmed it. */
+.video-remove { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.5rem 0.75rem; margin-top: 0.9rem; }
+.video-remove p { margin: 0 auto 0 0; color: var(--text-secondary); }
+.video-remove-go, .video-remove-yes, .video-remove-no {
+  min-height: 2.75rem; min-width: 2.75rem; padding: 0 0.9rem; display: inline-flex; align-items: center; gap: 0.45rem;
+  border-radius: var(--radius-sm); font: 700 1rem var(--label); letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+}
+.video-remove-go, .video-remove-yes { background: var(--surface); border: 1.5px solid var(--status-critical); color: var(--status-critical); }
+.video-remove-no { background: none; border: 1.5px solid var(--border); color: var(--text); }
+/* On a narrow phone the sentence takes its own line, so Remove and Keep stay together. */
+@media (max-width: 440px) { .video-remove p { flex-basis: 100%; } }
+.video-remove [aria-disabled='true'] { opacity: 0.7; cursor: default; }

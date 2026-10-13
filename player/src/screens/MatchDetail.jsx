@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from '../components/Link'
 import { navigate } from '../lib/router'
 import { usePlayerData } from '../lib/PlayerData'
-import { fetchMatchGame } from '../lib/api'
+import { fetchMatchGame, removeMatchVideo } from '../lib/api'
 import { longestRun, matchStory, turningPoint } from '../lib/story'
 import Sparkline from '../components/Sparkline'
 import MomentumRibbon from '../components/MomentumRibbon'
@@ -334,6 +334,18 @@ function PointByPoint({ id, match, selected, onSelect }) {
   const [asked, setAsked] = useState({ id, times: 0 })
   const player = useRef(null)
   const times = asked.id === id ? asked.times : 0
+  const { refresh } = usePlayerData()
+  // Which question the owner is on, kept with the match it belongs to like `asked`.
+  const [removing, setRemoving] = useState({ id, step: 'idle' })
+  const step = removing.id === id ? removing.step : 'idle'
+  const goButton = useRef(null)
+  const heading = useRef(null)
+  // The control to give the keyboard's place to once the page has redrawn without the one that was pressed.
+  const focusNext = useRef(null)
+  useEffect(() => {
+    focusNext.current?.current?.focus()
+    focusNext.current = null
+  })
 
   useEffect(() => {
     const controller = new AbortController()
@@ -347,6 +359,23 @@ function PointByPoint({ id, match, selected, onSelect }) {
   const points = loaded?.id === id ? loaded.points : null
   const video = loaded?.id === id ? loaded.video : null
   if (!game || game.moments.length === 0) return null
+
+  async function remove() {
+    if (step === 'busy') return
+    setRemoving({ id, step: 'busy' })
+    try {
+      await removeMatchVideo(id)
+    } catch (error) {
+      // Already gone (removed from another phone, or by the umpire) is the same as removed.
+      if (error.status !== 404) return setRemoving({ id, step: 'failed' })
+    }
+    setRemoving({ id, step: 'idle' })
+    setLoaded((was) => (was?.id === id ? { ...was, video: null } : was))
+    // The row and the video are gone: the place moves to the heading they sat under.
+    focusNext.current = heading
+    // The Matches list and this page's chip say "has video" from the list read; refresh is the provider's quiet one.
+    refresh()
+  }
 
   function pick(index) {
     onSelect(index)
@@ -371,7 +400,7 @@ function PointByPoint({ id, match, selected, onSelect }) {
   const theirs = match.opponents.join(' & ')
   return (
     <section className="detail-shape" aria-label="Point by point">
-      <h2>Point by point</h2>
+      <h2 ref={heading} tabIndex={-1}>Point by point</h2>
       {video && (
         <video
           ref={player}
@@ -400,6 +429,32 @@ function PointByPoint({ id, match, selected, onSelect }) {
         hint={video ? 'Tap a point to watch it' : undefined}
         watching={Boolean(video)}
       />
+      {video?.mayRemove && (
+        <div className="video-remove">
+          {step === 'idle' && (
+            <button ref={goButton} type="button" className="video-remove-go" onClick={() => setRemoving({ id, step: 'asking' })}><Icon name="trash" size={18} />Remove video</button>
+          )}
+          {step !== 'idle' && (
+            <>
+              <p role={step === 'failed' ? 'alert' : undefined}>{step === 'failed' ? 'Couldn’t remove it. Try again.' : 'It cannot be brought back.'}</p>
+              {/* aria-disabled, not disabled: a disabled button drops the keyboard's place to the page. */}
+              <button type="button" className="video-remove-yes" aria-disabled={step === 'busy'} onClick={remove}>{step === 'busy' ? 'Removing…' : 'Remove'}</button>
+              {/* Focus lands on the safe answer. */}
+              <button
+                type="button"
+                className="video-remove-no"
+                autoFocus
+                aria-disabled={step === 'busy'}
+                onClick={() => {
+                  if (step === 'busy') return
+                  focusNext.current = goButton
+                  setRemoving({ id, step: 'idle' })
+                }}
+              >Keep</button>
+            </>
+          )}
+        </div>
+      )}
     </section>
   )
 }
