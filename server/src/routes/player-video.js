@@ -47,14 +47,37 @@ async function ownMatch(req) {
 // A player's phone sends only the video that player is filming.
 const mine = (req) => (video) => video.source === 'player' && video.player_id === req.player.id
 
+/** Who holds the video of a match this player is in, when it is not this phone: { by, name }, as a refused claim says it. */
+async function takenBy(matchId, playerId, deviceId) {
+  const { rows } = await query(
+    `SELECT v.source, v.player_id, v.device_id, p.name AS holder, f.name AS facility_name
+       FROM match_videos v
+       JOIN matches m ON m.id = v.match_id
+       JOIN sessions s ON s.id = m.session_id
+       LEFT JOIN facilities f ON f.id = s.facility_id
+       LEFT JOIN players p ON p.id = v.player_id
+      WHERE v.match_id = $1 AND (m.team_a @> ARRAY[$2]::uuid[] OR m.team_b @> ARRAY[$2]::uuid[])`,
+    [matchId, playerId],
+  )
+  const held = rows[0]
+  if (!held || (held.source === 'player' && held.player_id === playerId && held.device_id === deviceId)) return undefined
+  return held.source === 'facility'
+    ? { by: 'facility', name: held.facility_name ?? 'The facility' }
+    : { by: 'player', name: held.holder ?? 'Another player' }
+}
+
 router.post('/video/camera/beat', async (req, res) => {
   const deviceId = deviceName(req.body?.deviceId)
   if (!deviceId) return res.status(400).json({ error: 'A deviceId is required' })
+  // A phone that says it is filming a match is told when the match's video
+  // is somebody else's now, so it can stop instead of filming for nothing.
+  let taken
   if (isUuid(req.body?.matchId)) {
-    await query(
+    const kept = await query(
       `UPDATE match_videos SET seen_at = now() WHERE match_id = $1 AND device_id = $2 AND player_id = $3 AND state = 'filming'`,
       [req.body.matchId, deviceId, req.player.id],
     )
+    if (kept.rowCount === 0) taken = await takenBy(req.body.matchId, req.player.id, deviceId)
   }
 
   // The newest match this player is in that is being played now. One
@@ -75,12 +98,13 @@ router.post('/video/camera/beat', async (req, res) => {
     [req.player.id],
   )
   const match = rows[0]
-  if (!match) return res.json({ now: Date.now(), match: null })
+  if (!match) return res.json({ now: Date.now(), match: null, taken })
   const { rows: people } = await query('SELECT id, name FROM players WHERE id = ANY($1::uuid[])', [[...match.team_a, ...match.team_b]])
   const nameOf = new Map(people.map((p) => [p.id, p.name]))
   res.json({
     now: Date.now(),
     match: { id: match.id, teamA: match.team_a.map((id) => nameOf.get(id) ?? ''), teamB: match.team_b.map((id) => nameOf.get(id) ?? '') },
+    taken,
   })
 })
 
