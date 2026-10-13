@@ -64,3 +64,13 @@ export function clockText(ms) {
   const hours = Math.floor(total / 3600)
   return hours > 0 ? `${hours}:${two(Math.floor(total / 60) % 60)}:${two(total % 60)}` : `${two(Math.floor(total / 60))}:${two(total % 60)}`
 }
+
+/**
+ * How long a send that failed waits before it starts again from nothing:
+ * 15 seconds, doubling with each failure in a row, never more than five
+ * minutes. A send the storage itself refused waits the five minutes at once.
+ */
+export function retryWaitMs(failures, refused) {
+  const longest = 5 * 60_000
+  return refused ? longest : Math.min(15_000 * 2 ** (Math.max(1, failures) - 1), longest)
+}

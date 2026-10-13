@@ -2781,10 +2781,16 @@ async function main() {
         const pBack = await pClaim(vPlayerToken, pPhone)
         check('and the first phone is then the one refused, by name -> 409',
           pBack.status === 409 && /^Smoke Video Two/.test(pBack.body.covered?.name ?? ''), JSON.stringify(pBack.body))
+        const pFilmingBeat = (bearer, deviceId) => asPlayer('/player/video/camera/beat', { method: 'POST', bearer, body: { deviceId, state: 'filming', matchId: pMatch } })
+        const pLost = await pFilmingBeat(vPlayerToken, pPhone)
+        check('the phone that lost the match is told so by its own beat, with the name of who films it now',
+          pLost.status === 200 && pLost.body.taken?.by === 'player' && /^Smoke Video Two/.test(pLost.body.taken?.name ?? ''), JSON.stringify(pLost.body).slice(0, 200))
+        check('a player outside the match who names it in a beat is told nothing about it', (await pFilmingBeat(vOutsiderToken, pPhone)).body.taken == null)
         console.log('  (waiting 35 s, then the holder beats)')
         await new Promise((resolve) => setTimeout(resolve, 35_000))
         const pKeep = await asPlayer('/player/video/camera/beat', { method: 'POST', bearer: pTwoToken, body: { deviceId: pOtherPhone, state: 'filming', matchId: pMatch } })
         check("a beat that names the match answers 200 and names it", pKeep.status === 200 && pKeep.body.match?.id === pMatch, JSON.stringify(pKeep.body).slice(0, 120))
+        check("and the holder's own beat is not told its match was taken", pKeep.body.taken == null, JSON.stringify(pKeep.body).slice(0, 160))
         console.log('  (waiting 35 s more, 70 s since the takeover)')
         await new Promise((resolve) => setTimeout(resolve, 35_000))
         const pStill = await pClaim(vPlayerToken, pPhone)

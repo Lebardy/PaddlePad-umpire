@@ -7,7 +7,7 @@
 // ============================================================
 
 import { readFileSync, readdirSync } from 'node:fs'
-import { CLAIM_AGAIN_MS, coveredFrom, mayClaim } from '../src/lib/filming.js'
+import { CLAIM_AGAIN_MS, coveredBy, coveredFrom, mayClaim } from '../src/lib/filming.js'
 
 let pass = 0
 let fail = 0
@@ -25,6 +25,8 @@ check('another player is filming', coveredFrom(byPlayer, 'm1', 1000), { matchId:
 check('the facility is filming', coveredFrom(byFacility, 'm1', 1000), { matchId: 'm1', by: 'facility', name: 'Boulevard Paddle Courts', againAt: 1000 + CLAIM_AGAIN_MS })
 check('a refusal that names nobody (the match is gone, the connection dropped) is not "covered"', coveredFrom({ status: 404, details: {} }, 'm1', 1000), null)
 check('nor is an error with no answer at all', coveredFrom(new Error('timeout'), 'm1', 1000), null)
+check("a beat that says another player's phone took the match over reads the same way", coveredBy({ by: 'player', name: 'Joshua Manalo' }, 'm1', 1000), { matchId: 'm1', by: 'player', name: 'Joshua Manalo', againAt: 1000 + CLAIM_AGAIN_MS })
+check('a beat that says nothing of the kind leaves nothing', coveredBy(undefined, 'm1', 1000), null)
 
 console.log('\nwhen a phone asks for a match')
 const held = coveredFrom(byPlayer, 'm1', 1000)

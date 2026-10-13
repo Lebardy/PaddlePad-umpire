@@ -26,12 +26,10 @@
 import * as api from './api'
 import { flattenMp4 } from './flattenMp4'
 import { sendToBucket } from './videoUpload'
-import { coveredFrom, mayClaim } from './filming'
-import { beatAction, firstFrameAt, isWholeBeat, isWide, noteBeatTiming, pickBitrate, pickType } from './videoClock'
+import { coveredBy, coveredFrom, mayClaim } from './filming'
+import { beatAction, firstFrameAt, isWholeBeat, isWide, noteBeatTiming, pickBitrate, pickType, retryWaitMs } from './videoClock'
 
 const BEAT_MS = 2_000
-const RETRY_MS = 15_000
-const REFUSED_RETRY_MS = 5 * 60_000
 const CAMERA_KEY = 'paddlepad.player.camera'
 const MAX_VIDEO_BYTES = 2 * 1024 ** 3
 // Stop filming a little short of the limit, so what was filmed can still be sent.
@@ -133,6 +131,7 @@ export function createCameraSession({ deviceId, onChange }) {
       // A cut-off answer says nothing about the match: without this it would read as "no match" and stop the recording.
       if (!isWholeBeat(answer)) throw new Error('cut-off beat')
       timing = noteBeatTiming(timing, { sentAt, receivedAt: Date.now(), serverNow: answer.now })
+      if (filming && answer.taken) giveUp(answer.taken)
       const action = beatAction(filming?.matchId ?? null, answer.match?.id ?? null, filmed.has(answer.match?.id))
       // A match nobody films any more, or no match at all: the "covered" note has nothing left to say.
       if (state.covered && state.covered.matchId !== answer.match?.id) set({ covered: null })
@@ -178,6 +177,19 @@ export function createCameraSession({ deviceId, onChange }) {
 
   function stopFilming() {
     if (recorder && recorder.state !== 'inactive') recorder.stop()
+  }
+
+  /**
+   * Another phone films this match now (this one went quiet for a minute
+   * and was taken over). Its recording would be refused at the end, so it
+   * stops here, keeps nothing, and the screen says who is filming.
+   */
+  function giveUp(taken) {
+    const { matchId } = filming
+    if (recorder && recorder.state !== 'inactive') { recorder.onstop = null; recorder.stop() }
+    filming = null
+    recorder = null
+    set({ phase: 'waiting', match: null, startedAt: null, covered: coveredBy(taken, matchId, Date.now()) })
   }
 
   async function finish(mine, parts) {
@@ -239,7 +251,9 @@ export function createCameraSession({ deviceId, onChange }) {
       sendingNow = false
       if (error.final) { queue.shift(); pump(); return }
       report(state.sending?.percent ?? 0, true)
-      retryTimer = setTimeout(pump, error.refused ? REFUSED_RETRY_MS : RETRY_MS)
+      // Each try sends the whole video again, so the tries thin out.
+      next.failures = (next.failures ?? 0) + 1
+      retryTimer = setTimeout(pump, retryWaitMs(next.failures, error.refused))
     }
   }
 

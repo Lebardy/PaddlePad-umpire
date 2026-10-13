@@ -5,7 +5,7 @@
 //   node scripts/check-video-clock.mjs
 // ============================================================
 
-import { START_LATE_MS, beatAction, clockText, firstFrameAt, isWholeBeat, isWide, noteBeatTiming, pickBitrate, pickType } from '../src/lib/videoClock.js'
+import { START_LATE_MS, beatAction, clockText, firstFrameAt, isWholeBeat, isWide, noteBeatTiming, pickBitrate, pickType, retryWaitMs } from '../src/lib/videoClock.js'
 
 let pass = 0
 let fail = 0
@@ -68,6 +68,18 @@ section('the timer')
   check('just started', clockText(0), '00:00')
   check('past the hour', clockText(3_852_000), '1:04:12')
   check('never negative', clockText(-5), '00:00')
+}
+
+section('how long a failed send waits before it starts again')
+{
+  check('the first failure: 15 seconds', retryWaitMs(1, false), 15_000)
+  check('the second: 30', retryWaitMs(2, false), 30_000)
+  check('the third: a minute', retryWaitMs(3, false), 60_000)
+  check('the fifth: four minutes', retryWaitMs(5, false), 240_000)
+  check('the sixth: five minutes, and no longer', retryWaitMs(6, false), 300_000)
+  check('the fortieth is still five minutes', retryWaitMs(40, false), 300_000)
+  check('a send the storage refused waits five minutes from the first', retryWaitMs(1, true), 300_000)
+  check('a count of nothing is treated as the first', retryWaitMs(0, false), 15_000)
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
