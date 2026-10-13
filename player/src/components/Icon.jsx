@@ -64,12 +64,14 @@ const PATHS = {
 
   // Filming a match: the notes before it and the camera screen.
   alert: 'M12 3l10 18H2zM12 10v5M12 18v.01',
+  cameraTick: 'M4 6h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM16 10l6-3v10l-6-3M6 12l2.5 2.5L12 10',
   corners: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
   offline: 'M3 9a14 14 0 0 1 18 0M6.5 12.5a9 9 0 0 1 11 0M10 16a4 4 0 0 1 4 0M12 20v.01M4 4l16 16',
   phone: 'M5 7h14a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zM17.5 12h.01',
   retry: 'M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5',
   timer: 'M12 5a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM12 9v4l2.5 2M9 2h6',
   trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13',
+  turn: 'M6 7h4a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zM13 4a7 7 0 0 1 7 7M17.5 9.5l2.5 2.5 2.5-2.5',
   upload: 'M12 16V4M7 9l5-5 5 5M4 20h16',
   wifi: 'M3 9a14 14 0 0 1 18 0M6.5 12.5a9 9 0 0 1 11 0M10 16a4 4 0 0 1 4 0M12 20v.01',
 }

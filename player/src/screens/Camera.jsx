@@ -85,7 +85,7 @@ function Camera() {
         <div className="camera-upright">
           <button className="back-link" onClick={leave}>&larr; Back</button>
           <div className="camera-upright-body">
-            <span className="camera-turn" aria-hidden="true"><Icon name="retry" size={72} /></span>
+            <span className="camera-turn" aria-hidden="true"><Icon name="turn" size={72} /></span>
             <h2>Turn the phone sideways</h2>
             <p>The camera starts once the picture is wide.</p>
           </div>
@@ -119,7 +119,7 @@ function Camera() {
           <div className="camera-status" role="status" tabIndex={-1} ref={status}>
             {covered && !state.sending && (
               <span className="camera-covered">
-                <span className="camera-covered-mark" aria-hidden="true"><Icon name="camera" size={34} /></span>
+                <span className="camera-covered-mark" aria-hidden="true"><Icon name="cameraTick" size={34} /></span>
                 <span className="camera-covered-words">
                   <strong>This match is covered</strong>
                   <span>{covered.name} is {covered.by === 'player' ? 'already filming' : 'filming'}</span>
@@ -138,9 +138,9 @@ function Camera() {
               </>
             )}
             {!filming && state.sending && (
-              <span className="camera-sending">
+              <span className={state.sending.failed ? 'camera-sending camera-sending--failed' : 'camera-sending'}>
                 <span className="camera-line">
-                  <Icon name="upload" size={26} />
+                  <Icon name={state.sending.failed ? 'alert' : 'upload'} size={26} />
                   <strong>{state.sending.failed ? 'Not sent yet' : 'Sending'}</strong>
                   <span className="camera-clock">{state.sending.percent}%</span>
                 </span>
@@ -148,7 +148,7 @@ function Camera() {
                   <span style={{ width: `${state.sending.percent}%` }} />
                 </span>
                 <span className="camera-keep">
-                  <Icon name="alert" size={18} />Keep this screen open
+                  {!state.sending.failed && <Icon name="alert" size={18} />}Keep this screen open
                   {/* "Try now" goes once it is pressed: the keyboard's place moves to the line it changed. */}
                   {state.sending.failed && <button className="camera-again" onClick={() => { session.current?.retryNow(); status.current?.focus() }}>Try now</button>}
                 </span>
