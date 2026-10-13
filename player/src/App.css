@@ -2810,7 +2810,10 @@
   border-radius: var(--radius-sm); font: 700 1rem var(--label); letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
 }
 .video-remove-go, .video-remove-yes { background: var(--surface); border: 1.5px solid var(--status-critical); color: var(--status-critical); }
-.video-remove-no { background: none; border: 1.5px solid var(--border); color: var(--text); }
+.video-remove-no { background: none; border: 1.5px solid var(--rule); color: var(--text); }
+.video-remove p[role='alert'] { display: flex; align-items: center; gap: 0.45rem; color: var(--status-critical); }
+.detail-shape > h2:focus-visible { outline-offset: -3px; }
 /* On a narrow phone the sentence takes its own line, so Remove and Keep stay together. */
 @media (max-width: 440px) { .video-remove p { flex-basis: 100%; } }
-.video-remove [aria-disabled='true'] { opacity: 0.7; cursor: default; }
+.video-remove [aria-disabled='true'] { cursor: default; }
+.video-remove-no[aria-disabled='true'] { opacity: 0.7; }

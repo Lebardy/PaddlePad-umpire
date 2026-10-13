@@ -342,6 +342,9 @@ function PointByPoint({ id, match, selected, onSelect }) {
   const heading = useRef(null)
   // The control to give the keyboard's place to once the page has redrawn without the one that was pressed.
   const focusNext = useRef(null)
+  // The match the page is on now, for a removal that finishes after the player has moved to another.
+  const shown = useRef(id)
+  useEffect(() => { shown.current = id }, [id])
   useEffect(() => {
     focusNext.current?.current?.focus()
     focusNext.current = null
@@ -367,12 +370,13 @@ function PointByPoint({ id, match, selected, onSelect }) {
       await removeMatchVideo(id)
     } catch (error) {
       // Already gone (removed from another phone, or by the umpire) is the same as removed.
-      if (error.status !== 404) return setRemoving({ id, step: 'failed' })
+      // Only this match's own row is touched: the player may be on the next match by now.
+      if (error.status !== 404) return setRemoving((was) => (was.id === id ? { id, step: 'failed' } : was))
     }
-    setRemoving({ id, step: 'idle' })
+    setRemoving((was) => (was.id === id ? { id, step: 'idle' } : was))
     setLoaded((was) => (was?.id === id ? { ...was, video: null } : was))
     // The row and the video are gone: the place moves to the heading they sat under.
-    focusNext.current = heading
+    if (shown.current === id) focusNext.current = heading
     // The Matches list and this page's chip say "has video" from the list read; refresh is the provider's quiet one.
     refresh()
   }
@@ -436,9 +440,9 @@ function PointByPoint({ id, match, selected, onSelect }) {
           )}
           {step !== 'idle' && (
             <>
-              <p role={step === 'failed' ? 'alert' : undefined}>{step === 'failed' ? 'Couldn’t remove it. Try again.' : 'It cannot be brought back.'}</p>
+              <p role={step === 'failed' ? 'alert' : undefined}>{step === 'failed' && <Icon name="alert" size={18} />}{step === 'failed' ? 'Couldn’t remove it. Try again.' : 'It cannot be brought back.'}</p>
               {/* aria-disabled, not disabled: a disabled button drops the keyboard's place to the page. */}
-              <button type="button" className="video-remove-yes" aria-disabled={step === 'busy'} onClick={remove}>{step === 'busy' ? 'Removing…' : 'Remove'}</button>
+              <button type="button" className="video-remove-yes" aria-disabled={step === 'busy'} onClick={remove}><Icon name="trash" size={18} />{step === 'busy' ? 'Removing…' : 'Remove'}</button>
               {/* Focus lands on the safe answer. */}
               <button
                 type="button"
