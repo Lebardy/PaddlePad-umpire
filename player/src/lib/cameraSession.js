@@ -186,26 +186,31 @@ export function createCameraSession({ deviceId, onChange }) {
     recorder = null
     set({ phase: 'waiting', match: null, startedAt: null })
     if (!mine.startedAt || parts.length === 0) return
-    let blob = new Blob(parts, { type: 'video/mp4' })
-    let durationMs = stoppedAt - mine.startedAt
-    let repacked = true
-    try {
-      const made = await flattenMp4(blob)
-      blob = made.blob
-      durationMs = Math.round(made.info.seconds * 1000)
-    } catch {
-      // Not sure of the tables, so nothing is rewritten: it goes as filmed and is marked so.
-      repacked = false
-    }
     filmed.add(mine.matchId)
+    // Queued before it is repacked: from this moment the screen says "Sending" and leaving it asks first.
     queue.push({
-      matchId: mine.matchId, blob,
+      matchId: mine.matchId, blob: new Blob(parts, { type: 'video/mp4' }),
       meta: {
-        deviceId, bytes: blob.size, width: mine.width, height: mine.height, durationMs: Math.max(1, durationMs),
-        firstFrameAt: firstFrameAt(mine.startedAt, timing), repacked,
+        deviceId, bytes: 0, width: mine.width, height: mine.height, durationMs: stoppedAt - mine.startedAt,
+        firstFrameAt: firstFrameAt(mine.startedAt, timing), repacked: null,
       },
     })
     pump()
+  }
+
+  /** Makes a recording playable from its first byte, once; `repacked` says whether it could be. */
+  async function repack(item) {
+    try {
+      const made = await flattenMp4(item.blob)
+      item.blob = made.blob
+      item.meta.durationMs = Math.round(made.info.seconds * 1000)
+      item.meta.repacked = true
+    } catch {
+      // Not sure of the tables, so nothing is rewritten: it goes as filmed and is marked so.
+      item.meta.repacked = false
+    }
+    item.meta.durationMs = Math.max(1, item.meta.durationMs)
+    item.meta.bytes = item.blob.size
   }
 
   /** Sends the videos in the queue, one at a time, oldest first. */
@@ -218,6 +223,7 @@ export function createCameraSession({ deviceId, onChange }) {
     const report = (percent, failed) => set({ sending: { percent, failed, waiting: queue.length - 1 } })
     report(0, false)
     try {
+      if (next.meta.repacked === null) await repack(next)
       if (next.meta.bytes > MAX_VIDEO_BYTES) throw Object.assign(new Error('too big'), { final: true })
       const form = await api.startVideoUpload(next.matchId, next.meta).catch((error) => {
         // The match was cancelled, another phone holds it, or the numbers were refused: trying again changes nothing.
