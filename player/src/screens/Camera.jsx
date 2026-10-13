@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from '../components/Icon'
 import { createCameraSession } from '../lib/cameraSession'
+import { addSignOutNotice, subscribeSessionEnded } from '../lib/api'
 import { getDeviceId } from '../lib/filming'
 import { guardBack, navigate } from '../lib/router'
 import { clockText } from '../lib/videoClock'
@@ -14,6 +15,7 @@ import { clockText } from '../lib/videoClock'
  * and does not record. The working parts live in lib/cameraSession.js.
  */
 const LEAVE_WARNING = 'Leave? A video still being filmed or sent will be lost.'
+const LOST_ON_SIGN_OUT = 'You were signed out, so the video you were filming was not saved.'
 
 function Camera() {
   const onBack = () => (window.history.length > 1 ? window.history.back() : navigate('/'))
@@ -46,6 +48,9 @@ function Camera() {
     }
   }, [])
 
+  // Signed out from elsewhere with a video in hand: it cannot be kept, so the sign-in screen says so.
+  useEffect(() => subscribeSessionEnded(() => { if (session.current?.isBusy()) addSignOutNotice(LOST_ON_SIGN_OUT) }), [])
+
   // The preview is the one place that knows the picture's real shape as the phone turns.
   useEffect(() => {
     const video = preview.current
@@ -75,7 +80,7 @@ function Camera() {
   if (state.phase === 'unsupported' || state.phase === 'denied') {
     return (
       <div className="camera-note">
-        <button className="back-link" onClick={onBack}>&larr; Back</button>
+        <button className="back-link" onClick={onBack}><Icon name="chevron" size={18} className="icon-back" />Back</button>
         <span className="camera-note-mark" aria-hidden="true"><Icon name={state.phase === 'denied' ? 'lock' : 'alert'} size={34} /></span>
         <h2>{state.phase === 'denied' ? 'The camera is not allowed' : "This browser can't film here"}</h2>
         <p>
@@ -99,7 +104,7 @@ function Camera() {
 
       {upright && (
         <div className="camera-upright">
-          <button className="back-link" onClick={leave}>&larr; Back</button>
+          <button className="back-link" onClick={leave}><Icon name="chevron" size={18} className="icon-back" />Back</button>
           <div className="camera-upright-body">
             <span className="camera-turn" aria-hidden="true"><Icon name="turn" size={72} /></span>
             <h2>Turn the phone sideways</h2>
@@ -115,7 +120,7 @@ function Camera() {
             {filming ? (
               <span className="camera-chip"><Icon name="lock" size={18} />Stops when the match ends</span>
             ) : (
-              <button className="camera-round" onClick={leave} aria-label="Back"><Icon name="chevron" size={22} className="camera-back-icon" /></button>
+              <button className="camera-round" onClick={leave} aria-label="Back"><Icon name="chevron" size={22} className="icon-back" /></button>
             )}
             <span className="camera-top-right">
               {state.offline && <span className="camera-tag camera-tag--warn"><Icon name="offline" size={16} />No connection</span>}

@@ -31,7 +31,11 @@ export function getDeviceId() {
  * connection dropped).
  */
 export function coveredFrom(error, matchId, now) {
-  const covered = error?.details?.covered
+  return coveredBy(error?.details?.covered, matchId, now)
+}
+
+/** The same, from the answer itself: `covered` is { by, name }, or nothing. */
+export function coveredBy(covered, matchId, now) {
   if (!covered) return null
   return { matchId, by: covered.by, name: covered.name, againAt: now + CLAIM_AGAIN_MS }
 }

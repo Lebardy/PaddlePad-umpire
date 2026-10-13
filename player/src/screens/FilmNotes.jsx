@@ -17,7 +17,7 @@ const ANGLE = [
 function FilmNotes() {
   return (
     <div className="film-notes">
-      <button type="button" className="back-link" onClick={() => (window.history.length > 1 ? window.history.back() : navigate('/'))}>&larr; Back</button>
+      <button type="button" className="back-link" onClick={() => (window.history.length > 1 ? window.history.back() : navigate('/'))}><Icon name="chevron" size={18} className="icon-back" />Back</button>
       <h1>Before you film</h1>
 
       <section className="film-note" aria-labelledby="film-court">

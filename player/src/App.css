@@ -173,6 +173,7 @@
   letter-spacing: 0.08em;
   display: inline-flex;
   align-items: center;
+  gap: 0.2rem;
   min-height: 44px;
   padding: 0 0.5rem 0 0;
   margin-bottom: 0.5rem;
@@ -997,6 +998,9 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
   padding: 0.5rem 0.75rem;
   border: 2px solid var(--rule);
   border-radius: var(--radius-sm);
@@ -1022,11 +1026,22 @@
   display: grid;
   align-content: start;
   gap: 0.1rem;
-  margin: 0.6rem 0 0.55rem;
   /* Room for all three lines and the second wrapping on a phone, so
-     tapping never pushes the boxes down. */
-  min-height: 5.6rem;
+     tapping never pushes the boxes down. A strip of the scoreboard from
+     edge to edge, so that room reads as a display waiting for a point,
+     not as bare space, and the words keep the full width they had. */
+  margin: 0.6rem calc(var(--gutter) * -1) 0.55rem;
+  min-height: 6.9rem;
+  padding: 0.65rem var(--gutter);
+  background: var(--board);
+  color: var(--board-ink);
 }
+.ribbon-readout .ribbon-at { color: var(--lamp); }
+.ribbon-readout .ribbon-hint,
+.ribbon-readout .ribbon-tags { color: var(--board-muted); }
+.ribbon-readout .ribbon-kind { background: var(--board-raised); }
+.ribbon-readout .ribbon-kind.is-winner { color: var(--win-lamp); }
+.ribbon-readout .ribbon-kind.is-mistake { color: var(--loss-lamp); }
 .ribbon-hint,
 .ribbon-who {
   font-family: var(--label);
@@ -2574,21 +2589,14 @@
 .detail-shape.is-filmed > h2 { margin-bottom: 0; }
 .match-video { position: sticky; top: 0; z-index: 3; display: block; width: calc(100% + 2 * var(--gutter)); aspect-ratio: 16 / 9; margin: 0 calc(var(--gutter) * -1); background: var(--board); }
 
-/* With a video, the line that names the picked point becomes a strip of
-   the scoreboard joined under the picture and staying with it; the names
-   and the boxes move beneath. The picked box -- the one being played --
+/* With a video, the strip that names the picked point is joined under
+   the picture and stays with it; the names and the boxes move beneath. The picked box -- the one being played --
    is ringed in lamp amber, and it and "Remove video" are kept clear of
    the strip and the tab bar when the page moves to them. */
 .ribbon.is-watching { display: flex; flex-direction: column; margin-top: 0; }
-.ribbon.is-watching .ribbon-readout { order: -1; position: sticky; top: var(--video-h); z-index: 2; min-height: 6.9rem; margin: 0 calc(var(--gutter) * -1) 0.7rem; padding: 0.65rem var(--gutter); background: var(--board); color: var(--board-ink); border-bottom: 3px solid var(--lamp); }
+.ribbon.is-watching .ribbon-readout { order: -1; position: sticky; top: var(--video-h); z-index: 2; margin-block: 0 0.7rem; border-bottom: 3px solid var(--lamp); }
 .ribbon.is-watching .ribbon-block,
 .detail-shape.is-filmed > .video-remove button { scroll-margin: calc(var(--video-h) + 8.5rem) 0 calc(4.5rem + env(safe-area-inset-bottom)); }
-.ribbon.is-watching .ribbon-at { color: var(--lamp); }
-.ribbon.is-watching .ribbon-hint,
-.ribbon.is-watching .ribbon-tags { color: var(--board-muted); }
-.ribbon.is-watching .ribbon-kind { background: var(--board-raised); }
-.ribbon.is-watching .ribbon-kind.is-winner { color: var(--win-lamp); }
-.ribbon.is-watching .ribbon-kind.is-mistake { color: var(--loss-lamp); }
 .ribbon.is-watching .ribbon-block.is-selected { outline: 4px solid var(--lamp); outline-offset: 1px; }
 
 /* A phone held sideways: the video takes the height of the screen on
@@ -2779,7 +2787,7 @@
 /* Words never sit straight on the picture: each has a nearly solid panel. */
 .camera-round, .camera-chip, .camera-tag, .camera-choice, .camera-status { background: rgba(18, 22, 28, 0.86); color: var(--board-ink); }
 .camera-round { width: 3rem; height: 3rem; border-radius: var(--radius); border: 0; display: grid; place-items: center; cursor: pointer; }
-.camera-back-icon { transform: rotate(180deg); }
+.icon-back { transform: rotate(180deg); }
 .camera-chip { display: flex; align-items: center; gap: 0.5rem; min-height: 3rem; padding: 0 1rem; border-radius: var(--radius); font-size: 0.95rem; }
 .camera-tag { padding: 0.35rem 0.6rem; border-radius: var(--radius-sm); font: 700 0.9rem var(--label); letter-spacing: 0.09em; display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
 .camera-tag--warn { background: var(--loss-lamp); color: var(--loss-ink); }

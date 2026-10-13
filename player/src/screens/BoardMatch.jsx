@@ -37,7 +37,7 @@ function BackLink() {
       className="back-link"
       onClick={() => (window.history.length > 1 ? window.history.back() : navigate('/leaderboard'))}
     >
-      &larr; Back
+      <Icon name="chevron" size={18} className="icon-back" />Back
     </button>
   )
 }

@@ -294,14 +294,14 @@ function MatchDetail({ id }) {
       <nav className="detail-nav" aria-label="Other matches">
         {older ? (
           <Link className="detail-nav-link" replace to={`/matches/${older.id}`}>
-            &larr; Previous match
+            <Icon name="chevron" size={18} className="icon-back" />Previous match
           </Link>
         ) : (
           <span />
         )}
         {newer && (
           <Link className="detail-nav-link" replace to={`/matches/${newer.id}`}>
-            Next match &rarr;
+            Next match<Icon name="chevron" size={18} />
           </Link>
         )}
       </nav>
@@ -473,7 +473,7 @@ function BackLink() {
       // including the scroll position the router saved.
       onClick={() => (window.history.length > 1 ? window.history.back() : navigate('/matches'))}
     >
-      &larr; Back
+      <Icon name="chevron" size={18} className="icon-back" />Back
     </button>
   )
 }

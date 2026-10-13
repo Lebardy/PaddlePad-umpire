@@ -23,11 +23,9 @@
 import * as api from './api'
 import { flattenMp4 } from './flattenMp4'
 import { sendToBucket } from './videoUpload'
-import { beatAction, firstFrameAt, isWholeBeat, isWide, noteBeatTiming, pickBitrate, pickType } from './videoClock'
+import { beatAction, firstFrameAt, isWholeBeat, isWide, noteBeatTiming, pickBitrate, pickType, retryWaitMs } from './videoClock'
 
 const BEAT_MS = 2_000
-const RETRY_MS = 15_000
-const REFUSED_RETRY_MS = 5 * 60_000
 const CAMERA_KEY = 'paddlepad.camera'
 const MAX_VIDEO_BYTES = 2 * 1024 ** 3
 // Stop filming a little short of the limit, so what was filmed can still be sent.
@@ -228,7 +226,9 @@ export function createCameraSession({ deviceId, onChange }) {
       sendingNow = false
       if (error.final) { queue.shift(); pump(); return }
       report(state.sending?.percent ?? 0, true)
-      retryTimer = setTimeout(pump, error.refused ? REFUSED_RETRY_MS : RETRY_MS)
+      // Each try sends the whole video again, so the tries thin out.
+      next.failures = (next.failures ?? 0) + 1
+      retryTimer = setTimeout(pump, retryWaitMs(next.failures, error.refused))
     }
   }
 

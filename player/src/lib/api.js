@@ -91,6 +91,16 @@ function rememberPausedNotice(details) {
   }
 }
 
+/** Adds a line to what the sign-in screen says once about how the last session ended. */
+export function addSignOutNotice(line) {
+  try {
+    const had = sessionStorage.getItem(PAUSED_NOTICE_KEY)
+    sessionStorage.setItem(PAUSED_NOTICE_KEY, had ? `${had} ${line}` : line)
+  } catch {
+    /* private mode */
+  }
+}
+
 /** The notice left by a paused session, removed as it is read. */
 export function takePausedNotice() {
   try {
