@@ -31,5 +31,11 @@ check('this player’s other phone has gone silent: taken over', playerClaimVerd
 check('a video already being sent stays, however quiet', playerClaimVerdict({ ...me, filmsMatches: false, held: filming({ state: 'sending', silent: true }) }), 'player')
 check('a finished video stays', playerClaimVerdict({ ...me, filmsMatches: false, held: filming({ state: 'ready', silent: true }) }), 'player')
 
+check('this phone’s own row is already being sent: it stays', playerClaimVerdict({ ...me, filmsMatches: false, held: filming({ player_id: 'p1', device_id: 'phone-1', state: 'sending' }) }), 'player')
+check('this phone’s own row is finished: it stays', playerClaimVerdict({ ...me, filmsMatches: false, held: filming({ player_id: 'p1', device_id: 'phone-1', state: 'ready' }) }), 'player')
+check('the facility films here, even while this phone holds a row', playerClaimVerdict({ ...me, filmsMatches: true, held: filming({ player_id: 'p1', device_id: 'phone-1' }) }), 'facility')
+check('this phone’s own row is still its own when silent', playerClaimVerdict({ ...me, filmsMatches: false, held: filming({ player_id: 'p1', device_id: 'phone-1', silent: true }) }), 'mine')
+check('another player on the same device id is not this phone', playerClaimVerdict({ ...me, filmsMatches: false, held: filming({ player_id: 'p2', device_id: 'phone-1' }) }), 'player')
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
