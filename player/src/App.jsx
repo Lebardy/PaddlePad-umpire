@@ -70,7 +70,8 @@ function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
     )
   }
 
-  if (error && matches.length === 0) {
+  // Not over the camera: a player with no matches yet may be filming, and one failed quiet refresh must not close it.
+  if (error && matches.length === 0 && path !== '/film/camera') {
     return (
       <div className="app-body">
         <ErrorState message={error} onRetry={refresh} />

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Icon from '../components/Icon'
 import { createCameraSession } from '../lib/cameraSession'
 import { getDeviceId } from '../lib/filming'
-import { navigate } from '../lib/router'
+import { guardBack, navigate } from '../lib/router'
 import { clockText } from '../lib/videoClock'
 
 /**
@@ -13,6 +13,8 @@ import { clockText } from '../lib/videoClock'
  * Where the facility films, or another player already is, it says so
  * and does not record. The working parts live in lib/cameraSession.js.
  */
+const LEAVE_WARNING = 'Leave? A video still being filmed or sent will be lost.'
+
 function Camera() {
   const onBack = () => (window.history.length > 1 ? window.history.back() : navigate('/'))
   const [state, setState] = useState({
@@ -23,12 +25,25 @@ function Camera() {
   const session = useRef(null)
   const preview = useRef(null)
   const status = useRef(null)
+  const leaving = useRef(false)
 
   useEffect(() => {
     const made = createCameraSession({ deviceId: getDeviceId(), onChange: setState })
     session.current = made
     made.open()
     return () => made.close()
+  }, [])
+
+  // The phone's own Back and a reload say the same thing the on-screen Back does.
+  useEffect(() => {
+    const mayLeave = () => leaving.current || !session.current?.isBusy() || confirm(LEAVE_WARNING)
+    const warn = (event) => { if (session.current?.isBusy()) event.preventDefault() }
+    const unguard = guardBack(mayLeave)
+    window.addEventListener('beforeunload', warn)
+    return () => {
+      unguard()
+      window.removeEventListener('beforeunload', warn)
+    }
   }, [])
 
   // The preview is the one place that knows the picture's real shape as the phone turns.
@@ -52,7 +67,8 @@ function Camera() {
   }, [state.phase])
 
   function leave() {
-    if (session.current?.isBusy() && !confirm('Leave? A video still being filmed or sent will be lost.')) return
+    if (session.current?.isBusy() && !confirm(LEAVE_WARNING)) return
+    leaving.current = true
     onBack()
   }
 
