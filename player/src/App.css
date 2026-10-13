@@ -2559,14 +2559,30 @@
 
 /* ============ Match video ============ */
 
-/* The match's video, inside "Point by point", above the boxes. The
-   browser's own controls; nothing is loaded until play is pressed. */
-.match-video { display: block; width: 100%; aspect-ratio: 16 / 9; margin: 0 0 0.75rem; border-radius: var(--radius); background: var(--board); }
+/* The match's video, inside "Point by point". The browser's own
+   controls; nothing is loaded until play is pressed.
+
+   It runs edge to edge and stays at the top of the screen for as long
+   as "Point by point" is on it, so a tapped point never plays out of
+   sight. --video-h is its height, which the strip under it needs. */
+.detail-shape.is-filmed {
+  container-type: inline-size;
+  --video-h: calc((100cqw + 2 * var(--gutter)) * 9 / 16);
+  /* Not hidden, as wide screens set: that would stop the video from staying put. */
+  overflow: clip;
+}
+.detail-shape.is-filmed > h2 { margin-bottom: 0; }
+.match-video { position: sticky; top: 0; z-index: 3; display: block; width: calc(100% + 2 * var(--gutter)); aspect-ratio: 16 / 9; margin: 0 calc(var(--gutter) * -1); background: var(--board); }
 
 /* With a video, the line that names the picked point becomes a strip of
-   the scoreboard under the picture, and the picked box -- the one being
-   played -- is ringed in lamp amber. */
-.ribbon.is-watching .ribbon-readout { min-height: 6.9rem; padding: 0.65rem 0.8rem; border-radius: var(--radius); background: var(--board); color: var(--board-ink); }
+   the scoreboard joined under the picture and staying with it; the names
+   and the boxes move beneath. The picked box -- the one being played --
+   is ringed in lamp amber, and it and "Remove video" are kept clear of
+   the strip and the tab bar when the page moves to them. */
+.ribbon.is-watching { display: flex; flex-direction: column; margin-top: 0; }
+.ribbon.is-watching .ribbon-readout { order: -1; position: sticky; top: var(--video-h); z-index: 2; min-height: 6.9rem; margin: 0 calc(var(--gutter) * -1) 0.7rem; padding: 0.65rem var(--gutter); background: var(--board); color: var(--board-ink); border-bottom: 3px solid var(--lamp); }
+.ribbon.is-watching .ribbon-block,
+.detail-shape.is-filmed > .video-remove button { scroll-margin: calc(var(--video-h) + 8.5rem) 0 calc(4.5rem + env(safe-area-inset-bottom)); }
 .ribbon.is-watching .ribbon-at { color: var(--lamp); }
 .ribbon.is-watching .ribbon-hint,
 .ribbon.is-watching .ribbon-tags { color: var(--board-muted); }
@@ -2574,6 +2590,40 @@
 .ribbon.is-watching .ribbon-kind.is-winner { color: var(--win-lamp); }
 .ribbon.is-watching .ribbon-kind.is-mistake { color: var(--loss-lamp); }
 .ribbon.is-watching .ribbon-block.is-selected { outline: 4px solid var(--lamp); outline-offset: 1px; }
+
+/* A phone held sideways: the video takes the height of the screen on
+   the left, and the strip, the boxes and the names sit beside it in a
+   pane that scrolls by itself. "Remove video" waits under the fold. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .detail-shape.is-filmed {
+    --left: max(var(--gutter), env(safe-area-inset-left));
+    --right: max(var(--gutter), env(safe-area-inset-right));
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    /* The screen, less the heading strip and the tab bar (.tab is 3.4rem and its padding). */
+    grid-template-rows: auto calc(100vh - 7.5rem - env(safe-area-inset-bottom)) auto;
+    grid-template-rows: auto calc(100dvh - 7.5rem - env(safe-area-inset-bottom)) auto;
+    column-gap: 1rem;
+    width: 100vw;
+    margin-inline: calc(50% - 50vw);
+    padding-inline: var(--left) var(--right);
+    border-inline: 0;
+    border-radius: 0;
+  }
+  .detail-shape.is-filmed > h2 { grid-column: 1 / -1; margin: 0 calc(var(--right) * -1) 0.6rem calc(var(--left) * -1); padding-inline: var(--left) var(--right); }
+  /* As tall as the screen allows, but never so wide that the pane beside it falls under 14rem. */
+  .detail-shape.is-filmed > .match-video { position: static; grid-area: 2 / 1; width: auto; height: min(100%, (100cqw - 15rem) * 9 / 16); margin: 0; border-radius: var(--radius); }
+  .ribbon.is-watching { grid-area: 2 / 2; position: relative; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  /* The pane scrolls; nothing in it is squeezed to fit. */
+  .ribbon.is-watching > * { flex-shrink: 0; }
+  .ribbon.is-watching .ribbon-readout { top: 0; margin: 0 0 0.6rem; padding-inline: 0.8rem; border-bottom: 0; border-radius: var(--radius); }
+  .ribbon.is-watching .ribbon-legend { order: 1; margin-top: 0.6rem; }
+  /* Room for the picked box's ring, which the pane would otherwise cut. */
+  .ribbon.is-watching .ribbon-blocks { padding: 5px; }
+  .ribbon.is-watching .ribbon-block { scroll-margin: 8.5rem 0 0.5rem; }
+  .detail-shape.is-filmed > .video-remove { grid-area: 3 / 2; }
+  .detail-shape.is-filmed > .video-remove button { scroll-margin: 0.5rem 0 calc(4.5rem + env(safe-area-inset-bottom)); }
+}
 
 /* A camera, wherever something has video or films: lamp on board,
    never a word. Each carries its own aria-label. */

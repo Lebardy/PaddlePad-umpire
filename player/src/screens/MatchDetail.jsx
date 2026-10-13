@@ -403,7 +403,7 @@ function PointByPoint({ id, match, selected, onSelect }) {
 
   const theirs = match.opponents.join(' & ')
   return (
-    <section className="detail-shape" aria-label="Point by point">
+    <section className={video ? 'detail-shape is-filmed' : 'detail-shape'} aria-label="Point by point">
       <h2 ref={heading} tabIndex={-1}>Point by point</h2>
       {video && (
         <video
