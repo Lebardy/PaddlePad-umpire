@@ -11,14 +11,14 @@
 // from the bucket with a link signed there too.
 // ============================================================
 
-import { randomBytes } from 'node:crypto'
 import { Router } from 'express'
 import { query, withTransaction } from '../db.js'
 import { requireActiveUmpire, requireAuth } from '../auth.js'
 import { isUuid } from '../validate.js'
-import { MAX_VIDEO_BYTES, bucketConfig, deleteFile, fileSize, signedReadUrl, signedUploadForm } from '../bucket.js'
+import { bucketConfig, deleteFile, signedReadUrl } from '../bucket.js'
 import { firstFrameFromLineUp, rallySeconds } from '../video-times.js'
 import { cameraStatus, noteBeat } from '../camera-beats.js'
+import { CLAIM_SILENT_SECONDS, deviceName, findVideo, finishUpload, startUpload } from '../video-send.js'
 
 const router = Router()
 
@@ -30,12 +30,6 @@ router.use((req, res, next) => {
 router.use(requireAuth, requireActiveUmpire(query))
 
 const BEAT_STATES = ['ready', 'filming', 'sending']
-// A filming claim whose phone has said nothing for this long may be taken over.
-const CLAIM_SILENT_SECONDS = 60
-const MAX_DURATION_MS = 6 * 60 * 60 * 1000
-
-// A phone's own name for itself: text, and not a book.
-const deviceName = (value) => (typeof value === 'string' && value.length >= 1 && value.length <= 100 ? value : '')
 
 function refusal(statusCode, message) {
   const error = new Error(message)
@@ -57,11 +51,6 @@ async function ownMatch(req) {
       WHERE m.id = $1 AND m.recorded_by = $2 AND s.facility_id = $3`,
     [req.params.id, req.umpire.id, req.umpire.facilityId],
   )
-  return rows[0] ?? null
-}
-
-async function findVideo(matchId) {
-  const { rows } = await query('SELECT * FROM match_videos WHERE match_id = $1', [matchId])
   return rows[0] ?? null
 }
 
@@ -180,54 +169,21 @@ router.post('/matches/:id/claim', async (req, res) => {
   res.status(201).json({ ok: true })
 })
 
-const wholeNumber = (value, max) => Number.isInteger(value) && value >= 1 && value <= max
+// The umpire app's cameras send only a facility's video.
+const facilitys = (video) => video.source === 'facility'
 
 router.post('/matches/:id/upload', async (req, res) => {
   const match = await ownMatch(req)
   if (!match) return res.status(404).json({ error: 'No such match' })
-  const { deviceId, bytes, width, height, durationMs, firstFrameAt } = req.body ?? {}
-  if (Number.isInteger(bytes) && bytes > MAX_VIDEO_BYTES) return res.status(413).json({ error: 'A video can be at most 2 GB' })
-  if (!wholeNumber(bytes, MAX_VIDEO_BYTES) || !wholeNumber(width, 10_000) || !wholeNumber(height, 10_000) ||
-      !wholeNumber(durationMs, MAX_DURATION_MS) || !Number.isFinite(firstFrameAt) || Math.abs(firstFrameAt - Date.now()) > 24 * 60 * 60 * 1000) {
-    return res.status(400).json({ error: 'The video needs its size, its picture size, its length and when it began' })
-  }
-
-  const video = await findVideo(match.id)
-  if (!video || video.source !== 'facility' || video.device_id !== String(deviceId ?? '') || video.state === 'ready') {
-    return res.status(409).json({ error: 'This phone is not filming that match' })
-  }
-  // Trying again after a failed send reuses the name, so nothing is left behind.
-  const key = video.file_key ?? `videos/${match.id}/${randomBytes(8).toString('hex')}.mp4`
-  const claimed = await query(
-    `UPDATE match_videos
-        SET state = 'sending', file_key = $2, bytes = $3, width = $4, height = $5, duration_ms = $6,
-            first_frame_at = to_timestamp($7::double precision / 1000), repacked = $8, seen_at = now()
-      WHERE match_id = $1 AND device_id = $9`,
-    [match.id, key, bytes, width, height, durationMs, firstFrameAt, req.body?.repacked !== false, video.device_id],
-  )
-  // The claim was taken over since it was read.
-  if (claimed.rowCount === 0) return res.status(409).json({ error: 'This phone is not filming that match' })
-  res.json({ form: signedUploadForm(bucketConfig(), key, { bytes }) })
+  const answer = await startUpload(match.id, req.body, facilitys)
+  res.status(answer.status).json(answer.body)
 })
 
 router.post('/matches/:id/done', async (req, res) => {
   const match = await ownMatch(req)
   if (!match) return res.status(404).json({ error: 'No such match' })
-  const video = await findVideo(match.id)
-  if (!video || video.source !== 'facility' || video.device_id !== String(req.body?.deviceId ?? '')) {
-    return res.status(409).json({ error: 'This phone is not filming that match' })
-  }
-  if (video.state === 'ready') return res.json({ ok: true })
-  if (video.state !== 'sending') return res.status(409).json({ error: 'The video has not arrived in full' })
-  // Believe the bucket, not the phone.
-  const size = await fileSize(bucketConfig(), video.file_key)
-  if (size !== Number(video.bytes)) return res.status(409).json({ error: 'The video has not arrived in full' })
-  const marked = await query(
-    `UPDATE match_videos SET state = 'ready', ready_at = now() WHERE match_id = $1 AND device_id = $2 AND state = 'sending'`,
-    [match.id, video.device_id],
-  )
-  if (marked.rowCount === 0) return res.status(409).json({ error: 'This phone is not filming that match' })
-  res.json({ ok: true })
+  const answer = await finishUpload(match.id, req.body?.deviceId, facilitys)
+  res.status(answer.status).json(answer.body)
 })
 
 router.get('/matches/:id', async (req, res) => {

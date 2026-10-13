@@ -28,7 +28,7 @@ const WHAT_YOU_GET = [
   },
 ]
 
-function EmptyState({ name, inProgress }) {
+function EmptyState({ name, inProgress, children }) {
   const firstName = name.split(' ')[0]
 
   return (
@@ -41,6 +41,8 @@ function EmptyState({ name, inProgress }) {
             ? `A match of yours is being scored right now. It'll appear here the moment it finishes.`
             : `Nothing to do — just play. Your matches show up here as soon as an umpire scores one you're in.`}
         </p>
+        {/* The one thing to do from here, at the foot of the board. */}
+        {children}
       </header>
 
       {inProgress > 0 && (

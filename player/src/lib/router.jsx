@@ -43,7 +43,23 @@ function change(travels) {
   })
 }
 
+// One screen may refuse the phone's own Back: it sets a function that says whether leaving is fine.
+let backGuard = null
+
+/** Sets the guard and returns a function that clears it. */
+export function guardBack(mayLeave) {
+  backGuard = mayLeave
+  return () => {
+    if (backGuard === mayLeave) backGuard = null
+  }
+}
+
 window.addEventListener('popstate', () => {
+  // Refused: the browser has already moved, so put the address back.
+  if (backGuard && !backGuard()) {
+    window.history.pushState(window.history.state, '', shown)
+    return
+  }
   change([shown, window.location.pathname].includes(travelling))
 })
 

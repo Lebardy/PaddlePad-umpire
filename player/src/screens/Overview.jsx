@@ -58,6 +58,23 @@ function LastNight({ matches }) {
   )
 }
 
+/**
+ * The way to the camera, wherever video is set up: a row of the board,
+ * under the record, so it is on the first screen of the smallest phone.
+ * Shared with the first screen of a player with no match yet.
+ */
+export function FilmButton() {
+  const { videoOn } = usePlayerData()
+  if (!videoOn) return null
+  return (
+    <Link className="film-go" to="/film">
+      <span className="film-go-mark" aria-hidden="true"><Icon name="camera" size={26} /></span>
+      <span className="film-go-words">Film my next match</span>
+      <Icon name="chevron" size={22} />
+    </Link>
+  )
+}
+
 function Overview({ player }) {
   const { summary, matches, inProgress, rallyRating, leaderboardOpen } = usePlayerData()
   const trend = rollingWinRate(matches, TREND_WINDOW)
@@ -67,6 +84,7 @@ function Overview({ player }) {
   return (
     <div className="overview">
       <Hero player={player} summary={summary} matches={matches}>
+        <FilmButton />
         <StatGrid summary={summary} />
       </Hero>
 

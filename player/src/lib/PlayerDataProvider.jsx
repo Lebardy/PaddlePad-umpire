@@ -38,6 +38,8 @@ export function PlayerDataProvider({ children }) {
     rallyRating: null,
     // Whether the Leaderboard tab exists yet; from /player/me.
     leaderboardOpen: false,
+    // Whether "Film my next match" is offered; from /player/me.
+    videoOn: false,
     loading: true,
     error: null,
     loadedAt: null,
@@ -72,6 +74,7 @@ export function PlayerDataProvider({ children }) {
           rating: me.rating ?? null,
           rallyRating: me.rallyRating ?? null,
           leaderboardOpen: me.leaderboardOpen === true,
+          videoOn: me.videoOn === true,
           loading: false,
           error: null,
           loadedAt: loadedAtRef.current,
@@ -97,6 +100,7 @@ export function PlayerDataProvider({ children }) {
           rating: quiet ? s.rating : null,
           rallyRating: quiet ? s.rallyRating : null,
           leaderboardOpen: quiet ? s.leaderboardOpen : false,
+          videoOn: quiet ? s.videoOn : false,
         }))
       } finally {
         inFlightRef.current = null

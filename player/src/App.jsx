@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import SignIn from './screens/SignIn'
-import Overview from './screens/Overview'
+import Overview, { FilmButton } from './screens/Overview'
 import Matches from './screens/Matches'
 import MatchDetail from './screens/MatchDetail'
 import People from './screens/People'
@@ -11,6 +11,8 @@ import BoardMatch from './screens/BoardMatch'
 import Leaderboard from './screens/Leaderboard'
 import FacilityPage from './screens/FacilityPage'
 import You from './screens/You'
+import FilmNotes from './screens/FilmNotes'
+import Camera from './screens/Camera'
 import EmptyState from './components/EmptyState'
 import ErrorState from './components/ErrorState'
 import TabBar from './components/TabBar'
@@ -33,6 +35,7 @@ const TITLES = {
   '/leaderboard': 'Leaderboard · PaddlePad',
   '/you': 'You · PaddlePad',
   '/rating/graph': 'PaddlePad Rating · PaddlePad',
+  '/film': 'Film a match · PaddlePad',
 }
 
 /**
@@ -46,7 +49,7 @@ const TITLES = {
  */
 function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
   const path = useRoute()
-  const { summary, loading, error, refresh, matches, leaderboardOpen } = usePlayerData()
+  const { summary, loading, error, refresh, matches, leaderboardOpen, videoOn } = usePlayerData()
 
   useEffect(() => {
     document.title = TITLES[path] ?? 'PaddlePad'
@@ -67,7 +70,8 @@ function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
     )
   }
 
-  if (error && matches.length === 0) {
+  // Not over the camera: a player with no matches yet may be filming, and one failed quiet refresh must not close it.
+  if (error && matches.length === 0 && path !== '/film/camera') {
     return (
       <div className="app-body">
         <ErrorState message={error} onRetry={refresh} />
@@ -83,8 +87,9 @@ function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
   // setting up sign-in and linking a code -- was unreachable for
   // precisely the person who had just arrived with a code and nothing
   // else. Matches and People stay collapsed; there is genuinely nothing
-  // on them.
-  if (summary && summary.matches === 0 && path !== '/you') {
+  // on them. `/film` is exempt too: a first match is exactly the one a
+  // new player would film.
+  if (summary && summary.matches === 0 && path !== '/you' && !path.startsWith('/film')) {
     return (
       <div className="app-body">
         <EmptyStateScreen
@@ -122,6 +127,8 @@ function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
         onPlayerChange={onPlayerChange}
       />
     )
+  else if (path === '/film') screen = videoOn ? <FilmNotes /> : <GoHome />
+  else if (path === '/film/camera') screen = videoOn ? <Camera /> : <GoHome />
   else screen = <NotFound />
 
   return (
@@ -133,7 +140,8 @@ function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
         {error && <p className="stale-note">Couldn&rsquo;t refresh just now.</p>}
         {screen}
       </div>
-      <TabBar path={path} showLeaderboard={leaderboardOpen} />
+      {/* The camera covers the whole screen, sideways. */}
+      {path !== '/film/camera' && <TabBar path={path} showLeaderboard={leaderboardOpen} />}
     </>
   )
 }
@@ -150,7 +158,9 @@ function EmptyStateScreen({ player, onSignOut, onPlayerChange }) {
           Sign out
         </button>
       </div>
-      <EmptyState name={player.name} inProgress={inProgress} />
+      <EmptyState name={player.name} inProgress={inProgress}>
+        <FilmButton />
+      </EmptyState>
       {/* One card, whichever this person actually needs. Someone who
           came in by code already has their umpire's record, so linking
           is meaningless to them -- what they lack is a way back in.
@@ -165,7 +175,7 @@ function EmptyStateScreen({ player, onSignOut, onPlayerChange }) {
   )
 }
 
-/** The leaderboard isn't open yet: back to the Overview rather than an empty page. */
+/** The leaderboard isn't open yet, or video isn't set up: back to the Overview rather than an empty page. */
 function GoHome() {
   useEffect(() => {
     navigate('/', { replace: true })

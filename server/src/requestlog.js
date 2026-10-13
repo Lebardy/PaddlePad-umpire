@@ -13,7 +13,7 @@
 // ============================================================
 
 // Health checks fire constantly and say nothing about who did what.
-const IGNORED = new Set(['/health', '/video/camera/beat'])
+const IGNORED = new Set(['/health', '/video/camera/beat', '/player/video/camera/beat'])
 
 // Reads are noise at this scale. Writes are the ones anyone will ever
 // need to reconstruct.

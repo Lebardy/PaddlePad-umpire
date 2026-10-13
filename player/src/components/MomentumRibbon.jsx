@@ -23,7 +23,7 @@
 // not at all for reduced motion.
 // ============================================================
 
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useInView } from '../lib/motion'
 import { pointKind, pointSentence } from '../lib/pointWords'
 
@@ -60,6 +60,15 @@ function MomentumRibbon({
   const ref = useRef(null)
   const inView = useInView(ref)
   const buttons = useRef([])
+
+  // With a video the picked box follows what is playing: keep it in
+  // sight, but only while the boxes are on screen -- never pull the page
+  // back to them from further down.
+  useEffect(() => {
+    if (!watching || selected === null) return
+    const box = ref.current.getBoundingClientRect()
+    if (box.bottom > 0 && box.top < window.innerHeight) buttons.current[selected]?.scrollIntoView({ block: 'nearest' })
+  }, [watching, selected])
 
   const last = moments.length - 1
   const context = { last, lowIndex }

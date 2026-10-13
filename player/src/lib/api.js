@@ -5,10 +5,9 @@
 // Railway service only uploads what lives under its root directory, so
 // reaching into ../src would work locally and break in production.
 //
-// This app is READ-ONLY. There are no writes, no outbox, no sync queue
-// and no scoring engine here -- all of that exists in the umpire app to
-// let someone keep tapping with no signal, and none of it applies to
-// looking at your own stats.
+// This app reads, with one exception: a player may film a match they
+// are in and send its video (the calls at the foot of this file). There
+// is still no outbox, no sync queue and no scoring engine here.
 // ============================================================
 
 const API_URL = (
@@ -467,4 +466,32 @@ export async function verifySession() {
     }
     throw error
   }
+}
+
+// ============================================================
+// Filming a match from this phone
+// ============================================================
+
+/** The camera screen's 2-second "I am here". Answers with the server's time and the match to film, if any. */
+export function cameraBeat({ deviceId, state, matchId }) {
+  return apiFetch('/player/video/camera/beat', { method: 'POST', body: { deviceId, state, matchId }, signal: AbortSignal.timeout(10_000) })
+}
+
+/** Refused with `details.covered` ({ by, name }) when the facility or another player is filming. */
+export function claimMatchVideo(matchId, deviceId) {
+  return apiFetch(`/player/matches/${encodeURIComponent(matchId)}/video/claim`, { method: 'POST', body: { deviceId }, signal: AbortSignal.timeout(10_000) })
+}
+
+/** `meta` is { deviceId, bytes, width, height, durationMs, firstFrameAt, repacked }. Answers with the form to send the file through. */
+export function startVideoUpload(matchId, meta) {
+  return apiFetch(`/player/matches/${encodeURIComponent(matchId)}/video/upload`, { method: 'POST', body: meta, signal: AbortSignal.timeout(20_000) }).then((d) => d.form)
+}
+
+export function finishVideoUpload(matchId, deviceId) {
+  return apiFetch(`/player/matches/${encodeURIComponent(matchId)}/video/done`, { method: 'POST', body: { deviceId }, signal: AbortSignal.timeout(20_000) })
+}
+
+/** Removes the video this player filmed. */
+export function removeMatchVideo(matchId) {
+  return apiFetch(`/player/matches/${encodeURIComponent(matchId)}/video`, { method: 'DELETE' })
 }
