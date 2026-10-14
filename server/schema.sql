@@ -513,6 +513,10 @@ CREATE TABLE IF NOT EXISTS player_ratings (
 -- says so rather than inventing a reason.
 ALTER TABLE player_ratings ADD COLUMN IF NOT EXISTS playstyle_traits JSONB;
 
+-- The rally points the run grouped this player by, so the app can place
+-- them among that run's levels (see ml/run.py build_levels).
+ALTER TABLE player_ratings ADD COLUMN IF NOT EXISTS rally_points DOUBLE PRECISION;
+
 -- Four columns that are not part of this table. These statements take
 -- them out of a database that has them and do nothing to one that does
 -- not.

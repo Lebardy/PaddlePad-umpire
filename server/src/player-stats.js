@@ -16,6 +16,7 @@
 
 import { deriveMatchState, eventFromRow } from './pickleball.js'
 import { buildPlaystyleProof } from './playstyle.js'
+import { levelForPlayer } from './levels.js'
 import { rallyMatchFor } from './rally-rating.js'
 import {
   MIN_MATCHES_PER_PLAYER,
@@ -510,6 +511,23 @@ export async function getStanding(query, playerId) {
       })
     : null
 
+  // The level comes only from the latest real ML run (one with structure
+  // notes; the smoke's hand-made runs have none), and only if the player
+  // is in it: an older run's level beside other players' newer ones
+  // would be stale.
+  const { rows: latest } = await query(
+    `SELECT run.notes->'structure'->'levels' AS levels, r.skill_group, r.rally_points
+       FROM rating_runs run
+       LEFT JOIN player_ratings r ON r.run_id = run.id AND r.player_id = $1
+      WHERE run.status = 'completed' AND run.notes ? 'structure'
+      ORDER BY run.computed_at DESC
+      LIMIT 1`,
+    [playerId],
+  )
+  const level = latest[0]
+    ? levelForPlayer({ levels: latest[0].levels, skillGroup: latest[0].skill_group, rallyPoints: latest[0].rally_points })
+    : null
+
   return {
     state: 'rated',
     // The name the pipeline gave this player's style, and the numbers
@@ -520,5 +538,6 @@ export async function getStanding(query, playerId) {
     // a style is compared with. Never who they are. The name is what the
     // app strips from the front of the style name (lib/styleName.js).
     band: group ? { name: group, size: peers.length } : null,
+    level,
   }
 }
