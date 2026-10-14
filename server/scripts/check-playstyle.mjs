@@ -71,7 +71,7 @@ section('the three columns')
   check('this player, their group, and the style they were split from',
     proof.rows,
     [
-      { label: 'Streaky', feature: 'winner_rate_std', family: 'consistency', direction: 'above', neutral: false, you: 1.2, group: 2.8, other: 4.4, style: 1.2 },
+      { label: 'Streaky', feature: 'winner_rate_std', family: 'consistency', direction: 'above', neutral: false, you: 1.2, group: 2.8, other: 4.4, style: 1.2, center: null },
       { label: 'Dinker', feature: 'net_game_preference_rate_mean', family: 'identity', direction: 'above', neutral: false, you: 0.62, group: 0.465, other: 0.31, style: 0.62 },
     ],
     'the group column averages everyone in the group including this player; the other column averages only the other style; the style column averages this player\'s style, (1.0+1.2+1.4)/3 = 1.2 and (0.60+0.62+0.64)/3 = 0.62')
@@ -209,6 +209,37 @@ section('the all-court noun is proven by both habits')
     })?.rows.length,
     2,
     'a name that is only the noun used to show nothing at all')
+}
+
+console.log('\nswing rows carry the averages they move around')
+{
+  const evidenceOf = (mean, std) => ({ winner_rate_mean: mean, winner_rate_std: std })
+  const peers = [
+    { playstyle_cluster: 0, playstyle_archetype: 'Steady Dinker', evidence: evidenceOf(0.48, 0.06) },
+    { playstyle_cluster: 0, playstyle_archetype: 'Steady Dinker', evidence: evidenceOf(0.42, 0.08) },
+    { playstyle_cluster: 0, playstyle_archetype: 'Steady Dinker', evidence: evidenceOf(0.45, 0.07) },
+    { playstyle_cluster: 1, playstyle_archetype: 'Streaky Dinker', evidence: evidenceOf(0.40, 0.12) },
+  ]
+  const traits = [{ label: 'Steady', feature: 'winner_rate_std', direction: 'below' }]
+  const row = buildPlaystyleProof({ traits, mine: peers[0], peers }).rows[0]
+  check('the player\'s own average sits beside their swing', row.center?.you, 0.48)
+  check('the style\'s average is the members\' average', row.center?.style, 0.45)
+  check('the group\'s average is everyone\'s', row.center?.group, 0.4375)
+  const old = buildPlaystyleProof({
+    traits,
+    mine: { playstyle_cluster: 0, evidence: { winner_rate_std: 0.06 } },
+    peers: peers.map((p) => ({ ...p, evidence: { winner_rate_std: p.evidence.winner_rate_std } })),
+  })
+  check('a run from before the averages has no center', old.rows[0].center, null)
+  const gap = buildPlaystyleProof({
+    traits,
+    mine: peers[0],
+    peers: [...peers.slice(0, 3), { ...peers[3], evidence: evidenceOf(null, 0.12) }],
+  }).rows[0]
+  check('a peer with a null average is left out of the group\'s average', gap.center?.group, 0.45,
+    'Number(null) is 0, which would drag the average down')
+  const noOwn = buildPlaystyleProof({ traits, mine: { ...peers[0], evidence: evidenceOf(null, 0.06) }, peers }).rows[0]
+  check('a null own average gives no center', noOwn.center, null)
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
