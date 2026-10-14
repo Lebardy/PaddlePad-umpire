@@ -517,7 +517,7 @@ payload = to_payload(final, evidence, report, structure, len(gated))
 check("one rating per player", len(payload["ratings"]) == final["player_id"].nunique())
 check("a rating carries the group, the playstyle and what is behind it, and nothing else",
       all(set(r) == {"playerId", "skillGroup", "playstyleCluster", "playstyleArchetype",
-                     "playstyleTraits", "evidence", "matchCount", "rallyPoints"}
+                     "playstyleTraits", "evidence", "matchCount"}
           for r in payload["ratings"]),
       str(sorted(payload["ratings"][0])))
 # Asserted as a COUNT, not as "no NaNs". The first version of this file
@@ -541,9 +541,6 @@ check("evidence carries the average each swing moves around",
 check("those averages are raw per-minute rates, not scaled values",
       all(r["evidence"]["winner_rate_mean"] is None or 0 <= r["evidence"]["winner_rate_mean"] < 5
           for r in payload["ratings"]), str([r["evidence"]["winner_rate_mean"] for r in payload["ratings"][:5]]))
-check("every rating carries the rally points it was grouped by",
-      all(r["rallyPoints"] == round(points[r["playerId"]], 1) for r in payload["ratings"]),
-      str([(r["playerId"], r.get("rallyPoints")) for r in payload["ratings"][:3]]))
 check("the run's notes carry the levels list",
       isinstance(payload["notes"]["structure"]["levels"], list), str(payload["notes"]["structure"].keys()))
 # ---- the evidence behind each name ------------------------------

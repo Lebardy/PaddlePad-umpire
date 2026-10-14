@@ -578,9 +578,6 @@ def to_payload(final, evidence_df, gate_report, structure_report, match_count):
             "playstyleTraits": traits if isinstance(traits, list) else None,
             "evidence": evidence,
             "matchCount": int(row.get("match_count") or 0),
-            # The rally points this player was grouped by, so the app can
-            # place them among the levels of this same run.
-            "rallyPoints": round(float(row["rally_points"]), 1),
         })
 
     return {
