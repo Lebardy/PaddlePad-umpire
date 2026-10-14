@@ -51,7 +51,7 @@ function LastNight({ matches }) {
     <section className="recent" aria-label="Your last night">
       <div className="section-head">
         <h2><Icon name="calendar" size={17} className="head-icon" />Your last night</h2>
-        <Link className="link" to="/matches">All {matches.length} matches &rarr;</Link>
+        <Link className="link" to="/matches">All {matches.length} matches<Icon name="chevron" size={16} className="icon-go" /></Link>
       </div>
       <NightBlock night={night} />
     </section>

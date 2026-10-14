@@ -7,7 +7,7 @@
 // ============================================================
 
 import { readFileSync, readdirSync } from 'node:fs'
-import { CLAIM_AGAIN_MS, coveredBy, coveredFrom, mayClaim } from '../src/lib/filming.js'
+import { CLAIM_AGAIN_MS, beatDue, coveredBy, coveredFrom, mayClaim } from '../src/lib/filming.js'
 
 let pass = 0
 let fail = 0
@@ -36,6 +36,12 @@ check('but again after 10 seconds, in case their phone has gone quiet', mayClaim
 check('one the facility films is never asked for again', mayClaim(coveredFrom(byFacility, 'm1', 1000), 'm1', 1000 + 60 * 60_000), false)
 check('the next match is asked for at once', mayClaim(held, 'm2', 1001), true)
 check('a blocked phone asks every 10 seconds', CLAIM_AGAIN_MS, 10_000)
+
+console.log('\nhow often a camera that is not filming checks in')
+check('a free camera checks in at every beat', beatDue(null, 1000, 1001), true)
+check('a covered camera waits 10 seconds after its last check-in', beatDue(held, 1000, 1000 + CLAIM_AGAIN_MS - 1), false)
+check('and then checks in again', beatDue(held, 1000, 1000 + CLAIM_AGAIN_MS), true)
+check('so does one the facility films, to learn when the match ends', beatDue(coveredFrom(byFacility, 'm1', 1000), 1000, 1000 + CLAIM_AGAIN_MS), true)
 
 // The camera screen relies on this: today a new version's service
 // worker takes over WITHOUT reloading an open page, so an update never

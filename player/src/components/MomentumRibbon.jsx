@@ -121,7 +121,7 @@ function MomentumRibbon({
 
       <p className="ribbon-readout" aria-live="polite">{readout}</p>
 
-      <div className="ribbon-blocks" role="group" aria-label="Every point in order" onKeyDown={onKeyDown}>
+      <div className="ribbon-blocks" role="group" aria-label="Every point in order" onKeyDown={onKeyDown} style={{ '--n': moments.length }}>
         {moments.map((moment, i) => (
           <button
             key={i}

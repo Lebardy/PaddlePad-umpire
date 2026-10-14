@@ -1090,7 +1090,8 @@
   animation: rise 220ms ease-out both;
   /* Paused until the boxes are scrolled to. */
   animation-play-state: paused;
-  animation-delay: calc(var(--i) * 22ms);
+  /* 22 ms apart, closer on a long match so the last box is in within a second. */
+  animation-delay: calc(var(--i) * min(22ms, 780ms / var(--n, 1)));
 }
 .ribbon.is-in .ribbon-block { animation-play-state: running; }
 .ribbon-block.is-winners { background: var(--series-1); border-color: var(--series-1); color: var(--series-1-ink); }
@@ -2788,6 +2789,8 @@
 .camera-round, .camera-chip, .camera-tag, .camera-choice, .camera-status { background: rgba(18, 22, 28, 0.86); color: var(--board-ink); }
 .camera-round { width: 3rem; height: 3rem; border-radius: var(--radius); border: 0; display: grid; place-items: center; cursor: pointer; }
 .icon-back { transform: rotate(180deg); }
+/* The go-links' arrow, sized to the words it follows. */
+.icon-go { flex: none; width: 1.1em; height: 1.1em; vertical-align: -0.2em; margin-left: 0.15em; }
 .camera-chip { display: flex; align-items: center; gap: 0.5rem; min-height: 3rem; padding: 0 1rem; border-radius: var(--radius); font-size: 0.95rem; }
 .camera-tag { padding: 0.35rem 0.6rem; border-radius: var(--radius-sm); font: 700 0.9rem var(--label); letter-spacing: 0.09em; display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
 .camera-tag--warn { background: var(--loss-lamp); color: var(--loss-ink); }

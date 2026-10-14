@@ -194,7 +194,7 @@ export function SetupStrip({ player }) {
         <Icon name="key" size={16} />
         Skip the code next time.
       </span>
-      <span className="setup-strip-go">Set up &rarr;</span>
+      <span className="setup-strip-go">Set up<Icon name="chevron" size={16} className="icon-go" /></span>
     </Link>
   )
 }
