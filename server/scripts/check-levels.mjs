@@ -17,13 +17,13 @@ function check(label, actual, expected) {
   console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${label}${ok ? '' : `\n       expected ${JSON.stringify(expected)}\n       got      ${JSON.stringify(actual)}`}`)
 }
 
-// Staging's run on 2026-10-15, lowest first. Its players and spreads are
-// the run's own; what is shown comes from today's ratings.
+// Staging's run of 2026-10-14 as recorded, lowest first. Only the names and
+// averages are read; what is shown comes from today's ratings.
 const TWO = [
-  { name: 'Developing', groups: ['Group A', 'Group B'], players: 40, average: 1469.0, spread: 98.2 },
-  { name: 'Advanced', groups: ['Group C'], players: 14, average: 1625.1, spread: 104.4, gapBelow: 156.1, neededBelow: 76.5 },
+  { name: 'Developing', groups: ['Group A', 'Group B'], players: 40, average: 1469.0, spread: 96.6 },
+  { name: 'Advanced', groups: ['Group C'], players: 14, average: 1625.1, spread: 123.2, gapBelow: 156.1, neededBelow: 72.6 },
 ]
-// Today's ratings of everyone in that run.
+// Made-up current ratings for that run's players.
 const TODAY = [1400, 1450, 1500, 1600, 1700]
 
 console.log('\nthe level follows the rating (staging: line 1547.05)')

@@ -512,12 +512,11 @@ export async function getStanding(query, playerId) {
       })
     : null
 
-  // Ratings are public on the leaderboard, so the level follows the rating.
-  // The levels come only from the latest real ML run (one with structure
-  // notes; the smoke's hand-made runs have none), and only if the player
-  // is in it: an older run's level beside other players' newer ones
-  // would be stale. Today's ratings place the player and the run's
-  // players among those levels (levels.js).
+  // Ratings are public on the leaderboard, so the level follows the rating:
+  // today's ratings place the player and the run's players among the levels
+  // of the latest real ML run (one with structure notes; the smoke's
+  // hand-made runs have none), see levels.js.
+  // Only for a player in that run, since the plate's numbers count its players.
   const { rows: latest } = await query(
     `SELECT run.notes->'structure'->'levels' AS levels,
             ARRAY(SELECT player_id FROM player_ratings WHERE run_id = run.id) AS players

@@ -855,7 +855,6 @@ async function main() {
           playstyleArchetype: 'Patient Net Controller',
           evidence: { aggression_mean: 0.61 },
           matchCount: 9,
-          rallyPoints: 1501.5,
         }],
       },
     })
