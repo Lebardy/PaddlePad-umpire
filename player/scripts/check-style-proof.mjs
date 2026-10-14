@@ -93,6 +93,15 @@ const oneTie = { feature: 'winner_rate_std', you: 0.06, style: null, group: 0.07
 check('a style of one compares you with the group', swingBands(oneTie, MEASURES.winner_rate_std, 'you', 'lower').bands.map((x) => x.words), ['3.9 to 5.1', '3.7 to 5.1'])
 const flip = { feature: 'winner_rate_std', you: 0.06, style: 0.065, group: 0.0745, center: { you: 0.48, style: 0.495, group: 0.4745 } }
 check('a steadier style that whole numbers would show wider ("4 to 6" against "4 to 5") shows one decimal', swingBands(flip, MEASURES.winner_rate_std, 'your style', 'lower').bands.map((x) => x.words), ['4.2 to 5.4', '4.3 to 5.6', '4.0 to 5.5'])
+// 'higher' calls the group steadier.
+const wider = { feature: 'drop_efficiency_std', you: 0.05, style: 0.15, group: 0.1, center: { you: 0.5, style: 0.5, group: 0.5 } }
+check('higher, and whole numbers agree: stays whole', swingBands(wider, MEASURES.drop_efficiency_std, 'your style', 'higher').bands.map((x) => x.words), ['45% to 55%', '35% to 65%', '40% to 60%'])
+const widerFlip = { feature: 'winner_rate_std', you: 0.05, style: 0.066, group: 0.06, center: { you: 0.45, style: 0.45, group: 0.4 } }
+check('higher, and whole numbers flip it ("4 to 5" against "3 to 5"): one decimal', swingBands(widerFlip, MEASURES.winner_rate_std, 'your style', 'higher').bands.map((x) => x.words), ['4.0 to 5.0', '3.8 to 5.2', '3.4 to 4.6'])
+const oneWider = { feature: 'winner_rate_std', you: 0.066, style: null, group: 0.06, center: { you: 0.45, style: null, group: 0.4 } }
+check('higher, for a style of one', swingBands(oneWider, MEASURES.winner_rate_std, 'you', 'higher').bands.map((x) => x.words), ['3.8 to 5.2', '3.4 to 4.6'])
+const full = { feature: 'drop_preference_rate_std', you: 0, style: null, group: 0, center: { you: 1, style: null, group: 1 } }
+check('every share band at 100% widens down, never past 100%', (({ lo, hi }) => [lo, hi])(swingBands(full, MEASURES.drop_preference_rate_std)), [90, 100])
 const flat = { feature: 'winner_rate_std', you: 0, style: null, group: 0, center: { you: 0, style: null, group: 0 } }
 check('every band 0 to 0 still has a scale', (({ lo, hi }) => [lo, hi])(swingBands(flat, MEASURES.winner_rate_std)), [0, 1])
 

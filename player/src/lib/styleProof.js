@@ -126,10 +126,15 @@ export function swingBands(row, measure, against = null, way = null) {
   const hidden = compared !== null && group !== null && (way === 'lower' ? compared >= group : group >= compared)
   for (const band of bands) band.words = usualWords(band.low, band.high, per10, hidden ? 1 : 0)
   const step = per10 ? 1 : 10
-  const lo = Math.floor(Math.min(...bands.map((band) => band.low)) / step) * step
-  const hi = Math.ceil(Math.max(...bands.map((band) => band.high)) / step) * step
-  // Every band 0 to 0 would leave a scale with no width.
-  return { bands, lo, hi: Math.max(hi, lo + step), unit: per10 ? '' : '%' }
+  let lo = Math.floor(Math.min(...bands.map((band) => band.low)) / step) * step
+  let hi = Math.ceil(Math.max(...bands.map((band) => band.high)) / step) * step
+  // Every band at one whole value would leave a scale with no width:
+  // widen it upwards, or downwards for a share already at 100%.
+  if (hi === lo) {
+    if (hi < top) hi += step
+    else lo -= step
+  }
+  return { bands, lo, hi, unit: per10 ? '' : '%' }
 }
 
 /** The line under a swing row: steadier or swinging more than the group. */

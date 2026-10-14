@@ -358,9 +358,11 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
   // has no average; see lib/styleProof.js).
   const line = traitLine(row, proof?.styleSize)
   const way = verdictWay(row, proof?.styleSize)
+  const lineShown = Boolean(withVerdict && word && row.you !== null && line)
   // A swing row says what the player usually does; a run from before the
-  // averages were sent keeps the bars.
-  const bands = swingBands(row, measure, way && (proof?.styleSize === 1 ? 'you' : 'your style'), way)
+  // averages were sent keeps the bars. Only a row with a line can need
+  // decimals to agree with it.
+  const bands = swingBands(row, measure, lineShown ? (proof?.styleSize === 1 ? 'you' : 'your style') : null, lineShown ? way : null)
 
   return (
     <>
@@ -408,7 +410,7 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
         </ul>
       )}
 
-      {withVerdict && word && row.you !== null && line && (
+      {lineShown && (
         <p className="proof-verdict">
           <Icon name={way === 'higher' ? 'arrowUp' : 'arrowDown'} size={15} />
           {bands ? swingLine(way, proof?.styleSize) : line}
