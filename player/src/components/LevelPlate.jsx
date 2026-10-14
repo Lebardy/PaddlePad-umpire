@@ -17,7 +17,7 @@ function LevelPlate({ level }) {
     <div className="level">
       <button type="button" className="level-plate" aria-expanded={open} aria-label={plateLabel(level)} onClick={() => setOpen(!open)}>
         <LevelEmblem rank={level.rank} size={56} className="level-plate-emblem" />
-        <span className={`level-plate-name${level.name.length > 10 ? ' is-long' : ''}`}>{level.name}</span>
+        <span className="level-plate-name" style={{ '--letters': level.name.length }}>{level.name}</span>
         <Icon name="chevron" size={20} className={`level-plate-chevron${open ? ' is-open' : ''}`} />
       </button>
       {open && (
