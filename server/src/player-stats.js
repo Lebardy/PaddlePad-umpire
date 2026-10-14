@@ -18,6 +18,7 @@ import { deriveMatchState, eventFromRow } from './pickleball.js'
 import { buildPlaystyleProof } from './playstyle.js'
 import { levelForPlayer } from './levels.js'
 import { rallyMatchFor } from './rally-rating.js'
+import { getRallyRatings } from './rally-rating-store.js'
 import {
   MIN_MATCHES_PER_PLAYER,
   RECOMMENDED_PLAYERS,
@@ -511,21 +512,27 @@ export async function getStanding(query, playerId) {
       })
     : null
 
-  // The level comes only from the latest real ML run (one with structure
+  // Ratings are public on the leaderboard, so the level follows the rating.
+  // The levels come only from the latest real ML run (one with structure
   // notes; the smoke's hand-made runs have none), and only if the player
   // is in it: an older run's level beside other players' newer ones
-  // would be stale.
+  // would be stale. Today's ratings place the player and the run's
+  // players among those levels (levels.js).
   const { rows: latest } = await query(
-    `SELECT run.notes->'structure'->'levels' AS levels, r.skill_group, r.rally_points
+    `SELECT run.notes->'structure'->'levels' AS levels,
+            ARRAY(SELECT player_id FROM player_ratings WHERE run_id = run.id) AS players
        FROM rating_runs run
-       LEFT JOIN player_ratings r ON r.run_id = run.id AND r.player_id = $1
       WHERE run.status = 'completed' AND run.notes ? 'structure'
       ORDER BY run.computed_at DESC
       LIMIT 1`,
-    [playerId],
   )
-  const level = latest[0]
-    ? levelForPlayer({ levels: latest[0].levels, skillGroup: latest[0].skill_group, rallyPoints: latest[0].rally_points })
+  const ratings = await getRallyRatings(query)
+  const level = latest[0]?.players.includes(playerId)
+    ? levelForPlayer({
+        levels: latest[0].levels,
+        points: ratings.get(playerId)?.points,
+        runPoints: latest[0].players.map((id) => ratings.get(id)?.points),
+      })
     : null
 
   return {
