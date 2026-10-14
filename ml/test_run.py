@@ -33,6 +33,8 @@ from pipeline.feature_engineering import (
 )
 from run import (
     EVIDENCE_COLUMNS,
+    LEVEL_NAMES,
+    build_levels,
     name_skill_groups,
     NotEnoughData,
     apply_gate,
@@ -298,6 +300,53 @@ check("one unclear gap among clear ones makes every group neutral",
       source == "neutral" and sorted(names.values()) == ["Group A", "Group B", "Group C"]
       and [g["clear"] for g in gaps] == [True, False], f"{names} {[g['clear'] for g in gaps]}")
 
+print("\nlevels: groups too close to call share one")
+
+# Fixed offsets, so the gaps are exact rather than at the mercy of a
+# random draw: ten players, standard deviation about 60.5.
+WIDE = [-90, -70, -50, -30, -10, 10, 30, 50, 70, 90]
+NARROW = [x / 9 for x in WIDE]
+
+def levelled(centres, offsets=NARROW):
+    rows = []
+    for name, centre in centres.items():
+        for i, off in enumerate(offsets):
+            rows.append({"player_id": f"{name}-{i}", "skill_group": name, "rally_points": float(centre + off)})
+    return build_levels(pd.DataFrame(rows))
+
+lv = levelled({"Group A": 1400, "Group B": 1600})
+check("two groups far apart are two levels, Developing below Advanced",
+      [l["name"] for l in lv] == ["Developing", "Advanced"] and [l["groups"] for l in lv] == [["Group A"], ["Group B"]],
+      str(lv))
+check("each level carries its players, average and spread",
+      lv[0]["players"] == 10 and lv[0]["average"] == 1400.0 and 6 < lv[0]["spread"] < 7, str(lv[0]))
+check("the upper level records the gap below it and the gap it needed",
+      lv[1]["gapBelow"] == 200.0 and 0 < lv[1]["neededBelow"] < 10 and "gapBelow" not in lv[0], str(lv))
+
+lv = levelled({"Group A": 1300, "Group B": 1500, "Group C": 1502})
+check("two groups too close to call merge into one level",
+      [l["name"] for l in lv] == ["Developing", "Advanced"] and lv[1]["groups"] == ["Group B", "Group C"]
+      and lv[1]["players"] == 20, str(lv))
+
+lv = levelled({"Group A": 1400, "Group B": 1450, "Group C": 1500}, WIDE)
+check("a chain of unclear pairs is one level, so nothing is shown", lv == [], str(lv))
+
+lv = levelled({"Group A": 1500, "Group B": 1502})
+check("one level is nothing to show", lv == [], str(lv))
+
+rows = [{"player_id": f"a{i}", "skill_group": "Group A", "rally_points": 1400.0 + o} for i, o in enumerate(NARROW)]
+rows.append({"player_id": "b0", "skill_group": "Group B", "rally_points": 1900.0})
+check("a group of one player is never clearly apart",
+      build_levels(pd.DataFrame(rows)) == [], "")
+
+for count in (3, 4, 5):
+    centres = {f"Group {chr(65 + i)}": 1200 + 200 * i for i in range(count)}
+    lv = levelled(centres)
+    check(f"{count} clear levels take the {count}-name ladder",
+          [l["name"] for l in lv] == LEVEL_NAMES[count], str([l["name"] for l in lv]))
+check("the ladder never gives a fifth name below five levels",
+      "Beginner" not in LEVEL_NAMES[4] and LEVEL_NAMES[4][-1] == "Expert", str(LEVEL_NAMES))
+
 print("\nstyle K-Means on chosen columns")
 
 # Twenty players whose two extra columns split them cleanly in half, while
@@ -486,6 +535,14 @@ check("nothing is NaN in the payload",
       not any(isinstance(v, float) and np.isnan(v)
               for r in payload["ratings"] for v in r["evidence"].values()
               if v is not None))
+check("evidence carries the average each swing moves around",
+      all(all(k in r["evidence"] for k in ("winner_rate_mean", "general_error_rate_mean", "dink_error_rate_mean"))
+          for r in payload["ratings"]), str(payload["ratings"][0]["evidence"].keys()))
+check("those averages are raw per-minute rates, not scaled values",
+      all(r["evidence"]["winner_rate_mean"] is None or 0 <= r["evidence"]["winner_rate_mean"] < 5
+          for r in payload["ratings"]), str([r["evidence"]["winner_rate_mean"] for r in payload["ratings"][:5]]))
+check("the run's notes carry the levels list",
+      isinstance(payload["notes"]["structure"]["levels"], list), str(payload["notes"]["structure"].keys()))
 # ---- the evidence behind each name ------------------------------
 #
 # A name a player cannot check is barely better than no name, so every

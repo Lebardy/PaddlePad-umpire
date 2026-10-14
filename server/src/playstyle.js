@@ -38,6 +38,18 @@ export const MIN_STYLE_MEMBERS = 3
 // "All-Court Player", and these two are its proof.
 export const IDENTITY_FEATURES = ['drop_preference_rate_mean', 'net_game_preference_rate_mean']
 
+// The average each swing measurement moves around, so the app can say
+// "usually 4 to 5" rather than a bare standard deviation.
+export const SWING_CENTRE = {
+  aggression_std: 'aggression_mean',
+  drop_efficiency_std: 'drop_efficiency_mean',
+  winner_rate_std: 'winner_rate_mean',
+  general_error_rate_std: 'general_error_rate_mean',
+  dink_error_rate_std: 'dink_error_rate_mean',
+  drop_preference_rate_std: 'drop_preference_rate_mean',
+  net_game_preference_rate_std: 'net_game_preference_rate_mean',
+}
+
 function mean(values) {
   return values.length > 0
     ? values.reduce((sum, v) => sum + v, 0) / values.length
@@ -98,7 +110,7 @@ export function buildPlaystyleProof({ traits, mine, peers }) {
     // a whole group of zeros is nothing recorded, and bars at 0% would
     // tell every one of them they never drop.
     const recorded = valuesOf(peers, feature).some((value) => value !== 0)
-    return {
+    const shaped = {
       label: trait.label,
       feature,
       family: trait.family ?? null,
@@ -121,6 +133,23 @@ export function buildPlaystyleProof({ traits, mine, peers }) {
       // other people in it.
       style: recorded && sameStyle.length >= MIN_STYLE_MEMBERS
         ? round(mean(valuesOf(sameStyle, feature)))
+        : null,
+    }
+    const centre = SWING_CENTRE[feature]
+    if (!centre) return shaped
+    // Unlike valuesOf, a null average is missing here, not a real 0.
+    const centresOf = (rows) => valuesOf(rows.filter((r) => r.evidence?.[centre] != null), centre)
+    const styleCentres = centresOf(sameStyle)
+    const ownCentre = mine.evidence[centre]
+    const hasCentre = shaped.you !== null && ownCentre != null && Number.isFinite(Number(ownCentre))
+    return {
+      ...shaped,
+      center: hasCentre
+        ? {
+            you: round(Number(ownCentre)),
+            style: shaped.style !== null && styleCentres.length >= MIN_STYLE_MEMBERS ? round(mean(styleCentres)) : null,
+            group: round(mean(centresOf(peers))),
+          }
         : null,
     }
   }

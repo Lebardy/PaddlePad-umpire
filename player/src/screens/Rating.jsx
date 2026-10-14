@@ -32,7 +32,7 @@ import { usePlayerData } from '../lib/PlayerData'
 import { navigate } from '../lib/router'
 import { endingPhrase, namedLeaders } from '../lib/endingWords'
 import { styleName } from '../lib/styleName'
-import { MEASURES, hiddenStyleNote, styleShareLine, traitLine, verdictWay } from '../lib/styleProof'
+import { MEASURES, hiddenStyleNote, styleShareLine, swingBands, swingLine, traitLine, verdictWay } from '../lib/styleProof'
 import { faultsToWorkOn } from '../lib/faultTips'
 import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
 import More from '../components/More'
@@ -40,6 +40,7 @@ import Collapsible from '../components/Collapsible'
 import ShotProfile from '../components/ShotProfile'
 import Icon from '../components/Icon'
 import StyleEmblem, { WordMark } from '../components/StyleEmblem'
+import LevelPlate from '../components/LevelPlate'
 
 
 // Said only where there IS a direction. Most of these measurements are
@@ -63,13 +64,14 @@ function showValue(value, as) {
 
 // `number` only staggers the entrance; each step is marked by its icon.
 // `lead` is drawn beside the value: the playstyle's emblem.
-function Step({ number, icon, title, value, lead, children }) {
+function Step({ number, icon, title, value, lead, before, children }) {
   return (
     <section className="step rise" style={{ '--i': number }} aria-label={title}>
       <div className="step-head">
         <span className="step-n"><Icon name={icon} size={18} /></span>
         <h2>{title}</h2>
       </div>
+      {before}
       {value && (
         <div className="step-lead">
           {lead}
@@ -327,7 +329,7 @@ function allCourtSentence(rows) {
   if (shown.length === 0) {
     return 'All-court means your style doesn’t lean towards dropping or driving, or towards the net or power — there is nothing recorded yet to show it.'
   }
-  return `Your style sits close to your group on ${shown.join(' and ')}, so it’s called all-court — your own numbers can lean one way${
+  return `Your style sits close to similar players on ${shown.join(' and ')}, so it’s called all-court — your own numbers can lean one way${
     missing ? ', and no third shots are recorded yet to compare drops with drives' : ''
   }.`
 }
@@ -344,7 +346,7 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
   const bars = [
     { who: 'you', value: row.you, mine: true },
     ...(hasStyle ? [{ who: 'your style', value: row.style }] : []),
-    { who: 'your group', value: row.group },
+    { who: 'similar players', value: row.group },
   ]
   // Bars are drawn against the biggest of them, so a row is read by
   // comparing its own bars and nothing else.
@@ -356,12 +358,17 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
   // has no average; see lib/styleProof.js).
   const line = traitLine(row, proof?.styleSize)
   const way = verdictWay(row, proof?.styleSize)
+  const lineShown = Boolean(withVerdict && word && row.you !== null && line)
+  // A swing row says what the player usually does; a run from before the
+  // averages were sent keeps the bars. Only a row with a line can need
+  // decimals to agree with it.
+  const bands = swingBands(row, measure, lineShown ? (proof?.styleSize === 1 ? 'you' : 'your style') : null, lineShown ? way : null)
 
   return (
     <>
       <div className="proof-head">
         {word && <span className="proof-word"><WordMark word={word} />{word}</span>}
-        <span className="proof-measure">{measure.label}</span>
+        <span className="proof-measure">{bands ? `${measure.thing}, usually` : measure.label}</span>
         {DIRECTION[measure.better] && (
           <span className="proof-better">{DIRECTION[measure.better]}</span>
         )}
@@ -371,6 +378,21 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
           read as zero: no third shots logged is not "never drops". */}
       {row.you === null ? (
         <p className="proof-verdict">Nothing recorded for this yet.</p>
+      ) : bands ? (
+        <ul className="swing-bands">
+          {bands.bands.map((band) => (
+            <li key={band.who} className={band.mine ? 'is-you' : undefined}>
+              <span className="proof-who">{band.who}</span>
+              <span className="swing-track" aria-hidden="true">
+                <span className="swing-band" style={{ '--left': ((band.low - bands.lo) / (bands.hi - bands.lo)) * 100, '--width': ((band.high - band.low) / (bands.hi - bands.lo)) * 100 }} />
+              </span>
+              <span className="proof-number">{band.words}</span>
+            </li>
+          ))}
+          <li className="swing-scale" aria-hidden="true"><span />
+            <span className="swing-ends"><span>{bands.lo}{bands.unit}</span><span>{bands.hi}{bands.unit}</span></span><span />
+          </li>
+        </ul>
       ) : (
         <ul className="proof-bars">
           {bars.map((bar) => (
@@ -388,10 +410,10 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
         </ul>
       )}
 
-      {withVerdict && word && row.you !== null && line && (
+      {lineShown && (
         <p className="proof-verdict">
           <Icon name={way === 'higher' ? 'arrowUp' : 'arrowDown'} size={15} />
-          {line}
+          {bands ? swingLine(way, proof?.styleSize) : line}
         </p>
       )}
     </>
@@ -404,21 +426,11 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
  * The skill group's only job for a player is to say who their style is
  * compared with, so it is said here, in one line, where it is used.
  */
-/** Who the style is compared with, and what that group is, on a tap. */
+/** How many in the player's group share the style. */
 function ComparedWith({ band, styleSize }) {
   if (!band?.size) return null
   return (
-    <>
-      <p className="step-line">{styleShareLine(styleSize, band.size)}</p>
-      <More label="Who are they?">
-        <p>
-          Everyone rated is split into a few groups by how their matches go:
-          points won, mistakes, drops landed. Yours has {band.size} players.
-          A word like &ldquo;Steady&rdquo; means steady among them, not
-          everyone. Your PPR doesn&rsquo;t decide your group.
-        </p>
-      </More>
-    </>
+    <p className="step-line share-line"><Icon name="people" size={18} />{styleShareLine(styleSize, band.size)}</p>
   )
 }
 
@@ -428,9 +440,9 @@ function Playstyle({ standing, number }) {
 
   if (!name) {
     return (
-      <Step number={number} icon="sparkle" title="Your playstyle" value="Not worked out yet">
+      <Step number={number} icon="sparkle" title="Your playstyle" value="Not worked out yet" before={<LevelPlate level={standing.level} />}>
         <p className="step-line">
-          Styles are worked out among the players closest to your level, and
+          Styles are worked out among similar players, and
           that needs at least three of them. There {band?.size === 1 || !band?.size ? 'is 1' : `are ${band.size}`} so far.
         </p>
       </Step>
@@ -439,10 +451,10 @@ function Playstyle({ standing, number }) {
 
   if (!proof) {
     return (
-      <Step number={number} icon="sparkle" title="Your playstyle" value={name} lead={<StyleEmblem name={name} />}>
+      <Step number={number} icon="sparkle" title="Your playstyle" value={name} lead={<StyleEmblem name={name} />} before={<LevelPlate level={standing.level} />}>
         <p className="step-line">
-          This name comes from how players with your style compare with the
-          players closest to your level. The measurements behind it weren&rsquo;t recorded for this
+          This name comes from how players with your style compare with
+          similar players. The measurements behind it weren&rsquo;t recorded for this
           run, so there is nothing to show beside it yet.
         </p>
       </Step>
@@ -450,7 +462,7 @@ function Playstyle({ standing, number }) {
   }
 
   return (
-    <Step number={number} icon="sparkle" title="Your playstyle" value={name} lead={<StyleEmblem name={name} />}>
+    <Step number={number} icon="sparkle" title="Your playstyle" value={name} lead={<StyleEmblem name={name} />} before={<LevelPlate level={standing.level} />}>
       <ComparedWith band={band} styleSize={proof.styleSize} />
 
       <ul className="proof" aria-label="Why this name">
@@ -486,9 +498,9 @@ function Playstyle({ standing, number }) {
 
       <More label="How this was worked out">
         <p>
-          Your group is split again by how its players play. Each word is
-          the measurement where your style sits furthest from your
-          group&rsquo;s average. The bars show averages only, never
+          Similar players are split again by how they play. Each word is
+          the measurement where your style sits furthest from their
+          average. The bars show averages only, never
           anyone&rsquo;s numbers but yours, and none for a style of fewer
           than three.
         </p>

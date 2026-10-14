@@ -1045,6 +1045,9 @@ async function main() {
     check('/player/standing carries the rally rating too',
       ['rated', 'not_enough_matches'].includes(standingWithRally.body.standing?.rallyRating?.state),
       JSON.stringify(standingWithRally.body.standing?.rallyRating ?? null).slice(0, 120))
+    check('/player/standing carries a level key (null for a player outside the latest levelled run)',
+      'level' in (standingWithRally.body.standing ?? {}) && standingWithRally.body.standing.level === null,
+      JSON.stringify(standingWithRally.body.standing?.level))
     const listWithRally = await asPlayer('/player/matches', { bearer: linked.body.token })
     const listed = listWithRally.body.matches ?? []
     check('/player/matches carries a rally section with only the agreed fields',
