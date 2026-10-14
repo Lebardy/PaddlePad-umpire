@@ -26,7 +26,7 @@
 import * as api from './api'
 import { flattenMp4 } from './flattenMp4'
 import { sendToBucket } from './videoUpload'
-import { coveredBy, coveredFrom, mayClaim } from './filming'
+import { beatDue, coveredBy, coveredFrom, mayClaim } from './filming'
 import { beatAction, firstFrameAt, isWholeBeat, isWide, noteBeatTiming, pickBitrate, pickType, retryWaitMs } from './videoClock'
 
 const BEAT_MS = 2_000
@@ -55,6 +55,7 @@ export function createCameraSession({ deviceId, onChange }) {
   let retryTimer = null
   let wakeLock = null
   let beating = false
+  let lastBeatAt = 0
   let sendingNow = false
   let closed = false
   const filmed = new Set()  // matches whose recording was queued, so none is filmed twice
@@ -122,8 +123,10 @@ export function createCameraSession({ deviceId, onChange }) {
   async function beat() {
     // Upright, the camera is not armed, so it does not say it is ready.
     if (beating || closed || (!state.wide && !filming)) return
+    if (!filming && !beatDue(state.covered, lastBeatAt, Date.now())) return
     beating = true
     const sentAt = Date.now()
+    lastBeatAt = sentAt
     try {
       const answer = await api.cameraBeat({
         deviceId, state: filming ? 'filming' : state.sending ? 'sending' : 'ready', matchId: filming?.matchId,

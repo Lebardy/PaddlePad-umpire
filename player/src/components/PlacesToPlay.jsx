@@ -41,7 +41,7 @@ function Ticket({ place }) {
               ))}
             </span>
           )}
-          <span className="ticket-go">See the place &rarr;</span>
+          <span className="ticket-go">See the place<Icon name="chevron" size={16} className="icon-go" /></span>
         </span>
       </Link>
     </li>

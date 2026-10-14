@@ -127,7 +127,7 @@ function MonthLists({ month }) {
             <span className="motm-score">
               {best.score.A}–{best.score.B}
             </span>
-            <span className="motm-go">See how it went &rarr;</span>
+            <span className="motm-go">See how it went<Icon name="chevron" size={16} className="icon-go" /></span>
           </Link>
         ) : (
           <p className="month-empty">Not yet this month.</p>

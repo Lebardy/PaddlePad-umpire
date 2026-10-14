@@ -40,6 +40,15 @@ export function coveredBy(covered, matchId, now) {
   return { matchId, by: covered.by, name: covered.name, againAt: now + CLAIM_AGAIN_MS }
 }
 
+/**
+ * Whether a camera that is not filming checks in now. One told someone
+ * else is filming checks in only as often as it asks again, so a crowd of
+ * such phones on one wifi stays under the server's per-address ceiling.
+ */
+export function beatDue(covered, lastBeatAt, now) {
+  return !covered || now - lastBeatAt >= CLAIM_AGAIN_MS
+}
+
 /** Whether to ask for this match now. One the facility films is not asked for again. */
 export function mayClaim(covered, matchId, now) {
   if (!covered || covered.matchId !== matchId) return true

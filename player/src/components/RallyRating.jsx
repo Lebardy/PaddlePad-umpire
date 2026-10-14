@@ -48,7 +48,7 @@ function LastWeek({ rallyRating }) {
           />
         </>
       )}
-      <span className="points-graph-more">See your graph &rarr;</span>
+      <span className="points-graph-more">See your graph<Icon name="chevron" size={16} className="icon-go" /></span>
     </Link>
   )
 }
@@ -114,7 +114,7 @@ function RallyRating({ rallyRating, place = null }) {
   const head = (
     <div className="section-head">
       <h2><Icon name="gauge" size={17} className="head-icon" />PaddlePad Rating</h2>
-      <Link className="link" to="/rating">Your rating &rarr;</Link>
+      <Link className="link" to="/rating">Your rating<Icon name="chevron" size={16} className="icon-go" /></Link>
     </div>
   )
 
