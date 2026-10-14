@@ -106,11 +106,12 @@ export function usualWords(low, high, per10, places = 0) {
  * averages were sent, which keeps the old row.
  *
  * `against` names the band the line compares with the group ('your
- * style', or 'you' for a style of one; null with no line). When whole
- * numbers would make those two read alike while the line says they
- * differ, the whole row shows one decimal.
+ * style', or 'you' for a style of one; null with no line) and `way` is
+ * the line's direction ('lower' calls that band steadier). When whole
+ * numbers would show the steadier band no narrower -- a tie, or a flip
+ * -- the whole row shows one decimal.
  */
-export function swingBands(row, measure, against = null) {
+export function swingBands(row, measure, against = null, way = null) {
   const centre = row.center
   if (!centre || centre.you === null || row.you === null) return null
   const per10 = measure.as === 'swing-per10'
@@ -119,9 +120,11 @@ export function swingBands(row, measure, against = null) {
   const bands = [['you', centre.you, row.you, true], ['your style', centre.style, row.style, false], ['your group', centre.group, row.group, false]]
     .filter(([, average, swing]) => average !== null && average !== undefined && swing !== null && swing !== undefined)
     .map(([who, average, swing, mine]) => ({ who, mine, low: Math.max(0, (average - swing) * times), high: Math.min(top, (average + swing) * times) }))
-  const compared = bands.filter((band) => band.who === against || band.who === 'your group')
-  const ties = compared.length === 2 && usualWords(compared[0].low, compared[0].high, per10) === usualWords(compared[1].low, compared[1].high, per10)
-  for (const band of bands) band.words = usualWords(band.low, band.high, per10, ties ? 1 : 0)
+  const whole = (band) => (band ? Math.round(band.high) - Math.round(band.low) : null)
+  const compared = whole(bands.find((band) => band.who === against))
+  const group = whole(bands.find((band) => band.who === 'your group'))
+  const hidden = compared !== null && group !== null && (way === 'lower' ? compared >= group : group >= compared)
+  for (const band of bands) band.words = usualWords(band.low, band.high, per10, hidden ? 1 : 0)
   const step = per10 ? 1 : 10
   const lo = Math.floor(Math.min(...bands.map((band) => band.low)) / step) * step
   const hi = Math.ceil(Math.max(...bands.map((band) => band.high)) / step) * step

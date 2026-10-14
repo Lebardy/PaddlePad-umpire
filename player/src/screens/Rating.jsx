@@ -360,7 +360,7 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
   const way = verdictWay(row, proof?.styleSize)
   // A swing row says what the player usually does; a run from before the
   // averages were sent keeps the bars.
-  const bands = swingBands(row, measure, way && (proof?.styleSize === 1 ? 'you' : 'your style'))
+  const bands = swingBands(row, measure, way && (proof?.styleSize === 1 ? 'you' : 'your style'), way)
 
   return (
     <>
