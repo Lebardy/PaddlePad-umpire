@@ -29,11 +29,11 @@ function check(label, actual, expected) {
 }
 
 console.log('\nwho shares the style')
-check('a style of one says nobody else has it', styleShareLine(1, 26), 'No one else among the 26 players at your level has this style yet.')
-check('a style of two says one other player', styleShareLine(2, 26), 'You and 1 other of the 26 players at your level share this style.')
-check('three or more says how many of the group', styleShareLine(19, 26), '19 of the 26 players at your level share this style.')
-check('no style size: only who it is compared with', styleShareLine(0, 26), 'Compared with the 26 players at your level.')
-check('no group, no line', [styleShareLine(3, 0), styleShareLine(3, undefined)], [null, null])
+check('a style of three or more', styleShareLine(10, 14), '10 of 14 play this way')
+check('a style of two', styleShareLine(2, 14), 'You and 1 other of 14 play this way')
+check('a style of one', styleShareLine(1, 14), 'No one else in your group plays this way yet')
+check('no style size', styleShareLine(null, 14), 'Compared with 14 in your group')
+check('no group', styleShareLine(3, 0), null)
 
 console.log('\nwhich way the sentence points')
 check('three or more: the style against the group',

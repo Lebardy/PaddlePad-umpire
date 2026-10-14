@@ -44,13 +44,13 @@ export const MEASURES = {
   net_game_preference_rate_std: { label: 'change in points won at the net, match to match', as: 'swing-percent', better: 'neither' },
 }
 
-/** The one line saying how many players at this level share the style. */
+/** The one line saying how many in the player's group share the style. */
 export function styleShareLine(styleSize, groupSize) {
   if (!groupSize) return null
-  if (!styleSize) return `Compared with the ${groupSize} players at your level.`
-  if (styleSize === 1) return `No one else among the ${groupSize} players at your level has this style yet.`
-  if (styleSize === 2) return `You and 1 other of the ${groupSize} players at your level share this style.`
-  return `${styleSize} of the ${groupSize} players at your level share this style.`
+  if (!styleSize) return `Compared with ${groupSize} in your group`
+  if (styleSize === 1) return 'No one else in your group plays this way yet'
+  if (styleSize === 2) return `You and 1 other of ${groupSize} play this way`
+  return `${styleSize} of ${groupSize} play this way`
 }
 
 /**

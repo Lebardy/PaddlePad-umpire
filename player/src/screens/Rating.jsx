@@ -40,6 +40,7 @@ import Collapsible from '../components/Collapsible'
 import ShotProfile from '../components/ShotProfile'
 import Icon from '../components/Icon'
 import StyleEmblem, { WordMark } from '../components/StyleEmblem'
+import LevelPlate from '../components/LevelPlate'
 
 
 // Said only where there IS a direction. Most of these measurements are
@@ -63,13 +64,14 @@ function showValue(value, as) {
 
 // `number` only staggers the entrance; each step is marked by its icon.
 // `lead` is drawn beside the value: the playstyle's emblem.
-function Step({ number, icon, title, value, lead, children }) {
+function Step({ number, icon, title, value, lead, before, children }) {
   return (
     <section className="step rise" style={{ '--i': number }} aria-label={title}>
       <div className="step-head">
         <span className="step-n"><Icon name={icon} size={18} /></span>
         <h2>{title}</h2>
       </div>
+      {before}
       {value && (
         <div className="step-lead">
           {lead}
@@ -404,21 +406,11 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
  * The skill group's only job for a player is to say who their style is
  * compared with, so it is said here, in one line, where it is used.
  */
-/** Who the style is compared with, and what that group is, on a tap. */
+/** How many in the player's group share the style. */
 function ComparedWith({ band, styleSize }) {
   if (!band?.size) return null
   return (
-    <>
-      <p className="step-line">{styleShareLine(styleSize, band.size)}</p>
-      <More label="Who are they?">
-        <p>
-          Everyone rated is split into a few groups by how their matches go:
-          points won, mistakes, drops landed. Yours has {band.size} players.
-          A word like &ldquo;Steady&rdquo; means steady among them, not
-          everyone. Your PPR doesn&rsquo;t decide your group.
-        </p>
-      </More>
-    </>
+    <p className="step-line share-line"><Icon name="people" size={18} />{styleShareLine(styleSize, band.size)}</p>
   )
 }
 
@@ -428,7 +420,7 @@ function Playstyle({ standing, number }) {
 
   if (!name) {
     return (
-      <Step number={number} icon="sparkle" title="Your playstyle" value="Not worked out yet">
+      <Step number={number} icon="sparkle" title="Your playstyle" value="Not worked out yet" before={<LevelPlate level={standing.level} />}>
         <p className="step-line">
           Styles are worked out among the players closest to your level, and
           that needs at least three of them. There {band?.size === 1 || !band?.size ? 'is 1' : `are ${band.size}`} so far.
@@ -439,7 +431,7 @@ function Playstyle({ standing, number }) {
 
   if (!proof) {
     return (
-      <Step number={number} icon="sparkle" title="Your playstyle" value={name} lead={<StyleEmblem name={name} />}>
+      <Step number={number} icon="sparkle" title="Your playstyle" value={name} lead={<StyleEmblem name={name} />} before={<LevelPlate level={standing.level} />}>
         <p className="step-line">
           This name comes from how players with your style compare with the
           players closest to your level. The measurements behind it weren&rsquo;t recorded for this
@@ -450,7 +442,7 @@ function Playstyle({ standing, number }) {
   }
 
   return (
-    <Step number={number} icon="sparkle" title="Your playstyle" value={name} lead={<StyleEmblem name={name} />}>
+    <Step number={number} icon="sparkle" title="Your playstyle" value={name} lead={<StyleEmblem name={name} />} before={<LevelPlate level={standing.level} />}>
       <ComparedWith band={band} styleSize={proof.styleSize} />
 
       <ul className="proof" aria-label="Why this name">
