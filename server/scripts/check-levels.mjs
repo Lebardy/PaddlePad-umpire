@@ -30,6 +30,11 @@ check('names the level, its ladder rank and its place tonight',
       { name: 'Developing', players: 40, average: 1469, spread: 98, gapAbove: 156 },
     ] })
 
+console.log('\nthe gap matches the averages shown')
+const straddle = [{ ...TWO[0], average: 1469.6 }, { ...TWO[1], gapBelow: 155.5 }]
+const shown = levelForPlayer({ levels: straddle, skillGroup: 'Group C', rallyPoints: 1 }).levels
+check('the gap is the difference of the two shown averages', shown[1].gapAbove, shown[0].average - shown[1].average)
+
 console.log('\na player in a joined level')
 check('either group of the joined level finds it',
   levelForPlayer({ levels: TWO, skillGroup: 'Group B', rallyPoints: 1263 })?.name, 'Developing')

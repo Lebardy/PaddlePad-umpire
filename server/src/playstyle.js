@@ -139,6 +139,7 @@ export function buildPlaystyleProof({ traits, mine, peers }) {
     if (!centre) return shaped
     // Unlike valuesOf, a null average is missing here, not a real 0.
     const centresOf = (rows) => valuesOf(rows.filter((r) => r.evidence?.[centre] != null), centre)
+    const styleCentres = centresOf(sameStyle)
     const ownCentre = mine.evidence[centre]
     const hasCentre = shaped.you !== null && ownCentre != null && Number.isFinite(Number(ownCentre))
     return {
@@ -146,7 +147,7 @@ export function buildPlaystyleProof({ traits, mine, peers }) {
       center: hasCentre
         ? {
             you: round(Number(ownCentre)),
-            style: shaped.style === null ? null : round(mean(centresOf(sameStyle))),
+            style: shaped.style !== null && styleCentres.length >= MIN_STYLE_MEMBERS ? round(mean(styleCentres)) : null,
             group: round(mean(centresOf(peers))),
           }
         : null,

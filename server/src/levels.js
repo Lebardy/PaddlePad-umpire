@@ -22,8 +22,8 @@ export function levelForPlayer({ levels, skillGroup, rallyPoints }) {
     average: Math.round(level.average),
     spread: Math.round(level.spread),
     ...(i === index ? { mine: true } : {}),
-    // The gap to the level above, which that level's notes call its gapBelow.
-    ...(i < levels.length - 1 ? { gapAbove: Math.round(levels[i + 1].gapBelow) } : {}),
+    // The gap to the level above, from the averages shown so the three numbers agree.
+    ...(i < levels.length - 1 ? { gapAbove: Math.round(levels[i + 1].average) - Math.round(level.average) } : {}),
   }))
   return {
     name: levels[index].name,

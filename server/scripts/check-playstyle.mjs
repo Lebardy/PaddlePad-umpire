@@ -240,6 +240,16 @@ console.log('\nswing rows carry the averages they move around')
     'Number(null) is 0, which would drag the average down')
   const noOwn = buildPlaystyleProof({ traits, mine: { ...peers[0], evidence: evidenceOf(null, 0.06) }, peers }).rows[0]
   check('a null own average gives no center', noOwn.center, null)
+  const thin = buildPlaystyleProof({
+    traits,
+    mine: peers[0],
+    peers: [peers[0], peers[1], { ...peers[2], evidence: evidenceOf(null, 0.07) }, peers[3]],
+  }).rows[0]
+  check('a style of three with one null average gives no style average', thin.center?.style, null,
+    'two centres would be averaged, and a two-person average stays hidden')
+  const pair = buildPlaystyleProof({ traits, mine: peers[0], peers: [peers[0], peers[1], peers[3]] }).rows[0]
+  check('a style of two gives no style average', pair.center?.style, null)
+  check('but the group average is still there', pair.center?.group != null, true)
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
