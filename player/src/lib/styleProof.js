@@ -45,8 +45,8 @@ export const MEASURES = {
 }
 
 /**
- * The one line saying how many share the style. The group's size is not
- * said: the player sees their level, and the group is only part of it.
+ * The one line saying how many share the style.
+ * Not the group's size: the plate counts the level, and a group can span levels.
  */
 export function styleShareLine(styleSize, groupSize) {
   if (!groupSize) return null

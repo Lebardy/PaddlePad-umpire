@@ -442,7 +442,7 @@ function Playstyle({ standing, number }) {
     return (
       <Step number={number} icon="sparkle" title="Your playstyle" value="Not worked out yet" before={<LevelPlate level={standing.level} />}>
         <p className="step-line">
-          Styles are worked out among the players closest to your level, and
+          Styles are worked out among similar players, and
           that needs at least three of them. There {band?.size === 1 || !band?.size ? 'is 1' : `are ${band.size}`} so far.
         </p>
       </Step>
@@ -453,8 +453,8 @@ function Playstyle({ standing, number }) {
     return (
       <Step number={number} icon="sparkle" title="Your playstyle" value={name} lead={<StyleEmblem name={name} />} before={<LevelPlate level={standing.level} />}>
         <p className="step-line">
-          This name comes from how players with your style compare with the
-          players closest to your level. The measurements behind it weren&rsquo;t recorded for this
+          This name comes from how players with your style compare with
+          similar players. The measurements behind it weren&rsquo;t recorded for this
           run, so there is nothing to show beside it yet.
         </p>
       </Step>
