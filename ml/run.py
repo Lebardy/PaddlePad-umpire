@@ -250,6 +250,87 @@ def neutral_group_names(ranked):
     return {cluster: f"Group {chr(ord('A') + i)}" for i, cluster in enumerate(by_size)}
 
 
+# Names for the levels a night finds, lowest first. The owner's choice
+# (2026-10-14): one five-word ladder, used only as far as the night
+# needs, so "Developing" is the bottom name from two levels up to four.
+LEVEL_NAMES = {
+    2: ["Developing", "Advanced"],
+    3: ["Developing", "Intermediate", "Advanced"],
+    4: ["Developing", "Intermediate", "Advanced", "Expert"],
+    5: ["Beginner", "Developing", "Intermediate", "Advanced", "Expert"],
+}
+
+
+def gap_between(lower, upper):
+    """
+    The gap between two sets of rally points, and the gap it takes to
+    call it clear: twice its standard error, the rule group_gaps uses.
+    A set of one player has no spread to judge by, so it never is.
+    """
+    lower, upper = np.asarray(lower, dtype=float), np.asarray(upper, dtype=float)
+    gap = float(upper.mean() - lower.mean())
+    if len(lower) < 2 or len(upper) < 2:
+        return gap, float("inf")
+    needed = 2 * float(np.sqrt(lower.var(ddof=1) / len(lower) + upper.var(ddof=1) / len(upper)))
+    return gap, needed
+
+
+def build_levels(labelled):
+    """
+    What players are shown: the skill groups, with every neighbouring
+    pair that is not clearly apart joined into one level.
+
+    Display only. K-Means already decided who is with whom; this never
+    moves a player between groups, it only says which groups are too
+    close on rally points to call one higher. Every unclear pair is
+    joined at once, so a chain of them becomes one level even when its
+    ends differ (the owner's choice: hold back a fuzzy difference rather
+    than draw an arbitrary line). Joined levels are tested again and
+    joined further while any neighbours are unclear; nothing is split.
+
+    Returns the levels lowest first, or [] when fewer than two remain.
+    """
+    by_group = labelled.groupby("skill_group")["rally_points"]
+    levels = sorted(
+        (([group], list(points)) for group, points in by_group),
+        key=lambda level: float(np.mean(level[1])),
+    )
+    while len(levels) > 1:
+        clear = []
+        for lower, upper in zip(levels, levels[1:]):
+            gap, needed = gap_between(lower[1], upper[1])
+            clear.append(gap > needed)
+        if all(clear):
+            break
+        joined = [levels[0]]
+        for is_clear, upper in zip(clear, levels[1:]):
+            if is_clear:
+                joined.append(upper)
+            else:
+                joined[-1] = (joined[-1][0] + upper[0], joined[-1][1] + upper[1])
+        levels = joined
+    if len(levels) < 2:
+        return []
+
+    names = LEVEL_NAMES[len(levels)]
+    out = []
+    for i, (groups, points) in enumerate(levels):
+        values = np.asarray(points, dtype=float)
+        entry = {
+            "name": names[i],
+            "groups": sorted(groups),
+            "players": int(len(values)),
+            "average": round(float(values.mean()), 1),
+            "spread": round(float(values.std(ddof=1)) if len(values) > 1 else 0.0, 1),
+        }
+        if i:
+            gap, needed = gap_between(levels[i - 1][1], points)
+            entry["gapBelow"] = round(gap, 1)
+            entry["neededBelow"] = round(needed, 1)
+        out.append(entry)
+    return out
+
+
 def run_pipeline(gated_df, rally_points):
     """
     Runs the vendored pipeline end to end and returns one row per
@@ -431,6 +512,9 @@ def run_pipeline(gated_df, rally_points):
         "groupOrder": group_order,
         "groupNamesFrom": group_names_from,
         "groupGaps": group_gaps_found,
+        # What players are shown: the groups too close to call joined into
+        # levels with names and numbers (see build_levels). Display only.
+        "levels": build_levels(skill_clustered),
         # What was subtracted from the playstyle features before
         # Level 2. Recorded with the run because it is part of what the
         # archetypes mean.
