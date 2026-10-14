@@ -32,7 +32,7 @@ import { usePlayerData } from '../lib/PlayerData'
 import { navigate } from '../lib/router'
 import { endingPhrase, namedLeaders } from '../lib/endingWords'
 import { styleName } from '../lib/styleName'
-import { MEASURES, hiddenStyleNote, styleShareLine, traitLine, verdictWay } from '../lib/styleProof'
+import { MEASURES, hiddenStyleNote, styleShareLine, swingBands, swingLine, traitLine, verdictWay } from '../lib/styleProof'
 import { faultsToWorkOn } from '../lib/faultTips'
 import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
 import More from '../components/More'
@@ -358,12 +358,15 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
   // has no average; see lib/styleProof.js).
   const line = traitLine(row, proof?.styleSize)
   const way = verdictWay(row, proof?.styleSize)
+  // A swing row says what the player usually does; a run from before the
+  // averages were sent keeps the bars.
+  const bands = swingBands(row, measure)
 
   return (
     <>
       <div className="proof-head">
         {word && <span className="proof-word"><WordMark word={word} />{word}</span>}
-        <span className="proof-measure">{measure.label}</span>
+        <span className="proof-measure">{bands ? `${measure.thing}, usually` : measure.label}</span>
         {DIRECTION[measure.better] && (
           <span className="proof-better">{DIRECTION[measure.better]}</span>
         )}
@@ -373,6 +376,21 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
           read as zero: no third shots logged is not "never drops". */}
       {row.you === null ? (
         <p className="proof-verdict">Nothing recorded for this yet.</p>
+      ) : bands ? (
+        <ul className="swing-bands">
+          {bands.bands.map((band) => (
+            <li key={band.who} className={band.mine ? 'is-you' : undefined}>
+              <span className="proof-who">{band.who}</span>
+              <span className="swing-track" aria-hidden="true">
+                <span className="swing-band" style={{ left: `${((band.low - bands.lo) / (bands.hi - bands.lo)) * 100}%`, width: `${((band.high - band.low) / (bands.hi - bands.lo)) * 100}%` }} />
+              </span>
+              <span className="proof-number">{band.words}</span>
+            </li>
+          ))}
+          <li className="swing-scale" aria-hidden="true"><span />
+            <span className="swing-ends"><span>{bands.lo}{bands.unit}</span><span>{bands.hi}{bands.unit}</span></span><span />
+          </li>
+        </ul>
       ) : (
         <ul className="proof-bars">
           {bars.map((bar) => (
@@ -393,7 +411,7 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
       {withVerdict && word && row.you !== null && line && (
         <p className="proof-verdict">
           <Icon name={way === 'higher' ? 'arrowUp' : 'arrowDown'} size={15} />
-          {line}
+          {bands ? swingLine(way, proof?.styleSize) : line}
         </p>
       )}
     </>

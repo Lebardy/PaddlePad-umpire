@@ -14,7 +14,10 @@ import {
   MEASURES,
   hiddenStyleNote,
   styleShareLine,
+  swingBands,
+  swingLine,
   traitLine,
+  usualWords,
   verdictWay,
 } from '../src/lib/styleProof.js'
 
@@ -63,6 +66,22 @@ check('no line for an unknown measure', traitLine(row('made_up', 0.5, 0.4), 5), 
 check('every measure has a label and a way to read its number',
   Object.entries(MEASURES).filter(([, m]) => typeof m.label !== 'string' || !m.as || !m.better).map(([f]) => f), [])
 check('no label runs past one line on a phone', Object.entries(MEASURES).filter(([, m]) => m.label.length > 50).map(([f, m]) => `${f}: ${m.label.length}`), [])
+
+console.log('\nswing rows say what a player usually does')
+const steady = { feature: 'winner_rate_std', you: 0.06, style: 0.07, group: 0.09, center: { you: 0.48, style: 0.45, group: 0.42 } }
+const b = swingBands(steady, MEASURES.winner_rate_std)
+check('per 10 minutes, rounded to whole shots', b.bands.map((x) => x.words), ['4 to 5', '4 to 5', '3 to 5'])
+check('you first, then your style, then your group', b.bands.map((x) => x.who), ['you', 'your style', 'your group'])
+check('the scale is whole numbers around every band', [b.lo, b.hi], [3, 6])
+const drops = { feature: 'drop_efficiency_std', you: 0.06, style: null, group: 0.11, center: { you: 0.54, style: null, group: 0.5 } }
+const d = swingBands(drops, MEASURES.drop_efficiency_std)
+check('shares in whole percents, and no style band without a style average', d.bands.map((x) => x.words), ['48% to 60%', '39% to 61%'])
+check('share scales snap to tens', [d.lo, d.hi], [30, 70])
+check('a band never goes below zero', swingBands({ ...steady, you: 0.6, center: { ...steady.center, you: 0.2 } }, MEASURES.winner_rate_std).bands[0].low, 0)
+check('no center, no bands (an older run)', swingBands({ ...steady, center: null }, MEASURES.winner_rate_std), null)
+check('a band that rounds to one number says "about"', usualWords(4.6, 4.9, true), 'about 5')
+check('narrower than the group', swingLine('lower', 3), 'Your style’s matches stay closer together than your group’s')
+check('wider, for a style of one', swingLine('higher', 1), 'Your matches spread wider than your group’s')
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

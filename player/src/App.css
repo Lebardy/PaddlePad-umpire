@@ -1411,7 +1411,7 @@
 .proof-bars { list-style: none; padding: 0; margin: 0.55rem 0 0; }
 .proof-bars li {
   display: grid;
-  grid-template-columns: 8.5rem minmax(0, 1fr) 3.4rem;
+  grid-template-columns: 5.5rem minmax(0, 1fr) 3.4rem;
   align-items: center;
   gap: 0.5rem;
   padding: 0.15rem 0;
@@ -1425,6 +1425,32 @@
 .proof-bars li.is-you .proof-number { color: var(--text); font-weight: 700; }
 .proof-verdict { display: flex; align-items: center; gap: 0.3rem; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin-top: 0.5rem; }
 .proof-verdict svg { flex: none; }
+/* A swing row: each band is what that player usually does, on one scale. */
+.swing-bands { list-style: none; padding: 0; margin: 0.55rem 0 0; }
+.swing-bands li {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) 6rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.15rem 0;
+}
+.swing-bands li.is-you .proof-who,
+.swing-bands li.is-you .proof-number { color: var(--text); font-weight: 700; }
+.swing-bands .proof-number { white-space: nowrap; }
+.swing-track { position: relative; height: 22px; }
+.swing-track::before { content: ''; position: absolute; left: 0; right: 0; top: 10px; height: 2px; background: var(--border); }
+.swing-band { position: absolute; top: 4px; height: 14px; border-radius: 7px; background: color-mix(in srgb, var(--text-muted) 70%, var(--surface)); }
+.swing-bands li.is-you .swing-band { background: var(--series-1); }
+.swing-ends {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--label);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
 
 /* ============ People ============ */
 
