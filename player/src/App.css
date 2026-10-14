@@ -1408,10 +1408,14 @@
   padding: 0 0.4rem;
   margin-left: auto;
 }
-.proof-bars { list-style: none; padding: 0; margin: 0.55rem 0 0; }
-.proof-bars li {
+.proof-bars,
+.swing-bands { list-style: none; padding: 0; margin: 0.55rem 0 0; }
+/* Bar rows and band rows share one grid, so every track in the list ends
+   at the same place. */
+.proof-bars li,
+.swing-bands li {
   display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr) 3.4rem;
+  grid-template-columns: 5.5rem minmax(0, 1fr) 6rem;
   align-items: center;
   gap: 0.5rem;
   padding: 0.15rem 0;
@@ -1426,20 +1430,23 @@
 .proof-verdict { display: flex; align-items: center; gap: 0.3rem; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin-top: 0.5rem; }
 .proof-verdict svg { flex: none; }
 /* A swing row: each band is what that player usually does, on one scale. */
-.swing-bands { list-style: none; padding: 0; margin: 0.55rem 0 0; }
-.swing-bands li {
-  display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr) 6rem;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.15rem 0;
-}
 .swing-bands li.is-you .proof-who,
 .swing-bands li.is-you .proof-number { color: var(--text); font-weight: 700; }
 .swing-bands .proof-number { white-space: nowrap; }
 .swing-track { position: relative; height: 22px; }
 .swing-track::before { content: ''; position: absolute; left: 0; right: 0; top: 10px; height: 2px; background: var(--border); }
-.swing-band { position: absolute; top: 4px; height: 14px; border-radius: 7px; background: color-mix(in srgb, var(--text-muted) 70%, var(--surface)); }
+.swing-band {
+  position: absolute;
+  top: 4px;
+  height: 14px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--text-muted) 70%, var(--surface));
+  /* --left and --width are percents of the track. A band too narrow to
+     see (matches that never vary) is a 10px pill centred where it sits,
+     kept inside the track. */
+  left: clamp(0px, calc((var(--left) + var(--width) / 2) * 1% - max(var(--width) * 0.5%, 5px)), calc(100% - 10px));
+  width: max(var(--width) * 1%, 10px);
+}
 .swing-bands li.is-you .swing-band { background: var(--series-1); }
 .swing-ends {
   display: flex;

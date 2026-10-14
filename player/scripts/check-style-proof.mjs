@@ -80,8 +80,19 @@ check('share scales snap to tens', [d.lo, d.hi], [30, 70])
 check('a band never goes below zero', swingBands({ ...steady, you: 0.6, center: { ...steady.center, you: 0.2 } }, MEASURES.winner_rate_std).bands[0].low, 0)
 check('no center, no bands (an older run)', swingBands({ ...steady, center: null }, MEASURES.winner_rate_std), null)
 check('a band that rounds to one number says "about"', usualWords(4.6, 4.9, true), 'about 5')
-check('narrower than the group', swingLine('lower', 3), 'Your style’s matches stay closer together than your group’s')
-check('wider, for a style of one', swingLine('higher', 1), 'Your matches spread wider than your group’s')
+check('the line, for a style', [swingLine('lower', 3), swingLine('higher', 3)], ['Your style: steadier than your group', 'Your style: swings more than your group'])
+check('the line, for a style of one', [swingLine('lower', 1), swingLine('higher', 1)], ['You: steadier than your group', 'You: swing more than your group'])
+// The line compares two bands; when whole numbers would make them read alike, the row shows one decimal.
+const tie = { feature: 'winner_rate_std', you: 0.06, style: 0.07, group: 0.08, center: { you: 0.48, style: 0.45, group: 0.44 } }
+check('a row whose compared bands would tie shows one decimal, on every band', swingBands(tie, MEASURES.winner_rate_std, 'your style').bands.map((x) => x.words), ['4.2 to 5.4', '3.8 to 5.2', '3.6 to 5.2'])
+check('a row that does not tie stays whole', swingBands(steady, MEASURES.winner_rate_std, 'your style').bands.map((x) => x.words), ['4 to 5', '4 to 5', '3 to 5'])
+check('no line, no decimals', swingBands(tie, MEASURES.winner_rate_std, null).bands.map((x) => x.words), ['4 to 5', '4 to 5', '4 to 5'])
+const pctTie = { feature: 'drop_efficiency_std', you: 0.06, style: 0.09, group: 0.088, center: { you: 0.54, style: 0.45, group: 0.452 } }
+check('a share row ties the same way, in tenths of a percent', swingBands(pctTie, MEASURES.drop_efficiency_std, 'your style').bands.map((x) => x.words), ['48.0% to 60.0%', '36.0% to 54.0%', '36.4% to 54.0%'])
+const oneTie = { feature: 'winner_rate_std', you: 0.06, style: null, group: 0.07, center: { you: 0.45, style: null, group: 0.44 } }
+check('a style of one compares you with the group', swingBands(oneTie, MEASURES.winner_rate_std, 'you').bands.map((x) => x.words), ['3.9 to 5.1', '3.7 to 5.1'])
+const flat = { feature: 'winner_rate_std', you: 0, style: null, group: 0, center: { you: 0, style: null, group: 0 } }
+check('every band 0 to 0 still has a scale', (({ lo, hi }) => [lo, hi])(swingBands(flat, MEASURES.winner_rate_std)), [0, 1])
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

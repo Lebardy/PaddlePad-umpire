@@ -91,11 +91,12 @@ export function traitLine(row, styleSize) {
   return `${styleSize === 1 ? 'You' : 'Your style'}: ${way} than your group`
 }
 
-/** "4 to 5", "48% to 60%", or "about 5" when both ends round alike. */
-export function usualWords(low, high, per10) {
+/** "4 to 5", "48% to 60%", or "about 5" when both ends round alike; `places` decimals. */
+export function usualWords(low, high, per10, places = 0) {
   const unit = per10 ? '' : '%'
-  const a = Math.round(low)
-  const b = Math.round(high)
+  const at = (x) => (Math.round(x * 10 ** places) / 10 ** places).toFixed(places)
+  const a = at(low)
+  const b = at(high)
   return a === b ? `about ${a}${unit}` : `${a}${unit} to ${b}${unit}`
 }
 
@@ -103,8 +104,13 @@ export function usualWords(low, high, per10) {
  * A swing row as bands: each one's average plus and minus its swing, so
  * a narrower band is a steadier player. Null for a run from before the
  * averages were sent, which keeps the old row.
+ *
+ * `against` names the band the line compares with the group ('your
+ * style', or 'you' for a style of one; null with no line). When whole
+ * numbers would make those two read alike while the line says they
+ * differ, the whole row shows one decimal.
  */
-export function swingBands(row, measure) {
+export function swingBands(row, measure, against = null) {
   const centre = row.center
   if (!centre || centre.you === null || row.you === null) return null
   const per10 = measure.as === 'swing-per10'
@@ -112,21 +118,19 @@ export function swingBands(row, measure) {
   const top = per10 ? Infinity : 100
   const bands = [['you', centre.you, row.you, true], ['your style', centre.style, row.style, false], ['your group', centre.group, row.group, false]]
     .filter(([, average, swing]) => average !== null && average !== undefined && swing !== null && swing !== undefined)
-    .map(([who, average, swing, mine]) => {
-      const low = Math.max(0, (average - swing) * times)
-      const high = Math.min(top, (average + swing) * times)
-      return { who, mine, low, high, words: usualWords(low, high, per10) }
-    })
+    .map(([who, average, swing, mine]) => ({ who, mine, low: Math.max(0, (average - swing) * times), high: Math.min(top, (average + swing) * times) }))
+  const compared = bands.filter((band) => band.who === against || band.who === 'your group')
+  const ties = compared.length === 2 && usualWords(compared[0].low, compared[0].high, per10) === usualWords(compared[1].low, compared[1].high, per10)
+  for (const band of bands) band.words = usualWords(band.low, band.high, per10, ties ? 1 : 0)
   const step = per10 ? 1 : 10
   const lo = Math.floor(Math.min(...bands.map((band) => band.low)) / step) * step
   const hi = Math.ceil(Math.max(...bands.map((band) => band.high)) / step) * step
-  return { bands, lo, hi, unit: per10 ? '' : '%' }
+  // Every band 0 to 0 would leave a scale with no width.
+  return { bands, lo, hi: Math.max(hi, lo + step), unit: per10 ? '' : '%' }
 }
 
-/** The line under a swing row, said about the bands rather than a number. */
+/** The line under a swing row: steadier or swinging more than the group. */
 export function swingLine(way, styleSize) {
-  const who = styleSize === 1 ? 'Your matches' : 'Your style’s matches'
-  return way === 'lower'
-    ? `${who} stay closer together than your group’s`
-    : `${who} spread wider than your group’s`
+  if (styleSize === 1) return way === 'lower' ? 'You: steadier than your group' : 'You: swing more than your group'
+  return way === 'lower' ? 'Your style: steadier than your group' : 'Your style: swings more than your group'
 }

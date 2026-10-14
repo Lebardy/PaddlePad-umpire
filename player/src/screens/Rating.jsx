@@ -360,7 +360,7 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
   const way = verdictWay(row, proof?.styleSize)
   // A swing row says what the player usually does; a run from before the
   // averages were sent keeps the bars.
-  const bands = swingBands(row, measure)
+  const bands = swingBands(row, measure, way && (proof?.styleSize === 1 ? 'you' : 'your style'))
 
   return (
     <>
@@ -382,7 +382,7 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
             <li key={band.who} className={band.mine ? 'is-you' : undefined}>
               <span className="proof-who">{band.who}</span>
               <span className="swing-track" aria-hidden="true">
-                <span className="swing-band" style={{ left: `${((band.low - bands.lo) / (bands.hi - bands.lo)) * 100}%`, width: `${((band.high - band.low) / (bands.hi - bands.lo)) * 100}%` }} />
+                <span className="swing-band" style={{ '--left': ((band.low - bands.lo) / (bands.hi - bands.lo)) * 100, '--width': ((band.high - band.low) / (bands.hi - bands.lo)) * 100 }} />
               </span>
               <span className="proof-number">{band.words}</span>
             </li>
