@@ -58,7 +58,11 @@ RANDOM_STATE = 42
 # The player's own feature values behind their archetype, so a playstyle
 # can be explained rather than merely asserted. These are the columns the
 # playstyle features are made of, so the list is the pipeline's own.
-EVIDENCE_COLUMNS = list(PLAYSTYLE_CLUSTERING_FEATURES)
+# The averages three swing measurements move around. The other swings'
+# averages are already playstyle features. Sent so the app can say
+# "usually 4 to 5 a game" instead of a bare standard deviation.
+SWING_CENTRES = ["winner_rate_mean", "general_error_rate_mean", "dink_error_rate_mean"]
+EVIDENCE_COLUMNS = list(PLAYSTYLE_CLUSTERING_FEATURES) + SWING_CENTRES
 
 
 class NotEnoughData(Exception):
@@ -486,6 +490,9 @@ def run_pipeline(gated_df, rally_points):
     final = final.merge(
         profiles[["player_id", "match_count"]],
         on="player_id", how="left", validate="one_to_one",
+    ).merge(
+        skill_clustered[["player_id", "rally_points"]],
+        on="player_id", how="left", validate="one_to_one",
     )
 
     # The RAW playstyle features are returned separately rather than
@@ -502,7 +509,11 @@ def run_pipeline(gated_df, rally_points):
     # The player is shown the raw values, because "your aggression is
     # -0.34" is not a fact about them -- it is a fact about how they
     # compare to the pool after skill was projected out.
-    evidence = playstyle_features.set_index("player_id")[EVIDENCE_COLUMNS]
+    evidence = (
+        playstyle_features
+        .merge(profiles[["player_id", *SWING_CENTRES]], on="player_id", how="left", validate="one_to_one")
+        .set_index("player_id")[EVIDENCE_COLUMNS]
+    )
 
     report = {
         "skillGroups": groups,
@@ -567,6 +578,9 @@ def to_payload(final, evidence_df, gate_report, structure_report, match_count):
             "playstyleTraits": traits if isinstance(traits, list) else None,
             "evidence": evidence,
             "matchCount": int(row.get("match_count") or 0),
+            # The rally points this player was grouped by, so the app can
+            # place them among the levels of this same run.
+            "rallyPoints": round(float(row["rally_points"]), 1),
         })
 
     return {
