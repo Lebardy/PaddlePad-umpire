@@ -2891,9 +2891,9 @@
 .level-plate-name {
   flex: 1; min-width: 0; color: var(--lamp);
   font: 900 2.75rem/0.95 var(--display); text-transform: uppercase;
-  /* INTERMEDIATE is about 5.2 em wide: shrink just enough that it fits beside the picture and chevron (132px) on a small phone. */
-  font-size: min(2.75rem, calc((100cqi - 132px) / 5.4));
 }
+/* INTERMEDIATE is about 5.2 em wide: shrink just enough that it fits beside the picture and chevron (132px) on a small phone. */
+.level-plate-name.is-long { font-size: min(2.75rem, calc((100cqi - 132px) / 5.4)); }
 .level-plate-chevron { flex: none; color: var(--board-muted); transform: rotate(90deg); transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1); }
 .level-plate-chevron.is-open { transform: rotate(-90deg); }
 
@@ -2931,9 +2931,9 @@
   font: 700 0.81rem/1 var(--label); letter-spacing: 0.06em; text-transform: uppercase; font-variant-numeric: tabular-nums;
 }
 .level-gap { padding-left: 34px; color: #1f7a45; }
-/* Turned upright, the two arrows point at the rows above and below. */
-.level-gap svg { transform: rotate(90deg); }
 :root[data-theme='dark'] .level-gap { color: #4cc47e; }
+/* In dark the board is barely lighter than the page: an edge keeps the plate a plate, drawn inside so the name keeps its room. */
+:root[data-theme='dark'] .level-plate { box-shadow: inset 0 0 0 1px var(--board-rule); }
 .level-key { padding: 6px 8px 0 42px; color: var(--text-muted); }
 .level-key-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--lamp); border: 2px solid var(--text); }
 .level-key-avg { margin-left: auto; }

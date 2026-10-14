@@ -17,7 +17,7 @@ function LevelPlate({ level }) {
     <div className="level">
       <button type="button" className="level-plate" aria-expanded={open} aria-label={plateLabel(level)} onClick={() => setOpen(!open)}>
         <LevelEmblem rank={level.rank} size={56} className="level-plate-emblem" />
-        <span className="level-plate-name">{level.name}</span>
+        <span className={`level-plate-name${level.name.length > 10 ? ' is-long' : ''}`}>{level.name}</span>
         <Icon name="chevron" size={20} className={`level-plate-chevron${open ? ' is-open' : ''}`} />
       </button>
       {open && (
@@ -25,7 +25,7 @@ function LevelPlate({ level }) {
           {level.levels.map((row) => (
             <Fragment key={row.name}>
               {/* Between this row and the one above it. */}
-              {row.gapAbove ? <li className="level-gap"><Icon name="swap" size={14} />{row.gapAbove} apart</li> : null}
+              {row.gapAbove ? <li className="level-gap"><Icon name="apart" size={14} />{row.gapAbove} apart</li> : null}
               <li className={`level-row${row.mine ? ' is-mine' : ''}`}>
                 <LevelEmblem rank={LADDER_RANK[row.name]} size={26} className="level-row-emblem" />
                 <span className="level-row-name">
