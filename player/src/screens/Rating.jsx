@@ -329,7 +329,7 @@ function allCourtSentence(rows) {
   if (shown.length === 0) {
     return 'All-court means your style doesn’t lean towards dropping or driving, or towards the net or power — there is nothing recorded yet to show it.'
   }
-  return `Your style sits close to your group on ${shown.join(' and ')}, so it’s called all-court — your own numbers can lean one way${
+  return `Your style sits close to similar players on ${shown.join(' and ')}, so it’s called all-court — your own numbers can lean one way${
     missing ? ', and no third shots are recorded yet to compare drops with drives' : ''
   }.`
 }
@@ -346,7 +346,7 @@ function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
   const bars = [
     { who: 'you', value: row.you, mine: true },
     ...(hasStyle ? [{ who: 'your style', value: row.style }] : []),
-    { who: 'your group', value: row.group },
+    { who: 'similar players', value: row.group },
   ]
   // Bars are drawn against the biggest of them, so a row is read by
   // comparing its own bars and nothing else.
@@ -498,9 +498,9 @@ function Playstyle({ standing, number }) {
 
       <More label="How this was worked out">
         <p>
-          Your group is split again by how its players play. Each word is
-          the measurement where your style sits furthest from your
-          group&rsquo;s average. The bars show averages only, never
+          Similar players are split again by how they play. Each word is
+          the measurement where your style sits furthest from their
+          average. The bars show averages only, never
           anyone&rsquo;s numbers but yours, and none for a style of fewer
           than three.
         </p>

@@ -32,10 +32,10 @@ function check(label, actual, expected) {
 }
 
 console.log('\nwho shares the style')
-check('a style of three or more', styleShareLine(10, 14), '10 of 14 play this way')
-check('a style of two', styleShareLine(2, 14), 'You and 1 other of 14 play this way')
-check('a style of one', styleShareLine(1, 14), 'No one else in your group plays this way yet')
-check('no style size', styleShareLine(null, 14), 'Compared with 14 in your group')
+check('a style of three or more', styleShareLine(10, 14), '10 play this way')
+check('a style of two', styleShareLine(2, 14), 'You and 1 other play this way')
+check('a style of one', styleShareLine(1, 14), 'No similar player plays this way yet')
+check('no style size', styleShareLine(null, 14), 'Compared with similar players')
 check('no group', styleShareLine(3, 0), null)
 
 console.log('\nwhich way the sentence points')
@@ -58,9 +58,9 @@ check('and it says why', hiddenStyleNote(2),
 
 console.log('\nthe short line under each trait')
 const row = (feature, style, group, you = style) => ({ feature, you, style, group, direction: style > group ? 'above' : 'below' })
-check('a style of several, lower', traitLine(row('error_to_winner_ratio', 0.89, 1.09), 19), 'Your style: lower than your group')
-check('a style of several, higher', traitLine(row('drop_preference_rate_mean', 0.55, 0.49), 19), 'Your style: higher than your group')
-check('a style of one is about the player', traitLine({ ...row('error_to_winner_ratio', null, 1.09, 0.8), direction: 'below' }, 1), 'You: lower than your group')
+check('a style of several, lower', traitLine(row('error_to_winner_ratio', 0.89, 1.09), 19), 'Your style: lower than others')
+check('a style of several, higher', traitLine(row('drop_preference_rate_mean', 0.55, 0.49), 19), 'Your style: higher than others')
+check('a style of one is about the player', traitLine({ ...row('error_to_winner_ratio', null, 1.09, 0.8), direction: 'below' }, 1), 'You: lower than others')
 check('no line when there is no way to point', traitLine(row('drop_preference_rate_mean', null, 0.49, 0.6), 2), null)
 check('no line for an unknown measure', traitLine(row('made_up', 0.5, 0.4), 5), null)
 check('every measure has a label and a way to read its number',
@@ -71,7 +71,7 @@ console.log('\nswing rows say what a player usually does')
 const steady = { feature: 'winner_rate_std', you: 0.06, style: 0.07, group: 0.09, center: { you: 0.48, style: 0.45, group: 0.42 } }
 const b = swingBands(steady, MEASURES.winner_rate_std)
 check('per 10 minutes, rounded to whole shots', b.bands.map((x) => x.words), ['4 to 5', '4 to 5', '3 to 5'])
-check('you first, then your style, then your group', b.bands.map((x) => x.who), ['you', 'your style', 'your group'])
+check('you first, then your style, then similar players', b.bands.map((x) => x.who), ['you', 'your style', 'similar players'])
 check('the scale is whole numbers around every band', [b.lo, b.hi], [3, 6])
 const drops = { feature: 'drop_efficiency_std', you: 0.06, style: null, group: 0.11, center: { you: 0.54, style: null, group: 0.5 } }
 const d = swingBands(drops, MEASURES.drop_efficiency_std)
@@ -80,8 +80,8 @@ check('share scales snap to tens', [d.lo, d.hi], [30, 70])
 check('a band never goes below zero', swingBands({ ...steady, you: 0.6, center: { ...steady.center, you: 0.2 } }, MEASURES.winner_rate_std).bands[0].low, 0)
 check('no center, no bands (an older run)', swingBands({ ...steady, center: null }, MEASURES.winner_rate_std), null)
 check('a band that rounds to one number says "about"', usualWords(4.6, 4.9, true), 'about 5')
-check('the line, for a style', [swingLine('lower', 3), swingLine('higher', 3)], ['Your style: steadier than your group', 'Your style: swings more than your group'])
-check('the line, for a style of one', [swingLine('lower', 1), swingLine('higher', 1)], ['You: steadier than your group', 'You: swing more than your group'])
+check('the line, for a style', [swingLine('lower', 3), swingLine('higher', 3)], ['Your style: steadier than others', 'Your style: swings more than others'])
+check('the line, for a style of one', [swingLine('lower', 1), swingLine('higher', 1)], ['You: steadier than others', 'You: swing more than others'])
 // The line calls one band steadier; when whole numbers would make it look no narrower (a tie or a flip), the row shows one decimal.
 const tie = { feature: 'winner_rate_std', you: 0.06, style: 0.07, group: 0.08, center: { you: 0.48, style: 0.45, group: 0.44 } }
 check('a row whose compared bands would tie shows one decimal, on every band', swingBands(tie, MEASURES.winner_rate_std, 'your style', 'lower').bands.map((x) => x.words), ['4.2 to 5.4', '3.8 to 5.2', '3.6 to 5.2'])

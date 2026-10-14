@@ -44,13 +44,16 @@ export const MEASURES = {
   net_game_preference_rate_std: { label: 'change in points won at the net, match to match', thing: 'points won at the net', as: 'swing-percent', better: 'neither' },
 }
 
-/** The one line saying how many in the player's group share the style. */
+/**
+ * The one line saying how many share the style. The group's size is not
+ * said: the player sees their level, and the group is only part of it.
+ */
 export function styleShareLine(styleSize, groupSize) {
   if (!groupSize) return null
-  if (!styleSize) return `Compared with ${groupSize} in your group`
-  if (styleSize === 1) return 'No one else in your group plays this way yet'
-  if (styleSize === 2) return `You and 1 other of ${groupSize} play this way`
-  return `${styleSize} of ${groupSize} play this way`
+  if (!styleSize) return 'Compared with similar players'
+  if (styleSize === 1) return 'No similar player plays this way yet'
+  if (styleSize === 2) return 'You and 1 other play this way'
+  return `${styleSize} play this way`
 }
 
 /**
@@ -88,7 +91,7 @@ export function hiddenStyleNote(styleSize) {
 export function traitLine(row, styleSize) {
   const way = verdictWay(row, styleSize)
   if (!MEASURES[row.feature] || !way) return null
-  return `${styleSize === 1 ? 'You' : 'Your style'}: ${way} than your group`
+  return `${styleSize === 1 ? 'You' : 'Your style'}: ${way} than others`
 }
 
 /** "4 to 5", "48% to 60%", or "about 5" when both ends round alike; `places` decimals. */
@@ -117,12 +120,12 @@ export function swingBands(row, measure, against = null, way = null) {
   const per10 = measure.as === 'swing-per10'
   const times = per10 ? 10 : 100
   const top = per10 ? Infinity : 100
-  const bands = [['you', centre.you, row.you, true], ['your style', centre.style, row.style, false], ['your group', centre.group, row.group, false]]
+  const bands = [['you', centre.you, row.you, true], ['your style', centre.style, row.style, false], ['similar players', centre.group, row.group, false]]
     .filter(([, average, swing]) => average !== null && average !== undefined && swing !== null && swing !== undefined)
     .map(([who, average, swing, mine]) => ({ who, mine, low: Math.max(0, (average - swing) * times), high: Math.min(top, (average + swing) * times) }))
   const whole = (band) => (band ? Math.round(band.high) - Math.round(band.low) : null)
   const compared = whole(bands.find((band) => band.who === against))
-  const group = whole(bands.find((band) => band.who === 'your group'))
+  const group = whole(bands.find((band) => band.who === 'similar players'))
   const hidden = compared !== null && group !== null && (way === 'lower' ? compared >= group : group >= compared)
   for (const band of bands) band.words = usualWords(band.low, band.high, per10, hidden ? 1 : 0)
   const step = per10 ? 1 : 10
@@ -139,6 +142,6 @@ export function swingBands(row, measure, against = null, way = null) {
 
 /** The line under a swing row: steadier or swinging more than the group. */
 export function swingLine(way, styleSize) {
-  if (styleSize === 1) return way === 'lower' ? 'You: steadier than your group' : 'You: swing more than your group'
-  return way === 'lower' ? 'Your style: steadier than your group' : 'Your style: swings more than your group'
+  if (styleSize === 1) return way === 'lower' ? 'You: steadier than others' : 'You: swing more than others'
+  return way === 'lower' ? 'Your style: steadier than others' : 'Your style: swings more than others'
 }
