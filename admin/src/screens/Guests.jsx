@@ -7,7 +7,7 @@ import StatusTag from '../components/StatusTag'
 import { addOpenPlay, cancelOpenPlay, fetchGuests, listFacilities } from '../lib/api'
 import { countWord } from '../lib/format'
 import {
-  dayOptions, endHours, feeWords, levelWords, scoreWords, spotsFor, startHours, toIso, whenWords,
+  comingWords, dayOptions, endHours, feeWords, scoreWords, spotsFor, startHours, toIso, whenWords,
 } from '../lib/guests'
 
 const FACES = [1, 2, 3, 4, 5]
@@ -130,7 +130,7 @@ export default function Guests({ me, facilityLabel }) {
                                 <i style={{ width: `${Math.min(100, (play.count / play.spots) * 100)}%` }} />
                               </span>
                             </td>
-                            <td>{levelWords(play.levels, play.newCount) || '—'}</td>
+                            <td>{comingWords(play)}</td>
                             <td><StatusTag status={play.status} /></td>
                             <td className="col-actions">
                               <div className="row-actions">
@@ -183,7 +183,7 @@ function GuestTotals({ totals, visits }) {
       </div>
       <div className="total">
         <span className="total-label">Visit score</span>
-        {score.figure && <span className="total-figure">{score.figure}</span>}
+        <span className="total-figure">{score.figure ?? '—'}</span>
         <span className="total-new">{score.words}</span>
       </div>
       <div className="total-rating">

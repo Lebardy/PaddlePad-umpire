@@ -6,7 +6,7 @@
 // ============================================================
 
 import {
-  dayOptions, endHours, feeWords, levelWords, scoreWords, spotsFor, startHours, toIso, whenWords,
+  comingWords, dayOptions, endHours, feeWords, levelWords, scoreWords, spotsFor, startHours, toIso, whenWords,
 } from '../src/lib/guests.js'
 
 let pass = 0
@@ -42,6 +42,10 @@ check('levels highest first, new last',
 check('only new players', levelWords([], 2), '2 new')
 check('nobody going', levelWords([], 0), '')
 check('no clear levels', levelWords(null, 0), '')
+
+check("who's coming by level", comingWords({ count: 3, levels: [{ name: 'Advanced', count: 2 }], newCount: 1 }), '2 Advanced · 1 new')
+check('no clear levels, people going', comingWords({ count: 3, levels: null, newCount: 0 }), '3 going')
+check('nobody going, a dash', comingWords({ count: 0, levels: [], newCount: 0 }), '—')
 
 check('a score from 3 ratings', scoreWords({ rated: 12, average: 4.6 }), { figure: '4.6', words: '12 rated · last 30 days' })
 check('a whole score keeps its decimal', scoreWords({ rated: 5, average: 4 }).figure, '4.0')

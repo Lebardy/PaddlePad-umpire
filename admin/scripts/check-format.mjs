@@ -49,6 +49,7 @@ check('marking fine reads as words', actionLabel('match.looks_fine'), 'Marked a 
 check('voided label', actionLabel('match.voided'), 'Voided a match')
 check('a void undone reads as words', actionLabel('match.restored'), 'Undid a void')
 check('open play added reads as words', actionLabel('open_play.added'), 'Added open play')
+check('open play cancelled reads as words', actionLabel('open_play.cancelled'), 'Cancelled open play')
 check('a removed video reads as words', actionLabel('match.video_removed'), 'Removed a match video')
 check('marking different people reads as words', actionLabel('player.not_duplicate'), 'Marked players as different people')
 check('a merge reads as words', actionLabel('player.merged'), 'Merged two players')

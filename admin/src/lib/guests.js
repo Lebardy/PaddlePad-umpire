@@ -48,6 +48,11 @@ export function levelWords(levels, newCount) {
   return [...(levels ?? []).map((l) => `${l.count} ${l.name}`), ...(newCount > 0 ? [`${newCount} new`] : [])].join(' · ')
 }
 
+/** The Who's coming cell: the levels, or just how many when there are no clear levels. */
+export function comingWords({ count, levels, newCount }) {
+  return levelWords(levels, newCount) || (count > 0 ? `${count} going` : '—')
+}
+
 /** The visit score, shown from 3 ratings. */
 export function scoreWords({ rated, average }) {
   if (rated === 0) return { figure: null, words: 'No ratings yet' }
