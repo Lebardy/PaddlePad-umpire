@@ -18,9 +18,7 @@ export const LADDER = ['Beginner', 'Developing', 'Intermediate', 'Advanced', 'Ex
  */
 export function levelForPlayer({ levels, points, runPoints }) {
   if (!Array.isArray(levels) || levels.length < 2 || !Number.isFinite(points)) return null
-  // Halfway between each neighbouring pair's averages (stored lowest first); a rating on a line goes up.
-  const lines = levels.slice(1).map((upper, i) => (levels[i].average + upper.average) / 2)
-  const levelOf = (value) => lines.filter((line) => value >= line).length
+  const levelOf = placer(levels)
   const placed = levels.map(() => [])
   for (const value of runPoints) if (Number.isFinite(value)) placed[levelOf(value)].push(value)
   if (placed.some((values) => values.length === 0)) return null
@@ -45,6 +43,24 @@ export function levelForPlayer({ levels, points, runPoints }) {
     you: Math.round(points),
     levels: rows.reverse(),
   }
+}
+
+// Halfway between each neighbouring pair's averages (stored lowest first); a rating on a line goes up.
+function placer(levels) {
+  const lines = levels.slice(1).map((upper, i) => (levels[i].average + upper.average) / 2)
+  return (value) => lines.filter((line) => value >= line).length
+}
+
+/**
+ * The level name for any current rating, by levelForPlayer's lines; null
+ * when the run's levels can't be shown (fewer than two, or one left empty).
+ */
+export function levelNamer({ levels, runPoints }) {
+  if (!Array.isArray(levels) || levels.length < 2) return null
+  const levelOf = placer(levels)
+  const filled = new Set(runPoints.filter(Number.isFinite).map(levelOf))
+  if (filled.size < levels.length) return null
+  return (points) => (Number.isFinite(points) ? levels[levelOf(points)].name : null)
 }
 
 function mean(values) {

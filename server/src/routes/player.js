@@ -28,6 +28,11 @@ import { findFacility, listFacilities } from '../facility-store.js'
 import { playerFacilityPage, playerFacilitySummary } from '../facility-rules.js'
 import { bucketConfig } from '../bucket.js'
 import { pointVideo } from '../point-video.js'
+import { playerInGoingOnSession } from '../overview-store.js'
+import {
+  joinOpenPlay, leaveOpenPlay, levelLookup, loadOpenPlays, namedFor, saveRating, visitFor,
+} from '../open-play-store.js'
+import { openPlayRow, ratingOpen, readRating } from '../visit-rules.js'
 
 const router = Router()
 
@@ -67,9 +72,10 @@ router.get('/me', async (req, res) => {
   )
   if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
 
-  const [matches, inProgress] = await Promise.all([
+  const [matches, inProgress, inSession] = await Promise.all([
     getPlayerMatches(query, req.player.id),
     countMatchesInProgress(query, req.player.id),
+    playerInGoingOnSession(query, req.player.id),
   ])
 
   // Needs the match count, so it runs after the pair above rather than
@@ -94,8 +100,10 @@ router.get('/me', async (req, res) => {
     rating,
     rallyRating,
     leaderboardOpen,
-    // For "Film my next match": off wherever video is not set up.
+    // For "Film my next match": off wherever video is not set up, and
+    // shown only while the player is in a session going on.
     videoOn: Boolean(bucketConfig()),
+    inSession,
   })
 })
 
@@ -536,6 +544,19 @@ router.post('/link', async (req, res) => {
        ON CONFLICT DO NOTHING`,
       [target.id, source.id],
     )
+    await client.query(
+      `INSERT INTO open_play_joins (open_play_id, player_id, created_at)
+       SELECT open_play_id, $2, created_at FROM open_play_joins WHERE player_id = $1
+       ON CONFLICT DO NOTHING`,
+      [target.id, source.id],
+    )
+    // Where both rated a session, the kept player's rating wins.
+    await client.query(
+      `INSERT INTO visit_ratings (player_id, session_id, facility_id, score, chips, updated_at)
+       SELECT $2, session_id, facility_id, score, chips, updated_at FROM visit_ratings WHERE player_id = $1
+       ON CONFLICT DO NOTHING`,
+      [target.id, source.id],
+    )
 
     // Re-counted after the rewrite rather than trusting theirs + yours:
     // this is the number the app tells the player they now have, and it
@@ -610,11 +631,16 @@ router.get('/matches', async (req, res) => {
   res.json({ matches: await getPlayerMatches(query, req.player.id, ratings) })
 })
 
-/** Every place to play on PaddlePad, by name, for the People tab. */
+/** Every place to play on PaddlePad, by name, for the People tab, each with its next open play this week. */
 router.get('/facilities', async (req, res) => {
-  const rows = await listFacilities(query, { all: true })
+  const [rows, plays] = await Promise.all([listFacilities(query, { all: true }), loadOpenPlays(query, { now: new Date() })])
   const videoOn = Boolean(bucketConfig())
-  res.json({ facilities: rows.map((row) => playerFacilitySummary(row, videoOn)) })
+  res.json({
+    facilities: rows.map((row) => {
+      const next = plays.find((play) => play.facilityId === row.id)
+      return { ...playerFacilitySummary(row, videoOn), nextOpenPlay: next ? { startsAt: next.startsAt, endsAt: next.endsAt } : null }
+    }),
+  })
 })
 
 /** One place to play: what it is, where, when it's open and what it costs. */
@@ -623,6 +649,61 @@ router.get('/facilities/:id', async (req, res) => {
   const row = await findFacility(query, req.params.id)
   if (!row) return res.status(404).json({ error: 'No such place' })
   res.json({ facility: playerFacilityPage(row, Boolean(bucketConfig())) })
+})
+
+/** Open plays as this player sees them: who's coming by level, and the names of people they've played with. */
+async function openPlayRows(plays, viewerId) {
+  const [{ levelOf, levelsShown }, named] = await Promise.all([
+    levelLookup(query),
+    namedFor(query, viewerId, [...new Set(plays.flatMap((play) => play.joined))]),
+  ])
+  return plays.map((play) => openPlayRow(play, { joined: play.joined, viewerId, levelOf, levelsShown, named }))
+}
+
+/** One open play as this player sees it now; null once it's over or gone. */
+async function openPlayFor(openPlayId, viewerId) {
+  const plays = await loadOpenPlays(query, { now: new Date() })
+  const [row] = await openPlayRows(plays.filter((play) => play.id === openPlayId), viewerId)
+  return row ?? null
+}
+
+/** This week's open play everywhere, or at one place, soonest first. */
+router.get('/open-plays', async (req, res) => {
+  const facilityId = req.query.facility ?? null
+  if (facilityId !== null && !isUuid(facilityId)) return res.status(404).json({ error: 'No such place' })
+  const plays = await loadOpenPlays(query, { facilityId, now: new Date() })
+  res.json({ openPlays: await openPlayRows(plays, req.player.id) })
+})
+
+/** One tap to go; joining twice changes nothing. */
+router.post('/open-plays/:id/join', async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such open play' })
+  const refused = await withTransaction((client) => joinOpenPlay(client, req.params.id, req.player.id, new Date()))
+  if (refused) return res.status(refused.status).json({ error: refused.error })
+  const openPlay = await openPlayFor(req.params.id, req.player.id)
+  if (!openPlay) return res.status(404).json({ error: 'No such open play' })
+  res.json({ openPlay })
+})
+
+/** "Going" tapped again: leaves. */
+router.delete('/open-plays/:id/join', async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such open play' })
+  await leaveOpenPlay(query, req.params.id, req.player.id)
+  const openPlay = await openPlayFor(req.params.id, req.player.id)
+  if (!openPlay) return res.status(404).json({ error: 'No such open play' })
+  res.json({ openPlay })
+})
+
+/** How the visit went: a face and chips, once per session, changeable for 7 days after their latest match there. */
+router.post('/sessions/:id/rating', async (req, res) => {
+  const read = readRating(req.body)
+  if (read.error) return res.status(400).json({ error: read.error })
+  const visit = isUuid(req.params.id) ? await visitFor(query, req.params.id, req.player.id) : null
+  if (!visit || !ratingOpen(visit, new Date())) return res.status(403).json({ error: "This visit can't be rated" })
+  const { score, chips } = await saveRating(query, {
+    playerId: req.player.id, sessionId: req.params.id, facilityId: visit.facilityId, ...read.values,
+  })
+  res.json({ visit: { sessionId: req.params.id, facilityName: visit.facilityName, open: true, score, chips } })
 })
 
 export default router

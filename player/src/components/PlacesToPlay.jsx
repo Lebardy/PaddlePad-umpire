@@ -10,12 +10,17 @@ import { fetchFacilities } from '../lib/api'
 import { Link } from './Link'
 import FacilityLogo from './FacilityLogo'
 import Icon from './Icon'
+import { dayTile, timeSpan } from '../lib/openPlay'
 
 function Ticket({ place }) {
   const facts = [
     place.openingHours && { icon: 'clock', text: place.openingHours },
     place.feeText && { icon: 'court', text: `Court ${place.feeText}` },
     place.umpireFeeText && { icon: 'clipboard', text: `Umpire ${place.umpireFeeText}` },
+    place.nextOpenPlay && {
+      icon: 'calendar',
+      text: `Open play ${dayTile(place.nextOpenPlay.startsAt).day} ${timeSpan(place.nextOpenPlay.startsAt, place.nextOpenPlay.endsAt)}`,
+    },
   ].filter(Boolean)
   return (
     <li className="ticket-slot">

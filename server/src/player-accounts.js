@@ -8,7 +8,8 @@
  * comment in schema.sql). Also clears any pause: closed wins.
  *
  * google_sub goes with the rest. Leaving it behind would make "closed"
- * mean "closed except the one-tap way in".
+ * mean "closed except the one-tap way in". Their open play joins and
+ * visit ratings go too: the row stays, so nothing cascades them away.
  */
 export async function wipePlayerCredentials(client, playerId) {
   await client.query(
@@ -26,6 +27,8 @@ export async function wipePlayerCredentials(client, playerId) {
       WHERE id = $1`,
     [playerId],
   )
+  await client.query('DELETE FROM open_play_joins WHERE player_id = $1', [playerId])
+  await client.query('DELETE FROM visit_ratings WHERE player_id = $1', [playerId])
 }
 
 /** Records a successful sign-in. `table` is 'umpires' or 'players', never user input. */

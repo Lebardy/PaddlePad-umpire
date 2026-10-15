@@ -45,6 +45,8 @@ export const ACTIONS = [
   'facility.updated',
   'facility.logo_changed',
   'facility.logo_removed',
+  'open_play.added',
+  'open_play.cancelled',
   'match.looks_fine',
   'match.voided',
   'match.restored',

@@ -25,6 +25,7 @@ import Icon from '../components/Icon'
 import StackedBar from '../components/StackedBar'
 import Meter from '../components/Meter'
 import RallyEndings from '../components/RallyEndings'
+import VisitSection from '../components/VisitSection'
 
 // Both timestamps come from a device clock, and startedAt is when the
 // umpire CREATED the match rather than when play began -- a match set up
@@ -194,6 +195,7 @@ function MatchDetail({ id }) {
           Stacked: you both lined up on one side before each serve.
         </p>
       )}
+      {match.visit && <VisitSection visit={match.visit} />}
 
       <section className="detail-shape" aria-label="How the match went">
         <h2>How it went</h2>

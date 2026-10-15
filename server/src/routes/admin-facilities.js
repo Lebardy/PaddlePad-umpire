@@ -11,6 +11,8 @@ import {
   saveFacilityLogo, updateFacility,
 } from '../facility-store.js'
 import { isUuid } from '../validate.js'
+import { levelLookup, loadOpenPlays, recentRatings } from '../open-play-store.js'
+import { guestsTotals, openPlayRow, openPlayWhen, readOpenPlay, visitSummary } from '../visit-rules.js'
 
 // Facilities: where umpires work. The owner sees and manages every one;
 // a facility's own admins see and manage only theirs.
@@ -183,6 +185,85 @@ router.delete('/:id/logo', async (req, res) => {
   } catch (error) {
     sendRefusal(res, error)
   }
+})
+
+/**
+ * A place's Guests page: this week's open plays with who's coming by level
+ * (never by name), and how visits went over the last 30 days, anonymous.
+ */
+router.get('/:id/guests', async (req, res) => {
+  if (!isUuid(req.params.id) || !mayManageFacility(req.admin, req.params.id)) {
+    return res.status(404).json({ error: 'No such facility' })
+  }
+  const [plays, { levelOf, levelsShown }, ratings] = await Promise.all([
+    loadOpenPlays(query, { facilityId: req.params.id, now: new Date() }),
+    levelLookup(query),
+    recentRatings(query, req.params.id),
+  ])
+  res.json({
+    totals: guestsTotals(plays),
+    openPlays: plays.map((play) => {
+      const { facility, atYourLevel, names, you, ...row } = openPlayRow(play, { joined: play.joined, levelOf, levelsShown })
+      return { ...row, status: row.count >= row.spots ? 'full' : 'open' }
+    }),
+    visits: visitSummary(ratings),
+  })
+})
+
+router.post('/:id/open-plays', async (req, res) => {
+  if (!isUuid(req.params.id) || !mayManageFacility(req.admin, req.params.id)) {
+    return res.status(404).json({ error: 'No such facility' })
+  }
+  const read = readOpenPlay(req.body, new Date())
+  if (read.error) return res.status(400).json({ error: read.error })
+  const { startsAt, endsAt, courts, spots, feeCentavos, umpire, note } = read.values
+  try {
+    const openPlay = await withTransaction(async (client) => {
+      const { rows } = await client.query(
+        `INSERT INTO open_plays (facility_id, starts_at, ends_at, courts, spots, fee_centavos, umpire, note, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING id`,
+        [req.params.id, startsAt, endsAt, courts, spots, feeCentavos, umpire, note, req.admin.id],
+      )
+      await recordActivity(client, {
+        adminId: req.admin.id, action: 'open_play.added', targetType: 'facility', targetId: req.params.id,
+        facilityId: req.params.id, summary: `Added open play ${openPlayWhen(startsAt, endsAt)}`,
+      })
+      return { id: rows[0].id, ...read.values }
+    })
+    res.status(201).json({ openPlay })
+  } catch (error) {
+    // The owner may name any id; one that is no facility fails its foreign key.
+    if (error.code === '23503') return res.status(404).json({ error: 'No such facility' })
+    throw error
+  }
+})
+
+/** Cancelling deletes the open play and everyone's join to it. */
+router.delete('/:id/open-plays/:openPlayId', async (req, res) => {
+  if (!isUuid(req.params.id) || !mayManageFacility(req.admin, req.params.id)) {
+    return res.status(404).json({ error: 'No such facility' })
+  }
+  if (!isUuid(req.params.openPlayId)) return res.status(404).json({ error: 'No such open play' })
+  const cancelled = await withTransaction(async (client) => {
+    const { rows: [{ going }] } = await client.query(
+      'SELECT count(*)::int AS going FROM open_play_joins WHERE open_play_id = $1',
+      [req.params.openPlayId],
+    )
+    const { rows } = await client.query(
+      'DELETE FROM open_plays WHERE id = $1 AND facility_id = $2 RETURNING starts_at, ends_at',
+      [req.params.openPlayId, req.params.id],
+    )
+    if (!rows[0]) return false
+    await recordActivity(client, {
+      adminId: req.admin.id, action: 'open_play.cancelled', targetType: 'facility', targetId: req.params.id,
+      facilityId: req.params.id,
+      summary: `Cancelled open play ${openPlayWhen(rows[0].starts_at, rows[0].ends_at)} (${going} ${going === 1 ? 'player was' : 'players were'} going)`,
+    })
+    return true
+  })
+  if (!cancelled) return res.status(404).json({ error: 'No such open play' })
+  res.status(204).end()
 })
 
 export default router

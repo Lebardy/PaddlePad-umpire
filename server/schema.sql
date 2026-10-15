@@ -871,3 +871,42 @@ CREATE TABLE IF NOT EXISTS match_videos (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     ready_at        TIMESTAMPTZ
 );
+
+-- Open play: hours a place posts for anyone to come and play, with its
+-- courts, spots, fee per player (paid there; null is free) and umpire.
+CREATE TABLE IF NOT EXISTS open_plays (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    facility_id   UUID NOT NULL REFERENCES facilities (id) ON DELETE CASCADE,
+    starts_at     TIMESTAMPTZ NOT NULL,
+    ends_at       TIMESTAMPTZ NOT NULL CHECK (ends_at > starts_at),
+    courts        INTEGER NOT NULL CHECK (courts BETWEEN 1 AND 20),
+    spots         INTEGER NOT NULL CHECK (spots BETWEEN 2 AND 200),
+    fee_centavos  INTEGER CHECK (fee_centavos IS NULL OR fee_centavos > 0),
+    umpire        BOOLEAN NOT NULL DEFAULT true,
+    note          TEXT CHECK (note IS NULL OR char_length(note) <= 60),
+    created_by    UUID REFERENCES admins (id) ON DELETE SET NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS open_plays_facility_idx ON open_plays (facility_id, starts_at);
+
+-- Who is going to each open play, one row per player; cancelling the
+-- open play takes its joins with it.
+CREATE TABLE IF NOT EXISTS open_play_joins (
+    open_play_id UUID NOT NULL REFERENCES open_plays (id) ON DELETE CASCADE,
+    player_id    UUID NOT NULL REFERENCES players (id) ON DELETE CASCADE,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (open_play_id, player_id)
+);
+
+-- How a visit went: one face (1-5) and chips per player per session they
+-- played in. The place sees them summed, never who gave them.
+CREATE TABLE IF NOT EXISTS visit_ratings (
+    player_id   UUID NOT NULL REFERENCES players (id) ON DELETE CASCADE,
+    session_id  UUID NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
+    facility_id UUID NOT NULL REFERENCES facilities (id) ON DELETE CASCADE,
+    score       SMALLINT NOT NULL CHECK (score BETWEEN 1 AND 5),
+    chips       TEXT[] NOT NULL DEFAULT '{}',
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (player_id, session_id)
+);
+CREATE INDEX IF NOT EXISTS visit_ratings_facility_idx ON visit_ratings (facility_id, updated_at);

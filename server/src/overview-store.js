@@ -9,7 +9,7 @@ import { deriveMatchState, eventFromRow } from './pickleball.js'
 import { scopeCondition } from './facility-rules.js'
 import { makeCursor, readCursor } from './people-rules.js'
 import {
-  PLAYER_ID_KEYS, WINDOW_DAYS, duplicatePairs, hasSignIn, leftOpenReason, matchReasons, pairKey, sameDayPairs, sharedMatchPairs,
+  ACTIVE_MS, PLAYER_ID_KEYS, WINDOW_DAYS, duplicatePairs, hasSignIn, leftOpenReason, matchReasons, pairKey, sameDayPairs, sharedMatchPairs,
 } from './overview-rules.js'
 
 const WEEK = "now() - interval '7 days'"
@@ -103,6 +103,30 @@ export async function sessionLeftOpenNow(queryFn, row, now = Date.now()) {
   if (row.ended_at || row.voided_at) return null
   const lastActivityAt = Math.max(...[row.opened_at, row.last_match_started_at, row.last_match_ended_at].map(toMs).filter((v) => v != null))
   return leftOpenReason({ openedAt: row.opened_at, lastActivityAt }, now)
+}
+
+/**
+ * Whether this player is in a session going on right now, for the player
+ * app's film bar: on its roster or in one of its non-voided matches, not
+ * ended or voided, and its last activity within ACTIVE_MS -- the same
+ * last activity loadRightNow uses, so a session left open never counts.
+ */
+export async function playerInGoingOnSession(queryFn, playerId) {
+  const { rows } = await queryFn(
+    `SELECT EXISTS (
+       SELECT 1 FROM sessions s
+        WHERE s.ended_at IS NULL AND s.voided_at IS NULL
+          AND (EXISTS (SELECT 1 FROM session_players sp WHERE sp.session_id = s.id AND sp.player_id = $1)
+               OR EXISTS (SELECT 1 FROM matches m WHERE m.session_id = s.id AND m.voided_at IS NULL
+                             AND (m.team_a || m.team_b) @> ARRAY[$1::uuid]))
+          AND GREATEST(s.created_at,
+                       (SELECT max(m.started_at) FROM matches m WHERE m.session_id = s.id AND m.voided_at IS NULL),
+                       (SELECT max(m.ended_at) FROM matches m WHERE m.session_id = s.id AND m.status = 'completed' AND m.voided_at IS NULL))
+              > now() - make_interval(secs => $2)
+     ) AS in_session`,
+    [playerId, ACTIVE_MS / 1000],
+  )
+  return rows[0].in_session
 }
 
 /**
@@ -365,6 +389,19 @@ export async function mergePlayers(client, keepId, removeId) {
   await client.query(
     `INSERT INTO session_players (session_id, player_id)
      SELECT session_id, $1 FROM session_players WHERE player_id = $2
+     ON CONFLICT DO NOTHING`,
+    [keepId, removeId],
+  )
+  await client.query(
+    `INSERT INTO open_play_joins (open_play_id, player_id, created_at)
+     SELECT open_play_id, $1, created_at FROM open_play_joins WHERE player_id = $2
+     ON CONFLICT DO NOTHING`,
+    [keepId, removeId],
+  )
+  // Where both rated a session, the kept player's rating wins.
+  await client.query(
+    `INSERT INTO visit_ratings (player_id, session_id, facility_id, score, chips, updated_at)
+     SELECT $1, session_id, facility_id, score, chips, updated_at FROM visit_ratings WHERE player_id = $2
      ON CONFLICT DO NOTHING`,
     [keepId, removeId],
   )

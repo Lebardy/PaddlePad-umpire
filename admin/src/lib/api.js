@@ -198,6 +198,12 @@ export function logoSrc(logoUrl, { small = false } = {}) {
   return logoUrl ? `${API_URL}${logoUrl}${small ? '&size=small' : ''}` : null
 }
 
+// Guests: a place's open play and how visits went
+
+export const fetchGuests = (facilityId) => apiFetch(`/admin/facilities/${facilityId}/guests`)
+export const addOpenPlay = (facilityId, body) => post(`/admin/facilities/${facilityId}/open-plays`, body).then((d) => d.openPlay)
+export const cancelOpenPlay = (facilityId, id) => apiFetch(`/admin/facilities/${facilityId}/open-plays/${id}`, { method: 'DELETE' })
+
 // Activity
 
 export function listActivity({ before, adminId, action, facilityId, q } = {}) {
