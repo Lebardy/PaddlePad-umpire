@@ -195,8 +195,8 @@ html { scrollbar-color: var(--border) var(--bg); }
 .tabs { list-style: none; margin: 0; padding: 0; display: flex; align-items: stretch; border-left: 1px solid var(--board-rule); }
 .tabs li { display: flex; border-right: 1px solid var(--board-rule); }
 .tabs a {
-  /* 0.75rem, not more: seven pages and the owner's name share one 1280 board. */
-  display: flex; align-items: center; padding: 0 0.75rem; font-size: 1.05rem;
+  /* 0.65rem, not more: seven pages (one is "Open play") and the owner's name share one 1280 board. */
+  display: flex; align-items: center; padding: 0 0.65rem; font-size: 1.05rem;
   color: var(--board-muted); text-decoration: none; position: relative; white-space: nowrap;
 }
 .tabs a:hover { color: var(--board-ink); background: var(--board-raised); }
