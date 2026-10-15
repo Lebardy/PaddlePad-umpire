@@ -50,6 +50,9 @@ check('no level of your own',
 check('no clear levels: nothing about levels at all',
   whoWords(row({ count: 3, atYourLevel: null, levels: null, names: ['Bea Mendoza'] })),
   { level: null, mix: null, empty: null, names: 'Bea +2' })
+check('only you going: nothing about levels',
+  whoWords(row({ count: 1, levels: [{ name: 'Developing', count: 1 }], you: true })),
+  { level: null, mix: null, empty: null, names: null })
 check('nobody yet', whoWords(row({ levels: [] })), { level: null, mix: null, empty: 'Nobody yet. Be the first.', names: null })
 check('two names and nobody else', whoWords(row({ count: 3, levels: null, names: ['Paolo Garcia', 'Bea Mendoza'], you: true })),
   { level: null, mix: null, empty: null, names: 'Paolo, Bea' })

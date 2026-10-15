@@ -59,12 +59,13 @@ export function whoWords(row) {
   const level = row.atYourLevel > 0 ? `${row.atYourLevel} at your level` : null
   const words = row.levels ? [...row.levels.map((l) => l.name), ...(row.newCount > 0 ? ['new'] : [])] : []
   const shown = row.names.slice(0, 2).map((name) => name.split(' ')[0])
-  const rest = row.count - shown.length - (row.you ? 1 : 0)
+  const others = row.count - (row.you ? 1 : 0)
   return {
     level,
-    mix: !level && row.count > 0 && words.length > 0 ? words.join(' · ') : null,
+    // Only you going: your own level is not who's coming.
+    mix: !level && others > 0 && words.length > 0 ? words.join(' · ') : null,
     empty: row.count === 0 ? 'Nobody yet. Be the first.' : null,
-    names: shown.length > 0 ? `${shown.join(', ')}${rest > 0 ? ` +${rest}` : ''}` : null,
+    names: shown.length > 0 ? `${shown.join(', ')}${others > shown.length ? ` +${others - shown.length}` : ''}` : null,
   }
 }
 
