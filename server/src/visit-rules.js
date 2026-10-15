@@ -109,17 +109,18 @@ export function joinRefusal({ endsAt, spots, count, you }, now) {
  */
 export function openPlayRow(play, { joined, viewerId = null, levelOf, levelsShown, named = new Map() }) {
   const ids = [...new Set(joined)]
+  // Your own level is not who's coming.
+  const others = ids.filter((id) => id !== viewerId)
   const tally = new Map()
   let newCount = 0
   if (levelsShown) {
-    for (const id of ids) {
+    for (const id of others) {
       const name = levelOf(id)
       if (name) tally.set(name, (tally.get(name) ?? 0) + 1)
       else newCount += 1
     }
   }
   const yours = levelsShown && viewerId ? levelOf(viewerId) : null
-  const others = ids.filter((id) => id !== viewerId)
   return {
     id: play.id,
     facility: { id: play.facilityId, name: play.facilityName },

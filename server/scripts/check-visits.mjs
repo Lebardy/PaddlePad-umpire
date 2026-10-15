@@ -87,11 +87,13 @@ check('the viewer at a level', openPlayRow(sat, { joined, viewerId: 'me', levelO
   id: 'op1', facility: { id: 'f1', name: 'Boulevard Paddle Courts' },
   startsAt: '2026-10-16T22:00:00.000Z', endsAt: '2026-10-17T01:00:00.000Z',
   courts: 2, spots: 16, feeCentavos: 15000, umpire: true, note: null,
-  count: 5, atYourLevel: 2, levels: [{ name: 'Advanced', count: 1 }, { name: 'Developing', count: 3 }], newCount: 1,
+  count: 5, atYourLevel: 2, levels: [{ name: 'Advanced', count: 1 }, { name: 'Developing', count: 2 }], newCount: 1,
   names: ['Bea Mendoza', 'Paolo Garcia'], you: true,
 })
 const noLevels = openPlayRow(sat, { joined, viewerId: 'me', levelOf, levelsShown: false, named })
 check('no clear levels: no level words at all', [noLevels.levels, noLevels.newCount, noLevels.atYourLevel], [null, 0, null])
+const withExpert = openPlayRow(sat, { joined: ['me', 'ace'], viewerId: 'me', levelOf: (id) => (id === 'ace' ? 'Expert' : levelOf(id)), levelsShown: true, named })
+check('your own level is not who is coming', [withExpert.levels, withExpert.newCount], [[{ name: 'Expert', count: 1 }], 0])
 check('a viewer with no level', openPlayRow(sat, { joined, viewerId: 'newbie', levelOf, levelsShown: true, named }).atYourLevel, null)
 check('nobody yet', openPlayRow(sat, { joined: [], viewerId: 'me', levelOf, levelsShown: true, named }).count, 0)
 check('a stranger is never named', openPlayRow(sat, { joined: ['stranger'], viewerId: 'me', levelOf, levelsShown: true, named }).names, [])
