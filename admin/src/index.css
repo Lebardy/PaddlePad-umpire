@@ -195,8 +195,8 @@ html { scrollbar-color: var(--border) var(--bg); }
 .tabs { list-style: none; margin: 0; padding: 0; display: flex; align-items: stretch; border-left: 1px solid var(--board-rule); }
 .tabs li { display: flex; border-right: 1px solid var(--board-rule); }
 .tabs a {
-  /* 1rem, not more: the menu's icons take the room the padding gives back. */
-  display: flex; align-items: center; padding: 0 1rem; font-size: 1.05rem;
+  /* 0.75rem, not more: seven pages and the owner's name share one 1280 board. */
+  display: flex; align-items: center; padding: 0 0.75rem; font-size: 1.05rem;
   color: var(--board-muted); text-decoration: none; position: relative; white-space: nowrap;
 }
 .tabs a:hover { color: var(--board-ink); background: var(--board-raised); }
@@ -591,12 +591,13 @@ td.table-foot { display: table-cell; }
   .topbar .brand-mark { padding-right: 1rem; }
   /* The sign shrinks to its lamp and one word: Admin, or Manager. */
   .topbar .brand-name { display: none; }
-  .tabs a { padding: 0 0.9rem; }
+  .tabs a { padding: 0 0.5rem; }
+  .tabs .icon { margin-right: 0.3em; }
   .who-cell, .signout { padding: 0 1rem; }
 }
-/* The narrowest the site goes: the owner's six tabs close up so the name still shows. */
+/* The narrowest the site goes: the owner's seven tabs close up so the name still shows. */
 @media (max-width: 1099px) {
-  .tabs a { padding: 0 0.6rem; }
+  .tabs a { padding: 0 0.4rem; font-size: 0.95rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -932,3 +933,43 @@ tr.is-voided .reason { opacity: 0.6; }
   box-sizing: border-box; width: 1.6rem; height: 1.6rem; padding: 0.25rem; margin-right: 0.5rem;
   background: var(--lamp); color: #15181d; border-radius: 2px; vertical-align: -0.28em; stroke-width: 2.2;
 }
+
+/* ============ Guests: a place's open play and how visits went ============ */
+
+.total-figure small { font-size: 1.3rem; color: var(--text-muted); }
+.status-open::before { background: var(--win-lamp); box-shadow: 0 0 6px var(--win-lamp); }
+.status-full::before { background: var(--lamp); box-shadow: 0 0 6px var(--lamp); }
+.guests-form .field-number input { width: 5.5rem; }
+/* Wide enough for one row: the note gives way so Add open play stays on it. */
+@media (min-width: 1181px) { .guests-form .field.grow { flex-basis: 9rem; } }
+.guests-hint { flex-basis: 100%; }
+.guests-error, .guests-form + .table-wrap, .guests-error + .table-wrap { margin-top: 0.75rem; }
+.cell-figure { font-family: var(--label); font-weight: 700; font-size: 1.1rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* How full it is: the blue of proportions, light track to dark fill. */
+.spots-meter { display: block; width: 6.5rem; height: 6px; margin-top: 0.45rem; background: var(--seq-track); }
+.spots-meter i { display: block; height: 100%; background: var(--seq-fill); }
+
+.visits {
+  display: grid; grid-template-columns: minmax(13rem, 1fr) minmax(0, 3fr);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+}
+.visits-score { display: grid; align-content: start; gap: 0.5rem; padding: 1.25rem; border-right: 1px solid var(--border); }
+.visits-score b { font-family: var(--display); font-weight: 900; font-size: 4rem; line-height: 0.9; font-variant-numeric: tabular-nums; }
+.visits-score span { color: var(--text-muted); }
+.visits-detail { display: grid; gap: 0.9rem; padding: 1rem 1.25rem; min-width: 0; }
+.visits-faces { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+.visits-faces li {
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 3rem;
+  background: var(--surface-sunken); color: var(--text-secondary); border-radius: var(--radius-sm);
+}
+.visits-faces b { font-family: var(--label); font-weight: 700; font-size: 1.25rem; color: var(--text); font-variant-numeric: tabular-nums; }
+.visits-line { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.visits-line > .total-label { min-width: 9rem; }
+/* The filter pills' look, but only a count: nothing here is pressed. */
+.visits-chip {
+  display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.4rem 0.35rem 0.85rem;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); font-weight: 600;
+}
+.visits-none { color: var(--text-muted); }
+/* A row's Cancel and its Confirm / Not now are a finger's size on a tablet. */
+.guests-table .btn-small { min-height: 2.75rem; }

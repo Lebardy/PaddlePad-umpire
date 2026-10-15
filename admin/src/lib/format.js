@@ -101,6 +101,8 @@ const ACTION_LABELS = {
   'player.not_duplicate': 'Marked players as different people',
   'player.merged': 'Merged two players',
   'session.closed': 'Closed a session',
+  'open_play.added': 'Added open play',
+  'open_play.cancelled': 'Cancelled open play',
 }
 
 export function actionLabel(action) {
@@ -157,7 +159,8 @@ export function signInMethodsText(methods) {
   return methods && methods.length > 0 ? methods.map(capitalize).join(', ') : 'No way in yet'
 }
 
-const STATUS_LABELS = { active: 'Active', paused: 'Paused', closed: 'Closed' }
+// Open and full are an open play's.
+const STATUS_LABELS = { active: 'Active', paused: 'Paused', closed: 'Closed', open: 'Open', full: 'Full' }
 
 export function statusLabel(status) {
   return STATUS_LABELS[status] ?? status

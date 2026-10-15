@@ -12,6 +12,7 @@ import Activity from './screens/Activity'
 import Admins from './screens/Admins'
 import Facilities from './screens/Facilities'
 import FacilityDetail from './screens/FacilityDetail'
+import Guests from './screens/Guests'
 import Invites from './screens/Invites'
 import MatchDetail from './screens/MatchDetail'
 import Overview from './screens/Overview'
@@ -81,6 +82,7 @@ export default function App() {
     const match = matchPath('/matches/:id', path)
     let screen
     if (path === '/') screen = <Overview me={admin} facilityLabel={facilityLabel(admin, facilities ?? [])} />
+    else if (path === '/guests') screen = <Guests me={admin} facilityLabel={facilityLabel(admin, facilities ?? [])} />
     else if (path === '/managers' && admin.role === 'owner') screen = <Admins me={admin} />
     else if (path === '/activity') screen = <Activity me={admin} />
     else if (path === '/account') screen = <Account admin={admin} onAdminChange={updateAdmin} />
