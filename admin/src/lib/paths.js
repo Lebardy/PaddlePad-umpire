@@ -2,7 +2,7 @@
 // Where an old admin address lives now.
 //
 // "People" was split into Players and Umpires, and "Invite codes" moved
-// under Umpires as a tab. Old links and bookmarks are sent on rather
+// under Umpires as a tab, and Guests became Open play. Old links and bookmarks are sent on rather
 // than landing on "There's no page here."
 // ============================================================
 
@@ -13,6 +13,7 @@ const MOVED = [
   [/^\/people\/umpires\/([^/]+)$/, (id) => `/umpires/${id}`],
   [/^\/invites$/, () => '/umpires/invites'],
   [/^\/admins$/, () => '/managers'],
+  [/^\/guests$/, () => '/open-play'],
 ]
 
 /** The new address for an old one, or null when `path` has not moved. */

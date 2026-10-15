@@ -4,7 +4,7 @@ import LampMark from './LampMark'
 
 const PAGES = [
   { to: '/', label: 'Overview', icon: 'overview', current: (path) => path === '/' },
-  { to: '/guests', label: 'Open play', icon: 'calendar', current: (path) => path === '/guests' },
+  { to: '/open-play', label: 'Open play', icon: 'calendar', current: (path) => path === '/open-play' },
   { to: '/players', label: 'Players', icon: 'people', current: (path) => path === '/players' || path.startsWith('/players/') },
   { to: '/umpires', label: 'Umpires', icon: 'clipboard', current: (path) => path === '/umpires' || path.startsWith('/umpires/') },
   { to: '/facilities', label: 'Facilities', icon: 'pin', facilityAdminLabel: 'Facility', current: (path) => path === '/facilities' || path.startsWith('/facilities/') },

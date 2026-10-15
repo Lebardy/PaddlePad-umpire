@@ -27,11 +27,12 @@ check('People › Umpires goes to Umpires', movedPath('/people/umpires'), '/umpi
 check("a player's page keeps its id", movedPath(`/people/players/${id}`), `/players/${id}`)
 check("an umpire's page keeps its id", movedPath(`/people/umpires/${id}`), `/umpires/${id}`)
 check('Invite codes goes under Umpires', movedPath('/invites'), '/umpires/invites')
+check('Guests goes to Open play', movedPath('/guests'), '/open-play')
 
 console.log('\ncurrent addresses stay put')
 check('nothing else moves',
-  ['/', '/players', '/umpires', '/umpires/invites', `/players/${id}`, '/facilities', '/account', '/people/nobody'].map(movedPath),
-  [null, null, null, null, null, null, null, null])
+  ['/', '/players', '/umpires', '/umpires/invites', `/players/${id}`, '/facilities', '/account', '/open-play', '/people/nobody'].map(movedPath),
+  [null, null, null, null, null, null, null, null, null])
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

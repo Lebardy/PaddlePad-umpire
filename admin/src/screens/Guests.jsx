@@ -88,7 +88,7 @@ export default function Guests({ me, facilityLabel }) {
             <div>
               <div className="section-head">
                 <h2 className="section-title" tabIndex={-1} ref={playsHeading}>
-                  <Icon name="calendar" />Open play<span className="worth-count">{data.openPlays.length}</span>
+                  <Icon name="calendar" />Coming up<span className="worth-count">{data.openPlays.length}</span>
                 </h2>
               </div>
               <OpenPlayForm
