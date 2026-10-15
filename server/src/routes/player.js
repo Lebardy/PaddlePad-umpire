@@ -544,6 +544,19 @@ router.post('/link', async (req, res) => {
        ON CONFLICT DO NOTHING`,
       [target.id, source.id],
     )
+    await client.query(
+      `INSERT INTO open_play_joins (open_play_id, player_id, created_at)
+       SELECT open_play_id, $2, created_at FROM open_play_joins WHERE player_id = $1
+       ON CONFLICT DO NOTHING`,
+      [target.id, source.id],
+    )
+    // Where both rated a session, the kept player's rating wins.
+    await client.query(
+      `INSERT INTO visit_ratings (player_id, session_id, facility_id, score, chips, updated_at)
+       SELECT $2, session_id, facility_id, score, chips, updated_at FROM visit_ratings WHERE player_id = $1
+       ON CONFLICT DO NOTHING`,
+      [target.id, source.id],
+    )
 
     // Re-counted after the rewrite rather than trusting theirs + yours:
     // this is the number the app tells the player they now have, and it

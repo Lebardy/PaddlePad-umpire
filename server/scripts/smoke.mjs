@@ -3536,6 +3536,31 @@ async function main() {
         rated: 1, average: null, faces: [0, 1, 0, 0, 0], good: {}, better: { Waiting: 1, Price: 1 },
       }), JSON.stringify(guestsAfter.body).slice(0, 200))
 
+    // --- the last spot, taken twice at once ---
+    const racePlay = await addOpenPlay({ ...opBody, startsAt: manilaAt(2, 18), endsAt: manilaAt(2, 20) })
+    const raceJoin = (who) => asPlayer(`/player/open-plays/${racePlay.body.openPlay?.id}/join`, { method: 'POST', bearer: who.token })
+    await raceJoin(two)
+    const race = await Promise.all([raceJoin(one), raceJoin(three)])
+    check('two players race for the last spot: one gets it, the other -> 409, This open play is full',
+      race.filter((r) => r.status === 200).length === 1
+        && race.filter((r) => r.status === 409 && r.body.error === 'This open play is full').length === 1,
+      JSON.stringify(race.map((r) => [r.status, r.body.error ?? r.body.openPlay?.count])))
+    await request(`/admin/facilities/${placeId}/open-plays/${racePlay.body.openPlay?.id}`, { method: 'DELETE', bearer: opOwnerToken })
+
+    // --- linking a code keeps the join and the rating ---
+    const twoRated = await rate(two, { score: 4, chips: [] })
+    const twoRecord = (await request('/players', { method: 'POST', bearer: opUmpireToken, body: { name: `Smoke Open Play Spelling ${opStamp}` } })).body.player?.id
+    const twoCode = (await request(`/players/${twoRecord}/claim-code`, { bearer: opUmpireToken })).body.claimCode
+    const twoLinked = await asPlayer('/player/link', { method: 'POST', bearer: two.token, body: { code: twoCode, confirm: true } })
+    check('Two rates the visit, then links a code -> 200', twoRated.status === 200 && twoLinked.status === 200,
+      `${twoRated.status} ${JSON.stringify(twoLinked.body).slice(0, 100)}`)
+    Object.assign(two, { id: twoLinked.body.player?.id, token: twoLinked.body.token })
+    const twoAfterLink = (await listFor(two))?.[0]
+    const guestsLinked = await request(`/admin/facilities/${placeId}/guests`, { bearer: opOwnerToken })
+    check('the link keeps their join and their rating',
+      twoAfterLink?.you === true && twoAfterLink.count === 1 && guestsLinked.body.visits?.rated === 2,
+      `${JSON.stringify(twoAfterLink)?.slice(0, 100)} ${JSON.stringify(guestsLinked.body.visits)}`)
+
     // --- cancelling ---
     const cancelled = await request(`/admin/facilities/${placeId}/open-plays/${openPlayId}`, { method: 'DELETE', bearer: opOwnerToken })
     check('the owner cancels it -> 204', cancelled.status === 204, String(cancelled.status))
@@ -3897,6 +3922,20 @@ async function main() {
       JSON.stringify((pastPage2.body.sessions ?? []).map((s) => s.id)) === JSON.stringify([sessionAId]) &&
       !page1Ids.includes(sessionAId) && pastPage2.body.next === null, JSON.stringify(pastPage2.body).slice(0, 160))
 
+    // John claims his record (a code is no sign-in, so he can still be
+    // merged away), joins open play at A and rates his visit there.
+    const johnCode = (await request(`/players/${johnId}/claim-code`, { bearer: umpAToken })).body.claimCode
+    const johnToken = (await asPlayer('/auth/player/claim', { method: 'POST', body: { code: johnCode } })).body.token
+    const ovDay = manilaDayStart(new Date()).getTime() + 86_400_000
+    const ovPlay = await request(`/admin/facilities/${facilityAId}/open-plays`, {
+      method: 'POST', bearer: fOwnerToken,
+      body: { startsAt: new Date(ovDay + 18 * 3_600_000).toISOString(), endsAt: new Date(ovDay + 20 * 3_600_000).toISOString(), courts: 1, spots: 8, umpire: false },
+    })
+    const johnJoined = await asPlayer(`/player/open-plays/${ovPlay.body.openPlay?.id}/join`, { method: 'POST', bearer: johnToken })
+    const johnRated = await asPlayer(`/player/sessions/${session2Id}/rating`, { method: 'POST', bearer: johnToken, body: { score: 4, chips: [] } })
+    check('John claims his record, joins open play at A and rates his visit',
+      ovPlay.status === 201 && johnJoined.status === 200 && johnRated.status === 200, `${ovPlay.status} ${johnJoined.status} ${johnRated.status}`)
+
     const wrongName = await request('/admin/overview/merge', {
       method: 'POST', bearer: fOwnerToken, body: { keepId: jonId, removeId: johnId, confirmName: 'nope' },
     })
@@ -3905,6 +3944,10 @@ async function main() {
       method: 'POST', bearer: fOwnerToken, body: { keepId: jonId, removeId: johnId, confirmName: johnName },
     })
     check('merge -> 200 with one match moved', merged.status === 200 && merged.body.movedMatches === 1, JSON.stringify(merged.body))
+
+    const guestsA = await request(`/admin/facilities/${facilityAId}/guests`, { bearer: fOwnerToken })
+    check("the merge keeps John's join and his rating, now Jon's",
+      guestsA.body.openPlays?.[0]?.count === 1 && guestsA.body.visits?.rated === 1, JSON.stringify(guestsA.body).slice(0, 200))
 
     const m3 = await request(`/matches/${m3Id}`, { bearer: umpAToken })
     check('M3 now names Jon, not John', m3.body.match?.teamA?.includes(jonId) && !m3.body.match?.teamA?.includes(johnId),

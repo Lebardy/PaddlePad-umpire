@@ -392,6 +392,19 @@ export async function mergePlayers(client, keepId, removeId) {
      ON CONFLICT DO NOTHING`,
     [keepId, removeId],
   )
+  await client.query(
+    `INSERT INTO open_play_joins (open_play_id, player_id, created_at)
+     SELECT open_play_id, $1, created_at FROM open_play_joins WHERE player_id = $2
+     ON CONFLICT DO NOTHING`,
+    [keepId, removeId],
+  )
+  // Where both rated a session, the kept player's rating wins.
+  await client.query(
+    `INSERT INTO visit_ratings (player_id, session_id, facility_id, score, chips, updated_at)
+     SELECT $1, session_id, facility_id, score, chips, updated_at FROM visit_ratings WHERE player_id = $2
+     ON CONFLICT DO NOTHING`,
+    [keepId, removeId],
+  )
   const { rows: moved } = await client.query(
     `UPDATE matches
         SET team_a = array_replace(team_a, $2::uuid, $1::uuid),
