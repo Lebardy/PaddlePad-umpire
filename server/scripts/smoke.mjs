@@ -3547,6 +3547,18 @@ async function main() {
       JSON.stringify(race.map((r) => [r.status, r.body.error ?? r.body.openPlay?.count])))
     await request(`/admin/facilities/${placeId}/open-plays/${racePlay.body.openPlay?.id}`, { method: 'DELETE', bearer: opOwnerToken })
 
+    // --- a paused player is not counted as going when it is cancelled ---
+    const pausedBody = { ...opBody, startsAt: manilaAt(3, 18), endsAt: manilaAt(3, 20) }
+    const pausedPlay = await addOpenPlay(pausedBody)
+    await asPlayer(`/player/open-plays/${pausedPlay.body.openPlay?.id}/join`, { method: 'POST', bearer: three.token })
+    await request(`/admin/players/${three.id}/pause`, { method: 'POST', bearer: opOwnerToken, body: { reason: 'smoke test' } })
+    await request(`/admin/facilities/${placeId}/open-plays/${pausedPlay.body.openPlay?.id}`, { method: 'DELETE', bearer: opOwnerToken })
+    await request(`/admin/players/${three.id}/unpause`, { method: 'POST', bearer: opOwnerToken })
+    const pausedSaid = ((await request(`/admin/activity?facilityId=${placeId}`, { bearer: opOwnerToken })).body.entries ?? []).map((e) => e.summary)
+    check('cancelling counts only active players: a paused joiner -> (0 players were going)',
+      pausedSaid.includes(`Cancelled open play ${openPlayWhen(pausedBody.startsAt, pausedBody.endsAt)} (0 players were going)`),
+      JSON.stringify(pausedSaid).slice(0, 200))
+
     // --- linking a code keeps the join and the rating ---
     const twoRated = await rate(two, { score: 4, chips: [] })
     const twoRecord = (await request('/players', { method: 'POST', bearer: opUmpireToken, body: { name: `Smoke Open Play Spelling ${opStamp}` } })).body.player?.id

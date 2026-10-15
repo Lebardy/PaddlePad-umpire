@@ -197,8 +197,13 @@ function GuestTotals({ totals, visits }) {
 
 /** The form strip: an open play is added here, never in a pop-up. */
 function OpenPlayForm({ onAdd }) {
-  const [days] = useState(() => dayOptions(Date.now()))
+  const [days, setDays] = useState(() => dayOptions(Date.now()))
   const [day, setDay] = useState(days[1].value)
+  // Relabelled each minute, so a page left open past midnight never calls today "Tomorrow".
+  useEffect(() => {
+    const timer = setInterval(() => setDays(dayOptions(Date.now())), 60_000)
+    return () => clearInterval(timer)
+  }, [])
   const [start, setStart] = useState(6)
   const [end, setEnd] = useState(9)
   const [courts, setCourts] = useState('1')

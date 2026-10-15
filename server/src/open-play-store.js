@@ -25,8 +25,8 @@ export async function levelLookup(query) {
   }
 }
 
-/** This week's open plays, soonest first, each with the active players going. One place's, given `facilityId`. */
-export async function loadOpenPlays(query, { facilityId = null, now }) {
+/** This week's open plays, soonest first, each with the active players going. One place's, given `facilityId`; just one, given `id`. */
+export async function loadOpenPlays(query, { facilityId = null, id = null, now }) {
   const { rows } = await query(
     `SELECT o.id, o.facility_id, f.name AS facility_name, o.starts_at, o.ends_at, o.courts, o.spots,
             o.fee_centavos, o.umpire, o.note,
@@ -35,10 +35,10 @@ export async function loadOpenPlays(query, { facilityId = null, now }) {
        JOIN facilities f ON f.id = o.facility_id
        LEFT JOIN open_play_joins j ON j.open_play_id = o.id
        LEFT JOIN players p ON p.id = j.player_id AND p.deactivated_at IS NULL AND p.paused_at IS NULL
-      WHERE o.ends_at > $1 AND o.starts_at < $2 AND ($3::uuid IS NULL OR o.facility_id = $3)
+      WHERE o.ends_at > $1 AND o.starts_at < $2 AND ($3::uuid IS NULL OR o.facility_id = $3) AND ($4::uuid IS NULL OR o.id = $4)
       GROUP BY o.id, f.name
       ORDER BY o.starts_at, f.name`,
-    [now, weekEnd(now), facilityId],
+    [now, weekEnd(now), facilityId, id],
   )
   return rows.map((row) => ({
     id: row.id,

@@ -247,7 +247,9 @@ router.delete('/:id/open-plays/:openPlayId', async (req, res) => {
   if (!isUuid(req.params.openPlayId)) return res.status(404).json({ error: 'No such open play' })
   const cancelled = await withTransaction(async (client) => {
     const { rows: [{ going }] } = await client.query(
-      'SELECT count(*)::int AS going FROM open_play_joins WHERE open_play_id = $1',
+      // Counted as the page counts them: paused or closed players are not going.
+      `SELECT count(*)::int AS going FROM open_play_joins j JOIN players p ON p.id = j.player_id
+        WHERE j.open_play_id = $1 AND p.deactivated_at IS NULL AND p.paused_at IS NULL`,
       [req.params.openPlayId],
     )
     const { rows } = await client.query(

@@ -662,8 +662,7 @@ async function openPlayRows(plays, viewerId) {
 
 /** One open play as this player sees it now; null once it's over or gone. */
 async function openPlayFor(openPlayId, viewerId) {
-  const plays = await loadOpenPlays(query, { now: new Date() })
-  const [row] = await openPlayRows(plays.filter((play) => play.id === openPlayId), viewerId)
+  const [row] = await openPlayRows(await loadOpenPlays(query, { id: openPlayId, now: new Date() }), viewerId)
   return row ?? null
 }
 

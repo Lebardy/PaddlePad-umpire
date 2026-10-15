@@ -17,11 +17,11 @@ export const LADDER = ['Beginner', 'Developing', 'Intermediate', 'Advanced', 'Ex
  * player's current rating, undefined for one who has none.
  */
 export function levelForPlayer({ levels, points, runPoints }) {
-  if (!Array.isArray(levels) || levels.length < 2 || !Number.isFinite(points)) return null
+  // The same test as the open-play words: fewer than two levels, or one left with nobody, shows nothing.
+  if (!levelNamer({ levels, runPoints }) || !Number.isFinite(points)) return null
   const levelOf = placer(levels)
   const placed = levels.map(() => [])
   for (const value of runPoints) if (Number.isFinite(value)) placed[levelOf(value)].push(value)
-  if (placed.some((values) => values.length === 0)) return null
   const index = levelOf(points)
   const rank = LADDER.indexOf(levels[index].name) + 1
   if (!rank) return null
