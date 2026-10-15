@@ -1,7 +1,8 @@
 // ============================================================
 // One open play, the same row on a place page and in the list: the day
-// (or the place), the hours, its chips, the spots taken, who's coming
-// and the one button -- Join, Going (tap again to leave) or Full.
+// (or the place), the hours, its chips, the manager's note, the spots
+// taken, who's coming and the one button -- Join, Going (tap again to
+// leave) or Full.
 // ============================================================
 
 import { useState } from 'react'
@@ -54,6 +55,7 @@ function OpenPlayRow({ row, tile, rank, onChange }) {
             {row.umpire && <li className="chip"><Icon name="clipboard" size={14} />Umpire</li>}
             <li className="chip"><Icon name="cash" size={14} />{feeWords(row.feeCentavos)}</li>
           </ul>
+          {row.note && <p className="op-msg"><Icon name="info" size={16} />{row.note}</p>}
         </div>
         <p className="op-spots"><b>{row.count}<small>/{row.spots}</small></b><span>Spots</span></p>
       </div>

@@ -3009,6 +3009,8 @@
 .op-place { font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
 .op-time { font-family: var(--display); font-weight: 900; font-size: 1.75rem; line-height: 0.95; text-transform: uppercase; }
 .op-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.op-msg { display: flex; align-items: flex-start; gap: 0.35rem; font-size: 0.88rem; line-height: 1.35; color: var(--text-muted); overflow-wrap: anywhere; }
+.op-msg svg { flex: none; margin-top: 0.05rem; }
 .op-spots { display: grid; justify-items: end; gap: 0.2rem; }
 .op-spots b { font-family: var(--display); font-weight: 900; font-size: 1.8rem; line-height: 1; font-variant-numeric: tabular-nums; }
 .op-spots small { font-size: 1.1rem; color: var(--text-muted); }
