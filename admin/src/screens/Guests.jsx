@@ -74,7 +74,7 @@ export default function Guests({ me, facilityLabel }) {
 
   return (
     <section>
-      <PageBoard title="Guests" intro={facilityName ? <><strong>{facilityName}</strong>, the next 7 days.</> : null}>
+      <PageBoard title="Open play" intro={facilityName ? <><strong>{facilityName}</strong>, the next 7 days.</> : null}>
         <FacilityPicker me={me} value={picked} onChange={pick} variant="board" />
       </PageBoard>
 
