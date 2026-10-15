@@ -72,6 +72,7 @@
 .empty-head h1,
 .board-match h1,
 .film-notes h1,
+.open-play-screen > h1,
 .camera-upright h2,
 .camera-note h2,
 .crash h1 {
@@ -89,13 +90,15 @@
 .graph-page h1,
 .leaderboard-screen h1,
 .film-notes h1,
+.open-play-screen > h1,
 .camera-upright h2,
 .camera-note h2,
 .section-head h1 { font-size: clamp(2.4rem, 11vw, 3rem); }
 .people-screen > h1,
 .standing h1,
 .graph-page h1,
-.leaderboard-screen h1 { margin: 0.25rem 0 1rem; }
+.leaderboard-screen h1,
+.open-play-screen > h1 { margin: 0.25rem 0 1rem; }
 
 /* Every label on the board and in the bands: condensed capitals. */
 .sb-label,
@@ -452,6 +455,8 @@
 .setup-card,
 .link-code,
 .film-note,
+.open-play,
+.visit,
 .error-state {
   background: var(--surface);
   margin-inline: calc(var(--gutter) * -1);
@@ -477,6 +482,8 @@
 .recent > .section-head,
 .month-band > .section-head,
 .places > .section-head,
+.open-play > .section-head,
+.visit > .section-head,
 .trend > .trend-head,
 .detail-shape > .board-match-head {
   display: flex;
@@ -2980,3 +2987,71 @@
 @media (prefers-reduced-motion: reduce) {
   .level-plate-chevron { transition: none; }
 }
+
+/* ============ Open play ============ */
+
+.place-board + .open-play { margin-top: 1rem; }
+
+/* One row everywhere: the day (or the place), the hours and their chips,
+   the spots on the right, the meter, then who's coming and one button. */
+.open-play > .section-head { margin-bottom: 0; }
+.op-rows > li + li { border-top: 1px solid var(--border); }
+.op { display: grid; gap: 0.65rem; padding: 0.9rem 0; }
+.op-main { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 0.75rem; }
+.op-tile { display: block; text-decoration: none; }
+.op-day {
+  width: 3rem; height: 3rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.15rem;
+  border-radius: 2px; background: var(--board); color: var(--board-ink);
+  font-family: var(--display); font-weight: 900; font-size: 1.35rem; line-height: 1;
+}
+.op-day b { font-family: var(--label); font-weight: 700; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--lamp); }
+.op-what { display: grid; gap: 0.4rem; min-width: 0; }
+.op-place { font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+.op-time { font-family: var(--display); font-weight: 900; font-size: 1.75rem; line-height: 0.95; text-transform: uppercase; }
+.op-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.op-spots { display: grid; justify-items: end; gap: 0.2rem; }
+.op-spots b { font-family: var(--display); font-weight: 900; font-size: 1.8rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.op-spots small { font-size: 1.1rem; color: var(--text-muted); }
+.op-spots span { font-family: var(--label); font-weight: 700; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.op-foot { display: flex; align-items: center; gap: 0.75rem; }
+.op-who { display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem 0.6rem; min-width: 0; font-size: 0.95rem; line-height: 1.3; }
+.op-level { display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 600; }
+.op-emblem { flex: none; color: var(--text); --emblem-cut: var(--surface); }
+.op-names { color: var(--text-muted); }
+/* The filled button, and outlined once you're going; Full is the outline gone quiet. */
+.op-go {
+  margin-left: auto; flex: none; min-height: 44px; min-width: 6rem; padding: 0 1rem;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;
+  border: 2px solid var(--button); border-radius: var(--radius-sm); background: var(--button); color: var(--button-ink);
+  font-family: var(--label); font-size: 1.05rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer;
+}
+.op-go-out { background: transparent; color: var(--text); border-color: var(--rule); }
+.op-go-full { color: var(--text-muted); border-color: var(--border); cursor: default; }
+.op-go[aria-busy='true'] { opacity: 0.6; cursor: progress; }
+.op-error { color: var(--status-critical); font-size: 0.9rem; line-height: 1.4; }
+.op-note { display: flex; align-items: center; gap: 0.45rem; padding-top: 0.8rem; border-top: 1px solid var(--border); font-size: 0.88rem; color: var(--text-muted); }
+.op-note svg { flex: none; }
+.op-day-head {
+  margin: 0 calc(var(--gutter) * -1); padding: 0.6rem var(--gutter);
+  background: var(--surface-sunken); border-bottom: 1px solid var(--border);
+  font-family: var(--label); font-weight: 700; font-size: 1rem; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.op-rows + .op-day-head { border-top: 1px solid var(--border); }
+
+/* How was your visit: five faces, then the chips that say why. */
+.visit-saved { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--lamp); }
+.visit-where { display: flex; align-items: center; gap: 0.6rem; font-weight: 600; margin-bottom: 0.8rem; overflow-wrap: anywhere; }
+.visit-faces { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.5rem; }
+.visit-face,
+.visit-chip {
+  min-height: 44px; border: 2px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text-secondary); cursor: pointer;
+}
+.visit-face { min-height: 3.2rem; display: grid; place-items: center; }
+.visit-chip { padding: 0 0.9rem; color: var(--text); font-family: var(--label); font-weight: 700; font-size: 0.95rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.visit-face.is-on,
+.visit-chip.is-on { background: var(--button); border-color: var(--button); color: var(--button-ink); }
+.visit-face:disabled,
+.visit-chip:disabled { cursor: progress; }
+.visit-ask { margin: 1rem 0 0.5rem; font-family: var(--label); font-weight: 700; font-size: 0.95rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-secondary); }
+.visit-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }

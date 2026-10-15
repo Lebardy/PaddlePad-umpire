@@ -427,6 +427,27 @@ export function fetchFacility(id, { signal } = {}) {
   return apiFetch(`/player/facilities/${encodeURIComponent(id)}`, { signal }).then((d) => d.facility)
 }
 
+/** This week's open play, soonest first: everywhere, or at one place given `facilityId`. */
+export function fetchOpenPlays({ facilityId, signal } = {}) {
+  const at = facilityId ? `?facility=${encodeURIComponent(facilityId)}` : ''
+  return apiFetch(`/player/open-plays${at}`, { signal }).then((d) => d.openPlays)
+}
+
+/** One tap to go. Answers with the open play as it now stands. */
+export function joinOpenPlay(id) {
+  return apiFetch(`/player/open-plays/${encodeURIComponent(id)}/join`, { method: 'POST' }).then((d) => d.openPlay)
+}
+
+/** "Going" tapped again. */
+export function leaveOpenPlay(id) {
+  return apiFetch(`/player/open-plays/${encodeURIComponent(id)}/join`, { method: 'DELETE' }).then((d) => d.openPlay)
+}
+
+/** How the visit went: a face (1-5) and chips. Saving again replaces it. */
+export function rateVisit(sessionId, { score, chips }) {
+  return apiFetch(`/player/sessions/${encodeURIComponent(sessionId)}/rating`, { method: 'POST', body: { score, chips } }).then((d) => d.visit)
+}
+
 /** Where an <img> loads a facility's logo from, or null when it has none. */
 export function logoSrc(logoUrl, { small = false } = {}) {
   return logoUrl ? `${API_URL}${logoUrl}${small ? '&size=small' : ''}` : null

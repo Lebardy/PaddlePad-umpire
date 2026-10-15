@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react'
 import FacilityLogo from '../components/FacilityLogo'
 import Icon from '../components/Icon'
+import OpenPlaySection from '../components/OpenPlaySection'
 import { fetchFacility } from '../lib/api'
 import { navigate } from '../lib/router'
 
@@ -76,6 +77,8 @@ function FacilityPage({ id }) {
           {figure('clipboard', 'Umpire fee', place.umpireFeeText)}
         </div>
       </section>
+
+      <OpenPlaySection key={place.id} facilityId={place.id} />
 
       {place.locationUrl && (
         <a className="place-map" href={place.locationUrl} target="_blank" rel="noopener noreferrer">

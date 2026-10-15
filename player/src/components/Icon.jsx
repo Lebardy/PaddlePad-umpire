@@ -50,6 +50,15 @@ const PATHS = {
   pin: 'M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
   court: 'M5 3h14v18H5zM5 12h14M12 3v5M12 16v5',
   clipboard: 'M9 3h6v4H9zM9 5H6v16h12V5h-3M9 12h6M9 16h4',
+  cash: 'M3 6h18v12H3zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z',
+  eye: 'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+
+  // How a visit went, one face per score.
+  face1: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9 10v.01M15 10v.01M8 16.5c1.2-1.6 2.5-2.2 4-2.2s2.8.6 4 2.2',
+  face2: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9 10v.01M15 10v.01M8.5 16c1-.9 2.2-1.3 3.5-1.3s2.5.4 3.5 1.3',
+  face3: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9 10v.01M15 10v.01M8.5 15.5h7',
+  face4: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9 10v.01M15 10v.01M8.5 14.5c1 .9 2.2 1.3 3.5 1.3s2.5-.4 3.5-1.3',
+  face5: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9 10v.01M15 10v.01M8 14c1.2 1.6 2.5 2.2 4 2.2s2.8-.6 4-2.2',
 
   // The mistakes on the Rating screen, each named by the rally ending it
   // stands for (lib/faultTips.js). Lines are the court or the net, a

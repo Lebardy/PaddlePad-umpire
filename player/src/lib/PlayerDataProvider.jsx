@@ -40,6 +40,8 @@ export function PlayerDataProvider({ children }) {
     leaderboardOpen: false,
     // Whether "Film my next match" is offered; from /player/me.
     videoOn: false,
+    // Whether the player is in a session going on now, for the same bar.
+    inSession: false,
     loading: true,
     error: null,
     loadedAt: null,
@@ -75,6 +77,7 @@ export function PlayerDataProvider({ children }) {
           rallyRating: me.rallyRating ?? null,
           leaderboardOpen: me.leaderboardOpen === true,
           videoOn: me.videoOn === true,
+          inSession: me.inSession === true,
           loading: false,
           error: null,
           loadedAt: loadedAtRef.current,
@@ -101,6 +104,7 @@ export function PlayerDataProvider({ children }) {
           rallyRating: quiet ? s.rallyRating : null,
           leaderboardOpen: quiet ? s.leaderboardOpen : false,
           videoOn: quiet ? s.videoOn : false,
+          inSession: quiet ? s.inSession : false,
         }))
       } finally {
         inFlightRef.current = null

@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from '../components/Link'
 import { usePlayerData } from '../lib/PlayerData'
-import { fetchLeaderboard } from '../lib/api'
+import { fetchLeaderboard, fetchOpenPlays } from '../lib/api'
 import { personalBests, rollingWinRate } from '../lib/derive'
 import { groupMatches } from '../lib/nights'
 import Hero from '../components/Hero'
@@ -58,14 +58,37 @@ function LastNight({ matches }) {
   )
 }
 
+/** "Looking for open play?", while some open play this week has a spot left. */
+function OpenPlayStrip() {
+  const [open, setOpen] = useState(0)
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchOpenPlays({ signal: controller.signal })
+      .then((rows) => setOpen(rows.filter((row) => row.count < row.spots).length))
+      .catch(() => {})
+    return () => controller.abort()
+  }, [])
+  if (open === 0) return null
+  return (
+    <Link className="setup-strip" to="/open-play">
+      <span className="setup-strip-what">
+        <Icon name="calendar" size={16} />
+        Looking for open play?
+      </span>
+      <span className="setup-strip-go">{open} this week<Icon name="chevron" size={16} className="icon-go" /></span>
+    </Link>
+  )
+}
+
 /**
- * The way to the camera, wherever video is set up: a row of the board,
- * under the record, so it is on the first screen of the smallest phone.
- * Shared with the first screen of a player with no match yet.
+ * The way to the camera, wherever video is set up and only while the
+ * player is in a session going on: a row of the board, under the record,
+ * so it is on the first screen of the smallest phone. Shared with the
+ * first screen of a player with no match yet.
  */
 export function FilmButton() {
-  const { videoOn } = usePlayerData()
-  if (!videoOn) return null
+  const { videoOn, inSession } = usePlayerData()
+  if (!videoOn || !inSession) return null
   return (
     <Link className="film-go" to="/film">
       <span className="film-go-mark" aria-hidden="true"><Icon name="camera" size={26} /></span>
@@ -93,6 +116,8 @@ function Overview({ player }) {
       <SetupStrip player={player} />
 
       <RallyRating rallyRating={rallyRating} place={place} />
+
+      <OpenPlayStrip />
 
       <LastNight matches={matches} />
 

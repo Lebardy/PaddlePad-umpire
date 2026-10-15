@@ -10,6 +10,7 @@ import RatingGraph from './screens/RatingGraph'
 import BoardMatch from './screens/BoardMatch'
 import Leaderboard from './screens/Leaderboard'
 import FacilityPage from './screens/FacilityPage'
+import OpenPlay from './screens/OpenPlay'
 import You from './screens/You'
 import FilmNotes from './screens/FilmNotes'
 import Camera from './screens/Camera'
@@ -36,6 +37,7 @@ const TITLES = {
   '/you': 'You · PaddlePad',
   '/rating/graph': 'PaddlePad Rating · PaddlePad',
   '/film': 'Film a match · PaddlePad',
+  '/open-play': 'Open play · PaddlePad',
 }
 
 /**
@@ -118,6 +120,7 @@ function SignedIn({ player, onSignOut, onSignedOut, onPlayerChange }) {
   else if (path === '/leaderboard') screen = leaderboardOpen ? <Leaderboard /> : <GoHome />
   else if (boardMatchRoute) screen = <BoardMatch id={boardMatchRoute.id} />
   else if (placeRoute) screen = <FacilityPage id={placeRoute.id} />
+  else if (path === '/open-play') screen = <OpenPlay />
   else if (path === '/you')
     screen = (
       <You
