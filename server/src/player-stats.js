@@ -19,6 +19,7 @@ import { buildPlaystyleProof } from './playstyle.js'
 import { levelForPlayer } from './levels.js'
 import { rallyMatchFor } from './rally-rating.js'
 import { getRallyRatings } from './rally-rating-store.js'
+import { ratingOpen } from './visit-rules.js'
 import {
   MIN_MATCHES_PER_PLAYER,
   RECOMMENDED_PLAYERS,
@@ -51,10 +52,12 @@ export async function getPlayerMatches(query, playerId, ratings = null) {
             m.ended_at,
             m.ended_early,
             s.name AS session_name,
+            s.id AS session_id, s.facility_id, s.voided_at AS session_voided_at, f.name AS facility_name,
             EXISTS (SELECT 1 FROM match_videos v WHERE v.match_id = m.id AND v.state = 'ready') AS has_video,
             row_number() OVER (ORDER BY m.ended_at) AS match_number
        FROM matches m
        JOIN sessions s ON s.id = m.session_id
+       LEFT JOIN facilities f ON f.id = s.facility_id
       WHERE (m.team_a @> ARRAY[$1]::uuid[] OR m.team_b @> ARRAY[$1]::uuid[])
         AND m.status = 'completed'
         AND m.ended_at IS NOT NULL
@@ -92,6 +95,19 @@ export async function getPlayerMatches(query, playerId, ratings = null) {
     [[...everyone]],
   )
   const nameOf = new Map(people.map((p) => [p.id, p.name]))
+
+  // How the visit went, once per session: asked on every match played in it.
+  const { rows: rated } = await query(
+    'SELECT session_id, score, chips FROM visit_ratings WHERE player_id = $1 AND session_id = ANY($2::uuid[])',
+    [playerId, [...new Set(rows.map((r) => r.session_id))]],
+  )
+  const ratingOf = new Map(rated.map((r) => [r.session_id, r]))
+  const lastPlayedAt = new Map()
+  for (const row of rows) {
+    const latest = lastPlayedAt.get(row.session_id)
+    if (!latest || row.started_at > latest) lastPlayedAt.set(row.session_id, row.started_at)
+  }
+  const now = new Date()
 
   const result = rows.map((row) => {
     const derived = deriveMatchState({
@@ -155,6 +171,19 @@ export async function getPlayerMatches(query, playerId, ratings = null) {
       // count this match.
       rally: ratings
         ? rallyMatchFor(ratings, playerId, row.id, row.winner === null ? null : row.winner === team)
+        : null,
+      visit: row.facility_id
+        ? {
+            sessionId: row.session_id,
+            facilityName: row.facility_name,
+            open: ratingOpen({
+              facilityId: row.facility_id,
+              voided: Boolean(row.session_voided_at),
+              lastPlayedAt: lastPlayedAt.get(row.session_id),
+            }, now),
+            score: ratingOf.get(row.session_id)?.score ?? null,
+            chips: ratingOf.get(row.session_id)?.chips ?? [],
+          }
         : null,
     }
   })
@@ -464,6 +493,19 @@ export async function getRatingState(query, playerId, matchCount) {
   }
 }
 
+/** The latest real ML run's levels and players (a run with structure notes), or null. */
+export async function latestRunLevels(query) {
+  const { rows } = await query(
+    `SELECT run.notes->'structure'->'levels' AS levels,
+            ARRAY(SELECT player_id FROM player_ratings WHERE run_id = run.id) AS players
+       FROM rating_runs run
+      WHERE run.status = 'completed' AND run.notes ? 'structure'
+      ORDER BY run.computed_at DESC
+      LIMIT 1`,
+  )
+  return rows[0] ?? null
+}
+
 /**
  * What the rating screen's playstyle card needs about this player's
  * place in the latest pipeline run: their group's name and size, and
@@ -517,20 +559,13 @@ export async function getStanding(query, playerId) {
   // of the latest real ML run (one with structure notes; the smoke's
   // hand-made runs have none), see levels.js.
   // Only for a player in that run, since the plate's numbers count its players.
-  const { rows: latest } = await query(
-    `SELECT run.notes->'structure'->'levels' AS levels,
-            ARRAY(SELECT player_id FROM player_ratings WHERE run_id = run.id) AS players
-       FROM rating_runs run
-      WHERE run.status = 'completed' AND run.notes ? 'structure'
-      ORDER BY run.computed_at DESC
-      LIMIT 1`,
-  )
+  const latest = await latestRunLevels(query)
   const ratings = await getRallyRatings(query)
-  const level = latest[0]?.players.includes(playerId)
+  const level = latest?.players.includes(playerId)
     ? levelForPlayer({
-        levels: latest[0].levels,
+        levels: latest.levels,
         points: ratings.get(playerId)?.points,
-        runPoints: latest[0].players.map((id) => ratings.get(id)?.points),
+        runPoints: latest.players.map((id) => ratings.get(id)?.points),
       })
     : null
 

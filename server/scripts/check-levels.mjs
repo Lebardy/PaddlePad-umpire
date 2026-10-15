@@ -6,7 +6,7 @@
 //   node server/scripts/check-levels.mjs
 // ============================================================
 
-import { LADDER, levelForPlayer } from '../src/levels.js'
+import { LADDER, levelForPlayer, levelNamer } from '../src/levels.js'
 
 let pass = 0
 let fail = 0
@@ -87,6 +87,15 @@ check('a name off the ladder',
 
 console.log('\nthe ladder')
 check('five names, lowest first', LADDER, ['Beginner', 'Developing', 'Intermediate', 'Advanced', 'Expert'])
+
+console.log('\nthe level name for any rating (levelNamer)')
+const namer = levelNamer({ levels: TWO, runPoints: [1400, 1450, 1500, 1600, 1700] })
+check('1,483 is Developing', namer(1483), 'Developing')
+check('1,611 is Advanced', namer(1611), 'Advanced')
+check('on the line goes up', namer(1547.05), 'Advanced')
+check('no rating, no level', namer(undefined), null)
+check('a level left empty: nothing to show', levelNamer({ levels: TWO, runPoints: [1400, 1450] }), null)
+check('fewer than two levels', levelNamer({ levels: TWO.slice(0, 1), runPoints: [1400] }), null)
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

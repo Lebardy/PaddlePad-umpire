@@ -29,6 +29,7 @@
 
 import { RALLY_ENDINGS, rallyEndingColumn } from '../src/rally-endings.js'
 import { NOT_LEFT_OPEN_MESSAGE, SESSION_REASON_MESSAGE } from '../src/overview-rules.js'
+import { manilaDayStart, openPlayWhen } from '../src/visit-rules.js'
 
 const API = (process.argv[2] ?? process.env.API_URL ?? 'http://localhost:3000').replace(/\/$/, '')
 
@@ -3381,6 +3382,179 @@ async function main() {
       method: 'PATCH', bearer: fOwnerToken, body: { name: `Smoke Facility (old) B ${fStamp}` },
     })
     check('renaming facility B for cleanup -> 200', renameB.status === 200, JSON.stringify(renameB.body).slice(0, 80))
+  }
+
+  section('open play — posting, joining, rating')
+  if (!ADMIN_SECTION || !OWNER_EMAIL || !OWNER_PASSWORD) {
+    console.log('  skip (needs a staging or local server, SMOKE_OWNER_EMAIL and SMOKE_OWNER_PASSWORD)')
+  } else {
+    // Its own place, umpire, players and session, so the tidy at the end
+    // removes them all, and the open play and the rating with them.
+    const opStamp = Date.now()
+    const placeName = `Smoke Open Play ${opStamp}`
+    const opOwnerIn = await request('/admin/auth/login', { method: 'POST', body: { email: OWNER_EMAIL, password: OWNER_PASSWORD } })
+    check('the owner signs in for the open play section -> 200', opOwnerIn.status === 200, String(opOwnerIn.status))
+    const opOwnerToken = opOwnerIn.body.token
+    const place = await request('/admin/facilities', { method: 'POST', bearer: opOwnerToken, body: { name: placeName } })
+    check('the owner adds a place -> 201', place.status === 201, String(place.status))
+    const placeId = place.body.facility?.id
+    const opInvite = await request('/admin/invites', {
+      method: 'POST', bearer: opOwnerToken, body: { note: 'smoke open play', facilityId: placeId },
+    })
+    const opUmpire = await request('/auth/register', {
+      method: 'POST',
+      body: {
+        email: `smoke.openplay.umpire.${opStamp}@example.com`, name: `Smoke Open Play Umpire ${opStamp}`,
+        password: `smk-${uuid()}`, invite: opInvite.body.invite?.code,
+      },
+    })
+    check('an umpire joins that place -> 201', opUmpire.status === 201, String(opUmpire.status))
+    const opUmpireToken = opUmpire.body.token
+    const players = []
+    for (const n of [1, 2, 3]) {
+      const name = `Smoke Open Play Player ${n} ${opStamp}`
+      const signedUp = await asPlayer('/auth/player/register', {
+        method: 'POST', body: { name, username: `smk_op${n}${opStamp}`.slice(0, 20), password: 'not-a-real-password' },
+      })
+      players.push({ id: signedUp.body.player?.id, token: signedUp.body.token, name })
+    }
+    check('three players sign up', players.every((p) => p.id && p.token))
+    const [one, two, three] = players
+
+    // One and Two play a match there: a visit they can rate, and a shared
+    // match, so each may see the other's name.
+    const opSessionId = uuid()
+    const opSession = await request('/sessions', {
+      method: 'POST', bearer: opUmpireToken, body: { id: opSessionId, name: `Smoke Open Play session ${opStamp}` },
+    })
+    check('the umpire opens a session at the place -> 201',
+      opSession.status === 201 && opSession.body.session?.facility_id === placeId, String(opSession.status))
+    await request(`/sessions/${opSessionId}/players`, { method: 'PUT', bearer: opUmpireToken, body: { playerIds: [one.id, two.id] } })
+    const opMatchId = uuid()
+    await request('/matches', {
+      method: 'POST', bearer: opUmpireToken,
+      body: { id: opMatchId, sessionId: opSessionId, teamA: [one.id], teamB: [two.id], firstServer: { team: 'A', playerId: one.id } },
+    })
+    const opPlayed = await request(`/matches/${opMatchId}/log`, {
+      method: 'PUT', bearer: opUmpireToken,
+      body: { deviceId: DEVICE, events: Array.from({ length: 11 }, (_, i) => rally(i, one.id)) },
+    })
+    check('One and Two play a match there', opPlayed.body.match?.status === 'completed', JSON.stringify(opPlayed.body).slice(0, 100))
+
+    const meInSession = await asPlayer('/player/me', { bearer: one.token })
+    check('a player in a session going on: inSession true', meInSession.body.inSession === true, String(meInSession.body.inSession))
+    const meNowhere = await asPlayer('/player/me', { bearer: three.token })
+    check('a player in no session: inSession false', meNowhere.body.inSession === false, String(meNowhere.body.inSession))
+
+    // --- posting ---
+    const today = manilaDayStart(new Date()).getTime()
+    const manilaAt = (day, hour) => new Date(today + day * 86_400_000 + hour * 3_600_000).toISOString()
+    const opBody = { startsAt: manilaAt(1, 18), endsAt: manilaAt(1, 20), courts: 1, spots: 2, fee: '150', umpire: true, note: 'Smoke test' }
+    const addOpenPlay = (body) => request(`/admin/facilities/${placeId}/open-plays`, { method: 'POST', bearer: opOwnerToken, body })
+    const added = await addOpenPlay(opBody)
+    check('the owner adds an open play, tomorrow 6-8 pm, 2 spots -> 201',
+      added.status === 201 && Boolean(added.body.openPlay?.id), JSON.stringify(added.body).slice(0, 120))
+    const openPlayId = added.body.openPlay?.id
+    const eighthDay = await addOpenPlay({ ...opBody, startsAt: manilaAt(7, 6), endsAt: manilaAt(7, 9) })
+    check('the eighth day -> 400, Pick a day in the next 7 days',
+      eighthDay.status === 400 && eighthDay.body.error === 'Pick a day in the next 7 days', JSON.stringify(eighthDay.body).slice(0, 100))
+    const fiveAm = await addOpenPlay({ ...opBody, startsAt: manilaAt(1, 5), endsAt: manilaAt(1, 7) })
+    check('5 am -> 400, Start at 6 am or later',
+      fiveAm.status === 400 && fiveAm.body.error === 'Start at 6 am or later', JSON.stringify(fiveAm.body).slice(0, 100))
+
+    const listFor = async (who) => (await asPlayer(`/player/open-plays?facility=${placeId}`, { bearer: who.token })).body.openPlays
+    const firstSight = await listFor(one)
+    check('a player sees it at the place: nobody going, not them',
+      firstSight?.length === 1 && firstSight[0].id === openPlayId && firstSight[0].count === 0 && firstSight[0].you === false
+        && firstSight[0].feeCentavos === 15000 && firstSight[0].facility?.name === placeName,
+      JSON.stringify(firstSight)?.slice(0, 160))
+    const opPlaces = await asPlayer('/player/facilities', { bearer: one.token })
+    const opPlaceRow = (opPlaces.body.facilities ?? []).find((f) => f.id === placeId)
+    check("the places list carries the place's next open play",
+      opPlaceRow?.nextOpenPlay?.startsAt === opBody.startsAt && opPlaceRow?.nextOpenPlay?.endsAt === opBody.endsAt,
+      JSON.stringify(opPlaceRow?.nextOpenPlay))
+
+    // --- joining ---
+    const join = (who) => asPlayer(`/player/open-plays/${openPlayId}/join`, { method: 'POST', bearer: who.token })
+    const joined = await join(one)
+    check('One joins -> 200, count 1, you true',
+      joined.status === 200 && joined.body.openPlay?.count === 1 && joined.body.openPlay?.you === true, JSON.stringify(joined.body).slice(0, 120))
+    const joinedAgain = await join(one)
+    check('joining again changes nothing -> 200, count 1',
+      joinedAgain.status === 200 && joinedAgain.body.openPlay?.count === 1 && joinedAgain.body.openPlay?.you === true,
+      JSON.stringify(joinedAgain.body).slice(0, 120))
+    const lastSpot = await join(two)
+    check('Two takes the last spot -> 200, count 2, and sees One by name',
+      lastSpot.status === 200 && lastSpot.body.openPlay?.count === 2 && JSON.stringify(lastSpot.body.openPlay?.names) === JSON.stringify([one.name]),
+      JSON.stringify(lastSpot.body).slice(0, 160))
+    const noSpot = await join(three)
+    check('Three is refused -> 409, This open play is full',
+      noSpot.status === 409 && noSpot.body.error === 'This open play is full', JSON.stringify(noSpot.body).slice(0, 100))
+    const strangerSees = (await listFor(three))?.[0]
+    check('a stranger sees the count but no names; players in no run count as new',
+      strangerSees?.count === 2 && strangerSees.names?.length === 0 && strangerSees.you === false
+        && strangerSees.newCount === (strangerSees.levels === null ? 0 : 2),
+      JSON.stringify(strangerSees)?.slice(0, 160))
+
+    const guestsFull = await request(`/admin/facilities/${placeId}/guests`, { bearer: opOwnerToken })
+    const fullRow = guestsFull.body.openPlays?.[0]
+    check('the guests page: 2 coming to 1 open play, 2 of 2 spots taken, FULL',
+      guestsFull.status === 200 && fullRow?.status === 'full' && JSON.stringify(guestsFull.body.totals) === JSON.stringify({
+        coming: 2, openPlays: 1, taken: 2, spots: 2, next: { startsAt: opBody.startsAt, endsAt: opBody.endsAt, count: 2, spots: 2 },
+      }), JSON.stringify(guestsFull.body).slice(0, 200))
+    check('and names nobody', Boolean(fullRow) && ['names', 'you', 'atYourLevel', 'facility'].every((key) => !(key in fullRow)),
+      JSON.stringify(fullRow)?.slice(0, 160))
+
+    const left = await asPlayer(`/player/open-plays/${openPlayId}/join`, { method: 'DELETE', bearer: one.token })
+    check('One leaves -> 200, count 1, you false',
+      left.status === 200 && left.body.openPlay?.count === 1 && left.body.openPlay?.you === false, JSON.stringify(left.body).slice(0, 120))
+
+    // --- rating the visit ---
+    const rate = (who, body) => asPlayer(`/player/sessions/${opSessionId}/rating`, { method: 'POST', bearer: who.token, body })
+    const rated = await rate(one, { score: 5, chips: ['Staff', 'Courts', 'Staff'] })
+    check('One rates the visit -> 200, each chip once, in the usual order',
+      rated.status === 200 && JSON.stringify(rated.body.visit) === JSON.stringify({
+        sessionId: opSessionId, facilityName: placeName, open: true, score: 5, chips: ['Courts', 'Staff'],
+      }), JSON.stringify(rated.body).slice(0, 160))
+    const changed = await rate(one, { score: 2, chips: ['Price', 'Waiting'] })
+    check('and changes it -> 200, Waiting before Price',
+      changed.status === 200 && changed.body.visit?.score === 2 && JSON.stringify(changed.body.visit?.chips) === JSON.stringify(['Waiting', 'Price']),
+      JSON.stringify(changed.body).slice(0, 160))
+    const noFace = await rate(one, { score: 6 })
+    check('a score of 6 -> 400, Pick a face', noFace.status === 400 && noFace.body.error === 'Pick a face', JSON.stringify(noFace.body).slice(0, 100))
+    const neverPlayed = await rate(three, { score: 4 })
+    check("rating a session never played in -> 403, This visit can't be rated",
+      neverPlayed.status === 403 && neverPlayed.body.error === "This visit can't be rated", JSON.stringify(neverPlayed.body).slice(0, 100))
+    const opHistory = await asPlayer('/player/matches', { bearer: one.token })
+    const opVisit = (opHistory.body.matches ?? []).find((m) => m.id === opMatchId)?.visit
+    check('the match carries the visit as rated',
+      JSON.stringify(opVisit) === JSON.stringify({ sessionId: opSessionId, facilityName: placeName, open: true, score: 2, chips: ['Waiting', 'Price'] }),
+      JSON.stringify(opVisit))
+    const guestsAfter = await request(`/admin/facilities/${placeId}/guests`, { bearer: opOwnerToken })
+    check('the guests page: a spot back, and one rating with no score below three',
+      guestsAfter.body.openPlays?.[0]?.status === 'open' && JSON.stringify(guestsAfter.body.visits) === JSON.stringify({
+        rated: 1, average: null, faces: [0, 1, 0, 0, 0], good: {}, better: { Waiting: 1, Price: 1 },
+      }), JSON.stringify(guestsAfter.body).slice(0, 200))
+
+    // --- cancelling ---
+    const cancelled = await request(`/admin/facilities/${placeId}/open-plays/${openPlayId}`, { method: 'DELETE', bearer: opOwnerToken })
+    check('the owner cancels it -> 204', cancelled.status === 204, String(cancelled.status))
+    const afterCancel = await listFor(two)
+    check("it is gone, and Two's join with it", afterCancel?.length === 0, JSON.stringify(afterCancel)?.slice(0, 120))
+    const joinCancelled = await join(two)
+    check('joining it now -> 404, No such open play',
+      joinCancelled.status === 404 && joinCancelled.body.error === 'No such open play', JSON.stringify(joinCancelled.body).slice(0, 100))
+    const opActivity = await request(`/admin/activity?facilityId=${placeId}`, { bearer: opOwnerToken })
+    const opSaid = (opActivity.body.entries ?? []).map((e) => e.summary)
+    const opWhen = openPlayWhen(opBody.startsAt, opBody.endsAt)
+    check('Activity records it added, then cancelled with who was going',
+      opSaid.includes(`Added open play ${opWhen}`) && opSaid.includes(`Cancelled open play ${opWhen} (1 player was going)`),
+      JSON.stringify(opSaid).slice(0, 200))
+
+    const opEnded = await request(`/sessions/${opSessionId}/end`, { method: 'POST', bearer: opUmpireToken, body: {} })
+    const meAfterEnd = await asPlayer('/player/me', { bearer: one.token })
+    check('once the session ends: inSession false',
+      opEnded.status === 200 && meAfterEnd.body.inSession === false, `${opEnded.status} ${meAfterEnd.body.inSession}`)
   }
 
   section('admin site — overview')
