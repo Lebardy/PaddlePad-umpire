@@ -46,3 +46,6 @@ paddlepad-backup.json
 # hidden abilities and every player's rally points.
 server/scripts/.sim-pool-truth.json
 server/scripts/.rally-points.json
+
+# Capstone paper drafts
+*.pdf
