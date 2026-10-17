@@ -503,7 +503,7 @@ function LiveMatch({ matchId, onBack }) {
                     the title is enough, and a paragraph here would push
                     the buttons off a tablet screen. */}
                 <h3>
-                  3rd shot <span className="third-shot-hint">serving side · optional</span>
+                  3rd shot <span className="third-shot-hint">serving side</span>
                 </h3>
                 <div className="third-shot-grid">
                   {servingTeamPlayers.map((id) => (
