@@ -1604,15 +1604,11 @@ section {
   .ending-btn { min-height: 4.5rem; font-size: 1.08rem; }
   .ending-group-title { margin-bottom: 0.4rem; }
 
+  /* Name above its buttons: beside them, "Drive" was cut off and a long
+     name wrapped to four lines, pushing the faults below the fold. */
   .third-shot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.45rem; }
-  .player-panel {
-    display: grid;
-    grid-template-columns: minmax(0, 5.5rem) minmax(0, 1fr);
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.45rem 0.5rem;
-  }
-  .player-panel-name { margin: 0; font-size: 0.95rem; }
+  .player-panel { padding: 0.45rem 0.5rem; }
+  .player-panel-name { margin-bottom: 0.3rem; font-size: 0.95rem; }
   .player-panel-outcomes { gap: 0.35rem; }
   .player-panel-outcomes .outcome-btn {
     min-height: 2.9rem;
