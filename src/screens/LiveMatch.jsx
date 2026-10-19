@@ -3,7 +3,7 @@ import Icon from '../components/Icon'
 import {
   addRallyEvent,
   addServerCorrection,
-  addThirdShotEvent,
+  tapThirdShot,
   undoLastEvent,
   endMatchManually,
   deleteMatch,
@@ -265,7 +265,7 @@ function LiveMatch({ matchId, onBack }) {
   }
 
   function logThirdShot(playerId, shotType, success) {
-    addThirdShotEvent(matchId, { playerId, shotType, success })
+    tapThirdShot(matchId, { playerId, shotType, success })
   }
 
   // The app works out the server from the rules, and gets it right so

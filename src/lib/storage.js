@@ -1,4 +1,5 @@
 import { DEFAULT_POINT_TARGET, deriveMatchState } from './pickleball'
+import { waitingThirdShot, withThirdShotTap } from './thirdShot'
 import { read, write } from './localstore'
 import { clearOutbox, markDirty, pending as outboxPending } from './outbox'
 
@@ -264,11 +265,7 @@ function finalizeAfterEventChange(match) {
  * normal: the panel is marked optional and often skipped.
  */
 function pendingThirdShotId(events) {
-  for (let i = events.length - 1; i >= 0; i -= 1) {
-    if (events[i].type === 'rally') return undefined
-    if (events[i].type === 'thirdShot') return events[i].id
-  }
-  return undefined
+  return waitingThirdShot(events)?.id
 }
 
 /**
@@ -328,21 +325,16 @@ export function addServerCorrection(matchId, playerId) {
 }
 
 /**
- * Logs a serving team's 3rd-shot choice (drop or drive), independent
- * of how the rally that contained it eventually ended. `success` only
- * applies to drops (did it land as an effective drop) and is ignored
- * for drives, matching drop_attempts/drop_successes/drive_attempts in
- * the ML schema.
+ * Logs a tap on a 3rd-shot button. A tap while another 3rd shot is
+ * waiting replaces it, and a tap on the waiting one clears it (see
+ * lib/thirdShot.js), so a corrected tap is never counted twice.
  */
-export function addThirdShotEvent(matchId, { playerId, shotType, success }) {
+export function tapThirdShot(matchId, tap) {
   const match = getMatch(matchId)
   if (!match || match.status === 'completed') return match
   return finalizeAfterEventChange({
     ...match,
-    events: [
-      ...match.events,
-      { type: 'thirdShot', id: crypto.randomUUID(), at: Date.now(), playerId, shotType, success },
-    ],
+    events: withThirdShotTap(match.events, tap, { id: crypto.randomUUID(), at: Date.now() }),
   })
 }
 
