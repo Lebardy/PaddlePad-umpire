@@ -21,6 +21,7 @@
 // `as` says how its number reads:
 //   percent        a share, shown as 19%
 //   ratio          shown as 0.85
+//   per10          a per-minute count, shown per 10 minutes as 1.4
 //   swing-percent  how much a share changes from match to match (the
 //                  spread of a proportion), shown as ±12%
 //   swing-per10    how much a per-minute count changes from match to
@@ -37,7 +38,7 @@ export const MEASURES = {
   winner_rate_std: { label: 'change in winning shots per 10 min, match to match', thing: 'winning shots per 10 min', as: 'swing-per10', better: 'neither' },
   general_error_rate_std: { label: 'change in mistakes per 10 min, match to match', thing: 'mistakes per 10 min', as: 'swing-per10', better: 'neither' },
   dink_error_rate_std: { label: 'change in net mistakes per 10 min, match to match', thing: 'net mistakes per 10 min', as: 'swing-per10', better: 'neither' },
-  drop_usage_rate: { label: 'third shots that are drops', as: 'percent', better: 'neither' },
+  drop_usage_rate: { label: 'drops per 10 min', as: 'per10', better: 'neither' },
   drop_preference_rate_mean: { label: 'drops rather than drives', as: 'percent', better: 'neither' },
   drop_preference_rate_std: { label: 'change in choosing drops, match to match', thing: 'choosing drops over drives', as: 'swing-percent', better: 'neither' },
   net_game_preference_rate_mean: { label: 'points won at the net', as: 'percent', better: 'neither' },

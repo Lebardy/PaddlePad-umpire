@@ -57,6 +57,7 @@ function showValue(value, as) {
   if (value === null || value === undefined) return '—'
   if (as === 'percent') return `${Math.round(value * 100)}%`
   if (as === 'ratio') return value.toFixed(2)
+  if (as === 'per10') return (value * 10).toFixed(1)
   if (as === 'swing-percent') return `±${Math.round(value * 100)}%`
   if (as === 'swing-per10') return `±${(value * 10).toFixed(1)}`
   return `±${value.toFixed(2)}`
