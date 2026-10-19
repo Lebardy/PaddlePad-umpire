@@ -6,7 +6,8 @@
 //   node scripts/check-third-shot.mjs
 //
 // The server counts every thirdShot event as an attempt, so a
-// corrected tap must replace the waiting one, never add a second.
+// corrected tap must replace the waiting one while it is the last
+// thing logged, not add a second.
 // ============================================================
 
 import { isSameThirdShot, waitingThirdShot, withThirdShotTap } from '../src/lib/thirdShot.js'

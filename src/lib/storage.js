@@ -256,8 +256,9 @@ function finalizeAfterEventChange(match) {
  * actually win me points" could not be answered at all.
  *
  * Several can sit after the last rally only when a serve correction came
- * between the taps (see lib/thirdShot.js); a tap with the third shot as
- * the last event replaces it instead. So the LAST one wins where there
+ * between the taps, or in logs from before taps replaced each other (see
+ * lib/thirdShot.js); a tap with the third shot as the last event replaces
+ * it instead. So the LAST one wins where there
  * are several, and the earlier ones still count as attempts -- only the
  * link is singular.
  *
@@ -325,9 +326,10 @@ export function addServerCorrection(matchId, playerId) {
 }
 
 /**
- * Logs a tap on a 3rd-shot button. A tap while another 3rd shot is
- * waiting replaces it, and a tap on the waiting one clears it (see
- * lib/thirdShot.js), so a corrected tap is never counted twice.
+ * Logs a tap on a 3rd-shot button. While the waiting 3rd shot is the
+ * last thing logged, a tap on another button replaces it and a tap on
+ * the same one clears it (see lib/thirdShot.js), so a corrected tap is
+ * not counted twice. After a serve correction the new tap is added.
  */
 export function tapThirdShot(matchId, tap) {
   const match = getMatch(matchId)

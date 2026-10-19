@@ -356,11 +356,12 @@ function LiveMatch({ matchId, onBack }) {
 
       <TakeoverNotice matchId={matchId} />
 
-      {/* Everything tapped during a rally, in one block that fits a
-          tablet screen in either orientation without scrolling: the
-          score and undo, the 3rd shot and the ending buttons (or the "who" step in the
-          same place). Explanations and the match
-          controls sit below it. See App.css for the arrangements. */}
+      {/* Everything tapped during a rally, in one block: the score and
+          undo, the 3rd shot and the ending buttons (or the "who" step in
+          the same place). It fits a tablet without scrolling in portrait,
+          and in landscape down to about 720 px of height; Safari's bars on
+          an iPad leave less. Explanations and the match controls sit
+          below it. See App.css for the arrangements. */}
       <div className={`scoring${match.status === 'in_progress' ? ' is-live' : ''}`}>
         <div className="scoring-status">
           <div className="scoreboard" aria-label="Score">
@@ -495,6 +496,7 @@ function LiveMatch({ matchId, onBack }) {
                               <div className="player-panel-outcomes">
                                 <button
                                   className="outcome-btn winner"
+                                  aria-label={`Drop landed, ${name(id)}`}
                                   aria-pressed={picked(id, 'drop', true)}
                                   onClick={() => logThirdShot(id, 'drop', true)}
                                 >
@@ -502,6 +504,7 @@ function LiveMatch({ matchId, onBack }) {
                                 </button>
                                 <button
                                   className="outcome-btn error"
+                                  aria-label={`Drop missed, ${name(id)}`}
                                   aria-pressed={picked(id, 'drop', false)}
                                   onClick={() => logThirdShot(id, 'drop', false)}
                                 >
@@ -509,6 +512,7 @@ function LiveMatch({ matchId, onBack }) {
                                 </button>
                                 <button
                                   className="outcome-btn neutral"
+                                  aria-label={`Drive, ${name(id)}`}
                                   aria-pressed={picked(id, 'drive', null)}
                                   onClick={() => logThirdShot(id, 'drive', null)}
                                 >
