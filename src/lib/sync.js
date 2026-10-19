@@ -222,14 +222,19 @@ export function drain() {
     drainAgain = true
     return draining
   }
+  // draining is cleared in the same synchronous step as the last
+  // drainAgain check, so a drain() call cannot land between the two and
+  // get a promise that is about to settle with no run behind it.
   draining = (async () => {
-    do {
-      drainAgain = false
-      await runDrain()
-    } while (drainAgain)
-  })().finally(() => {
-    draining = null
-  })
+    try {
+      do {
+        drainAgain = false
+        await runDrain()
+      } while (drainAgain)
+    } finally {
+      draining = null
+    }
+  })()
   return draining
 }
 

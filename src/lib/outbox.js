@@ -62,9 +62,9 @@ export function outboxKey(kind, entityId) {
 }
 
 /**
- * Marks something as needing a push. Idempotent: marking an already
- * queued entity just refreshes its timestamp and leaves its position,
- * which is what makes rapid taps collapse into one push.
+ * Marks something as needing a push. Marking an already queued entity
+ * updates it in place and leaves its position, which is what makes rapid
+ * taps collapse into one push.
  *
  * Every mark also bumps a counter on the entry. A push that is already
  * in flight read its payload BEFORE this mark, so it must not retire the
@@ -124,12 +124,14 @@ export function deadLetter() {
 }
 
 /**
- * The entry's current mark, or undefined if it is not queued. A push
- * reads this just before it reads its payload and hands it back to
- * resolve.
+ * The entry's current mark, or undefined if it is not queued. An entry
+ * written before marks existed (queued by an older version of the app, or
+ * revived from the dead letters) counts as mark 0. A push reads this just
+ * before it reads its payload and hands it back to resolve.
  */
 export function currentMark(key) {
-  return load().entries[key]?.mark
+  const entry = load().entries[key]
+  return entry && (entry.mark ?? 0)
 }
 
 /**
@@ -143,7 +145,7 @@ export function currentMark(key) {
 export function resolve(key, mark) {
   const state = load()
   if (!state.entries[key]) return
-  if (mark !== undefined && state.entries[key].mark !== mark) return
+  if (mark !== undefined && (state.entries[key].mark ?? 0) !== mark) return
   const entries = { ...state.entries }
   delete entries[key]
   save({

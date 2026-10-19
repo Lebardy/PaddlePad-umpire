@@ -67,6 +67,7 @@ globalThis.fetch = async (url, init) => {
   return new Response('{}', { status: 200 })
 }
 
+const { write } = await import('../src/lib/localstore.js')
 const storage = await import('../src/lib/storage.js')
 const sync = await import('../src/lib/sync.js')
 const outbox = await import('../src/lib/outbox.js')
@@ -111,6 +112,21 @@ sync.flush()
 await pushing2
 check('server has the rally', serverEvents.filter((e) => e.type === 'rally').length, 1)
 check('sent by that same awaited drain (two pushes)', puts, 2)
+check('nothing left queued', outbox.pendingCount(), 0)
+
+console.log('an entry queued by the previous version (no mark) during a push')
+write('paddlepad.outbox', {
+  order: [`log:${match.id}`],
+  entries: { [`log:${match.id}`]: { kind: 'log', entityId: match.id, dirtyAt: 1, attempts: 0, nextAttemptAt: 0, lastError: null, state: 'pending' } },
+  deadLetter: [],
+})
+puts = 0
+const pushing3 = sync.drain()
+await sleep(50)
+storage.tapThirdShot(match.id, drop(true))
+sync.flush()
+await pushing3
+check('server has the tap made during the push', shots(serverEvents), ['drive', 'drop+'])
 check('nothing left queued', outbox.pendingCount(), 0)
 
 console.log(`\n${pass} ok / ${fail} FAIL`)
