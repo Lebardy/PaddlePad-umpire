@@ -255,14 +255,14 @@ function finalizeAfterEventChange(match) {
  * this existed the two were unrelatable -- which is why "does dropping
  * actually win me points" could not be answered at all.
  *
- * The LAST one wins where there are several. Undo removes the previous
- * event outright (undoLastEvent), so a re-tap without an undo is the
- * umpire correcting themselves, and the correction is what they meant.
- * The earlier taps still count as attempts, exactly as before -- only
- * the link is singular.
+ * Several can sit after the last rally only when a serve correction came
+ * between the taps (see lib/thirdShot.js); a tap with the third shot as
+ * the last event replaces it instead. So the LAST one wins where there
+ * are several, and the earlier ones still count as attempts -- only the
+ * link is singular.
  *
  * Returns undefined when the umpire logged no third shot, which is
- * normal: the panel is marked optional and often skipped.
+ * normal: the panel is often skipped.
  */
 function pendingThirdShotId(events) {
   return waitingThirdShot(events)?.id
