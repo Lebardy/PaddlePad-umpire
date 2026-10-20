@@ -397,6 +397,10 @@ export async function takeOverMatch(matchId, { resolution } = {}) {
     // deliberately refuses to overwrite queued work.
     replaceServerState({ matches: [{ ...remote, scoringDevice: deviceId }], force: true })
     outbox.resolve(outbox.outboxKey('log', matchId))
+    // The umpire chose the server's log, so a refused copy of theirs in the
+    // couldn't-sync list no longer describes anything; left there it would
+    // freeze this match against pulls and "Try again" would send it stale.
+    outbox.discardDead(outbox.outboxKey('log', matchId))
     lastPushed.set(matchId, ++pushes)
     notify()
     return { status: 'adopted', events: remoteEvents.length }

@@ -83,6 +83,7 @@ globalThis.fetch = async (url, init) => {
       return new Response(JSON.stringify({ error: 'Another device is scoring this match', heldBy: { umpireName: 'x' } }), { status: 409 })
     }
     serverEvents = body.events
+    lease = body.deviceId // a saved log makes the pusher the scorer
     return json({ match: serverMatch() })
   }
   if (method === 'PUT' && path === `/sessions/${SID}/players`) {
@@ -326,6 +327,41 @@ check('local keeps the refused log', ids(storage.getMatch(MID).events), ['r1', '
 outbox.discardDead(outbox.outboxKey('log', MID))
 await sync.pullMatch(MID)
 check('after discarding, a pull applies the server log', ids(storage.getMatch(MID).events), ['r1'])
+
+console.log('a takeover adopt clears a refused log line')
+reset({ local: [rally(1)], server: [rally(1), rally(2)] })
+outbox.markDirty('log', MID)
+outbox.killEntry(outbox.outboxKey('log', MID), 'refused')
+outbox.markDirty('log', MID)
+outbox.block(outbox.outboxKey('log', MID), { heldBy: 'other' })
+lease = 'other'
+await sync.takeOverMatch(MID)
+check('the couldn\'t-sync list is empty', outbox.deadLetter().length, 0)
+
+console.log('"Try again" does not release a blocked log')
+reset({ local: [rally(1), rally(9)], server: [rally(1), rally(2)] })
+outbox.markDirty('log', MID)
+outbox.killEntry(outbox.outboxKey('log', MID), 'refused')
+outbox.markDirty('log', MID)
+outbox.block(outbox.outboxKey('log', MID), { heldBy: 'other' })
+outbox.reviveDead(outbox.outboxKey('log', MID))
+check('still blocked', outbox.pending()[0]?.state, 'blocked')
+await sync.drain()
+check('the server is unchanged', ids(serverEvents), ['r1', 'r2'])
+
+console.log('a match pull on its way during a takeover adopt')
+reset({ local: [rally(1)], server: [rally(1)] })
+outbox.markDirty('log', MID)
+outbox.block(outbox.outboxKey('log', MID), { heldBy: 'other' })
+lease = 'other'
+getDelay = 300
+const slowPull = sync.pullMatch(MID) // answer fixed as [r1]
+await sleep(20)
+getDelay = 0
+serverEvents = [rally(1), rally(2)] // the other device scored
+await sync.takeOverMatch(MID)
+await slowPull
+check('the older answer does not undo the adopt', ids(storage.getMatch(MID).events), ['r1', 'r2'])
 
 console.log(`\n${pass} ok / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)

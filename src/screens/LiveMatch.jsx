@@ -217,6 +217,8 @@ function LiveMatch({ matchId, onBack }) {
   // pays for it.
   const scoringDevice = match?.scoringDevice
   const isScorer = !scoringDevice || scoringDevice === getDeviceId()
+  // A finished or voided match no longer changes, so watching it is pointless.
+  const watching = !isScorer && match?.status === 'in_progress' && !match.voidedAt
 
   useEffect(() => {
     const controller = new AbortController()
@@ -227,7 +229,7 @@ function LiveMatch({ matchId, onBack }) {
     }
     refresh()
 
-    if (!isScorer) {
+    if (watching) {
       const tick = () => {
         if (document.visibilityState === 'visible') refresh()
         timer = setTimeout(tick, WATCH_POLL_MS)
@@ -239,7 +241,7 @@ function LiveMatch({ matchId, onBack }) {
       controller.abort()
       if (timer) clearTimeout(timer)
     }
-  }, [matchId, isScorer])
+  }, [matchId, watching])
 
   function name(id) {
     return knownPlayers.find((p) => p.id === id)?.name ?? '?'

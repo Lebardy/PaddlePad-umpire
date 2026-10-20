@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { pending } from '../lib/outbox'
+import { getMatch } from '../lib/storage'
 import { takeOverMatch } from '../lib/sync'
 import { useSyncStatus } from '../lib/useSyncStatus'
 
@@ -64,11 +65,14 @@ function TakeoverNotice({ matchId }) {
   }
 
   if (conflict) {
+    // Live, not the count when the prompt first showed: taps made while
+    // the umpire decides are part of what each button keeps or discards.
+    const localCount = getMatch(matchId)?.events.length ?? conflict.localCount
     return (
       <div className="takeover">
         <p className="takeover-text">
           <strong>Both devices recorded different rallies.</strong> This device
-          has {conflict.localCount} taps; the server has {conflict.remoteCount}.
+          has {localCount} taps; the server has {conflict.remoteCount}.
           One of them has to be kept — they can&rsquo;t be combined, because each
           is a different account of the same points.
         </p>
@@ -78,7 +82,7 @@ function TakeoverNotice({ matchId }) {
             Keep the server&rsquo;s {conflict.remoteCount}
           </button>
           <button className="dupe-no" onClick={() => run('mine')} disabled={busy}>
-            Keep my {conflict.localCount}
+            Keep my {localCount}
           </button>
         </div>
       </div>

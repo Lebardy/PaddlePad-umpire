@@ -251,6 +251,10 @@ export function reviveDead(key) {
   const state = load()
   const dead = state.deadLetter.find((d) => d.key === key)
   if (!dead) return
+  const existing = state.entries[key]
+  // A log blocked behind another device's lease stays blocked: only a
+  // takeover releases it (see markDirty).
+  const blocked = existing?.state === 'blocked'
   save({
     // Already queued again if the umpire changed it after it was refused.
     order: state.order.includes(key) ? state.order : [...state.order, key],
@@ -262,8 +266,8 @@ export function reviveDead(key) {
         dirtyAt: Date.now(),
         attempts: 0,
         nextAttemptAt: 0,
-        lastError: null,
-        state: 'pending',
+        lastError: blocked ? existing.lastError : null,
+        state: blocked ? 'blocked' : 'pending',
         // Kept so that a second refusal goes back to the same place in
         // the list instead of jumping to the end.
         refusedFirst: dead.refusedFirst ?? dead.diedAt,
