@@ -499,5 +499,21 @@ await sync.pullCore()
 await sync.pullSession(SID)
 check('a later pull brings the session and its match back', [storage.getSession(SID)?.id, storage.getMatch(MID)?.id], [SID, MID])
 
+console.log('dismissing one refused session cancel while another is still queued')
+reset({ local: [], server: [] })
+const S2 = '77777777-7777-4777-8777-777777777777'
+const M2 = '88888888-8888-4888-8888-888888888888'
+write('paddlepad.sessions', [...storage.getSessions(), { id: S2, name: 's2', createdAt: 1, playerIds: [], playerCount: 0 }])
+write('paddlepad.matches', [...storage.getMatches(), { ...base, id: M2, sessionId: S2, events: [] }])
+refuseDelete = true
+storage.deleteSession(SID)
+storage.deleteSession(S2)
+await sync.drain()
+failGets = true
+sync.discardDead(`sessionDelete:${SID}`)
+await sleep(50)
+check('the dismissed session\'s match is no longer buried', storage.isTombstoned('matches', MID), false)
+check('the other queued session\'s match stays buried', storage.isTombstoned('matches', M2), true)
+
 console.log(`\n${pass} ok / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)

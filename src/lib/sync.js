@@ -464,12 +464,13 @@ export function discardDead(key) {
     clearTombstone('matches', id)
     pullMatch(id).catch(() => {})
   } else if (kind === 'sessionDelete') {
+    const buried = getTombstones().sessionMatches?.[id] ?? []
     clearTombstone('sessions', id)
     // Deleting a session also buried its matches; the ones with no delete
     // of their own still queued come back with it, even if the pulls
     // below fail (any later pull then restores them).
     const owed = new Set([...outbox.pending(), ...outbox.deadLetter()].map((e) => e.key))
-    for (const matchId of getTombstones().matches) {
+    for (const matchId of buried) {
       if (!owed.has(outbox.outboxKey('matchDelete', matchId))) clearTombstone('matches', matchId)
     }
     pullCore().then(() => pullSession(id)).catch(() => {})

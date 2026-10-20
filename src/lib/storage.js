@@ -678,7 +678,7 @@ const TOMBSTONES_KEY = 'paddlepad.tombstones'
  * syncs from resurrecting what the umpire just cancelled.
  */
 export function getTombstones() {
-  return read(TOMBSTONES_KEY, { matches: [], sessions: [] })
+  return read(TOMBSTONES_KEY, { matches: [], sessions: [], sessionMatches: {} })
 }
 
 function addTombstone(kind, id) {
@@ -689,9 +689,12 @@ function addTombstone(kind, id) {
 
 export function clearTombstone(kind, id) {
   const current = getTombstones()
+  // The matches a deleted session buried are remembered only as long as it is.
+  const { [id]: _gone, ...sessionMatches } = current.sessionMatches ?? {}
   write(TOMBSTONES_KEY, {
     ...current,
     [kind]: current[kind].filter((existing) => existing !== id),
+    ...(kind === 'sessions' ? { sessionMatches } : {}),
   })
 }
 
@@ -764,6 +767,11 @@ export function deleteSession(sessionId) {
     discardDead(outboxKey('log', match.id))
   }
   addTombstone('sessions', sessionId)
+  const current = getTombstones()
+  write(TOMBSTONES_KEY, {
+    ...current,
+    sessionMatches: { ...current.sessionMatches, [sessionId]: matches.map((m) => m.id) },
+  })
   markDirty('sessionDelete', sessionId)
   return true
 }
