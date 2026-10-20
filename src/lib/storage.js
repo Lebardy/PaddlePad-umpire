@@ -404,6 +404,9 @@ export function replaceServerState({
   // explicit takeover, where the umpire has been asked and has chosen
   // the server's version. Never set it for a background pull.
   force = false,
+  // Ids this device pushed while this pull was on its way. Their local
+  // copy is newer than the pull's answer, so they count as queued work.
+  keep = new Set(),
 }) {
   if (players) {
     // Merged, not replaced. The list endpoint is capped (the players with
@@ -418,7 +421,7 @@ export function replaceServerState({
 
   if (sessions) {
     const dirty = new Set(
-      pendingEntities('session').concat(pendingEntities('roster')),
+      pendingEntities('session').concat(pendingEntities('roster'), [...keep]),
     )
     const local = getSessions()
     const merged = sessions.map((s) => {
@@ -463,7 +466,7 @@ export function replaceServerState({
     // simply not drawn.
     for (const player of sessionDetail.players ?? []) rememberPlayer(player)
 
-    const dirty = new Set(pendingEntities('roster'))
+    const dirty = new Set(pendingEntities('roster').concat([...keep]))
     if (!dirty.has(sessionDetail.session.id)) {
       const updated = getSessions().map((s) =>
         s.id === sessionDetail.session.id
@@ -481,7 +484,7 @@ export function replaceServerState({
   if (matches) {
     const dirty = force
       ? new Set()
-      : new Set(pendingEntities('match').concat(pendingEntities('log')))
+      : new Set(pendingEntities('match').concat(pendingEntities('log'), [...keep]))
     const local = getMatches()
     const fromServer = matches
       .filter((m) => !dirty.has(m.id))

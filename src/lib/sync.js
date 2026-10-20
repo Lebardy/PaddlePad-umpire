@@ -82,6 +82,16 @@ function setReachable(value) {
 // Pull
 // ============================================================
 
+// Every successful push, numbered, and the number of each entity's latest
+// one. A pull notes the number before it asks; anything pushed after that
+// is newer here than in the pull's answer.
+let pushes = 0
+const lastPushed = new Map()
+
+function pushedSince(since) {
+  return new Set([...lastPushed].filter(([, n]) => n > since).map(([id]) => id))
+}
+
 /**
  * Refreshes players and sessions from the server.
  *
@@ -90,12 +100,13 @@ function setReachable(value) {
  */
 export async function pullCore({ signal } = {}) {
   if (!getToken()) return
+  const since = pushes
   const [players, sessions] = await Promise.all([
     api.searchPlayers('', { signal }),
     api.fetchSessions({ signal }),
   ])
   setReachable(true)
-  replaceServerState({ players, sessions })
+  replaceServerState({ players, sessions, keep: pushedSince(since) })
 }
 
 /**
@@ -109,20 +120,22 @@ export async function pullCore({ signal } = {}) {
  */
 export async function pullSession(sessionId, { signal } = {}) {
   if (!getToken()) return
+  const since = pushes
   const [detail, matches] = await Promise.all([
     api.fetchSession(sessionId, { signal }),
     api.fetchMatchesForSession(sessionId, { signal }),
   ])
   setReachable(true)
-  replaceServerState({ sessionDetail: detail, matches })
+  replaceServerState({ sessionDetail: detail, matches, keep: pushedSince(since) })
 }
 
 /** Pulls one match INCLUDING its event log, for the scoring screen. */
 export async function pullMatch(matchId, { signal } = {}) {
   if (!getToken()) return
+  const since = pushes
   const match = await api.fetchMatch(matchId, { signal })
   setReachable(true)
-  replaceServerState({ matches: [match] })
+  replaceServerState({ matches: [match], keep: pushedSince(since) })
 }
 
 // ============================================================
@@ -259,6 +272,7 @@ async function runDrain() {
     try {
       await push(entry, payload)
       outbox.resolve(entry.key, mark)
+      lastPushed.set(entry.entityId, ++pushes)
       setReachable(true)
     } catch (error) {
       const status = error instanceof ApiError ? error.status : undefined
@@ -349,6 +363,10 @@ export function compareLogs(local, remote) {
  *               thrown away silently: the counts are handed back so the
  *               umpire can choose.
  *
+ * A tap made while the claim is on its way is never overwritten: the
+ * takeover starts again with it, and the umpire's earlier choice no
+ * longer applies, since it was about the logs before that tap.
+ *
  * @param {string} matchId
  * @param {object} [options]
  * @param {'server'|'mine'} [options.resolution] choice for a diverged log
@@ -360,12 +378,20 @@ export async function takeOverMatch(matchId, { resolution } = {}) {
   setReachable(true)
 
   const local = getMatch(matchId)
+  // Read in the same step as the log, so it describes the log the
+  // relation below is worked out from.
+  const mark = outbox.currentMark(outbox.outboxKey('log', matchId))
   const localEvents = local?.events ?? []
   const remoteEvents = remote.events ?? []
   const relation = compareLogs(localEvents, remoteEvents)
 
   const adoptServer = async () => {
     await api.claimMatch(matchId, { deviceId, force: true })
+    // A tap made while the claim was on its way is not in what was read
+    // above; overwriting it would lose it, so decide again with it.
+    if (outbox.currentMark(outbox.outboxKey('log', matchId)) !== mark) {
+      return takeOverMatch(matchId)
+    }
     // force, because this match is in the outbox and a normal merge
     // deliberately refuses to overwrite queued work.
     replaceServerState({ matches: [remote], force: true })
