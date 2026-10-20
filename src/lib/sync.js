@@ -356,21 +356,25 @@ export function compareLogs(local, remote) {
  * real scoring. That is what "take over and the score went backwards"
  * was.
  *
- * So takeover now reads the server first and works out how the two logs
- * actually relate:
+ * So takeover claims the match first, then reads the server and works
+ * out how the two logs actually relate. Claiming first matters: once
+ * the claim lands the other device's saves are refused, so what is read
+ * afterwards is final (reading first lost a rally the other device saved
+ * in between).
  *
  *   behind      adopt the server's log and carry on from there -- which
  *               is what "take over scoring" means in plain English
  *   ahead       this device really does hold unsent taps; push them
  *   diverged    both sides recorded different rallies. Nothing is
  *               thrown away silently: the counts are handed back so the
- *               umpire can choose.
+ *               umpire can choose. This device holds the lease while
+ *               they choose, so the other device's taps block meanwhile.
  *
- * A tap made while the claim is on its way is never overwritten: the
- * takeover starts again with it, and the umpire's earlier choice no
- * longer applies, since it was about the logs before that tap. While
- * the umpire is being asked, the log stays blocked (taps included), so
- * nothing is pushed over the other device's rallies until they answer.
+ * The log stays blocked while the umpire is being asked (taps included),
+ * so nothing is pushed over the other device's rallies until they answer.
+ * A tap made while the claim was on its way is read like any other, and
+ * an earlier choice no longer applies to it, since it was about the logs
+ * before that tap.
  *
  * @param {string} matchId
  * @param {object} [options]
@@ -379,23 +383,22 @@ export function compareLogs(local, remote) {
 export async function takeOverMatch(matchId, { resolution } = {}) {
   const deviceId = outbox.getDeviceId()
 
+  const before = getMatch(matchId)
+  await api.claimMatch(matchId, { deviceId, force: true })
   const remote = await api.fetchMatch(matchId)
   setReachable(true)
 
   const local = getMatch(matchId)
+  const choice = local === before ? resolution : undefined
   const localEvents = local?.events ?? []
   const remoteEvents = remote.events ?? []
   const relation = compareLogs(localEvents, remoteEvents)
 
-  const adoptServer = async () => {
-    await api.claimMatch(matchId, { deviceId, force: true })
-    // A tap made while the claim was on its way is not in what was read
-    // above (every tap writes a new match object); overwriting it would
-    // lose it, so decide again with it.
-    if (getMatch(matchId) !== local) return takeOverMatch(matchId)
+  const adoptServer = () => {
+    const adopted = { ...remote, scoringDevice: deviceId }
     // force, because this match is in the outbox and a normal merge
     // deliberately refuses to overwrite queued work.
-    replaceServerState({ matches: [{ ...remote, scoringDevice: deviceId }], force: true })
+    replaceServerState({ matches: [adopted], force: true })
     outbox.resolve(outbox.outboxKey('log', matchId))
     // The umpire chose the server's log, so a refused copy of theirs in the
     // couldn't-sync list no longer describes anything; left there it would
@@ -407,7 +410,6 @@ export async function takeOverMatch(matchId, { resolution } = {}) {
   }
 
   const pushMine = async () => {
-    await api.claimMatch(matchId, { deviceId, force: true })
     setScoringDevice(matchId, deviceId) // the claim made this device the scorer
     outbox.markDirty('log', matchId)
     outbox.release(outbox.outboxKey('log', matchId))
@@ -416,8 +418,8 @@ export async function takeOverMatch(matchId, { resolution } = {}) {
   }
 
   if (relation === 'diverged') {
-    if (resolution === 'server') return adoptServer()
-    if (resolution === 'mine') return pushMine()
+    if (choice === 'server') return adoptServer()
+    if (choice === 'mine') return pushMine()
     return {
       status: 'conflict',
       localCount: localEvents.length,

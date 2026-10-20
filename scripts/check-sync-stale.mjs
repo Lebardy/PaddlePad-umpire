@@ -363,5 +363,28 @@ await sync.takeOverMatch(MID)
 await slowPull
 check('the older answer does not undo the adopt', ids(storage.getMatch(MID).events), ['r1', 'r2'])
 
+console.log('the other device saves a rally while this device takes over')
+const otherSaves = (events) =>
+  fetch('http://x/matches/' + MID + '/log', { method: 'PUT', body: JSON.stringify({ deviceId: 'other', events }) })
+reset({ local: [rally(1)], server: [rally(1), rally(2)] })
+outbox.markDirty('log', MID)
+outbox.block(outbox.outboxKey('log', MID), { heldBy: 'other' })
+lease = 'other'
+getDelay = 100
+const takingOver5 = sync.takeOverMatch(MID)
+await sleep(50)
+const late = await otherSaves([rally(1), rally(2), rally(3)]) // after the claim
+await takingOver5
+check('a save after the claim is refused', late.status, 409)
+check('local and server agree after the adopt', ids(storage.getMatch(MID).events), ids(serverEvents))
+reset({ local: [rally(1)], server: [rally(1), rally(2)] })
+outbox.markDirty('log', MID)
+outbox.block(outbox.outboxKey('log', MID), { heldBy: 'other' })
+lease = 'other'
+await otherSaves([rally(1), rally(2), rally(3)]) // before the claim
+await sync.takeOverMatch(MID)
+check('a save before the claim is adopted', ids(storage.getMatch(MID).events), ['r1', 'r2', 'r3'])
+check('and the server keeps it', ids(serverEvents), ['r1', 'r2', 'r3'])
+
 console.log(`\n${pass} ok / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)
