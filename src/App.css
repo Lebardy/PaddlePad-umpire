@@ -1642,10 +1642,41 @@ section {
   }
 
   .ending-btn { font-size: 0.98rem; min-height: 3.7rem; }
+}
 
-  /* Drop/Drive: the two drop outcomes on top, Drive underneath. */
-  .player-panel-outcomes { grid-template-columns: 1fr 1fr; }
-  .player-panel-outcomes > :last-child { grid-column: 1 / -1; }
+/* ============ Phones, either way up ============ */
+
+/* The 3rd shot is one line per serving player: the name, then its three
+   buttons. No card around it, so two players cost two short rows and
+   the endings start on the first screen. */
+@media (max-width: 699px), (max-height: 520px) and (orientation: landscape) {
+  .third-shot-row { margin-bottom: 0.5rem; padding-bottom: 0.5rem; }
+  .third-shot-row h3 { margin-bottom: 0.3rem; }
+  .third-shot-grid { gap: 0.35rem 1.5rem; }
+  .player-panel {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0;
+    background: none;
+    border: 0;
+  }
+  .player-panel-name {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .player-panel-outcomes { display: flex; gap: 0.3rem; }
+  .player-panel-outcomes .outcome-btn {
+    min-height: 2.75rem;
+    padding-inline: 0.55rem;
+    font-size: 0.92rem;
+    white-space: nowrap;
+  }
 }
 
 /* ============ Landscape phone ============ */
