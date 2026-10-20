@@ -16,6 +16,7 @@ import TakeoverNotice from '../components/TakeoverNotice'
 import MatchVideo from '../components/MatchVideo'
 import * as sync from '../lib/sync'
 import { getDeviceId } from '../lib/outbox'
+import { LEASE_MINUTES } from '../../server/src/scoring-lease.js'
 import { deriveMatchState, currentServerPlayerId, courtSides } from '../lib/pickleball'
 import { isSameThirdShot, waitingThirdShot } from '../lib/thirdShot'
 import {
@@ -295,8 +296,10 @@ function LiveMatch({ matchId, onBack }) {
   // An unfinished match is removed outright -- wrong pairing, wrong
   // court, started by mistake. Nothing in it counted yet.
   function handleCancel() {
-    if (watching) {
-      alert(`${match.recordedByName ?? 'Another device'} is scoring this match on another device. Take over first to cancel it.`)
+    // The server refuses too; this only saves the trip while the other
+    // device's lease is fresh.
+    if (watching && Date.now() - new Date(match.scoringClaimedAt).getTime() < LEASE_MINUTES * 60_000) {
+      alert('Another device is scoring this match. Cancel it there, or wait until it has been idle for 15 minutes.')
       return
     }
     if (

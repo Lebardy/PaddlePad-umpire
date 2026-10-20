@@ -547,7 +547,7 @@ export function replaceServerState({
         // Who holds the scoring lease. Without it every device thinks it
         // is the scorer, so a watching device never refreshes its screen.
         scoringDevice: m.scoringDevice ?? null,
-        recordedByName: m.recordedByName ?? null,
+        scoringClaimedAt: m.scoringClaimedAt ?? null,
         // A match list carries no events -- only the single-match fetch
         // does. Defaulting to [] here would wipe the local log of an
         // already-synced match every time the session screen refreshed.
@@ -677,7 +677,7 @@ const TOMBSTONES_KEY = 'paddlepad.tombstones'
  * quietly dropped. They also stop a pull that lands before the delete
  * syncs from resurrecting what the umpire just cancelled.
  */
-function getTombstones() {
+export function getTombstones() {
   return read(TOMBSTONES_KEY, { matches: [], sessions: [] })
 }
 

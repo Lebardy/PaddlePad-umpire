@@ -72,6 +72,7 @@ let serverVoided = false // the session
 let serverMatchVoided = false
 let refuseDelete = false // a DELETE answers 409, as when another device scores
 let deleteBodies = []
+let failGets = false // every GET fails, as when offline
 
 const serverMatch = () => ({ ...base, startedAt: new Date(1).toISOString(), events: serverEvents, voidedAt: serverMatchVoided ? 1 : null, scoringDevice: lease })
 const json = (body) => new Response(JSON.stringify(body), { status: 200 })
@@ -122,6 +123,7 @@ globalThis.fetch = async (url, init) => {
     serverHasSession = false
     return new Response(null, { status: 204 })
   }
+  if (failGets) throw new TypeError('offline')
   // A GET: the answer is fixed on arrival, delivered later.
   let answer = {}
   if (path === `/matches/${MID}`) answer = { match: serverMatch() }
@@ -160,6 +162,7 @@ function reset({ local, server, roster = [A1] }) {
   serverMatchVoided = false
   refuseDelete = false
   deleteBodies = []
+  failGets = false
   outbox.clearOutbox()
 }
 
@@ -462,7 +465,7 @@ reset({ local: [rally(1)], server: [rally(1)] })
 storage.deleteMatch(MID)
 await sync.drain()
 check('the cancel sends this device\'s id', deleteBodies, [{ deviceId: outbox.getDeviceId() }])
-check('it is gone here while the cancel is owed', storage.getMatch(MID), null)
+check('it is gone here once the server has removed it', storage.getMatch(MID), null)
 reset({ local: [rally(1)], server: [rally(1)] })
 refuseDelete = true
 storage.deleteMatch(MID)
@@ -481,6 +484,20 @@ sync.discardDead(`sessionDelete:${SID}`)
 await sleep(100)
 check('discarding it brings the session back', storage.getSession(SID)?.id, SID)
 check('and its match', storage.getMatch(MID)?.id, MID)
+
+console.log('a dismissed session cancel when the pulls fail')
+reset({ local: [], server: [] })
+refuseDelete = true
+storage.deleteSession(SID)
+await sync.drain()
+failGets = true
+sync.discardDead(`sessionDelete:${SID}`)
+await sleep(100)
+failGets = false
+refuseDelete = false
+await sync.pullCore()
+await sync.pullSession(SID)
+check('a later pull brings the session and its match back', [storage.getSession(SID)?.id, storage.getMatch(MID)?.id], [SID, MID])
 
 console.log(`\n${pass} ok / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)

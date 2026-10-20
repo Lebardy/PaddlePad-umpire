@@ -8,6 +8,7 @@ import {
   setScoringDevice,
   replaceServerState,
   clearTombstone,
+  getTombstones,
   isTombstoned,
 } from './storage'
 
@@ -464,20 +465,16 @@ export function discardDead(key) {
     pullMatch(id).catch(() => {})
   } else if (kind === 'sessionDelete') {
     clearTombstone('sessions', id)
-    restoreSession(id).catch(() => {})
+    // Deleting a session also buried its matches; the ones with no delete
+    // of their own still queued come back with it, even if the pulls
+    // below fail (any later pull then restores them).
+    const owed = new Set([...outbox.pending(), ...outbox.deadLetter()].map((e) => e.key))
+    for (const matchId of getTombstones().matches) {
+      if (!owed.has(outbox.outboxKey('matchDelete', matchId))) clearTombstone('matches', matchId)
+    }
+    pullCore().then(() => pullSession(id)).catch(() => {})
   }
   notify()
-}
-
-// Deleting a session also buried its matches; the ones with no delete of
-// their own still queued come back with it.
-async function restoreSession(sessionId) {
-  await pullCore()
-  const owed = new Set([...outbox.pending(), ...outbox.deadLetter()].map((e) => e.key))
-  for (const match of await api.fetchMatchesForSession(sessionId)) {
-    if (!owed.has(outbox.outboxKey('matchDelete', match.id))) clearTombstone('matches', match.id)
-  }
-  await pullSession(sessionId)
 }
 
 export function resumeAfterSignIn() {

@@ -509,7 +509,7 @@ router.delete('/:id', async (req, res) => {
   const deviceId = String(req.body?.deviceId ?? '')
   if (deviceId && heldByAnotherDevice(rows[0], deviceId)) {
     return res.status(409).json({
-      error: `${rows[0].recorded_by_name ?? 'Another umpire'} is scoring this match on another device`,
+      error: 'Another device is scoring this match',
       heldBy: { umpireName: rows[0].recorded_by_name, since: rows[0].scoring_claimed_at },
     })
   }

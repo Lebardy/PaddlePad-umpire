@@ -212,7 +212,7 @@ router.delete('/:id', async (req, res) => {
     const held = playing.rows.find((m) => heldByAnotherDevice(m, deviceId))
     if (held) {
       return res.status(409).json({
-        error: `${held.recorded_by_name ?? 'Another umpire'} is scoring a match in this session on another device`,
+        error: 'Another device is scoring a match in this session',
         heldBy: { umpireName: held.recorded_by_name, since: held.scoring_claimed_at },
       })
     }
