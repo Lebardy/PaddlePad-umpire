@@ -5,6 +5,7 @@ import { subscribe } from './localstore'
 import {
   getSession,
   getMatch,
+  setScoringDevice,
   replaceServerState,
   clearTombstone,
   isTombstoned,
@@ -394,7 +395,7 @@ export async function takeOverMatch(matchId, { resolution } = {}) {
     if (getMatch(matchId) !== local) return takeOverMatch(matchId)
     // force, because this match is in the outbox and a normal merge
     // deliberately refuses to overwrite queued work.
-    replaceServerState({ matches: [remote], force: true })
+    replaceServerState({ matches: [{ ...remote, scoringDevice: deviceId }], force: true })
     outbox.resolve(outbox.outboxKey('log', matchId))
     lastPushed.set(matchId, ++pushes)
     notify()
@@ -403,6 +404,7 @@ export async function takeOverMatch(matchId, { resolution } = {}) {
 
   const pushMine = async () => {
     await api.claimMatch(matchId, { deviceId, force: true })
+    setScoringDevice(matchId, deviceId) // the claim made this device the scorer
     outbox.markDirty('log', matchId)
     outbox.release(outbox.outboxKey('log', matchId))
     await drain()

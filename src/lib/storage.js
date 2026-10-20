@@ -136,6 +136,15 @@ export function getMatches() {
   return readJSON(MATCHES_KEY, [])
 }
 
+/**
+ * Records that this device now holds a match's scoring lease (after a
+ * successful claim). Local only: the claim itself told the server.
+ */
+export function setScoringDevice(matchId, deviceId) {
+  const match = getMatch(matchId)
+  if (match) saveMatch({ ...match, scoringDevice: deviceId })
+}
+
 /** A single match by id, or null if it doesn't exist. */
 export function getMatch(matchId) {
   return getMatches().find((m) => m.id === matchId) ?? null
@@ -527,6 +536,9 @@ export function replaceServerState({
         // there.
         voidedAt: m.voidedAt ? new Date(m.voidedAt).getTime() : null,
         voidReason: m.voidReason ?? null,
+        // Who holds the scoring lease. Without it every device thinks it
+        // is the scorer, so a watching device never refreshes its screen.
+        scoringDevice: m.scoringDevice ?? null,
         // A match list carries no events -- only the single-match fetch
         // does. Defaulting to [] here would wipe the local log of an
         // already-synced match every time the session screen refreshed.

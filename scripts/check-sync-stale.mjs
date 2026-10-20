@@ -71,7 +71,7 @@ let serverEnded = false
 let serverVoided = false // the session
 let serverMatchVoided = false
 
-const serverMatch = () => ({ ...base, startedAt: new Date(1).toISOString(), events: serverEvents, voidedAt: serverMatchVoided ? 1 : null })
+const serverMatch = () => ({ ...base, startedAt: new Date(1).toISOString(), events: serverEvents, voidedAt: serverMatchVoided ? 1 : null, scoringDevice: lease })
 const json = (body) => new Response(JSON.stringify(body), { status: 200 })
 
 globalThis.fetch = async (url, init) => {
@@ -298,6 +298,24 @@ await sync.pullCore()
 check('core pull keeps the session void', Boolean(storage.getSession(SID).voidedAt), true)
 await sync.drain()
 check('server has the session voided', serverVoided, true)
+
+console.log('who holds the scoring lease is kept locally')
+reset({ local: [rally(1)], server: [rally(1)] })
+lease = 'other'
+await sync.pullMatch(MID)
+check('a pull records the other device as the scorer', storage.getMatch(MID).scoringDevice, 'other')
+reset({ local: [rally(1)], server: [rally(1), rally(2)] })
+outbox.markDirty('log', MID)
+outbox.block(outbox.outboxKey('log', MID), { heldBy: 'other' })
+lease = 'other'
+await sync.takeOverMatch(MID)
+check('an adopt names this device', storage.getMatch(MID).scoringDevice, outbox.getDeviceId())
+reset({ local: [rally(1), rally(2)], server: [rally(1)] })
+outbox.markDirty('log', MID)
+outbox.block(outbox.outboxKey('log', MID), { heldBy: 'other' })
+lease = 'other'
+await sync.takeOverMatch(MID)
+check('a push-mine takeover names this device', storage.getMatch(MID).scoringDevice, outbox.getDeviceId())
 
 console.log(`\n${pass} ok / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)
