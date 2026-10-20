@@ -1,7 +1,15 @@
 import { DEFAULT_POINT_TARGET, deriveMatchState } from './pickleball'
 import { waitingThirdShot, withThirdShotTap } from './thirdShot'
 import { read, write } from './localstore'
-import { clearOutbox, deadLetter, markDirty, pending as outboxPending } from './outbox'
+import {
+  clearOutbox,
+  deadLetter,
+  discardDead,
+  markDirty,
+  outboxKey,
+  pending as outboxPending,
+  resolve as resolveOutbox,
+} from './outbox'
 
 // ============================================================
 // PaddlePad Umpire local persistence layer
@@ -700,6 +708,10 @@ export function deleteMatch(matchId) {
 
   writeJSON(MATCHES_KEY, getMatches().filter((m) => m.id !== matchId))
   addTombstone('matches', matchId)
+  // Its unsent log (blocked, or in the couldn't-sync list) is moot now; left
+  // queued it would never be noticed again, since the match is gone.
+  resolveOutbox(outboxKey('log', matchId))
+  discardDead(outboxKey('log', matchId))
   markDirty('matchDelete', matchId)
   return true
 }

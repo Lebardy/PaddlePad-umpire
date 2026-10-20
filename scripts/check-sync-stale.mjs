@@ -395,5 +395,15 @@ check('local has the server log', ids(storage.getMatch(MID).events), ['r1', 'r2'
 await sync.drain()
 check('the server gets the void', serverMatchVoided, true)
 
+console.log('cancelling a match with an unsent blocked log')
+reset({ local: [rally(1)], server: [rally(1)] })
+outbox.markDirty('log', MID)
+outbox.killEntry(outbox.outboxKey('log', MID), 'refused')
+outbox.markDirty('log', MID)
+outbox.block(outbox.outboxKey('log', MID), { heldBy: 'other' })
+storage.deleteMatch(MID)
+check('no log entry is left', outbox.pending().map((e) => e.key), [outbox.outboxKey('matchDelete', MID)])
+check('nor a couldn\'t-sync line', outbox.deadLetter().length, 0)
+
 console.log(`\n${pass} ok / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)
