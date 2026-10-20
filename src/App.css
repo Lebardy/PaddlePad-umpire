@@ -1601,7 +1601,9 @@ section {
 
   .ending-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem; }
   .ending-group + .ending-group { margin-top: 0.75rem; }
-  .ending-btn { min-height: 4.5rem; font-size: 1.08rem; }
+  /* Most labels here take two or three lines, so the padding sets their
+     height: trimmed, the last fault row fits an iPad's Safari (1024x700). */
+  .ending-btn { min-height: 4.1rem; padding-block: 0.35rem; font-size: 1.08rem; }
   .ending-group-title { margin-bottom: 0.4rem; }
 
   /* Name above its buttons, on one line: beside them, "Drive" was cut
