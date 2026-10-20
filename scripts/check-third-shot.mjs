@@ -6,8 +6,8 @@
 //   node scripts/check-third-shot.mjs
 //
 // The server counts every thirdShot event as an attempt, so a
-// corrected tap must replace the waiting one while it is the last
-// thing logged, not add a second.
+// corrected tap must replace the waiting one (even after a serve
+// correction was logged) and never add a second.
 // ============================================================
 
 import { isSameThirdShot, waitingThirdShot, withThirdShotTap } from '../src/lib/thirdShot.js'
@@ -50,9 +50,18 @@ log = withThirdShotTap(withThirdShotTap([rally], dropMiss, stamp()), dropIn, sta
 check('Drop ✗ then Drop ✓ leaves one Drop ✓', shots(log), [['ana', 'drop', true]])
 check('the rally before it is kept', log[0], rally)
 check('tapping the filled one again leaves none', shots(withThirdShotTap(log, dropIn, stamp())), [])
-log = withThirdShotTap([rally, ...withThirdShotTap([], dropMiss, stamp()), correction], dropIn, stamp())
-check('after a serve correction the tap is added, nothing removed', shots(log), [['ana', 'drop', false], ['ana', 'drop', true]])
-check('the serve correction is kept', log.some((e) => e.id === 'c1'), true)
+const missThenCorrection = [rally, ...withThirdShotTap([], dropMiss, stamp()), correction]
+log = withThirdShotTap(missThenCorrection, dropMiss, stamp())
+check('after a serve correction, the same button clears the waiting one', shots(log), [])
+check('the serve correction is kept when it clears', log.some((e) => e.id === 'c1'), true)
+log = withThirdShotTap(missThenCorrection, { ...dropIn, playerId: 'ben' }, stamp())
+check('after a serve correction, another button replaces it', shots(log), [['ben', 'drop', true]])
+check('the replacement is at the end', log[log.length - 1].type, 'thirdShot')
+check('the serve correction stays in place, before the new tap', log.findIndex((e) => e.id === 'c1'), 1)
+const earlier = missThenCorrection.filter((e) => e.type === 'thirdShot')
+log = withThirdShotTap([...missThenCorrection, { ...rally, id: 'r3' }], dropIn, stamp())
+check('after a later rally nothing is waiting: appended, earlier one untouched', shots(log), [['ana', 'drop', false], ['ana', 'drop', true]])
+check('the earlier 3rd shot is the same event', log.includes(earlier[0]), true)
 const added = withThirdShotTap([], drive, { id: 'x1', at: 5 })
 check('the event has the shape the server takes', added, [{ type: 'thirdShot', id: 'x1', at: 5, playerId: 'ana', shotType: 'drive', success: null }])
 

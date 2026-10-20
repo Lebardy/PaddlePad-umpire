@@ -23,13 +23,15 @@ export function isSameThirdShot(event, tap) {
 /**
  * The log after a tap on a 3rd-shot button. The server counts every
  * thirdShot as an attempt, so a corrected tap replaces the waiting one
- * and a second tap on the same button clears it. That is done only while
- * it is the last event, so a tap can never remove anything else.
+ * and a second tap on the same button clears it. The waiting one is
+ * found wherever it sits since the last rally, so a serve correction
+ * logged after it does not leave it behind. Only that one event is ever
+ * removed.
  */
 export function withThirdShotTap(events, tap, { id, at }) {
-  const last = events[events.length - 1]
-  const kept = last?.type === 'thirdShot' ? events.slice(0, -1) : events
-  if (last?.type === 'thirdShot' && isSameThirdShot(last, tap)) return kept
+  const waiting = waitingThirdShot(events)
+  const kept = waiting ? events.filter((e) => e !== waiting) : events
+  if (waiting && isSameThirdShot(waiting, tap)) return kept
   return [
     ...kept,
     { type: 'thirdShot', id, at, playerId: tap.playerId, shotType: tap.shotType, success: tap.success },
