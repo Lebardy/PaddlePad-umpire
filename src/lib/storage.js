@@ -420,8 +420,15 @@ export function replaceServerState({
   }
 
   if (sessions) {
+    // Void and end are queued changes too: a pull's older value would be
+    // pushed straight back over the umpire's.
     const dirty = new Set(
-      pendingEntities('session').concat(pendingEntities('roster'), [...keep]),
+      pendingEntities('session').concat(
+        pendingEntities('roster'),
+        pendingEntities('sessionVoid'),
+        pendingEntities('sessionEnd'),
+        [...keep],
+      ),
     )
     const local = getSessions()
     // A session queued or just pushed here but absent locally was deleted
@@ -487,7 +494,9 @@ export function replaceServerState({
   if (matches) {
     const dirty = force
       ? new Set()
-      : new Set(pendingEntities('match').concat(pendingEntities('log'), [...keep]))
+      : new Set(
+          pendingEntities('match').concat(pendingEntities('log'), pendingEntities('matchVoid'), [...keep]),
+        )
     const local = getMatches()
     const fromServer = matches
       .filter((m) => !dirty.has(m.id))

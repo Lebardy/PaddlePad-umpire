@@ -68,8 +68,10 @@ let claimDelay = 0
 let lease = null // device id holding the scoring lease; null = nobody
 let serverHasSession = true
 let serverEnded = false
+let serverVoided = false // the session
+let serverMatchVoided = false
 
-const serverMatch = () => ({ ...base, startedAt: new Date(1).toISOString(), events: serverEvents })
+const serverMatch = () => ({ ...base, startedAt: new Date(1).toISOString(), events: serverEvents, voidedAt: serverMatchVoided ? 1 : null })
 const json = (body) => new Response(JSON.stringify(body), { status: 200 })
 
 globalThis.fetch = async (url, init) => {
@@ -96,6 +98,14 @@ globalThis.fetch = async (url, init) => {
     serverEnded = JSON.parse(init.body).ended
     return json({ session: {} })
   }
+  if (method === 'POST' && path === `/sessions/${SID}/void`) {
+    serverVoided = JSON.parse(init.body).voided
+    return json({ session: {} })
+  }
+  if (method === 'POST' && path === `/matches/${MID}/void`) {
+    serverMatchVoided = JSON.parse(init.body).voided
+    return json({ match: serverMatch() })
+  }
   if (method === 'DELETE' && path === `/sessions/${SID}`) {
     serverHasSession = false
     return new Response(null, { status: 204 })
@@ -105,9 +115,9 @@ globalThis.fetch = async (url, init) => {
   if (path === `/matches/${MID}`) answer = { match: serverMatch() }
   else if (path === `/sessions/${SID}`) answer = { session: { id: SID, name: 's', playerIds: [...serverRoster] }, players: [] }
   else if (path === '/sessions') {
-    answer = { sessions: serverHasSession ? [{ id: SID, name: 's', created_at: 1, ended_at: serverEnded ? 1 : null, player_count: 1 }] : [] }
+    answer = { sessions: serverHasSession ? [{ id: SID, name: 's', created_at: 1, ended_at: serverEnded ? 1 : null, voided_at: serverVoided ? 1 : null, player_count: 1 }] : [] }
   } else if (path === '/players') answer = { players: [] }
-  else if (path === `/matches/session/${SID}`) answer = { matches: [] }
+  else if (path === `/matches/session/${SID}`) answer = { matches: [{ ...serverMatch(), events: undefined }] }
   await sleep(getDelay)
   return json(answer)
 }
@@ -134,6 +144,8 @@ function reset({ local, server, roster = [A1] }) {
   lease = null
   serverHasSession = true
   serverEnded = false
+  serverVoided = false
+  serverMatchVoided = false
   outbox.clearOutbox()
 }
 
@@ -262,6 +274,30 @@ const result3 = await sync.takeOverMatch(MID)
 check('result is adopted', result3.status, 'adopted')
 check('local is the server log', ids(storage.getMatch(MID).events), ['r1', 'r2'])
 check('nothing queued', outbox.pendingCount(), 0)
+
+console.log('a queued void or end, not yet pushed, then a pull that knows nothing of it')
+reset({ local: [rally(1)], server: [rally(1)] })
+storage.voidMatch(MID, 'x')
+await sync.pullMatch(MID)
+check('match pull keeps the void', Boolean(storage.getMatch(MID).voidedAt), true)
+await sync.pullSession(SID)
+check('session pull keeps the void', Boolean(storage.getMatch(MID).voidedAt), true)
+await sync.drain()
+check('server has the match voided', serverMatchVoided, true)
+
+reset({ local: [], server: [] })
+storage.setSessionEnded(SID)
+await sync.pullCore()
+check('core pull keeps the end', Boolean(storage.getSession(SID).endedAt), true)
+await sync.drain()
+check('server has the session ended', serverEnded, true)
+
+reset({ local: [], server: [] })
+storage.voidSession(SID, 'x')
+await sync.pullCore()
+check('core pull keeps the session void', Boolean(storage.getSession(SID).voidedAt), true)
+await sync.drain()
+check('server has the session voided', serverVoided, true)
 
 console.log(`\n${pass} ok / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)
