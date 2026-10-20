@@ -1659,6 +1659,9 @@ section {
   /* The wide column gap is for a sideways phone, where both players
      share a line: it keeps one's Drive from running into the next name. */
   .third-shot-grid { gap: 0.35rem 1.5rem; }
+  /* Two partners share a line only if each keeps ~88px of name (as at
+     360x780); otherwise Jose Miguel Cruz/Reyes both read "Jose / Miguel…". */
+  .third-shot-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
   .player-panel {
     display: flex;
     align-items: center;

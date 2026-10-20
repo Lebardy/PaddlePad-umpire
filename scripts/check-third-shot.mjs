@@ -62,6 +62,10 @@ const earlier = missThenCorrection.filter((e) => e.type === 'thirdShot')
 log = withThirdShotTap([...missThenCorrection, { ...rally, id: 'r3' }], dropIn, stamp())
 check('after a later rally nothing is waiting: appended, earlier one untouched', shots(log), [['ana', 'drop', false], ['ana', 'drop', true]])
 check('the earlier 3rd shot is the same event', log.includes(earlier[0]), true)
+const older = withThirdShotTap([], dropMiss, stamp())[0]
+const full = [older, { ...rally, thirdShotId: older.id }, ...withThirdShotTap([], dropMiss, stamp()), correction]
+check('a clear removes only the waiting one', withThirdShotTap(full, dropMiss, stamp()), [older, full[1], correction])
+check('a replace keeps everything before it', withThirdShotTap(full, dropIn, stamp()).slice(0, 3), [older, full[1], correction])
 const added = withThirdShotTap([], drive, { id: 'x1', at: 5 })
 check('the event has the shape the server takes', added, [{ type: 'thirdShot', id: 'x1', at: 5, playerId: 'ana', shotType: 'drive', success: null }])
 
