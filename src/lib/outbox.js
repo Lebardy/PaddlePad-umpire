@@ -86,7 +86,11 @@ export function markDirty(kind, entityId) {
       attempts: 0,
       nextAttemptAt: 0,
       lastError: null,
-      state: 'pending',
+      // A blocked log stays blocked through further taps: its push would
+      // replace the other device's rallies once the lease is ours or has
+      // run out. Only a takeover releases it (see release).
+      state: existing?.state === 'blocked' ? 'blocked' : 'pending',
+      ...(existing?.state === 'blocked' ? { lastError: existing.lastError } : {}),
       mark: (existing?.mark ?? 0) + 1,
       ...(existing ? { firstDirtyAt: existing.firstDirtyAt ?? existing.dirtyAt } : {}),
     },
@@ -94,6 +98,20 @@ export function markDirty(kind, entityId) {
 
   const order = existing ? state.order : [...state.order, key]
   save({ ...state, order, entries })
+}
+
+/** Lets a blocked entry push again; only a takeover that has claimed the match does this. */
+export function release(key) {
+  const state = load()
+  const entry = state.entries[key]
+  if (!entry) return
+  save({
+    ...state,
+    entries: {
+      ...state.entries,
+      [key]: { ...entry, state: 'pending', nextAttemptAt: 0, attempts: 0, lastError: null },
+    },
+  })
 }
 
 /**

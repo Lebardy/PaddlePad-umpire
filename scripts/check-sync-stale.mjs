@@ -65,6 +65,9 @@ let serverEvents = []
 let serverRoster = []
 let getDelay = 0
 let claimDelay = 0
+let lease = null // device id holding the scoring lease; null = nobody
+let serverHasSession = true
+let serverEnded = false
 
 const serverMatch = () => ({ ...base, startedAt: new Date(1).toISOString(), events: serverEvents })
 const json = (body) => new Response(JSON.stringify(body), { status: 200 })
@@ -73,7 +76,11 @@ globalThis.fetch = async (url, init) => {
   const path = new URL(String(url), 'http://x').pathname.replace(/^\/api/, '')
   const method = init?.method ?? 'GET'
   if (method === 'PUT' && path === `/matches/${MID}/log`) {
-    serverEvents = JSON.parse(init.body).events
+    const body = JSON.parse(init.body)
+    if (lease && lease !== body.deviceId) {
+      return new Response(JSON.stringify({ error: 'Another device is scoring this match', heldBy: { umpireName: 'x' } }), { status: 409 })
+    }
+    serverEvents = body.events
     return json({ match: serverMatch() })
   }
   if (method === 'PUT' && path === `/sessions/${SID}/players`) {
@@ -81,13 +88,25 @@ globalThis.fetch = async (url, init) => {
     return json({})
   }
   if (method === 'POST' && path === `/matches/${MID}/claim`) {
+    lease = JSON.parse(init.body).deviceId
     await sleep(claimDelay)
     return json({ match: serverMatch() })
+  }
+  if (method === 'POST' && path === `/sessions/${SID}/end`) {
+    serverEnded = JSON.parse(init.body).ended
+    return json({ session: {} })
+  }
+  if (method === 'DELETE' && path === `/sessions/${SID}`) {
+    serverHasSession = false
+    return new Response(null, { status: 204 })
   }
   // A GET: the answer is fixed on arrival, delivered later.
   let answer = {}
   if (path === `/matches/${MID}`) answer = { match: serverMatch() }
   else if (path === `/sessions/${SID}`) answer = { session: { id: SID, name: 's', playerIds: [...serverRoster] }, players: [] }
+  else if (path === '/sessions') {
+    answer = { sessions: serverHasSession ? [{ id: SID, name: 's', created_at: 1, ended_at: serverEnded ? 1 : null, player_count: 1 }] : [] }
+  } else if (path === '/players') answer = { players: [] }
   else if (path === `/matches/session/${SID}`) answer = { matches: [] }
   await sleep(getDelay)
   return json(answer)
@@ -105,12 +124,16 @@ const ids = (events) => events.map((e) => e.id)
 function reset({ local, server, roster = [A1] }) {
   store.clear()
   store.set('paddlepad.token', 'tok')
+  write('paddlepad.tombstones', { sessions: [], matches: [] })
   write('paddlepad.matches', [{ ...base, events: local }])
   write('paddlepad.sessions', [{ id: SID, name: 's', createdAt: 1, playerIds: roster, playerCount: roster.length }])
   serverEvents = server
   serverRoster = roster
   getDelay = 0
   claimDelay = 0
+  lease = null
+  serverHasSession = true
+  serverEnded = false
   outbox.clearOutbox()
 }
 
@@ -155,6 +178,7 @@ console.log('a takeover with a tap made during the claim, logs the same')
 reset({ local: [rally(1)], server: [rally(1)] })
 outbox.markDirty('log', MID)
 outbox.block(outbox.outboxKey('log', MID), { heldBy: 'other' })
+lease = 'other'
 claimDelay = 300
 const takingOver = sync.takeOverMatch(MID)
 await sleep(50)
@@ -168,6 +192,7 @@ console.log('a takeover with a tap made during the claim, this device was behind
 reset({ local: [rally(1)], server: [rally(1), rally(2)] })
 outbox.markDirty('log', MID)
 outbox.block(outbox.outboxKey('log', MID), { heldBy: 'other' })
+lease = 'other'
 claimDelay = 300
 const takingOver2 = sync.takeOverMatch(MID)
 await sleep(50)
@@ -177,11 +202,62 @@ check('result is a conflict', result2.status, 'conflict')
 check('local log still has the tap, not the server rally', ids(storage.getMatch(MID).events).includes('r2'), false)
 check('local log has two events', storage.getMatch(MID).events.length, 2)
 check('the tap is still queued', outbox.pendingCount(), 1)
+await sync.drain()
+check('a drain leaves the server rally', ids(serverEvents), ['r1', 'r2'])
+check('the entry is still blocked', outbox.pending()[0]?.state, 'blocked')
+storage.addRallyEvent(MID, { actingPlayerId: A1, outcome: 'winner', zone: 'open' })
+await sync.drain()
+check('a further tap and drain push nothing', ids(serverEvents), ['r1', 'r2'])
+
+console.log('a takeover keeping the server, with a tap made during the claim')
+reset({ local: [rally(1), rally(9)], server: [rally(1), rally(2)] })
+outbox.markDirty('log', MID)
+outbox.block(outbox.outboxKey('log', MID), { heldBy: 'other' })
+lease = 'other'
+claimDelay = 300
+const takingOver4 = sync.takeOverMatch(MID, { resolution: 'server' })
+await sleep(50)
+storage.addRallyEvent(MID, { actingPlayerId: A1, outcome: 'winner', zone: 'open' })
+const result4 = await takingOver4
+check('the earlier choice is dropped: conflict', result4.status, 'conflict')
+await sync.drain()
+check('the server is unchanged after a drain', ids(serverEvents), ['r1', 'r2'])
+
+console.log('a blocked log whose lease the other device no longer holds')
+reset({ local: [rally(1), rally(9)], server: [rally(1), rally(2)] })
+outbox.markDirty('log', MID)
+outbox.block(outbox.outboxKey('log', MID), { heldBy: 'other' })
+storage.addRallyEvent(MID, { actingPlayerId: A1, outcome: 'winner', zone: 'open' })
+await sync.drain()
+check('a tap and drain push nothing', ids(serverEvents), ['r1', 'r2'])
+
+console.log('a core pull that is older than a session change pushed during it')
+reset({ local: [], server: [] })
+getDelay = 300
+const pullingCore = sync.pullCore()
+await sleep(50)
+storage.setSessionEnded(SID)
+await sync.drain()
+await pullingCore
+check('server has the end', serverEnded, true)
+check('local session is still ended', Boolean(storage.getSession(SID)?.endedAt), true)
+
+console.log('a session deleted during a core pull')
+reset({ local: [], server: [] })
+getDelay = 300
+const pullingCore2 = sync.pullCore()
+await sleep(50)
+storage.deleteSession(SID)
+await sync.drain()
+await pullingCore2
+check('server deleted it', serverHasSession, false)
+check('it does not come back', storage.getSession(SID), null)
 
 console.log('a takeover with no tap')
 reset({ local: [rally(1)], server: [rally(1), rally(2)] })
 outbox.markDirty('log', MID)
 outbox.block(outbox.outboxKey('log', MID), { heldBy: 'other' })
+lease = 'other'
 const result3 = await sync.takeOverMatch(MID)
 check('result is adopted', result3.status, 'adopted')
 check('local is the server log', ids(storage.getMatch(MID).events), ['r1', 'r2'])

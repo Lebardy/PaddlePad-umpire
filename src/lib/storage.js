@@ -424,7 +424,10 @@ export function replaceServerState({
       pendingEntities('session').concat(pendingEntities('roster'), [...keep]),
     )
     const local = getSessions()
-    const merged = sessions.map((s) => {
+    // A session queued or just pushed here but absent locally was deleted
+    // here; the pull's older copy must not bring it back.
+    const live = sessions.filter((s) => !dirty.has(s.id) || local.some((l) => l.id === s.id))
+    const merged = live.map((s) => {
       const mine = local.find((l) => l.id === s.id)
       // Keep the local roster if this device still owes the server one.
       if (mine && dirty.has(s.id)) return mine

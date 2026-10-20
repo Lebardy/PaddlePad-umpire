@@ -82,9 +82,11 @@ function setReachable(value) {
 // Pull
 // ============================================================
 
-// Every successful push, numbered, and the number of each entity's latest
-// one. A pull notes the number before it asks; anything pushed after that
-// is newer here than in the pull's answer.
+// Every successful push or takeover adopt, numbered, and the number of each
+// entity's latest one. A pull notes the number before it asks; anything
+// that made the server's copy newer after that is newer here than in the
+// pull's answer. Per tab: another tab's push is not seen (the app open
+// twice is rare).
 let pushes = 0
 const lastPushed = new Map()
 
@@ -365,7 +367,9 @@ export function compareLogs(local, remote) {
  *
  * A tap made while the claim is on its way is never overwritten: the
  * takeover starts again with it, and the umpire's earlier choice no
- * longer applies, since it was about the logs before that tap.
+ * longer applies, since it was about the logs before that tap. While
+ * the umpire is being asked, the log stays blocked (taps included), so
+ * nothing is pushed over the other device's rallies until they answer.
  *
  * @param {string} matchId
  * @param {object} [options]
@@ -378,9 +382,6 @@ export async function takeOverMatch(matchId, { resolution } = {}) {
   setReachable(true)
 
   const local = getMatch(matchId)
-  // Read in the same step as the log, so it describes the log the
-  // relation below is worked out from.
-  const mark = outbox.currentMark(outbox.outboxKey('log', matchId))
   const localEvents = local?.events ?? []
   const remoteEvents = remote.events ?? []
   const relation = compareLogs(localEvents, remoteEvents)
@@ -388,14 +389,14 @@ export async function takeOverMatch(matchId, { resolution } = {}) {
   const adoptServer = async () => {
     await api.claimMatch(matchId, { deviceId, force: true })
     // A tap made while the claim was on its way is not in what was read
-    // above; overwriting it would lose it, so decide again with it.
-    if (outbox.currentMark(outbox.outboxKey('log', matchId)) !== mark) {
-      return takeOverMatch(matchId)
-    }
+    // above (every tap writes a new match object); overwriting it would
+    // lose it, so decide again with it.
+    if (getMatch(matchId) !== local) return takeOverMatch(matchId)
     // force, because this match is in the outbox and a normal merge
     // deliberately refuses to overwrite queued work.
     replaceServerState({ matches: [remote], force: true })
     outbox.resolve(outbox.outboxKey('log', matchId))
+    lastPushed.set(matchId, ++pushes)
     notify()
     return { status: 'adopted', events: remoteEvents.length }
   }
@@ -403,6 +404,7 @@ export async function takeOverMatch(matchId, { resolution } = {}) {
   const pushMine = async () => {
     await api.claimMatch(matchId, { deviceId, force: true })
     outbox.markDirty('log', matchId)
+    outbox.release(outbox.outboxKey('log', matchId))
     await drain()
     return { status: 'pushed', events: localEvents.length }
   }
