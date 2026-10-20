@@ -67,6 +67,7 @@ export function getSyncStatus() {
   return {
     pending: outbox.pendingCount(),
     dead: outbox.deadLetter().length,
+    blocked: outbox.pending().filter((e) => e.state === 'blocked').length,
     reachable,
     authPaused,
   }
