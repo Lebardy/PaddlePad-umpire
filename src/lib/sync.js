@@ -360,7 +360,9 @@ export function compareLogs(local, remote) {
  * out how the two logs actually relate. Claiming first matters: once
  * the claim lands the other device's saves are refused, so what is read
  * afterwards is final (reading first lost a rally the other device saved
- * in between).
+ * in between). A save already being written when the claim lands may
+ * still land and take the lease back; this device's next tap then blocks
+ * and the umpire is asked again, so nothing is lost.
  *
  *   behind      adopt the server's log and carry on from there -- which
  *               is what "take over scoring" means in plain English
@@ -374,13 +376,17 @@ export function compareLogs(local, remote) {
  * so nothing is pushed over the other device's rallies until they answer.
  * A tap made while the claim was on its way is read like any other, and
  * an earlier choice no longer applies to it, since it was about the logs
- * before that tap.
+ * before that tap. The same goes when the server's log has moved on from
+ * the one the prompt showed (`remoteLast`, the id of its last event: a
+ * log that was undone and tapped again has a new one, where a count
+ * would match).
  *
  * @param {string} matchId
  * @param {object} [options]
  * @param {'server'|'mine'} [options.resolution] choice for a diverged log
+ * @param {string|null} [options.remoteLast] last server event id the choice was made against
  */
-export async function takeOverMatch(matchId, { resolution } = {}) {
+export async function takeOverMatch(matchId, { resolution, remoteLast } = {}) {
   const deviceId = outbox.getDeviceId()
 
   const before = getMatch(matchId)
@@ -389,9 +395,10 @@ export async function takeOverMatch(matchId, { resolution } = {}) {
   setReachable(true)
 
   const local = getMatch(matchId)
-  const choice = local === before ? resolution : undefined
   const localEvents = local?.events ?? []
   const remoteEvents = remote.events ?? []
+  const last = remoteEvents.at(-1)?.id ?? null
+  const choice = local === before && (remoteLast === undefined || remoteLast === last) ? resolution : undefined
   const relation = compareLogs(localEvents, remoteEvents)
 
   const adoptServer = () => {
@@ -433,6 +440,7 @@ export async function takeOverMatch(matchId, { resolution } = {}) {
       status: 'conflict',
       localCount: localEvents.length,
       remoteCount: remoteEvents.length,
+      remoteLast: last,
     }
   }
 

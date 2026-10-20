@@ -756,7 +756,12 @@ export function deleteSession(sessionId) {
 
   writeJSON(MATCHES_KEY, getMatches().filter((m) => m.sessionId !== sessionId))
   writeJSON(SESSIONS_KEY, getSessions().filter((s) => s.id !== sessionId))
-  for (const match of matches) addTombstone('matches', match.id)
+  for (const match of matches) {
+    addTombstone('matches', match.id)
+    // As in deleteMatch: its unsent log is moot and would sit queued forever.
+    resolveOutbox(outboxKey('log', match.id))
+    discardDead(outboxKey('log', match.id))
+  }
   addTombstone('sessions', sessionId)
   markDirty('sessionDelete', sessionId)
   return true

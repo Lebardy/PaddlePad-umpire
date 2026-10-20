@@ -405,5 +405,33 @@ storage.deleteMatch(MID)
 check('no log entry is left', outbox.pending().map((e) => e.key), [outbox.outboxKey('matchDelete', MID)])
 check('nor a couldn\'t-sync line', outbox.deadLetter().length, 0)
 
+console.log('another device voided the match, nothing queued here, then an adopt')
+reset({ local: [rally(1)], server: [rally(1), rally(2)] })
+serverMatchVoided = true
+await sync.takeOverMatch(MID)
+check('local is voided like the server', Boolean(storage.getMatch(MID).voidedAt), true)
+
+console.log('cancelling a session with an unsent blocked log')
+reset({ local: [rally(1)], server: [rally(1)] })
+outbox.markDirty('log', MID)
+outbox.block(outbox.outboxKey('log', MID), { heldBy: 'other' })
+storage.deleteSession(SID)
+check('no log entry is left', outbox.pending().some((e) => e.kind === 'log'), false)
+
+console.log('a choice made before the server log changed')
+reset({ local: [rally(1), rally(9)], server: [rally(1), rally(2)] })
+outbox.markDirty('log', MID)
+outbox.block(outbox.outboxKey('log', MID), { heldBy: 'other' })
+lease = 'other'
+const asked = await sync.takeOverMatch(MID)
+check('first a conflict', asked.status, 'conflict')
+serverEvents = [rally(1), rally(2), rally(3)] // the other device went on
+const answered = await sync.takeOverMatch(MID, { resolution: 'mine', remoteLast: asked.remoteLast })
+check('the choice is dropped: asked again', answered.status, 'conflict')
+await sync.drain()
+check('the server is unchanged', ids(serverEvents), ['r1', 'r2', 'r3'])
+const chosen = await sync.takeOverMatch(MID, { resolution: 'mine', remoteLast: answered.remoteLast })
+check('a choice about what the server holds now goes through', chosen.status, 'pushed')
+
 console.log(`\n${pass} ok / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)

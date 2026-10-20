@@ -8,7 +8,7 @@ import { useSyncStatus } from '../lib/useSyncStatus'
  * Shown when this device's taps for a match are blocked because another
  * device holds the scoring lease.
  *
- * Taking over reads the server first and works out how the two logs
+ * Taking over claims the match, then reads the server and works out how the two logs
  * relate, rather than assuming this device's copy should win. In almost
  * every real case this device was only WATCHING and has fallen behind,
  * so taking over means adopting the current score and carrying on --
@@ -37,7 +37,7 @@ function TakeoverNotice({ matchId }) {
     setBusy(true)
     setError(null)
     try {
-      const result = await takeOverMatch(matchId, { resolution })
+      const result = await takeOverMatch(matchId, { resolution, remoteLast: conflict?.remoteLast })
       if (result.status === 'conflict') {
         setConflict(result)
       } else {
