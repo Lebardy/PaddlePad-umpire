@@ -295,6 +295,10 @@ function LiveMatch({ matchId, onBack }) {
   // An unfinished match is removed outright -- wrong pairing, wrong
   // court, started by mistake. Nothing in it counted yet.
   function handleCancel() {
+    if (watching) {
+      alert(`${match.recordedByName ?? 'Another device'} is scoring this match on another device. Take over first to cancel it.`)
+      return
+    }
     if (
       !confirm(
         'Cancel this match? It will be deleted along with everything scored so far.',

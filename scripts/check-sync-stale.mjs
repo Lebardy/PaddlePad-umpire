@@ -70,6 +70,8 @@ let serverHasSession = true
 let serverEnded = false
 let serverVoided = false // the session
 let serverMatchVoided = false
+let refuseDelete = false // a DELETE answers 409, as when another device scores
+let deleteBodies = []
 
 const serverMatch = () => ({ ...base, startedAt: new Date(1).toISOString(), events: serverEvents, voidedAt: serverMatchVoided ? 1 : null, scoringDevice: lease })
 const json = (body) => new Response(JSON.stringify(body), { status: 200 })
@@ -107,7 +109,16 @@ globalThis.fetch = async (url, init) => {
     serverMatchVoided = JSON.parse(init.body).voided
     return json({ match: serverMatch() })
   }
+  if (method === 'DELETE' && refuseDelete) {
+    deleteBodies.push(JSON.parse(init.body))
+    return new Response(JSON.stringify({ error: 'Sam is scoring this match on another device', heldBy: { umpireName: 'Sam' } }), { status: 409 })
+  }
+  if (method === 'DELETE' && path === `/matches/${MID}`) {
+    deleteBodies.push(JSON.parse(init.body))
+    return new Response(null, { status: 204 })
+  }
   if (method === 'DELETE' && path === `/sessions/${SID}`) {
+    deleteBodies.push(JSON.parse(init.body))
     serverHasSession = false
     return new Response(null, { status: 204 })
   }
@@ -147,6 +158,8 @@ function reset({ local, server, roster = [A1] }) {
   serverEnded = false
   serverVoided = false
   serverMatchVoided = false
+  refuseDelete = false
+  deleteBodies = []
   outbox.clearOutbox()
 }
 
@@ -443,6 +456,31 @@ check('same pending count', during.pending, before.pending)
 check('blocked count differs', during.blocked !== before.blocked, true)
 outbox.release(outbox.outboxKey('log', MID))
 check('unblocking changes it back', sync.getSyncStatus().blocked, before.blocked)
+
+console.log('a cancel the server refused')
+reset({ local: [rally(1)], server: [rally(1)] })
+storage.deleteMatch(MID)
+await sync.drain()
+check('the cancel sends this device\'s id', deleteBodies, [{ deviceId: outbox.getDeviceId() }])
+check('it is gone here while the cancel is owed', storage.getMatch(MID), null)
+reset({ local: [rally(1)], server: [rally(1)] })
+refuseDelete = true
+storage.deleteMatch(MID)
+await sync.drain()
+check('a refused cancel waits in the couldn\'t-sync list', outbox.deadLetter().map((d) => d.key), [`matchDelete:${MID}`])
+sync.discardDead(`matchDelete:${MID}`)
+await sleep(100)
+check('discarding it brings the match back', storage.getMatch(MID)?.id, MID)
+reset({ local: [], server: [] })
+refuseDelete = true
+storage.deleteSession(SID)
+await sync.drain()
+check('a refused session cancel sends the device id', deleteBodies, [{ deviceId: outbox.getDeviceId() }])
+check('and waits in the list', outbox.deadLetter().map((d) => d.key), [`sessionDelete:${SID}`])
+sync.discardDead(`sessionDelete:${SID}`)
+await sleep(100)
+check('discarding it brings the session back', storage.getSession(SID)?.id, SID)
+check('and its match', storage.getMatch(MID)?.id, MID)
 
 console.log(`\n${pass} ok / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)

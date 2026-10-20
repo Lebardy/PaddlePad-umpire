@@ -646,6 +646,47 @@ async function main() {
   })
   check('the taking-over device can now push', afterTakeover.status === 200)
 
+  section('a cancel from a device that is not scoring the match is refused')
+  // otherDevice holds liveMatchId now, with a fresh lease.
+  const cancelByOther = await call(`/matches/${liveMatchId}`, { method: 'DELETE', body: { deviceId: DEVICE } })
+  check('another device cancelling a held match -> 409 with heldBy',
+    cancelByOther.status === 409 && Boolean(cancelByOther.body.heldBy?.umpireName), JSON.stringify(cancelByOther.body))
+  const heldSession = uuid()
+  const heldMatch = uuid()
+  await call('/sessions', { method: 'POST', body: { id: heldSession, name: `Held Night ${stamp}` } })
+  await call('/matches', {
+    method: 'POST',
+    body: {
+      id: heldMatch, sessionId: heldSession, teamA, teamB,
+      stacking: { A: false, B: false },
+      firstServer: { team: 'A', playerId: teamA[0] },
+      startedAt: Date.now(),
+    },
+  })
+  await call(`/matches/${heldMatch}/log`, { method: 'PUT', body: { deviceId: otherDevice, events: [rally(0, teamA[0])] } })
+  const sessionByOther = await call(`/sessions/${heldSession}`, { method: 'DELETE', body: { deviceId: DEVICE } })
+  check('another device deleting a session with a held match -> 409 with heldBy',
+    sessionByOther.status === 409 && Boolean(sessionByOther.body.heldBy?.umpireName), JSON.stringify(sessionByOther.body))
+  const sessionByHolder = await call(`/sessions/${heldSession}`, { method: 'DELETE', body: { deviceId: otherDevice } })
+  check('the device holding the match can delete the session -> 204', sessionByHolder.status === 204, String(sessionByHolder.status))
+  const [ownMatch, oldCopyMatch] = [uuid(), uuid()]
+  for (const id of [ownMatch, oldCopyMatch]) {
+    await call('/matches', {
+      method: 'POST',
+      body: {
+        id, sessionId, teamA, teamB,
+        stacking: { A: false, B: false },
+        firstServer: { team: 'A', playerId: teamA[0] },
+        startedAt: Date.now(),
+      },
+    })
+    await call(`/matches/${id}/log`, { method: 'PUT', body: { deviceId: otherDevice, events: [rally(0, teamA[0])] } })
+  }
+  const cancelByHolder = await call(`/matches/${ownMatch}`, { method: 'DELETE', body: { deviceId: otherDevice } })
+  check('the device scoring the match can cancel it -> 204', cancelByHolder.status === 204, String(cancelByHolder.status))
+  const oldCopy = await call(`/matches/${oldCopyMatch}`, { method: 'DELETE' })
+  check('a cancel with no deviceId (older app copy) still works -> 204', oldCopy.status === 204, String(oldCopy.status))
+
   section('an id or date the server cannot read is refused, not a server error')
   // The umpire app retries any 5xx for ever and holds everything queued
   // behind it, so a request that can never succeed has to answer 4xx.

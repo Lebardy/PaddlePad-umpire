@@ -215,12 +215,12 @@ async function push(entry, payload) {
     return
   }
   if (entry.kind === 'matchDelete') {
-    await api.deleteMatchOnServer(payload.id)
+    await api.deleteMatchOnServer(payload.id, { deviceId: outbox.getDeviceId() })
     clearTombstone('matches', payload.id)
     return
   }
   if (entry.kind === 'sessionDelete') {
-    await api.deleteSessionOnServer(payload.id)
+    await api.deleteSessionOnServer(payload.id, { deviceId: outbox.getDeviceId() })
     clearTombstone('sessions', payload.id)
     return
   }
@@ -457,7 +457,27 @@ export function retryDead(key) {
 
 export function discardDead(key) {
   outbox.discardDead(key)
+  // A refused cancel is given up: the record stays, so bring it back here.
+  const [kind, id] = key.split(':')
+  if (kind === 'matchDelete') {
+    clearTombstone('matches', id)
+    pullMatch(id).catch(() => {})
+  } else if (kind === 'sessionDelete') {
+    clearTombstone('sessions', id)
+    restoreSession(id).catch(() => {})
+  }
   notify()
+}
+
+// Deleting a session also buried its matches; the ones with no delete of
+// their own still queued come back with it.
+async function restoreSession(sessionId) {
+  await pullCore()
+  const owed = new Set([...outbox.pending(), ...outbox.deadLetter()].map((e) => e.key))
+  for (const match of await api.fetchMatchesForSession(sessionId)) {
+    if (!owed.has(outbox.outboxKey('matchDelete', match.id))) clearTombstone('matches', match.id)
+  }
+  await pullSession(sessionId)
 }
 
 export function resumeAfterSignIn() {
