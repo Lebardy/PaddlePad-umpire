@@ -1,7 +1,7 @@
 import { DEFAULT_POINT_TARGET, deriveMatchState } from './pickleball'
 import { waitingThirdShot, withThirdShotTap } from './thirdShot'
 import { read, write } from './localstore'
-import { clearOutbox, markDirty, pending as outboxPending } from './outbox'
+import { clearOutbox, deadLetter, markDirty, pending as outboxPending } from './outbox'
 
 // ============================================================
 // PaddlePad Umpire local persistence layer
@@ -555,9 +555,14 @@ export function replaceServerState({
   }
 }
 
-/** Entity ids of a given kind currently queued for the server. */
+/**
+ * Entity ids of a given kind currently queued for the server. Includes
+ * changes in the "Couldn't sync" list: the server refused them but the
+ * umpire's copy is still the only one, so a pull must not replace it.
+ * Discarding one from the list lets the next pull refresh it again.
+ */
 function pendingEntities(kind) {
-  return outboxPending()
+  return [...outboxPending(), ...deadLetter()]
     .filter((entry) => entry.kind === kind)
     .map((entry) => entry.entityId)
 }

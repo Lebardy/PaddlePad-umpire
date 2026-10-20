@@ -222,7 +222,8 @@ export function block(key, info) {
  * Retires an entry that can never succeed.
  *
  * Dead-lettered work is kept, never silently dropped: the umpire's taps
- * are still in local storage, and the entry is listed (screens/
+ * are still in local storage (pulls leave them alone, see
+ * pendingEntities in storage.js), and the entry is listed (screens/
  * CouldntSync.jsx) so they can retry or knowingly discard it. Listed
  * once: a change refused a second time replaces its earlier line.
  * Continuing to drain past it is deliberate --

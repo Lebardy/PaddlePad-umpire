@@ -317,5 +317,15 @@ lease = 'other'
 await sync.takeOverMatch(MID)
 check('a push-mine takeover names this device', storage.getMatch(MID).scoringDevice, outbox.getDeviceId())
 
+console.log('a change in the couldn\'t-sync list is not overwritten by a pull')
+reset({ local: [rally(1), rally(9)], server: [rally(1)] })
+outbox.markDirty('log', MID)
+outbox.killEntry(outbox.outboxKey('log', MID), 'refused')
+await sync.pullMatch(MID)
+check('local keeps the refused log', ids(storage.getMatch(MID).events), ['r1', 'r9'])
+outbox.discardDead(outbox.outboxKey('log', MID))
+await sync.pullMatch(MID)
+check('after discarding, a pull applies the server log', ids(storage.getMatch(MID).events), ['r1'])
+
 console.log(`\n${pass} ok / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)
