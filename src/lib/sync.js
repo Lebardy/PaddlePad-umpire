@@ -395,7 +395,16 @@ export async function takeOverMatch(matchId, { resolution } = {}) {
   const relation = compareLogs(localEvents, remoteEvents)
 
   const adoptServer = () => {
-    const adopted = { ...remote, scoringDevice: deviceId }
+    // A void made here and not yet sent is the umpire's latest word on it;
+    // the queued push sends it, so the adopted copy must not undo it.
+    const voidQueued = outbox.pending().some((e) => e.kind === 'matchVoid' && e.entityId === matchId)
+    const adopted = {
+      ...remote,
+      scoringDevice: deviceId,
+      ...(voidQueued && local
+        ? { voidedAt: local.voidedAt ?? null, voidReason: local.voidReason ?? null }
+        : {}),
+    }
     // force, because this match is in the outbox and a normal merge
     // deliberately refuses to overwrite queued work.
     replaceServerState({ matches: [adopted], force: true })
