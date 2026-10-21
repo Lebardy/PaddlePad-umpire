@@ -20,5 +20,6 @@ export const FAULT_ENDINGS = RALLY_ENDINGS.filter((ending) => ending.outcome ===
 export const RALLY_RULE =
   'Tap what ended the rally, then the player who did it. An ace, a service fault or a foot fault can only be the server, so those count at once.'
 
+// Drop ✓ is USA Pickleball's drop done right: it lands in the opponents' kitchen, so they must let it bounce.
 export const THIRD_SHOT_RULE =
-  'Serving side only, for their third shot. Drop ✓ landed soft at the net, Drop ✗ missed, Drive hit hard. Separate from how the rally ended: one rally can have both.'
+  'Serving side only, for their third shot. Drop ✓ bounced in the opponents’ kitchen, Drop ✗ did not (net, out, deep or volleyed), Drive hit hard. Separate from how the rally ended: one rally can have both.'

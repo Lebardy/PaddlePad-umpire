@@ -27,7 +27,7 @@
 // MatchSetup change, this has to change with them.
 // ============================================================
 
-import { FAULT_ENDINGS, RALLY_RULE, WINNING_ENDINGS } from '../lib/outcomes'
+import { FAULT_ENDINGS, RALLY_RULE, THIRD_SHOT_RULE, WINNING_ENDINGS } from '../lib/outcomes'
 import Icon from '../components/Icon'
 
 const STEPS = [
@@ -44,7 +44,7 @@ const TERMS = [
   },
   {
     term: 'Third shot',
-    body: 'Serving side only, for their third shot of the rally. Drop ✓ landed soft at the net, Drop ✗ missed, Drive hit hard. Recorded separately from how the rally ended, so one rally can have both.',
+    body: THIRD_SHOT_RULE,
   },
   {
     term: 'Stacking',

@@ -48,8 +48,8 @@ export function emptyStats() {
     unforced_errors: 0,
     // Whether the third shot actually WON the point, which is a
     // different question from whether the drop landed.
-    // drop_successes is the umpire's judgement that the ball arrived
-    // soft at the net; these say what happened to the rally afterwards.
+    // drop_successes is the umpire's judgement that the drop bounced in
+    // the opponents' kitchen; these say what happened to the rally afterwards.
     //
     // Only rallies carrying a thirdShotId count here, so they are
     // always <= the attempt counts above: a third shot the umpire

@@ -3,7 +3,7 @@ import Icon from '../components/Icon'
 import {
   addRallyEvent,
   addServerCorrection,
-  addThirdShotEvent,
+  tapThirdShot,
   undoLastEvent,
   endMatchManually,
   deleteMatch,
@@ -17,6 +17,7 @@ import MatchVideo from '../components/MatchVideo'
 import * as sync from '../lib/sync'
 import { getDeviceId } from '../lib/outbox'
 import { deriveMatchState, currentServerPlayerId, courtSides } from '../lib/pickleball'
+import { isSameThirdShot, waitingThirdShot } from '../lib/thirdShot'
 import {
   FAULT_ENDINGS,
   RALLY_RULE,
@@ -265,7 +266,7 @@ function LiveMatch({ matchId, onBack }) {
   }
 
   function logThirdShot(playerId, shotType, success) {
-    addThirdShotEvent(matchId, { playerId, shotType, success })
+    tapThirdShot(matchId, { playerId, shotType, success })
   }
 
   // The app works out the server from the rules, and gets it right so
@@ -329,6 +330,11 @@ function LiveMatch({ matchId, onBack }) {
   const servingTeamPlayers = derived.servingTeam === 'A' ? match.teamA : match.teamB
   const history = [...match.events].reverse()
   const lastRally = history.find((event) => event.type === 'rally')
+  // Filled in on its button and named on the Last line, so a glance
+  // down confirms the tap. A rally after it means it is no longer waiting.
+  const waiting = waitingThirdShot(match.events)
+  const picked = (playerId, shotType, success) =>
+    isSameThirdShot(waiting, { playerId, shotType, success })
   const pendingEnding = pending ? rallyEnding(pending) : null
   const sides = match.status === 'in_progress' ? courtSides(derived, match) : null
 
@@ -350,11 +356,12 @@ function LiveMatch({ matchId, onBack }) {
 
       <TakeoverNotice matchId={matchId} />
 
-      {/* Everything tapped during a rally, in one block that fits a
-          tablet screen in either orientation without scrolling: the
-          score and undo, the ending buttons (or the "who" step in the
-          same place), and the third shot. Explanations and the match
-          controls sit below it. See App.css for the arrangements. */}
+      {/* Everything tapped during a rally, in one block: the score and
+          undo, the 3rd shot and the ending buttons (or the "who" step in
+          the same place). It fits a tablet without scrolling in portrait,
+          and in landscape down to about 720 px of height; Safari's bars on
+          an iPad leave less. Explanations and the match controls sit
+          below it. See App.css for the arrangements. */}
       <div className={`scoring${match.status === 'in_progress' ? ' is-live' : ''}`}>
         <div className="scoring-status">
           <div className="scoreboard" aria-label="Score">
@@ -407,9 +414,11 @@ function LiveMatch({ matchId, onBack }) {
                     <span className="last-logged-text">
                       {pendingEnding
                         ? `${pendingEnding.label} — who?`
-                        : lastRally
-                          ? `Last: ${rallyLabel(lastRally)} — ${name(lastRally.actingPlayerId)}`
-                          : 'No rallies yet'}
+                        : waiting
+                          ? `Last: ${describeEvent(waiting, name)}`
+                          : lastRally
+                            ? `Last: ${rallyLabel(lastRally)} — ${name(lastRally.actingPlayerId)}`
+                            : 'No rallies yet'}
                     </span>
                     <button
                       className="undo"
@@ -425,115 +434,119 @@ function LiveMatch({ matchId, onBack }) {
         </div>
 
         {match.status === 'in_progress' && (
-          <>
-            <div className="scoring-rally">
-              {pendingEnding ? (
-                <section
-                  className={`who-picker ${pendingEnding.outcome}`}
-                  aria-label={`Who — ${pendingEnding.label}`}
-                >
-                  <p className="who-question">
-                    {pendingEnding.outcome === 'winner'
-                      ? 'Who hit it?'
-                      : 'Who made the fault?'}
-                  </p>
-                  {sides ? (
-                    <CourtPicker
-                      sides={sides}
-                      nearEnd={nearEnd}
-                      serverId={serverId}
-                      name={name}
-                      onPick={(id) => logRally(id, pendingEnding)}
-                      onSwapEnds={swapEnds}
-                    />
-                  ) : (
-                    // Singles: one player a side, nobody to tell apart.
-                    <div className="who-teams">
-                      {teams.map(({ key, ids }) => (
-                        <div key={key} className="who-team">
-                          {ids.map((id) => (
-                            <button
-                              key={id}
-                              className="who-btn"
-                              onClick={() => logRally(id, pendingEnding)}
-                            >
-                              {name(id)}
-                              {id === serverId && <span className="who-serving">serving</span>}
-                            </button>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              ) : (
-                <section className="rally-log" aria-label="How the rally ended">
-                  {[
-                    ['Won with a shot', WINNING_ENDINGS, 'winner'],
-                    ['Lost by a fault', FAULT_ENDINGS, 'error'],
-                  ].map(([title, endings, tone]) => (
-                    <div key={tone} className={`ending-group ${tone}`}>
-                      <h3 className="ending-group-title">{title}</h3>
-                      <div className="ending-grid">
-                        {endings.map((ending) => (
+          <div className="scoring-rally">
+            {pendingEnding ? (
+              <section
+                className={`who-picker ${pendingEnding.outcome}`}
+                aria-label={`Who — ${pendingEnding.label}`}
+              >
+                <p className="who-question">
+                  {pendingEnding.outcome === 'winner'
+                    ? 'Who hit it?'
+                    : 'Who made the fault?'}
+                </p>
+                {sides ? (
+                  <CourtPicker
+                    sides={sides}
+                    nearEnd={nearEnd}
+                    serverId={serverId}
+                    name={name}
+                    onPick={(id) => logRally(id, pendingEnding)}
+                    onSwapEnds={swapEnds}
+                  />
+                ) : (
+                  // Singles: one player a side, nobody to tell apart.
+                  <div className="who-teams">
+                    {teams.map(({ key, ids }) => (
+                      <div key={key} className="who-team">
+                        {ids.map((id) => (
                           <button
-                            key={ending.key}
-                            className={`ending-btn ${tone}`}
-                            onClick={() => pick(ending)}
+                            key={id}
+                            className="who-btn"
+                            onClick={() => logRally(id, pendingEnding)}
                           >
-                            <Icon name={ending.key} size={26} className="icon-solo" />
-                            <span className="ending-label">
-                              {ending.label}
-                              {ending.by === 'server' && (
-                                <span className="ending-auto">server</span>
-                              )}
-                            </span>
+                            {name(id)}
+                            {id === serverId && <span className="who-serving">serving</span>}
                           </button>
                         ))}
                       </div>
-                    </div>
-                  ))}
-                </section>
-              )}
-            </div>
-
-            {/* Only the serving team ever hits the 3rd shot of a rally. */}
-            <section className="third-shot-log scoring-third">
-                {/* The full rule is in "What do these mean?" below; on court
-                    the title is enough, and a paragraph here would push
-                    the buttons off a tablet screen. */}
-                <h3>
-                  3rd shot <span className="third-shot-hint">serving side</span>
-                </h3>
-                <div className="third-shot-grid">
-                  {servingTeamPlayers.map((id) => (
-                    <div className="player-panel" key={id}>
-                      <div className="player-panel-name">{name(id)}</div>
-                      <div className="player-panel-outcomes">
-                        <button
-                          className="outcome-btn winner"
-                          onClick={() => logThirdShot(id, 'drop', true)}
-                        >
-                          <span>Drop <Icon name="check" size={18} className="icon-solo" /></span>
-                        </button>
-                        <button
-                          className="outcome-btn error"
-                          onClick={() => logThirdShot(id, 'drop', false)}
-                        >
-                          <span>Drop <Icon name="x" size={18} className="icon-solo" /></span>
-                        </button>
-                        <button
-                          className="outcome-btn neutral"
-                          onClick={() => logThirdShot(id, 'drive', null)}
-                        >
-                          <span><Icon name="drive" />Drive</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </section>
-          </>
+            ) : (
+              <section className="rally-log" aria-label="How the rally ended">
+                {[
+                  ['Won with a shot', WINNING_ENDINGS, 'winner'],
+                  ['Lost by a fault', FAULT_ENDINGS, 'error'],
+                ].map(([title, endings, tone]) => (
+                  <div key={tone} className={`ending-group ${tone}`}>
+                    {/* The 3rd shot comes first, where the umpire is
+                        already looking when a point ends: 3rd shot, how
+                        it ended, who. Only the serving team hits it. */}
+                    {tone === 'winner' && (
+                      <div className="third-shot-row">
+                        <h3>
+                          3rd shot <span className="third-shot-hint">serving side</span>
+                        </h3>
+                        <div className="third-shot-grid">
+                          {servingTeamPlayers.map((id) => (
+                            <div className="player-panel" key={id}>
+                              <div className="player-panel-name">{name(id)}</div>
+                              <div className="player-panel-outcomes">
+                                <button
+                                  className="outcome-btn winner"
+                                  aria-label={`Drop landed, ${name(id)}`}
+                                  aria-pressed={picked(id, 'drop', true)}
+                                  onClick={() => logThirdShot(id, 'drop', true)}
+                                >
+                                  <span>Drop <Icon name="check" size={18} className="icon-solo" /></span>
+                                </button>
+                                <button
+                                  className="outcome-btn error"
+                                  aria-label={`Drop missed, ${name(id)}`}
+                                  aria-pressed={picked(id, 'drop', false)}
+                                  onClick={() => logThirdShot(id, 'drop', false)}
+                                >
+                                  <span>Drop <Icon name="x" size={18} className="icon-solo" /></span>
+                                </button>
+                                <button
+                                  className="outcome-btn neutral"
+                                  aria-label={`Drive, ${name(id)}`}
+                                  aria-pressed={picked(id, 'drive', null)}
+                                  onClick={() => logThirdShot(id, 'drive', null)}
+                                >
+                                  <span><Icon name="drive" />Drive</span>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <h3 className="ending-group-title">{title}</h3>
+                    <div className="ending-grid">
+                      {endings.map((ending) => (
+                        <button
+                          key={ending.key}
+                          className={`ending-btn ${tone}`}
+                          onClick={() => pick(ending)}
+                        >
+                          <Icon name={ending.key} size={26} className="icon-solo" />
+                          <span className="ending-label">
+                            {ending.label}
+                            {ending.by === 'server' && (
+                              <span className="ending-auto">server</span>
+                            )}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </section>
+            )}
+          </div>
         )}
       </div>
 
