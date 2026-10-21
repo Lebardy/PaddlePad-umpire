@@ -423,11 +423,13 @@ function LiveMatch({ matchId, onBack }) {
                     <span className="last-logged-text">
                       {pendingEnding
                         ? `${pendingEnding.label} — who?`
-                        : waiting
-                          ? `Last: ${describeEvent(waiting, name)}`
-                          : lastRally
-                            ? `Last: ${rallyLabel(lastRally)} — ${name(lastRally.actingPlayerId)}`
-                            : 'No rallies yet'}
+                        : history[0]?.type === 'serverCorrection'
+                          ? `Last: ${describeEvent(history[0], name)}`
+                          : waiting
+                            ? `Last: ${describeEvent(waiting, name)}`
+                            : lastRally
+                              ? `Last: ${rallyLabel(lastRally)} — ${name(lastRally.actingPlayerId)}`
+                              : 'No rallies yet'}
                     </span>
                     <button
                       className="undo"
