@@ -434,8 +434,8 @@ export function claimMatch(matchId, { deviceId, force = false }) {
 }
 
 /** Cancels an unfinished match. Idempotent server-side. */
-export function deleteMatchOnServer(matchId) {
-  return apiFetch(`/matches/${matchId}`, { method: 'DELETE' })
+export function deleteMatchOnServer(matchId, { deviceId }) {
+  return apiFetch(`/matches/${matchId}`, { method: 'DELETE', body: { deviceId } })
 }
 
 /** Voids (or un-voids) a finished match, excluding it from the export. */
@@ -447,8 +447,8 @@ export function setMatchVoided(matchId, { voided, reason }) {
 }
 
 /** Cancels a session and its unfinished matches. Idempotent server-side. */
-export function deleteSessionOnServer(sessionId) {
-  return apiFetch(`/sessions/${sessionId}`, { method: 'DELETE' })
+export function deleteSessionOnServer(sessionId, { deviceId }) {
+  return apiFetch(`/sessions/${sessionId}`, { method: 'DELETE', body: { deviceId } })
 }
 
 /** Voids (or restores) a session, excluding all its matches from the export. */

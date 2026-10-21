@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { pending } from '../lib/outbox'
+import { getMatch } from '../lib/storage'
 import { takeOverMatch } from '../lib/sync'
 import { useSyncStatus } from '../lib/useSyncStatus'
 
@@ -7,7 +8,7 @@ import { useSyncStatus } from '../lib/useSyncStatus'
  * Shown when this device's taps for a match are blocked because another
  * device holds the scoring lease.
  *
- * Taking over reads the server first and works out how the two logs
+ * Taking over claims the match, then reads the server and works out how the two logs
  * relate, rather than assuming this device's copy should win. In almost
  * every real case this device was only WATCHING and has fallen behind,
  * so taking over means adopting the current score and carrying on --
@@ -36,7 +37,7 @@ function TakeoverNotice({ matchId }) {
     setBusy(true)
     setError(null)
     try {
-      const result = await takeOverMatch(matchId, { resolution })
+      const result = await takeOverMatch(matchId, { resolution, remoteLast: conflict?.remoteLast })
       if (result.status === 'conflict') {
         setConflict(result)
       } else {
@@ -64,11 +65,14 @@ function TakeoverNotice({ matchId }) {
   }
 
   if (conflict) {
+    // Live, not the count when the prompt first showed: taps made while
+    // the umpire decides are part of what each button keeps or discards.
+    const localCount = getMatch(matchId)?.events.length ?? conflict.localCount
     return (
       <div className="takeover">
         <p className="takeover-text">
           <strong>Both devices recorded different rallies.</strong> This device
-          has {conflict.localCount} taps; the server has {conflict.remoteCount}.
+          has {localCount} taps; the server has {conflict.remoteCount}.
           One of them has to be kept — they can&rsquo;t be combined, because each
           is a different account of the same points.
         </p>
@@ -78,7 +82,7 @@ function TakeoverNotice({ matchId }) {
             Keep the server&rsquo;s {conflict.remoteCount}
           </button>
           <button className="dupe-no" onClick={() => run('mine')} disabled={busy}>
-            Keep my {conflict.localCount}
+            Keep my {localCount}
           </button>
         </div>
       </div>

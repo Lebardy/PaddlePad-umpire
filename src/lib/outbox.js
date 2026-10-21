@@ -86,7 +86,11 @@ export function markDirty(kind, entityId) {
       attempts: 0,
       nextAttemptAt: 0,
       lastError: null,
-      state: 'pending',
+      // A blocked log stays blocked through further taps: its push would
+      // replace the other device's rallies once the lease is ours or has
+      // run out. Only a takeover releases it (see release).
+      state: existing?.state === 'blocked' ? 'blocked' : 'pending',
+      ...(existing?.state === 'blocked' ? { lastError: existing.lastError } : {}),
       mark: (existing?.mark ?? 0) + 1,
       ...(existing ? { firstDirtyAt: existing.firstDirtyAt ?? existing.dirtyAt } : {}),
     },
@@ -94,6 +98,20 @@ export function markDirty(kind, entityId) {
 
   const order = existing ? state.order : [...state.order, key]
   save({ ...state, order, entries })
+}
+
+/** Lets a blocked entry push again; only a takeover that has claimed the match does this. */
+export function release(key) {
+  const state = load()
+  const entry = state.entries[key]
+  if (!entry) return
+  save({
+    ...state,
+    entries: {
+      ...state.entries,
+      [key]: { ...entry, state: 'pending', nextAttemptAt: 0, attempts: 0, lastError: null },
+    },
+  })
 }
 
 /**
@@ -204,7 +222,8 @@ export function block(key, info) {
  * Retires an entry that can never succeed.
  *
  * Dead-lettered work is kept, never silently dropped: the umpire's taps
- * are still in local storage, and the entry is listed (screens/
+ * are still in local storage (pulls leave them alone, see
+ * pendingEntities in storage.js), and the entry is listed (screens/
  * CouldntSync.jsx) so they can retry or knowingly discard it. Listed
  * once: a change refused a second time replaces its earlier line.
  * Continuing to drain past it is deliberate --
@@ -232,6 +251,10 @@ export function reviveDead(key) {
   const state = load()
   const dead = state.deadLetter.find((d) => d.key === key)
   if (!dead) return
+  const existing = state.entries[key]
+  // A log blocked behind another device's lease stays blocked: only a
+  // takeover releases it (see markDirty).
+  const blocked = existing?.state === 'blocked'
   save({
     // Already queued again if the umpire changed it after it was refused.
     order: state.order.includes(key) ? state.order : [...state.order, key],
@@ -243,8 +266,8 @@ export function reviveDead(key) {
         dirtyAt: Date.now(),
         attempts: 0,
         nextAttemptAt: 0,
-        lastError: null,
-        state: 'pending',
+        lastError: blocked ? existing.lastError : null,
+        state: blocked ? 'blocked' : 'pending',
         // Kept so that a second refusal goes back to the same place in
         // the list instead of jumping to the end.
         refusedFirst: dead.refusedFirst ?? dead.diedAt,

@@ -1,7 +1,15 @@
 import { DEFAULT_POINT_TARGET, deriveMatchState } from './pickleball'
 import { waitingThirdShot, withThirdShotTap } from './thirdShot'
 import { read, write } from './localstore'
-import { clearOutbox, markDirty, pending as outboxPending } from './outbox'
+import {
+  clearOutbox,
+  deadLetter,
+  discardDead,
+  markDirty,
+  outboxKey,
+  pending as outboxPending,
+  resolve as resolveOutbox,
+} from './outbox'
 
 // ============================================================
 // PaddlePad Umpire local persistence layer
@@ -134,6 +142,15 @@ export function removePlayerFromSession(sessionId, playerId) {
 /** All matches ever played, across every session, newest first. */
 export function getMatches() {
   return readJSON(MATCHES_KEY, [])
+}
+
+/**
+ * Records that this device now holds a match's scoring lease (after a
+ * successful claim). Local only: the claim itself told the server.
+ */
+export function setScoringDevice(matchId, deviceId) {
+  const match = getMatch(matchId)
+  if (match) saveMatch({ ...match, scoringDevice: deviceId })
 }
 
 /** A single match by id, or null if it doesn't exist. */
@@ -404,6 +421,9 @@ export function replaceServerState({
   // explicit takeover, where the umpire has been asked and has chosen
   // the server's version. Never set it for a background pull.
   force = false,
+  // Ids this device pushed while this pull was on its way. Their local
+  // copy is newer than the pull's answer, so they count as queued work.
+  keep = new Set(),
 }) {
   if (players) {
     // Merged, not replaced. The list endpoint is capped (the players with
@@ -417,11 +437,21 @@ export function replaceServerState({
   }
 
   if (sessions) {
+    // Void and end are queued changes too: a pull's older value would be
+    // pushed straight back over the umpire's.
     const dirty = new Set(
-      pendingEntities('session').concat(pendingEntities('roster')),
+      pendingEntities('session').concat(
+        pendingEntities('roster'),
+        pendingEntities('sessionVoid'),
+        pendingEntities('sessionEnd'),
+        [...keep],
+      ),
     )
     const local = getSessions()
-    const merged = sessions.map((s) => {
+    // A session queued or just pushed here but absent locally was deleted
+    // here; the pull's older copy must not bring it back.
+    const live = sessions.filter((s) => !dirty.has(s.id) || local.some((l) => l.id === s.id))
+    const merged = live.map((s) => {
       const mine = local.find((l) => l.id === s.id)
       // Keep the local roster if this device still owes the server one.
       if (mine && dirty.has(s.id)) return mine
@@ -463,7 +493,7 @@ export function replaceServerState({
     // simply not drawn.
     for (const player of sessionDetail.players ?? []) rememberPlayer(player)
 
-    const dirty = new Set(pendingEntities('roster'))
+    const dirty = new Set(pendingEntities('roster').concat([...keep]))
     if (!dirty.has(sessionDetail.session.id)) {
       const updated = getSessions().map((s) =>
         s.id === sessionDetail.session.id
@@ -481,7 +511,9 @@ export function replaceServerState({
   if (matches) {
     const dirty = force
       ? new Set()
-      : new Set(pendingEntities('match').concat(pendingEntities('log')))
+      : new Set(
+          pendingEntities('match').concat(pendingEntities('log'), pendingEntities('matchVoid'), [...keep]),
+        )
     const local = getMatches()
     const fromServer = matches
       .filter((m) => !dirty.has(m.id))
@@ -512,6 +544,10 @@ export function replaceServerState({
         // there.
         voidedAt: m.voidedAt ? new Date(m.voidedAt).getTime() : null,
         voidReason: m.voidReason ?? null,
+        // Who holds the scoring lease. Without it every device thinks it
+        // is the scorer, so a watching device never refreshes its screen.
+        scoringDevice: m.scoringDevice ?? null,
+        scoringClaimedAt: m.scoringClaimedAt ?? null,
         // A match list carries no events -- only the single-match fetch
         // does. Defaulting to [] here would wipe the local log of an
         // already-synced match every time the session screen refreshed.
@@ -528,9 +564,14 @@ export function replaceServerState({
   }
 }
 
-/** Entity ids of a given kind currently queued for the server. */
+/**
+ * Entity ids of a given kind currently queued for the server. Includes
+ * changes in the "Couldn't sync" list: the server refused them but the
+ * umpire's copy is still the only one, so a pull must not replace it.
+ * Discarding one from the list lets the next pull refresh it again.
+ */
 function pendingEntities(kind) {
-  return outboxPending()
+  return [...outboxPending(), ...deadLetter()]
     .filter((entry) => entry.kind === kind)
     .map((entry) => entry.entityId)
 }
@@ -636,8 +677,8 @@ const TOMBSTONES_KEY = 'paddlepad.tombstones'
  * quietly dropped. They also stop a pull that lands before the delete
  * syncs from resurrecting what the umpire just cancelled.
  */
-function getTombstones() {
-  return read(TOMBSTONES_KEY, { matches: [], sessions: [] })
+export function getTombstones() {
+  return read(TOMBSTONES_KEY, { matches: [], sessions: [], sessionMatches: {} })
 }
 
 function addTombstone(kind, id) {
@@ -648,9 +689,12 @@ function addTombstone(kind, id) {
 
 export function clearTombstone(kind, id) {
   const current = getTombstones()
+  // The matches a deleted session buried are remembered only as long as it is.
+  const { [id]: _gone, ...sessionMatches } = current.sessionMatches ?? {}
   write(TOMBSTONES_KEY, {
     ...current,
     [kind]: current[kind].filter((existing) => existing !== id),
+    ...(kind === 'sessions' ? { sessionMatches } : {}),
   })
 }
 
@@ -668,6 +712,10 @@ export function deleteMatch(matchId) {
 
   writeJSON(MATCHES_KEY, getMatches().filter((m) => m.id !== matchId))
   addTombstone('matches', matchId)
+  // Its unsent log (blocked, or in the couldn't-sync list) is moot now; left
+  // queued it would never be noticed again, since the match is gone.
+  resolveOutbox(outboxKey('log', matchId))
+  discardDead(outboxKey('log', matchId))
   markDirty('matchDelete', matchId)
   return true
 }
@@ -712,8 +760,18 @@ export function deleteSession(sessionId) {
 
   writeJSON(MATCHES_KEY, getMatches().filter((m) => m.sessionId !== sessionId))
   writeJSON(SESSIONS_KEY, getSessions().filter((s) => s.id !== sessionId))
-  for (const match of matches) addTombstone('matches', match.id)
+  for (const match of matches) {
+    addTombstone('matches', match.id)
+    // As in deleteMatch: its unsent log is moot and would sit queued forever.
+    resolveOutbox(outboxKey('log', match.id))
+    discardDead(outboxKey('log', match.id))
+  }
   addTombstone('sessions', sessionId)
+  const current = getTombstones()
+  write(TOMBSTONES_KEY, {
+    ...current,
+    sessionMatches: { ...current.sessionMatches, [sessionId]: matches.map((m) => m.id) },
+  })
   markDirty('sessionDelete', sessionId)
   return true
 }

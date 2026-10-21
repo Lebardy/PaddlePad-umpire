@@ -483,7 +483,9 @@ router.delete('/:id', async (req, res) => {
   const params = [req.params.id]
   const scope = umpireScope(req.umpire.facilityId, params, 'sess.facility_id')
   const { rows } = await query(
-    `SELECT m.status FROM matches m JOIN sessions sess ON sess.id = m.session_id
+    `SELECT m.status, m.scoring_device, m.scoring_claimed_at, u.name AS recorded_by_name
+       FROM matches m JOIN sessions sess ON sess.id = m.session_id
+       LEFT JOIN umpires u ON u.id = m.recorded_by
       WHERE m.id = $1 AND ${scope}`,
     params,
   )
@@ -499,6 +501,16 @@ router.delete('/:id', async (req, res) => {
   if (rows[0].status === 'completed') {
     return res.status(409).json({
       error: 'That match is already finished — void it instead of deleting it',
+    })
+  }
+
+  // Another device scoring this match keeps it. A request with no deviceId
+  // (an app copy from before this check) is not refused, as before.
+  const deviceId = String(req.body?.deviceId ?? '')
+  if (deviceId && heldByAnotherDevice(rows[0], deviceId)) {
+    return res.status(409).json({
+      error: 'Another device is scoring this match',
+      heldBy: { umpireName: rows[0].recorded_by_name, since: rows[0].scoring_claimed_at },
     })
   }
 

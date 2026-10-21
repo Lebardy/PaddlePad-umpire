@@ -5,8 +5,10 @@ import { subscribe } from './localstore'
 import {
   getSession,
   getMatch,
+  setScoringDevice,
   replaceServerState,
   clearTombstone,
+  getTombstones,
   isTombstoned,
 } from './storage'
 
@@ -66,6 +68,7 @@ export function getSyncStatus() {
   return {
     pending: outbox.pendingCount(),
     dead: outbox.deadLetter().length,
+    blocked: outbox.pending().filter((e) => e.state === 'blocked').length,
     reachable,
     authPaused,
   }
@@ -82,6 +85,18 @@ function setReachable(value) {
 // Pull
 // ============================================================
 
+// Every successful push or takeover adopt, numbered, and the number of each
+// entity's latest one. A pull notes the number before it asks; anything
+// that made the server's copy newer after that is newer here than in the
+// pull's answer. Per tab: another tab's push is not seen (the app open
+// twice is rare).
+let pushes = 0
+const lastPushed = new Map()
+
+function pushedSince(since) {
+  return new Set([...lastPushed].filter(([, n]) => n > since).map(([id]) => id))
+}
+
 /**
  * Refreshes players and sessions from the server.
  *
@@ -90,12 +105,13 @@ function setReachable(value) {
  */
 export async function pullCore({ signal } = {}) {
   if (!getToken()) return
+  const since = pushes
   const [players, sessions] = await Promise.all([
     api.searchPlayers('', { signal }),
     api.fetchSessions({ signal }),
   ])
   setReachable(true)
-  replaceServerState({ players, sessions })
+  replaceServerState({ players, sessions, keep: pushedSince(since) })
 }
 
 /**
@@ -109,20 +125,22 @@ export async function pullCore({ signal } = {}) {
  */
 export async function pullSession(sessionId, { signal } = {}) {
   if (!getToken()) return
+  const since = pushes
   const [detail, matches] = await Promise.all([
     api.fetchSession(sessionId, { signal }),
     api.fetchMatchesForSession(sessionId, { signal }),
   ])
   setReachable(true)
-  replaceServerState({ sessionDetail: detail, matches })
+  replaceServerState({ sessionDetail: detail, matches, keep: pushedSince(since) })
 }
 
 /** Pulls one match INCLUDING its event log, for the scoring screen. */
 export async function pullMatch(matchId, { signal } = {}) {
   if (!getToken()) return
+  const since = pushes
   const match = await api.fetchMatch(matchId, { signal })
   setReachable(true)
-  replaceServerState({ matches: [match] })
+  replaceServerState({ matches: [match], keep: pushedSince(since) })
 }
 
 // ============================================================
@@ -198,12 +216,12 @@ async function push(entry, payload) {
     return
   }
   if (entry.kind === 'matchDelete') {
-    await api.deleteMatchOnServer(payload.id)
+    await api.deleteMatchOnServer(payload.id, { deviceId: outbox.getDeviceId() })
     clearTombstone('matches', payload.id)
     return
   }
   if (entry.kind === 'sessionDelete') {
-    await api.deleteSessionOnServer(payload.id)
+    await api.deleteSessionOnServer(payload.id, { deviceId: outbox.getDeviceId() })
     clearTombstone('sessions', payload.id)
     return
   }
@@ -259,6 +277,7 @@ async function runDrain() {
     try {
       await push(entry, payload)
       outbox.resolve(entry.key, mark)
+      lastPushed.set(entry.entityId, ++pushes)
       setReachable(true)
     } catch (error) {
       const status = error instanceof ApiError ? error.status : undefined
@@ -339,55 +358,91 @@ export function compareLogs(local, remote) {
  * real scoring. That is what "take over and the score went backwards"
  * was.
  *
- * So takeover now reads the server first and works out how the two logs
- * actually relate:
+ * So takeover claims the match first, then reads the server and works
+ * out how the two logs actually relate. Claiming first matters: once
+ * the claim lands the other device's saves are refused, so what is read
+ * afterwards is final (reading first lost a rally the other device saved
+ * in between). A save already being written when the claim lands may
+ * still land and take the lease back; this device's next tap then blocks
+ * and the umpire is asked again, so nothing is lost.
  *
  *   behind      adopt the server's log and carry on from there -- which
  *               is what "take over scoring" means in plain English
  *   ahead       this device really does hold unsent taps; push them
  *   diverged    both sides recorded different rallies. Nothing is
  *               thrown away silently: the counts are handed back so the
- *               umpire can choose.
+ *               umpire can choose. This device holds the lease while
+ *               they choose, so the other device's taps block meanwhile.
+ *
+ * The log stays blocked while the umpire is being asked (taps included),
+ * so nothing is pushed over the other device's rallies until they answer.
+ * A tap made while the claim was on its way is read like any other, and
+ * an earlier choice no longer applies to it, since it was about the logs
+ * before that tap. The same goes when the server's log has moved on from
+ * the one the prompt showed (`remoteLast`, the id of its last event: a
+ * log that was undone and tapped again has a new one, where a count
+ * would match).
  *
  * @param {string} matchId
  * @param {object} [options]
  * @param {'server'|'mine'} [options.resolution] choice for a diverged log
+ * @param {string|null} [options.remoteLast] last server event id the choice was made against
  */
-export async function takeOverMatch(matchId, { resolution } = {}) {
+export async function takeOverMatch(matchId, { resolution, remoteLast } = {}) {
   const deviceId = outbox.getDeviceId()
 
+  const before = getMatch(matchId)
+  await api.claimMatch(matchId, { deviceId, force: true })
   const remote = await api.fetchMatch(matchId)
   setReachable(true)
 
   const local = getMatch(matchId)
   const localEvents = local?.events ?? []
   const remoteEvents = remote.events ?? []
+  const last = remoteEvents.at(-1)?.id ?? null
+  const choice = local === before && (remoteLast === undefined || remoteLast === last) ? resolution : undefined
   const relation = compareLogs(localEvents, remoteEvents)
 
-  const adoptServer = async () => {
-    await api.claimMatch(matchId, { deviceId, force: true })
+  const adoptServer = () => {
+    // A void made here and not yet sent is the umpire's latest word on it;
+    // the queued push sends it, so the adopted copy must not undo it.
+    const voidQueued = outbox.pending().some((e) => e.kind === 'matchVoid' && e.entityId === matchId)
+    const adopted = {
+      ...remote,
+      scoringDevice: deviceId,
+      ...(voidQueued && local
+        ? { voidedAt: local.voidedAt ?? null, voidReason: local.voidReason ?? null }
+        : {}),
+    }
     // force, because this match is in the outbox and a normal merge
     // deliberately refuses to overwrite queued work.
-    replaceServerState({ matches: [remote], force: true })
+    replaceServerState({ matches: [adopted], force: true })
     outbox.resolve(outbox.outboxKey('log', matchId))
+    // The umpire chose the server's log, so a refused copy of theirs in the
+    // couldn't-sync list no longer describes anything; left there it would
+    // freeze this match against pulls and "Try again" would send it stale.
+    outbox.discardDead(outbox.outboxKey('log', matchId))
+    lastPushed.set(matchId, ++pushes)
     notify()
     return { status: 'adopted', events: remoteEvents.length }
   }
 
   const pushMine = async () => {
-    await api.claimMatch(matchId, { deviceId, force: true })
+    setScoringDevice(matchId, deviceId) // the claim made this device the scorer
     outbox.markDirty('log', matchId)
+    outbox.release(outbox.outboxKey('log', matchId))
     await drain()
     return { status: 'pushed', events: localEvents.length }
   }
 
   if (relation === 'diverged') {
-    if (resolution === 'server') return adoptServer()
-    if (resolution === 'mine') return pushMine()
+    if (choice === 'server') return adoptServer()
+    if (choice === 'mine') return pushMine()
     return {
       status: 'conflict',
       localCount: localEvents.length,
       remoteCount: remoteEvents.length,
+      remoteLast: last,
     }
   }
 
@@ -403,6 +458,23 @@ export function retryDead(key) {
 
 export function discardDead(key) {
   outbox.discardDead(key)
+  // A refused cancel is given up: the record stays, so bring it back here.
+  const [kind, id] = key.split(':')
+  if (kind === 'matchDelete') {
+    clearTombstone('matches', id)
+    pullMatch(id).catch(() => {})
+  } else if (kind === 'sessionDelete') {
+    const buried = getTombstones().sessionMatches?.[id] ?? []
+    clearTombstone('sessions', id)
+    // Deleting a session also buried its matches; the ones with no delete
+    // of their own still queued come back with it, even if the pulls
+    // below fail (any later pull then restores them).
+    const owed = new Set([...outbox.pending(), ...outbox.deadLetter()].map((e) => e.key))
+    for (const matchId of buried) {
+      if (!owed.has(outbox.outboxKey('matchDelete', matchId))) clearTombstone('matches', matchId)
+    }
+    pullCore().then(() => pullSession(id)).catch(() => {})
+  }
   notify()
 }
 

@@ -16,6 +16,7 @@ import TakeoverNotice from '../components/TakeoverNotice'
 import MatchVideo from '../components/MatchVideo'
 import * as sync from '../lib/sync'
 import { getDeviceId } from '../lib/outbox'
+import { LEASE_MINUTES } from '../../server/src/scoring-lease.js'
 import { deriveMatchState, currentServerPlayerId, courtSides } from '../lib/pickleball'
 import { isSameThirdShot, waitingThirdShot } from '../lib/thirdShot'
 import {
@@ -217,6 +218,8 @@ function LiveMatch({ matchId, onBack }) {
   // pays for it.
   const scoringDevice = match?.scoringDevice
   const isScorer = !scoringDevice || scoringDevice === getDeviceId()
+  // A finished or voided match no longer changes, so watching it is pointless.
+  const watching = !isScorer && match?.status === 'in_progress' && !match.voidedAt
 
   useEffect(() => {
     const controller = new AbortController()
@@ -227,7 +230,7 @@ function LiveMatch({ matchId, onBack }) {
     }
     refresh()
 
-    if (!isScorer) {
+    if (watching) {
       const tick = () => {
         if (document.visibilityState === 'visible') refresh()
         timer = setTimeout(tick, WATCH_POLL_MS)
@@ -239,7 +242,7 @@ function LiveMatch({ matchId, onBack }) {
       controller.abort()
       if (timer) clearTimeout(timer)
     }
-  }, [matchId, isScorer])
+  }, [matchId, watching])
 
   function name(id) {
     return knownPlayers.find((p) => p.id === id)?.name ?? '?'
@@ -293,6 +296,12 @@ function LiveMatch({ matchId, onBack }) {
   // An unfinished match is removed outright -- wrong pairing, wrong
   // court, started by mistake. Nothing in it counted yet.
   function handleCancel() {
+    // The server refuses too; this only saves the trip while the other
+    // device's lease is fresh.
+    if (watching && Date.now() - new Date(match.scoringClaimedAt).getTime() < LEASE_MINUTES * 60_000) {
+      alert('Another device is scoring this match. Cancel it there, or wait until it has been idle for 15 minutes.')
+      return
+    }
     if (
       !confirm(
         'Cancel this match? It will be deleted along with everything scored so far.',

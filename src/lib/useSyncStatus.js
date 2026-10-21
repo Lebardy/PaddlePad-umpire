@@ -11,6 +11,7 @@ function snapshot() {
   if (
     next.pending !== cached.pending ||
     next.dead !== cached.dead ||
+    next.blocked !== cached.blocked ||
     next.reachable !== cached.reachable ||
     next.authPaused !== cached.authPaused
   ) {

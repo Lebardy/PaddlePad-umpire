@@ -4,6 +4,7 @@ import { requireActiveUmpire, requireAuth } from '../auth.js'
 import { isUuid } from '../validate.js'
 import { invalidateRallyRatings } from '../rally-rating-store.js'
 import { umpireScope } from '../facility-rules.js'
+import { heldByAnotherDevice } from '../scoring-lease.js'
 
 const router = Router()
 router.use(requireAuth, requireActiveUmpire(query))
@@ -196,6 +197,25 @@ router.delete('/:id', async (req, res) => {
         finished.rows[0].n === 1 ? '' : 'es'
       } and can't be deleted. Void the session instead — that keeps the record but leaves it out of the exported data.`,
     })
+  }
+
+  // The cascade would remove a match another device is scoring. No deviceId
+  // (an app copy from before this check) is not refused, as before.
+  const deviceId = String(req.body?.deviceId ?? '')
+  if (deviceId) {
+    const playing = await query(
+      `SELECT m.status, m.scoring_device, m.scoring_claimed_at, u.name AS recorded_by_name
+         FROM matches m LEFT JOIN umpires u ON u.id = m.recorded_by
+        WHERE m.session_id = $1`,
+      [req.params.id],
+    )
+    const held = playing.rows.find((m) => heldByAnotherDevice(m, deviceId))
+    if (held) {
+      return res.status(409).json({
+        error: 'Another device is scoring a match in this session',
+        heldBy: { umpireName: held.recorded_by_name, since: held.scoring_claimed_at },
+      })
+    }
   }
 
   // ON DELETE CASCADE clears session_players and any unfinished matches.
