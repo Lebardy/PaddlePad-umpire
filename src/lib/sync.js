@@ -37,6 +37,8 @@ const DEBOUNCE_MS = 2_000
 const HEARTBEAT_MS = 30_000
 
 let draining = null
+// Set by a drain() call made while a run is in flight; see drain.
+let drainAgain = false
 let debounceTimer = null
 let heartbeatTimer = null
 
@@ -210,13 +212,29 @@ async function push(entry, payload) {
 
 /**
  * Pushes everything owed, in order. Safe to call at any time; overlapping
- * calls share the one in-flight run rather than racing.
+ * calls never race, they share one in-flight chain of runs. A call made
+ * while a run is in flight asks for one more run after it, because that
+ * run may have read its payloads before the change that prompted the
+ * call. The returned promise covers that extra run too.
  */
 export function drain() {
-  if (draining) return draining
-  draining = runDrain().finally(() => {
-    draining = null
-  })
+  if (draining) {
+    drainAgain = true
+    return draining
+  }
+  // draining is cleared in the same synchronous step as the last
+  // drainAgain check, so a drain() call cannot land between the two and
+  // get a promise that is about to settle with no run behind it.
+  draining = (async () => {
+    try {
+      do {
+        drainAgain = false
+        await runDrain()
+      } while (drainAgain)
+    } finally {
+      draining = null
+    }
+  })()
   return draining
 }
 
@@ -228,6 +246,9 @@ async function runDrain() {
     if (entry.state === 'blocked') continue
     if (entry.nextAttemptAt > Date.now()) break // head-of-line, deliberately
 
+    // Read before the payload, with nothing awaited in between, so a tap
+    // made during the push below bumps the mark and is not retired with it.
+    const mark = outbox.currentMark(entry.key)
     const payload = payloadFor(entry)
     if (!payload) {
       // The entity was deleted locally; nothing left to send.
@@ -237,7 +258,7 @@ async function runDrain() {
 
     try {
       await push(entry, payload)
-      outbox.resolve(entry.key)
+      outbox.resolve(entry.key, mark)
       setReachable(true)
     } catch (error) {
       const status = error instanceof ApiError ? error.status : undefined
