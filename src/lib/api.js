@@ -514,6 +514,11 @@ export function lineUpMatchVideo(matchId, eventId, second) {
   return apiFetch(`/video/matches/${matchId}/line-up`, { method: 'POST', body: { eventId, second } }).then((d) => d.video)
 }
 
+/** The umpire's highlights for a filmed match: the whole list of starred rally ids, at most 5. */
+export function setMatchHighlights(matchId, rallyIds) {
+  return apiFetch(`/video/matches/${matchId}/highlights`, { method: 'PUT', body: { rallyIds } }).then((d) => d.video)
+}
+
 export function removeMatchVideo(matchId) {
   return apiFetch(`/video/matches/${matchId}`, { method: 'DELETE' })
 }
