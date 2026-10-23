@@ -23,6 +23,7 @@
 import * as api from './api'
 import { flattenMp4 } from './flattenMp4'
 import { sendToBucket } from './videoUpload'
+import { spoolChunk, spoolRecovered, spoolRemove, spoolStart } from './videoSpool'
 import { beatAction, firstFrameAt, isWholeBeat, isWide, noteBeatTiming, pickBitrate, pickType, retryWaitMs } from './videoClock'
 
 const BEAT_MS = 2_000
@@ -53,6 +54,7 @@ export function createCameraSession({ deviceId, onChange }) {
   let beating = false
   let sendingNow = false
   let closed = false
+  let recovering = true     // the beat waits for what a reload left behind, so a new recording cannot overwrite it
   const filmed = new Set()  // matches whose recording was queued, so none is filmed twice
   // shortcut: unsent videos wait here with no cap, upgrade if a court's wifi is ever down for whole evenings
   const queue = []          // videos waiting to go: { matchId, blob, meta }
@@ -98,7 +100,7 @@ export function createCameraSession({ deviceId, onChange }) {
       picture: { width: settings.width ?? 0, height: settings.height ?? 0 },
       wide: isWide(settings.width ?? 0, settings.height ?? 0),
     })
-    if (!beatTimer) { beatTimer = setInterval(beat, BEAT_MS); beat() }
+    if (!beatTimer) { beatTimer = setInterval(beat, BEAT_MS); recover() }
     document.addEventListener('visibilitychange', onVisible)
     return keepAwake()
   }
@@ -117,7 +119,7 @@ export function createCameraSession({ deviceId, onChange }) {
 
   async function beat() {
     // Upright, the camera is not armed, so it does not say it is ready.
-    if (beating || closed || (!state.wide && !filming)) return
+    if (beating || closed || recovering || (!state.wide && !filming)) return
     beating = true
     const sentAt = Date.now()
     try {
@@ -151,11 +153,18 @@ export function createCameraSession({ deviceId, onChange }) {
     })
     made.ondataavailable = (event) => {
       if (!event.data?.size) return
+      spoolChunk(mine.matchId, parts.length, event.data)
       parts.push(event.data)
       bytes += event.data.size
       if (bytes > FULL_BYTES) stopFilming()
     }
-    made.onstart = () => { mine.startedAt = Date.now(); set({ startedAt: mine.startedAt }) }
+    made.onstart = () => {
+      mine.startedAt = Date.now()
+      set({ startedAt: mine.startedAt })
+      spoolStart(mine.matchId, {
+        deviceId, width: mine.width, height: mine.height, startedAt: mine.startedAt, firstFrameAt: firstFrameAt(mine.startedAt, timing),
+      })
+    }
     made.onstop = () => finish(mine, parts)
     made.start(4_000)
     filming = mine
@@ -172,7 +181,7 @@ export function createCameraSession({ deviceId, onChange }) {
     filming = null
     recorder = null
     set({ phase: 'waiting', match: null, startedAt: null })
-    if (!mine.startedAt || parts.length === 0) return
+    if (!mine.startedAt || parts.length === 0) { spoolRemove(mine.matchId); return }
     filmed.add(mine.matchId)
     // Queued before it is repacked: from this moment the screen says "Sending" and leaving it asks first.
     queue.push({
@@ -185,6 +194,24 @@ export function createCameraSession({ deviceId, onChange }) {
     pump()
   }
 
+  /** Videos a reload or a crash cut short were saved as they were filmed: send what there is of them. */
+  async function recover() {
+    for (const { matchId, blob, meta } of await spoolRecovered()) {
+      if (closed) return
+      filmed.add(matchId)
+      queue.push({
+        matchId, blob,
+        meta: {
+          deviceId: meta.deviceId, bytes: 0, width: meta.width, height: meta.height,
+          durationMs: Math.max(1, meta.lastChunkAt - meta.startedAt), firstFrameAt: meta.firstFrameAt, repacked: null,
+        },
+      })
+    }
+    recovering = false
+    beat()
+    pump()
+  }
+
   /** Makes a recording playable from its first byte, once; `repacked` says whether it could be. */
   async function repack(item) {
     try {
@@ -192,7 +219,9 @@ export function createCameraSession({ deviceId, onChange }) {
       item.blob = made.blob
       item.meta.durationMs = Math.round(made.info.seconds * 1000)
       item.meta.repacked = true
-    } catch {
+    } catch (error) {
+      // A saved recording the phone can no longer read can never be sent; without this it would block every later one.
+      if (error?.name === 'NotReadableError') throw Object.assign(error, { final: true })
       // Not sure of the tables, so nothing is rewritten: it goes as filmed and is marked so.
       item.meta.repacked = false
     }
@@ -218,13 +247,14 @@ export function createCameraSession({ deviceId, onChange }) {
         throw error
       })
       await sendToBucket(form, next.blob, (part) => report(Math.floor(part * 100), false))
-      await api.finishVideoUpload(next.matchId, deviceId)
+      await api.finishVideoUpload(next.matchId, next.meta.deviceId)
       queue.shift()
+      spoolRemove(next.matchId)
       sendingNow = false
       pump()
     } catch (error) {
       sendingNow = false
-      if (error.final) { queue.shift(); pump(); return }
+      if (error.final) { queue.shift(); spoolRemove(next.matchId); pump(); return }
       report(state.sending?.percent ?? 0, true)
       // Each try sends the whole video again, so the tries thin out.
       next.failures = (next.failures ?? 0) + 1

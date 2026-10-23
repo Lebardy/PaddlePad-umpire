@@ -53,7 +53,7 @@ function Camera({ onBack }) {
   }, [state.phase])
 
   function leave() {
-    if (session.current?.isBusy() && !confirm('Leave? A video still being filmed or sent will be lost.')) return
+    if (session.current?.isBusy() && !confirm('Leave? Filming stops here. What was filmed is sent when you open Camera again.')) return
     onBack()
   }
 
