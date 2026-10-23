@@ -2652,7 +2652,7 @@
   border: none; border-radius: 999px; background: var(--button); color: var(--button-ink);
   font: 700 1.1rem var(--label); font-variant-numeric: tabular-nums; cursor: pointer;
 }
-.highlights-play svg:nth-of-type(2) { fill: currentColor; stroke: none; }
+.highlights-play svg { fill: currentColor; stroke: none; }
 .highlights-play:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .highlights-at { color: var(--text-muted); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
 .detail-shape.is-filmed > .highlights + .ribbon { margin-top: 0.7rem; }
