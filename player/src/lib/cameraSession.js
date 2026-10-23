@@ -248,7 +248,9 @@ export function createCameraSession({ deviceId, onChange }) {
       item.blob = made.blob
       item.meta.durationMs = Math.round(made.info.seconds * 1000)
       item.meta.repacked = true
-    } catch {
+    } catch (error) {
+      // A saved recording the phone can no longer read can never be sent; without this it would block every later one.
+      if (error?.name === 'NotReadableError') throw Object.assign(error, { final: true })
       // Not sure of the tables, so nothing is rewritten: it goes as filmed and is marked so.
       item.meta.repacked = false
     }
@@ -274,7 +276,7 @@ export function createCameraSession({ deviceId, onChange }) {
         throw error
       })
       await sendToBucket(form, next.blob, (part) => report(Math.floor(part * 100), false))
-      await api.finishVideoUpload(next.matchId, deviceId)
+      await api.finishVideoUpload(next.matchId, next.meta.deviceId)
       queue.shift()
       spoolRemove(next.matchId)
       sendingNow = false

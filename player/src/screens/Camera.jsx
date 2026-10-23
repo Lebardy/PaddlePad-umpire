@@ -14,7 +14,7 @@ import { clockText } from '../lib/videoClock'
  * Where the facility films, or another player already is, it says so
  * and does not record. The working parts live in lib/cameraSession.js.
  */
-const LEAVE_WARNING = 'Leave? A video still being filmed or sent will be lost.'
+const LEAVE_WARNING = 'Leave? Filming stops here. What was filmed is sent when you open Camera again.'
 const LOST_ON_SIGN_OUT = 'You were signed out, so the video you were filming was not saved.'
 
 function Camera() {
