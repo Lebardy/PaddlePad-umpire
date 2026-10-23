@@ -153,6 +153,19 @@ router.get('/board', async (req, res) => {
   res.json({ board: await getMonthlyBoard(query) })
 })
 
+/** The match of the month's video for anyone on the board, or null: the whole match and its highlights. */
+async function boardVideo(matchId) {
+  const { rows } = await query(
+    `SELECT id, team_a, team_b, first_server_team, first_server_player, right_start_a, right_start_b,
+            point_target, started_at, clock_offset_ms
+       FROM matches WHERE id = $1`,
+    [matchId],
+  )
+  if (!rows[0]) return null
+  const { rows: events } = await query('SELECT id, type, payload, at FROM match_events WHERE match_id = $1 ORDER BY seq', [matchId])
+  return pointVideo(rows[0], events, events.map((e) => ({ type: e.type, ...e.payload })))
+}
+
 /**
  * How this month's match of the month went -- that match and no other.
  *
@@ -163,7 +176,7 @@ router.get('/board', async (req, res) => {
 router.get('/board/match/:id', async (req, res) => {
   const story = await getMatchOfTheMonthStory(query, req.params.id)
   if (!story) return res.status(404).json({ error: 'That is not this month\'s match of the month' })
-  res.json({ match: story })
+  res.json({ match: { ...story, video: await boardVideo(req.params.id) } })
 })
 
 /**
@@ -210,7 +223,7 @@ router.get('/matches/:id/game', async (req, res) => {
   if (!row) return res.status(404).json({ error: 'No such match' })
 
   const { rows: events } = await query(
-    `SELECT type, payload, at FROM match_events WHERE match_id = $1 ORDER BY seq`,
+    `SELECT id, type, payload, at FROM match_events WHERE match_id = $1 ORDER BY seq`,
     [row.id],
   )
   const log = events.map((e) => ({ type: e.type, ...e.payload }))

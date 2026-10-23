@@ -2578,6 +2578,23 @@ async function main() {
         const played = await fetch(v.url)
         check('the link plays the file from the bucket', played.status === 200 && (await played.arrayBuffer()).byteLength === 1024, String(played.status))
 
+        const near = (a, b) => typeof a === 'number' && Math.abs(a - b) <= 1
+        check('a new video has no highlights', Array.isArray(v?.highlights) && v.highlights.length === 0, JSON.stringify(v?.highlights))
+        const starred = await request(`/video/matches/${vMatch}/highlights`, { method: 'PUT', bearer: token, body: { rallyIds: [events[2].id, events[1].id] } })
+        const hl = starred.body.video?.highlights ?? []
+        check('the umpire stars two rallies -> 200, in play order, each with its clip',
+          starred.status === 200 && hl.length === 2 && hl[0].id === events[1].id && near(hl[0].start, 16) && near(hl[0].end, 32)
+            && hl[1].id === events[2].id && near(hl[1].start, 31) && near(hl[1].end, 47),
+          JSON.stringify(hl))
+        check('six rallies -> 400',
+          (await request(`/video/matches/${vMatch}/highlights`, { method: 'PUT', bearer: token, body: { rallyIds: Array.from({ length: 6 }, () => crypto.randomUUID()) } })).status === 400)
+        check('a rally of another match -> 400',
+          (await request(`/video/matches/${vMatch}/highlights`, { method: 'PUT', bearer: token, body: { rallyIds: [crypto.randomUUID()] } })).status === 400)
+        check('the same rally twice -> 400',
+          (await request(`/video/matches/${vMatch}/highlights`, { method: 'PUT', bearer: token, body: { rallyIds: [events[1].id, events[1].id] } })).status === 400)
+        check('the admin match page carries them, each on its point or none',
+          (await request(`/admin/matches/${vMatch}`, { bearer: vOwner })).body.match?.video?.highlights?.length === 2)
+
         // Rows the admin site lists can link to the match page and show a camera.
         const listedRow = (rows) => (rows ?? []).find((m) => m.id === vMatch)
         const vPlayerRow = listedRow((await request(`/admin/players/${vPlayers[0]}`, { bearer: vOwner })).body.player?.matches)
@@ -2671,6 +2688,9 @@ async function main() {
         })).body.token
         check('a player who was not in the match cannot read it -> 404',
           (await asPlayer(`/player/matches/${vMatch}/game`, { bearer: vOutsiderToken })).status === 404)
+
+        const cleared = await request(`/video/matches/${vMatch}/highlights`, { method: 'PUT', bearer: token, body: { rallyIds: [] } })
+        check('un-starring everything -> 200 and none left', cleared.status === 200 && cleared.body.video?.highlights?.length === 0, String(cleared.status))
 
         const vStranger = await request('/admin/invites', { method: 'POST', bearer: vOwner, body: { note: 'smoke video', facilityId: vOther.id } })
         const strangerIn = await request('/auth/register', {
