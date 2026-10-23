@@ -17,7 +17,8 @@ export function usePointVideo(video, count, selected, onSelect) {
   function seek(second) {
     const node = ref.current
     if (!node) return
-    jumping.current = true
+    // The browser says "seeking" only when the position really moves.
+    jumping.current = Math.abs(node.currentTime - second) > 0.01
     node.currentTime = second
     node.play().catch(() => {})
   }
