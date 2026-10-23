@@ -1144,8 +1144,6 @@
   margin: 0 0 0.8rem;
 }
 .board-match .ichips { margin-bottom: 1.25rem; }
-.board-footer { margin-top: 0.8rem; font-size: 0.84rem; color: var(--text-muted); line-height: 1.45; }
-.board-match .board-footer { margin-top: 1rem; }
 
 /* ---- The chart, with its key moments pinned to it ---- */
 .mchart {

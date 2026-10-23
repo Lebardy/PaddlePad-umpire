@@ -280,8 +280,6 @@ function Story({ match, onExpired }) {
           <p>{chosenSentence(match)}</p>
         </More>
       </section>
-
-      <p className="board-footer">The game only — never anyone&rsquo;s shots.</p>
     </>
   )
 }
