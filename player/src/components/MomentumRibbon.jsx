@@ -26,6 +26,7 @@
 import { useEffect, useRef } from 'react'
 import { useInView } from '../lib/motion'
 import { pointKind, pointSentence } from '../lib/pointWords'
+import Icon from './Icon'
 
 /** The moments that mattered about point i, in words, most important first. */
 function momentsOf(moment, i, { last, lowIndex }) {
@@ -51,11 +52,12 @@ function momentsOf(moment, i, { last, lowIndex }) {
  * @param {number | null} props.selected - the picked box, if any
  * @param {(i: number) => void} props.onSelect
  * @param {string} [props.hint] - what the line above the boxes says before a box is picked
+ * @param {Set<number> | null} [props.starred] - points the umpire picked as highlights
  * @param {boolean} [props.watching] - the match has a video: the picked box is the one being played
  */
 function MomentumRibbon({
   moments, path, points, asShown, winners, losers, lowIndex, selected, onSelect,
-  hint = 'Tap a point to see how it was won', watching = false,
+  hint = 'Tap a point to see how it was won', starred = null, watching = false,
 }) {
   const ref = useRef(null)
   const inView = useInView(ref)
@@ -127,16 +129,17 @@ function MomentumRibbon({
             key={i}
             ref={(el) => { buttons.current[i] = el }}
             type="button"
-            className={`ribbon-block is-${moment.scorer}${selected === i ? ' is-selected' : ''}`}
+            className={`ribbon-block is-${moment.scorer}${selected === i ? ' is-selected' : ''}${starred?.has(i) ? ' is-starred' : ''}`}
             style={{ '--i': i }}
             // One tab stop for the whole set: the chosen box, or the
             // first before anything is chosen.
             tabIndex={i === (selected ?? 0) ? 0 : -1}
-            aria-label={`Point ${i + 1}, ${asShown(path[i])}, ${nameOf(moment.scorer)} scored`}
+            aria-label={`Point ${i + 1}, ${asShown(path[i])}, ${nameOf(moment.scorer)} scored${starred?.has(i) ? ', highlight' : ''}`}
             aria-pressed={selected === i}
             onClick={() => choose(i)}
           >
             {reached(i)}
+            {starred?.has(i) && <Icon name="star" size={10} className="ribbon-star" />}
           </button>
         ))}
       </div>

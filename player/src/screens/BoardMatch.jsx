@@ -29,6 +29,8 @@ import Icon from '../components/Icon'
 import MatchChart from '../components/MatchChart'
 import MomentumRibbon from '../components/MomentumRibbon'
 import More from '../components/More'
+import Highlights from '../components/Highlights'
+import { usePointVideo } from '../lib/usePointVideo'
 
 function BackLink() {
   return (
@@ -122,7 +124,7 @@ const EMPTY_GAME = {
   longestRun: { by: null, points: 0 },
 }
 
-function Story({ match }) {
+function Story({ match, onExpired }) {
   const winnersA = match.winner === 'A'
   const winners = (winnersA ? match.teamA : match.teamB).join(' & ')
   const losers = (winnersA ? match.teamB : match.teamA).join(' & ')
@@ -137,6 +139,7 @@ function Story({ match }) {
   const clean = useCountUp(Number.isFinite(match.clean) ? Math.round(match.clean * 100) : NaN)
   // The point picked in the boxes, lit up on the chart above them.
   const [selected, setSelected] = useState(null)
+  const { ref: filmRef, pick, playReel, onTimeUpdate, onSeeking, reel, starred } = usePointVideo(match.video, game.moments.length, selected, setSelected)
 
   const markers = []
   if (game.lowPoint && game.lowPoint.losers - game.lowPoint.winners >= 2) {
@@ -216,8 +219,25 @@ function Story({ match }) {
       )}
 
       {game.moments.length > 0 && (
-        <section className="detail-shape" aria-label="Point by point">
+        <section className={match.video ? 'detail-shape is-filmed' : 'detail-shape'} aria-label="Point by point">
           <h2>Point by point</h2>
+          {match.video && (
+            <>
+              <video
+                ref={filmRef}
+                className="match-video"
+                src={match.video.url}
+                controls
+                playsInline
+                preload="none"
+                aria-label="Video of this match"
+                onTimeUpdate={onTimeUpdate}
+                onSeeking={onSeeking}
+                onError={onExpired}
+              />
+              <Highlights count={match.video.highlights?.length ?? 0} reel={reel} onPlay={playReel} />
+            </>
+          )}
           <MomentumRibbon
             moments={game.moments}
             path={game.path}
@@ -227,7 +247,10 @@ function Story({ match }) {
             losers={losers}
             lowIndex={game.lowPoint ? game.lowPoint.index : null}
             selected={selected}
-            onSelect={setSelected}
+            onSelect={match.video ? pick : setSelected}
+            starred={match.video ? starred : null}
+            hint={match.video ? 'Tap a point to watch it' : undefined}
+            watching={Boolean(match.video)}
           />
         </section>
       )}
@@ -266,6 +289,8 @@ function Story({ match }) {
 function BoardMatch({ id }) {
   const [match, setMatch] = useState(null)
   const [error, setError] = useState(null)
+  // The video's link lasts two hours: once, a fresh one is asked for.
+  const [times, setTimes] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -282,12 +307,12 @@ function BoardMatch({ id }) {
         )
       })
     return () => controller.abort()
-  }, [id])
+  }, [id, times])
 
   return (
     <div className="board-match">
       <BackLink />
-      {match ? <Story match={match} /> : <p className="muted-inline">{error ?? 'Loading…'}</p>}
+      {match ? <Story match={match} onExpired={() => { if (times < 1) setTimes(times + 1) }} /> : <p className="muted-inline">{error ?? 'Loading…'}</p>}
     </div>
   )
 }
