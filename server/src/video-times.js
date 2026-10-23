@@ -43,6 +43,34 @@ export function rallySeconds({ startedAtMs, offsetMs, firstFrameAtMs, durationMs
   })
 }
 
+/** A highlight plays at most this long before its rally's end, and this long after. */
+export const HIGHLIGHT_BEFORE_MS = 15_000
+export const HIGHLIGHT_AFTER_MS = 1_000
+
+/**
+ * The umpire's picked rallies as clips of the video, in play order:
+ * `{ id, index, start, end }` in seconds, `index` being the rally's
+ * place in `rallies`. The same reading of the stamps as rallySeconds,
+ * so Fix timing moves the clips too. A pick the video does not show,
+ * or an id that is no longer a rally, has no clip.
+ */
+export function highlightClips({ startedAtMs, offsetMs, firstFrameAtMs, durationMs, rallies, picked }) {
+  const shift = (offsetMs ?? 0) - firstFrameAtMs
+  const wanted = new Set(picked)
+  const tenth = (ms) => Math.round(ms / 100) / 10
+  const clips = []
+  rallies.forEach((rally, index) => {
+    if (!wanted.has(rally.id)) return
+    const end = rally.atMs + shift
+    const before = (index === 0 ? startedAtMs : rallies[index - 1].atMs) + shift
+    const from = Math.max(0, before, end - HIGHLIGHT_BEFORE_MS)
+    const to = Math.min(durationMs, end + HIGHLIGHT_AFTER_MS)
+    if (end < 0 || from >= durationMs || to <= from) return
+    clips.push({ id: rally.id, index, start: tenth(from), end: tenth(to) })
+  })
+  return clips
+}
+
 /**
  * Fix timing: the umpire paused the video at `videoSecond` and tapped
  * the rally that ended there. The first picture's moment that makes
