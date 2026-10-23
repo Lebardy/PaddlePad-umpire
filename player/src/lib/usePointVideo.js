@@ -9,10 +9,12 @@ import { reelStep } from './reel'
  */
 export function usePointVideo(video, count, selected, onSelect) {
   const ref = useRef(null)
-  const [reel, setReel] = useState(null)
+  const [reel, setReel] = useState(null) // { video, index }
   // Our own jumps, so only the viewer's own seeking leaves the reel.
   const jumping = useRef(false)
   const clips = video?.highlights ?? []
+  // A reel belongs to the video it was started on: another match, or a fresh link, ends it.
+  const clip = reel?.video === video ? reel.index : null
 
   function seek(second) {
     const node = ref.current
@@ -35,7 +37,7 @@ export function usePointVideo(video, count, selected, onSelect) {
 
   function playReel() {
     if (clips.length === 0) return
-    setReel({ index: 0 })
+    setReel({ video, index: 0 })
     seek(clips[0].start)
   }
 
@@ -43,10 +45,10 @@ export function usePointVideo(video, count, selected, onSelect) {
     const node = event.currentTarget
     if (node.paused) return
     const at = node.currentTime
-    if (reel) {
-      const step = reelStep(clips, reel.index, at)
+    if (clip !== null) {
+      const step = reelStep(clips, clip, at)
       if (step.done) { node.pause(); setReel(null) }
-      else if (step.index !== reel.index) { setReel({ index: step.index }); seek(step.seek) }
+      else if (step.index !== clip) { setReel({ video, index: step.index }); seek(step.seek) }
     }
     // The point being played: the last one whose rally has started.
     let playing = null
@@ -63,7 +65,7 @@ export function usePointVideo(video, count, selected, onSelect) {
 
   return {
     ref, pick, playReel, onTimeUpdate, onSeeking,
-    reel: reel && { at: reel.index + 1, of: clips.length },
+    reel: clip !== null ? { at: clip + 1, of: clips.length } : null,
     starred: new Set(clips.map((clip) => clip.point).filter((point) => point !== null)),
   }
 }
