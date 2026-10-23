@@ -871,6 +871,10 @@ CREATE TABLE IF NOT EXISTS match_videos (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     ready_at        TIMESTAMPTZ
 );
+-- The umpire's picked rallies (match_events ids), shown as a reel. They
+-- belong to the video: removing it removes them.
+ALTER TABLE match_videos ADD COLUMN IF NOT EXISTS highlights UUID[] NOT NULL DEFAULT '{}'
+    CHECK (cardinality(highlights) <= 5);
 
 -- Open play: hours a place posts for anyone to come and play, with its
 -- courts, spots, fee per player (paid there; null is free) and umpire.

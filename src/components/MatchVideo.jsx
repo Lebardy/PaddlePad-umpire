@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon'
-import { fetchMatchVideo, lineUpMatchVideo, removeMatchVideo } from '../lib/api'
+import { fetchMatchVideo, lineUpMatchVideo, removeMatchVideo, setMatchHighlights } from '../lib/api'
 import { clockText } from '../lib/videoClock'
 
 /**
@@ -19,6 +19,7 @@ function MatchVideo({ matchId, events, describe }) {
   const [video, setVideo] = useState(null)
   const [fixing, setFixing] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [at, setAt] = useState(0)
   const player = useRef(null)
@@ -51,6 +52,29 @@ function MatchVideo({ matchId, events, describe }) {
   const rallies = video.rallies.filter((rally) => byId.has(rally.id))
   // The rally being watched: the last one whose start has gone by.
   const playing = rallies.reduce((found, rally) => (rally.second !== null && rally.second <= at + 0.25 ? rally.id : found), null)
+
+  const picked = new Set((video.highlights ?? []).map((h) => h.id))
+  const full = picked.size >= 5
+
+  // Starring saves at once; the star changes first and goes back if the save fails.
+  async function star(rallyId) {
+    if (saving) return
+    const next = picked.has(rallyId) ? [...picked].filter((id) => id !== rallyId) : [...picked, rallyId]
+    const before = video
+    setVideo({ ...video, highlights: next.map((id) => ({ id })) })
+    setSaving(true)
+    setError(null)
+    try {
+      const saved = await setMatchHighlights(matchId, next)
+      // Only the stars change: the answer's fresh link would reload the video and lose the umpire's place.
+      setVideo((was) => (was && saved ? { ...was, highlights: saved.highlights } : saved))
+    } catch (err) {
+      setVideo(before)
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   function jump(second) {
     const element = player.current
@@ -87,7 +111,10 @@ function MatchVideo({ matchId, events, describe }) {
 
   return (
     <section className="match-video">
-      <h3><Icon name="camera" size={18} />Video</h3>
+      <h3>
+        <Icon name="camera" size={18} />Video
+        <span className="video-star-count" aria-label={`${picked.size} of 5 highlights`}><Icon name="star" size={14} />{picked.size}/5</span>
+      </h3>
       <video
         ref={player}
         className="match-video-player"
@@ -123,11 +150,25 @@ function MatchVideo({ matchId, events, describe }) {
                 <button className="video-this" onClick={() => lineUp(rally.id)} disabled={busy || at === 0}>This one</button>
               </>
             ) : (
-              <button className="video-rally" onClick={() => jump(rally.second)} disabled={rally.second === null}>
-                <span className="video-rally-words">{describe(byId.get(rally.id))}</span>
-                {rally.second !== null && <span className="video-rally-at">{clockText(rally.second * 1000)}</span>}
-                {rally.second !== null && <Icon name={rally.id === playing ? 'pause' : 'play'} size={16} />}
-              </button>
+              <>
+                <button className="video-rally" onClick={() => jump(rally.second)} disabled={rally.second === null}>
+                  <span className="video-rally-words">{describe(byId.get(rally.id))}</span>
+                  {rally.second !== null && <span className="video-rally-at">{clockText(rally.second * 1000)}</span>}
+                  {rally.second !== null && <Icon name={rally.id === playing ? 'pause' : 'play'} size={16} />}
+                </button>
+                {rally.second !== null && (
+                  <button
+                    className={`video-star${picked.has(rally.id) ? ' is-on' : ''}`}
+                    onClick={() => star(rally.id)}
+                    disabled={full && !picked.has(rally.id)}
+                    aria-disabled={saving}
+                    aria-pressed={picked.has(rally.id)}
+                    aria-label={picked.has(rally.id) ? 'Remove highlight' : 'Highlight'}
+                  >
+                    <Icon name="star" size={20} />
+                  </button>
+                )}
+              </>
             )}
           </li>
         ))}

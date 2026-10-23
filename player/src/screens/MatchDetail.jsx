@@ -21,6 +21,8 @@ import { fetchMatchGame, removeMatchVideo } from '../lib/api'
 import { longestRun, matchStory, turningPoint } from '../lib/story'
 import Sparkline from '../components/Sparkline'
 import MomentumRibbon from '../components/MomentumRibbon'
+import Highlights from '../components/Highlights'
+import { usePointVideo } from '../lib/usePointVideo'
 import Icon from '../components/Icon'
 import StackedBar from '../components/StackedBar'
 import Meter from '../components/Meter'
@@ -334,7 +336,6 @@ function PointByPoint({ id, match, selected, onSelect }) {
   // The video's link lasts two hours. If it has run out by the time
   // play is pressed, the match is asked for once more, for a fresh one.
   const [asked, setAsked] = useState({ id, times: 0 })
-  const player = useRef(null)
   const times = asked.id === id ? asked.times : 0
   const { refresh } = usePlayerData()
   // Which question the owner is on, kept with the match it belongs to like `asked`.
@@ -363,6 +364,7 @@ function PointByPoint({ id, match, selected, onSelect }) {
   const game = loaded?.id === id ? loaded.game : null
   const points = loaded?.id === id ? loaded.points : null
   const video = loaded?.id === id ? loaded.video : null
+  const { ref: filmRef, pick, playReel, onTimeUpdate, onSeeking, reel, starred } = usePointVideo(video, game?.moments.length ?? 0, selected, onSelect)
   if (!game || game.moments.length === 0) return null
 
   async function remove() {
@@ -383,42 +385,26 @@ function PointByPoint({ id, match, selected, onSelect }) {
     refresh()
   }
 
-  function pick(index) {
-    onSelect(index)
-    const second = video?.seconds?.[index]
-    if (!player.current) return
-    if (second === null || second === undefined) return player.current.pause()
-    player.current.currentTime = second
-    player.current.play().catch(() => {})
-  }
-
-  // The point being played: the last one whose rally has started.
-  function follow(event) {
-    if (event.currentTarget.paused) return
-    const at = event.currentTarget.currentTime
-    let playing = null
-    video.seconds.forEach((second, index) => {
-      if (second !== null && second <= at + 0.25 && index < game.moments.length) playing = index
-    })
-    if (playing !== null && playing !== selected) onSelect(playing)
-  }
-
   const theirs = match.opponents.join(' & ')
   return (
     <section className={video ? 'detail-shape is-filmed' : 'detail-shape'} aria-label="Point by point">
       <h2 ref={heading} tabIndex={-1}>Point by point</h2>
       {video && (
-        <video
-          ref={player}
-          className="match-video"
-          src={video.url}
-          controls
-          playsInline
-          preload="none"
-          aria-label="Video of this match"
-          onTimeUpdate={follow}
-          onError={() => { if (times < 1) setAsked({ id, times: times + 1 }) }}
-        />
+        <>
+          <video
+            ref={filmRef}
+            className="match-video"
+            src={video.url}
+            controls
+            playsInline
+            preload="none"
+            aria-label="Video of this match"
+            onTimeUpdate={onTimeUpdate}
+            onSeeking={onSeeking}
+            onError={() => { if (times < 1) setAsked({ id, times: times + 1 }) }}
+          />
+          <Highlights count={video.highlights?.length ?? 0} reel={reel} onPlay={playReel} />
+        </>
       )}
       <MomentumRibbon
         moments={game.moments}
@@ -432,6 +418,7 @@ function PointByPoint({ id, match, selected, onSelect }) {
         lowIndex={game.lowPoint ? game.lowPoint.index : null}
         selected={selected}
         onSelect={video ? pick : onSelect}
+        starred={video ? starred : null}
         hint={video ? 'Tap a point to watch it' : undefined}
         watching={Boolean(video)}
       />

@@ -1105,6 +1105,11 @@
 .ribbon-block.is-selected { outline: 2px solid var(--text); outline-offset: 2px; }
 .ribbon-block:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
+/* The umpire's picked points: a small filled star in the box's top corner,
+   out of the way of the score. */
+.ribbon-block.is-starred { position: relative; }
+.ribbon-star { position: absolute; top: 1px; right: 1px; fill: currentColor; stroke: none; pointer-events: none; }
+
 /* ============ Match of the month ============ */
 
 .board-match-eyebrow {
@@ -1139,8 +1144,6 @@
   margin: 0 0 0.8rem;
 }
 .board-match .ichips { margin-bottom: 1.25rem; }
-.board-footer { margin-top: 0.8rem; font-size: 0.84rem; color: var(--text-muted); line-height: 1.45; }
-.board-match .board-footer { margin-top: 1rem; }
 
 /* ---- The chart, with its key moments pinned to it ---- */
 .mchart {
@@ -2640,6 +2643,18 @@
 .detail-shape.is-filmed > .video-remove button { scroll-margin: calc(var(--video-h) + 8.5rem) 0 calc(4.5rem + env(safe-area-inset-bottom)); }
 .ribbon.is-watching .ribbon-block.is-selected { outline: 4px solid var(--lamp); outline-offset: 1px; }
 
+/* The Highlights reel under the video: the button and, while it plays, which clip. */
+.highlights { display: flex; align-items: center; gap: 0.8rem; margin-top: 0.7rem; }
+.highlights-play {
+  min-height: 2.75rem; min-width: 2.75rem; padding: 0 1rem; display: inline-flex; align-items: center; gap: 0.4rem;
+  border: none; border-radius: 999px; background: var(--button); color: var(--button-ink);
+  font: 700 1.1rem var(--label); font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.highlights-play svg { fill: currentColor; stroke: none; }
+.highlights-play:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.highlights-at { color: var(--text-muted); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.detail-shape.is-filmed > .highlights + .ribbon { margin-top: 0.7rem; }
+
 /* A phone held sideways: the video takes the height of the screen on
    the left, and the strip, the boxes and the names sit beside it in a
    pane that scrolls by itself. "Remove video" waits under the fold. */
@@ -2670,6 +2685,7 @@
   /* Room for the picked box's ring, which the pane would otherwise cut. */
   .ribbon.is-watching .ribbon-blocks { padding: 5px; }
   .ribbon.is-watching .ribbon-block { scroll-margin: 8.5rem 0 0.5rem; }
+  .detail-shape.is-filmed > .highlights { grid-area: 3 / 1; }
   .detail-shape.is-filmed > .video-remove { grid-area: 3 / 2; }
   .detail-shape.is-filmed > .video-remove button { scroll-margin: 0.5rem 0 calc(4.5rem + env(safe-area-inset-bottom)); }
 }

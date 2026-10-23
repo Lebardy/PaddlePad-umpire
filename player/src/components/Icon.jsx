@@ -33,6 +33,7 @@ const PATHS = {
   clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2',
   calendar: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
   camera: 'M3 7h12v10H3zM15 10l6-3v10l-6-3',
+  play: 'M7 4l13 8-13 8z',
   info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5v.01',
   chevron: 'M9 6l6 6-6 6',
   target: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z',

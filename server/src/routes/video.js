@@ -16,7 +16,7 @@ import { query, withTransaction } from '../db.js'
 import { requireActiveUmpire, requireAuth } from '../auth.js'
 import { isUuid } from '../validate.js'
 import { bucketConfig, deleteFile, signedReadUrl } from '../bucket.js'
-import { firstFrameFromLineUp, rallySeconds } from '../video-times.js'
+import { firstFrameFromLineUp, highlightClips, rallySeconds } from '../video-times.js'
 import { cameraStatus, noteBeat } from '../camera-beats.js'
 import { CLAIM_SILENT_SECONDS, deviceName, findVideo, finishUpload, startUpload } from '../video-send.js'
 
@@ -66,13 +66,14 @@ async function videoAnswer(match, config) {
     `SELECT id, at FROM match_events WHERE match_id = $1 AND type = 'rally' ORDER BY seq`,
     [match.id],
   )
-  const seconds = rallySeconds({
+  const timing = {
     startedAtMs: new Date(match.started_at).getTime(),
     offsetMs: match.clock_offset_ms,
     firstFrameAtMs: new Date(video.first_frame_at).getTime(),
     durationMs: video.duration_ms,
-    rallies: events.map((e) => ({ atMs: new Date(e.at).getTime() })),
-  })
+  }
+  const timed = events.map((e) => ({ id: e.id, atMs: new Date(e.at).getTime() }))
+  const seconds = rallySeconds({ ...timing, rallies: timed })
   return {
     ...base,
     url: signedReadUrl(config, video.file_key),
@@ -80,6 +81,8 @@ async function videoAnswer(match, config) {
     width: video.width,
     height: video.height,
     rallies: events.map((e, index) => ({ id: e.id, second: seconds[index] })),
+    highlights: highlightClips({ ...timing, rallies: timed, picked: video.highlights ?? [] })
+      .map(({ id, start, end }) => ({ id, start, end })),
   }
 }
 
@@ -211,6 +214,28 @@ router.post('/matches/:id/line-up', async (req, res) => {
     `UPDATE match_videos SET first_frame_at = to_timestamp($2::double precision / 1000), lined_up_by = 'umpire' WHERE match_id = $1`,
     [match.id, firstFrame],
   )
+  res.json({ video: await videoAnswer(match, bucketConfig()) })
+})
+
+const PICK_RALLIES = { error: 'Pick up to 5 rallies of this match' }
+
+// The umpire's highlights: the whole list each time, so starring and
+// un-starring are the same call.
+router.put('/matches/:id/highlights', async (req, res) => {
+  const match = await ownMatch(req)
+  if (!match) return res.status(404).json({ error: 'No such match' })
+  const video = await findVideo(match.id)
+  if (!video || video.state !== 'ready') return res.status(409).json({ error: 'This match has no video' })
+  const ids = req.body?.rallyIds
+  if (!Array.isArray(ids) || ids.length > 5 || !ids.every(isUuid) || new Set(ids).size !== ids.length) {
+    return res.status(400).json(PICK_RALLIES)
+  }
+  const { rows } = ids.length === 0 ? { rows: [] } : await query(
+    `SELECT id FROM match_events WHERE match_id = $1 AND type = 'rally' AND id = ANY($2::uuid[])`,
+    [match.id, ids],
+  )
+  if (rows.length !== ids.length) return res.status(400).json(PICK_RALLIES)
+  await query('UPDATE match_videos SET highlights = $2::uuid[] WHERE match_id = $1', [match.id, ids])
   res.json({ video: await videoAnswer(match, bucketConfig()) })
 })
 

@@ -46,7 +46,7 @@ router.get('/:id', async (req, res) => {
   const row = await matchInScope(req)
   if (!row) return res.status(404).json(NO_MATCH)
   const [{ rows: events }, { rows: people }, { rows: held }] = await Promise.all([
-    query('SELECT type, payload, at FROM match_events WHERE match_id = $1 ORDER BY seq', [row.id]),
+    query('SELECT id, type, payload, at FROM match_events WHERE match_id = $1 ORDER BY seq', [row.id]),
     query('SELECT id, name FROM players WHERE id = ANY($1::uuid[])', [[...row.team_a, ...row.team_b]]),
     query('SELECT 1 FROM match_videos WHERE match_id = $1', [row.id]),
   ])
