@@ -1846,7 +1846,7 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
 .video-star { flex: none; width: 44px; height: 44px; margin-right: 0.5rem; display: grid; place-items: center; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text-muted); cursor: pointer; }
 .video-star.is-on { color: var(--primary); }
 .video-star.is-on svg { fill: currentColor; }
-.video-star:disabled { opacity: 0.4; cursor: default; }
+.video-star:disabled, .video-star[aria-disabled='true'] { opacity: 0.4; cursor: default; }
 .video-star-count { display: inline-flex; align-items: center; gap: 0.25rem; margin-left: 0.5rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-size: 0.85rem; font-variant-numeric: tabular-nums; vertical-align: middle; }
 .video-this { margin: 0.4rem 0.6rem 0.4rem 0; border-color: var(--primary); background: var(--primary); color: var(--primary-contrast); }
 .video-coming { display: flex; align-items: center; gap: 0.45rem; margin: 0 0 1.25rem; color: var(--text-muted); }

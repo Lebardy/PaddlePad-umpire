@@ -58,13 +58,16 @@ function MatchVideo({ matchId, events, describe }) {
 
   // Starring saves at once; the star changes first and goes back if the save fails.
   async function star(rallyId) {
+    if (saving) return
     const next = picked.has(rallyId) ? [...picked].filter((id) => id !== rallyId) : [...picked, rallyId]
     const before = video
     setVideo({ ...video, highlights: next.map((id) => ({ id })) })
     setSaving(true)
     setError(null)
     try {
-      setVideo(await setMatchHighlights(matchId, next))
+      const saved = await setMatchHighlights(matchId, next)
+      // Only the stars change: the answer's fresh link would reload the video and lose the umpire's place.
+      setVideo((was) => (was && saved ? { ...was, highlights: saved.highlights } : saved))
     } catch (err) {
       setVideo(before)
       setError(err.message)
@@ -157,7 +160,8 @@ function MatchVideo({ matchId, events, describe }) {
                   <button
                     className={`video-star${picked.has(rally.id) ? ' is-on' : ''}`}
                     onClick={() => star(rally.id)}
-                    disabled={saving || (full && !picked.has(rally.id))}
+                    disabled={full && !picked.has(rally.id)}
+                    aria-disabled={saving}
                     aria-pressed={picked.has(rally.id)}
                     aria-label={picked.has(rally.id) ? 'Remove highlight' : 'Highlight'}
                   >
