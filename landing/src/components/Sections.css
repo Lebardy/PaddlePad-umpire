@@ -1,0 +1,83 @@
+/* Below the See it loop: the number strip, how the rating works, the footer. */
+
+/* ---------- the number strip ---------- */
+.tally { border-block: 1px solid var(--rule); margin-top: 8px; }
+.tally-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding-inline: 0; }
+.tally-cell { position: relative; padding: 22px 24px 20px; border-right: 1px solid var(--rule); display: grid; gap: 4px; align-content: start; }
+.tally-cell:last-child { border-right: 0; }
+.tally-icon { color: var(--muted); display: inline-flex; margin-bottom: 4px; }
+.tally-cell b { display: block; font: 900 clamp(48px, 4.6vw, 64px)/1 var(--display); color: var(--lamp); font-variant-numeric: tabular-nums; }
+.tally-label { font: 700 16px/1.2 var(--label); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+/* A lamp catching: dark, a stutter of light, then steady. */
+.tally-cell b.flicker { animation: flick 900ms steps(1, end) both; }
+@keyframes flick { 0% { opacity: .1; } 15% { opacity: 1; } 25% { opacity: .15; } 40% { opacity: 1; } 50% { opacity: .3; } 65%, 100% { opacity: 1; text-shadow: 0 0 22px rgba(255, 184, 28, .4); } }
+@media (max-width: 760px) {
+  .tally-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tally-cell:nth-child(2) { border-right: 0; }
+  .tally-cell:nth-child(-n+2) { border-bottom: 1px solid var(--rule); }
+  .tally-cell { padding: 18px 16px; }
+}
+
+/* ---------- watch ---------- */
+.watch { padding-block: clamp(40px, 7vw, 88px) 0; }
+.watch-title { margin: 0 0 clamp(24px, 4vw, 44px); font: 900 clamp(44px, 6vw, 88px)/.9 var(--display); text-transform: uppercase; }
+/* Fixed 16:9 so the page does not jump when the video loads. */
+.watch-frame { position: relative; aspect-ratio: 16 / 9; width: 100%; background: var(--raised); border: 2px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.watch-frame video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
+.watch-play { position: absolute; inset: 0; margin: auto; width: 96px; height: 96px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--lamp); color: var(--board); cursor: pointer; box-shadow: 0 0 36px rgba(255, 184, 28, .45); transition: transform .15s; }
+.watch-play svg { fill: currentColor; margin-left: 5px; }
+.watch-play:hover { transform: scale(1.06); }
+.watch-line { display: flex; align-items: center; gap: 10px; margin: 16px 0 0; font: 700 20px var(--label); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.watch-line svg { color: var(--lamp); flex: none; }
+
+/* ---------- how the rating works ---------- */
+.rating { padding-block: clamp(40px, 7vw, 88px); }
+.rating-title { margin: 0 0 clamp(24px, 4vw, 44px); font: 900 clamp(44px, 6vw, 88px)/.9 var(--display); text-transform: uppercase; text-wrap: balance; }
+.rating-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 clamp(16px, 3vw, 44px); }
+.rating-step { position: relative; display: grid; gap: 6px; align-content: start; }
+/* An unlit step is a dark lamp; lit, it takes the amber. */
+.rating-icon { width: 64px; height: 64px; display: grid; place-items: center; border: 2px solid var(--rule); border-radius: 8px; background: var(--raised); color: var(--muted); margin-bottom: 10px; position: relative; z-index: 1; transition: color .4s, border-color .4s, box-shadow .4s; transition-delay: calc(var(--i) * 350ms); }
+.rating-step b { font: 700 clamp(22px, 1.65vw, 26px)/1.1 var(--label); text-transform: uppercase; letter-spacing: .02em; text-wrap: balance; }
+.rating-step p { margin: 0; color: var(--muted); font-size: 17px; line-height: 1.4; max-width: 30ch; }
+/* The line from each icon to the next, drawn as it lights. */
+.rating-step:not(:last-child)::after { content: ''; position: absolute; top: 31px; left: 72px; right: calc(clamp(16px, 3vw, 44px) * -1 + 8px); height: 2px; background: linear-gradient(90deg, var(--lamp) 50%, var(--rule) 50%) right / 200% 100%; transition: background-position .35s; transition-delay: calc(var(--i) * 350ms + 200ms); }
+.rating-step:not(:last-child)::before { content: ''; position: absolute; top: 25px; right: calc(clamp(16px, 3vw, 44px) * -1 - 2px); width: 12px; height: 12px; border-top: 2px solid var(--rule); border-right: 2px solid var(--rule); transform: rotate(45deg); transition: border-color .2s; transition-delay: calc(var(--i) * 350ms + 500ms); }
+.rating-steps.lit .rating-icon { color: var(--lamp); border-color: var(--lamp); box-shadow: 0 6px 14px rgba(0, 0, 0, .35), 0 0 18px rgba(255, 184, 28, .25); }
+.rating-steps.lit .rating-step:not(:last-child)::after { background-position: left; }
+.rating-steps.lit .rating-step:not(:last-child)::before { border-color: var(--lamp); }
+@media (max-width: 860px) {
+  .rating-steps { grid-template-columns: 1fr; gap: 0; }
+  .rating-step { grid-template-columns: 64px minmax(0, 1fr); gap: 2px 16px; padding-bottom: 28px; align-items: center; }
+  .rating-icon { grid-row: span 2; margin: 0; }
+  .rating-step b { align-self: end; }
+  .rating-step p { align-self: start; }
+  .rating-step:last-child { padding-bottom: 0; }
+  /* Vertical line down from icon to icon, no arrowhead. */
+  .rating-step:not(:last-child)::before { display: none; }
+  .rating-step:not(:last-child)::after { top: 64px; bottom: 0; left: 31px; right: auto; width: 2px; height: auto; background: linear-gradient(180deg, var(--lamp) 50%, var(--rule) 50%) bottom / 100% 200%; transition-property: background-position; }
+  .rating-steps.lit .rating-step:not(:last-child)::after { background-position: top; }
+}
+
+/* ---------- footer ---------- */
+.foot { border-top: 1px solid var(--rule); padding-block: 28px 36px; }
+.foot-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 32px; }
+.foot .brand { line-height: 1; margin: 0; }
+.foot-links { display: flex; flex-wrap: wrap; gap: 0 28px; }
+.foot-links a { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; font: 700 20px var(--label); text-transform: uppercase; letter-spacing: .04em; text-decoration: none; color: var(--ink); overflow-wrap: anywhere; }
+.foot-links a svg { color: var(--lamp); flex: none; }
+.foot-links a:hover { color: var(--lamp); }
+.foot-links a:last-child { text-transform: none; letter-spacing: 0; }
+
+/* Everything above stops moving: final state at once. */
+@media (prefers-reduced-motion: reduce) {
+  .tally-cell b.flicker { animation: none; }
+  .watch-play { transition: none; }
+  .watch-play:hover { transform: none; }
+  .rating-icon, .rating-step::before, .rating-step::after { transition: none !important; }
+  .rating-steps .rating-icon { color: var(--lamp); border-color: var(--lamp); }
+  .rating-step:not(:last-child)::after { background-position: left; }
+  .rating-step:not(:last-child)::before { border-color: var(--lamp); }
+}
+@media (prefers-reduced-motion: reduce) and (max-width: 860px) {
+  .rating-step:not(:last-child)::after { background-position: top; }
+}

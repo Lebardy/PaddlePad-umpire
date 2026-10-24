@@ -1,0 +1,72 @@
+/* The top board: dark bar, tabs, lamp headline, and the audience panels. */
+[hidden] { display: none !important; }
+
+.topbar { position: sticky; top: 0; z-index: 5; background: var(--board); border-bottom: 1px solid var(--rule); }
+.bar { display: flex; align-items: stretch; }
+.brand { font: 900 clamp(20px, 3vw, 32px)/60px var(--display); text-transform: uppercase; letter-spacing: .02em; margin-right: 14px; white-space: nowrap; }
+[role="tablist"] { display: flex; flex: 1; justify-content: flex-end; }
+[role="tab"] { appearance: none; background: none; border: 0; border-left: 1px solid var(--rule); color: var(--muted); font: 700 18px/60px var(--label); padding: 0 20px; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; min-width: 46px; justify-content: center; transition: background-color .2s, color .2s; }
+[role="tab"]:hover { color: var(--ink); }
+[role="tab"][aria-selected="true"] { background: var(--lamp); color: var(--board); }
+[role="tab"]:focus-visible { outline-offset: -3px; }
+/* The open tab is amber, so its ring turns dark to show. */
+[role="tab"][aria-selected="true"]:focus-visible { outline-color: var(--board); }
+/* On a phone only the open tab keeps its word; the others are icons. */
+@media (max-width: 860px) {
+  [role="tab"] { padding: 0 12px; gap: 0; }
+  [role="tab"] span { display: none; }
+  [role="tab"][aria-selected="true"] { gap: 6px; padding: 0 12px; font-size: 15px; }
+  [role="tab"][aria-selected="true"] span { display: inline; }
+}
+
+/* The narrowest phones: the four tabs and the name must fit in the width. */
+@media (max-width: 360px) {
+  .brand { margin-right: 8px; font-size: 18px; }
+  [role="tab"] { padding: 0 8px; min-width: 40px; }
+  [role="tab"][aria-selected="true"] { padding: 0 8px; font-size: 14px; }
+}
+
+/* ---------- the lamp headline ---------- */
+.lamp-head { margin: 0; padding-top: clamp(22px, 4vw, 44px); max-width: 16ch; font: 900 clamp(52px, 7.4vw, 112px)/.86 var(--display); text-transform: uppercase; letter-spacing: -.01em; }
+.lamp-word { display: inline-block; white-space: nowrap; }
+.lamp-ch { display: inline-block; }
+.lamp-head:not(.still) .lamp-ch { animation: ignite 1s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 32ms + 150ms); }
+@keyframes ignite {
+  0% { color: var(--lamp); text-shadow: 0 0 36px rgba(255, 184, 28, .45), 0 0 8px var(--lamp); transform: translateY(.14em) scale(1.06); opacity: .15; }
+  40% { opacity: 1; }
+  60% { color: var(--lamp); text-shadow: 0 0 22px rgba(255, 184, 28, .4); transform: none; }
+  100% { color: var(--ink); text-shadow: none; }
+}
+
+/* ---------- the audience panels ---------- */
+.panel { --accent: var(--lamp); padding-block: 26px 36px; scroll-margin-top: 60px; }
+.panel[data-audience="umpires"] { --accent: var(--umpire); }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--raised); }
+.fact { padding: 20px 24px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 2px 16px; align-items: center; min-height: 116px; }
+.fact:nth-child(2n) { border-right: 0; }
+.fact:nth-last-child(-n+2) { border-bottom: 0; }
+/* A square the way a lamp is mounted: a ring, with the icon lit inside. */
+.fact-icon { grid-row: span 2; width: 56px; height: 56px; display: grid; place-items: center; color: var(--accent); border: 2px solid var(--accent); border-radius: 8px; background: rgba(0, 0, 0, .25); box-shadow: inset 0 0 0 3px var(--raised), 0 6px 14px rgba(0, 0, 0, .35); }
+.fact b { align-self: end; font: 900 clamp(24px, 2.4vw, 34px)/1 var(--display); text-transform: uppercase; }
+.fact p { margin: 0; align-self: start; color: var(--muted); font-size: 17px; max-width: 34em; }
+@media (max-width: 600px) {
+  .facts { grid-template-columns: 1fr; }
+  .fact { border-right: 0; min-height: 0; padding: 16px; }
+  .fact:nth-last-child(2) { border-bottom: 1px solid var(--rule); }
+}
+
+.ctas { display: flex; flex-wrap: wrap; gap: 16px 28px; padding-top: 24px; }
+.cta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 56px; padding: 0 24px; border-radius: 6px; font: 700 21px var(--label); text-transform: uppercase; letter-spacing: .03em; text-decoration: none; transition: transform .15s, filter .15s; }
+.btn:hover { transform: translateY(-2px); filter: brightness(1.08); }
+.btn.amber { background: var(--lamp); color: var(--board); }
+.btn.green { background: var(--umpire); color: #04140c; }
+.btn.ghost { border: 2px solid var(--ink); color: var(--ink); }
+.note { color: var(--muted); font-size: 16px; }
+.note.mail { font: 700 20px var(--label); color: var(--lamp); user-select: all; overflow-wrap: anywhere; }
+::selection { background: var(--lamp); color: var(--board); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .panel .fact { animation: hang 700ms cubic-bezier(.2, 1.5, .4, 1) both; animation-delay: calc(var(--i) * 90ms + 120ms); transform-origin: top center; }
+  @keyframes hang { 0% { transform: perspective(900px) rotateX(-32deg) translateY(-14px); opacity: 0; } 30% { opacity: 1; } 100% { transform: none; } }
+}
