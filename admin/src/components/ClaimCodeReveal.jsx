@@ -1,5 +1,10 @@
 import { useMemo, useState } from 'react'
 import qrcode from 'qrcode-generator'
+import { claimQrText } from '../lib/claimLink'
+
+// Build-time address of the player app; unset in a bare local checkout.
+const PLAYER_APP_URL = import.meta.env?.VITE_PLAYER_APP_URL ?? ''
+const PLAYER_HOST = PLAYER_APP_URL.replace(/^https?:\/\//, '').replace(/\/$/, '')
 
 /**
  * Shows a freshly made claim code once, the same moment it comes back
@@ -14,7 +19,7 @@ export default function ClaimCodeReveal({ code, playerName }) {
   // the same choice the umpire app makes for a player's own claim code.
   const qrSrc = useMemo(() => {
     const qr = qrcode(0, 'M')
-    qr.addData(code)
+    qr.addData(claimQrText(code, PLAYER_APP_URL))
     qr.make()
     return qr.createDataURL(5)
   }, [code])
@@ -34,10 +39,14 @@ export default function ClaimCodeReveal({ code, playerName }) {
       <div>
         <p className="ticket-label">New claim code for {playerName}</p>
         <p className="ticket-code">{code}</p>
-        <p className="ticket-text">Give this to the player. It won’t be shown again once you leave this page.</p>
+        <p className="ticket-text">
+          {PLAYER_APP_URL
+            ? `Give this to the player: they scan it, or type the code at ${PLAYER_HOST}. It won’t be shown again once you leave this page.`
+            : 'Give this to the player. It won’t be shown again once you leave this page.'}
+        </p>
       </div>
       <div className="claim-reveal-side">
-        <img className="qr" src={qrSrc} alt={`QR code for claim code ${code}`} width={168} height={168} />
+        <img className="qr" src={qrSrc} alt={PLAYER_APP_URL ? `QR code that opens the claim page for ${code}` : `QR code for claim code ${code}`} width={168} height={168} />
         <button type="button" className="btn-lamp" onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
       </div>
     </div>
