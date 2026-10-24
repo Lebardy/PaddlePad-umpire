@@ -44,12 +44,12 @@ export const TALLY = [
   { icon: 'tap', value: 2, label: 'Taps per rally' },
   { icon: 'target', value: 18, label: 'Ways a rally ends' },
   { icon: 'star', value: 5, label: 'Highlights per match' },
-  { icon: 'moon', value: '3 AM', label: 'Ratings refresh, Manila time' },
+  { icon: 'moon', value: '3 AM', label: 'Skill groups refresh, Manila time' },
 ]
 
 export const RATING_STEPS = [
   { icon: 'tap', title: 'Every rally scored', text: 'The umpire taps how it ended: 18 kinds of ending.' },
-  { icon: 'moon', title: 'Every night at 3 AM', text: 'A job reads the day’s matches.' },
+  { icon: 'trend', title: 'A chess-style rating', text: 'Worked out when the match ends.' },
+  { icon: 'moon', title: 'Every night at 3 AM', text: 'A job refreshes the skill groups.' },
   { icon: 'style', title: 'Grouped by how you play', text: 'K-Means compares players in the same skill group: Dropper, Driver, Net Player, Power Player or All-Court Player.' },
-  { icon: 'trend', title: 'A chess-style rating', text: 'Beat stronger players and it climbs more.' },
 ]

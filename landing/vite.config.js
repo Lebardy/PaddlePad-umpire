@@ -23,10 +23,10 @@ function forwardNow(playerUrl) {
   }
 }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_')
-  // A build without these would quietly send nobody anywhere.
-  if (mode === 'production' && !(env.VITE_PLAYER_APP_URL && env.VITE_UMPIRE_APP_URL)) {
+  // A build without these would quietly send nobody anywhere (preview only serves a finished build).
+  if (command === 'build' && !(env.VITE_PLAYER_APP_URL && env.VITE_UMPIRE_APP_URL)) {
     throw new Error('Set VITE_PLAYER_APP_URL and VITE_UMPIRE_APP_URL before building (locally: cp .env.example .env).')
   }
   return { plugins: [react(), forwardNow(env.VITE_PLAYER_APP_URL)] }

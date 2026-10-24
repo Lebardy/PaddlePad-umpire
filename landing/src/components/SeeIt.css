@@ -31,12 +31,17 @@
 .device.focus { transform: scale(1.02); }
 .device.rest { transform: scale(.96); opacity: .6; }
 .tablet { max-width: 660px; border: 10px solid #05070a; border-radius: 24px; }
-.phone { max-width: 300px; border: 9px solid #05070a; border-radius: 36px; aspect-ratio: 9 / 21; display: flex; flex-direction: column; }
+.phone { max-width: 300px; border: 9px solid #05070a; border-radius: 36px; aspect-ratio: 9 / 22; display: flex; flex-direction: column; }
 .screens { display: grid; flex: 1; }
 .screen { grid-area: 1 / 1; min-width: 0; display: flex; flex-direction: column; transition: opacity .45s, visibility .45s; }
 .screen.off { opacity: 0; visibility: hidden; }
 .tablet .screens { font-size: clamp(12px, calc(100cqw / 44), 14.5px); background: var(--u-bg); }
-.phone .screens { font-size: max(12px, calc(100cqw / 24)); background: var(--p-bg); }
+/* Narrow phones keep the text size, so the same screen needs more height. */
+@media (max-width: 370px) { .phone { aspect-ratio: 9 / 24; } }
+@media (max-width: 340px) { .phone { aspect-ratio: 9 / 28; } }
+.phone .screens { position: relative; font-size: max(12px, calc(100cqw / 24)); background: var(--p-bg); }
+/* The phone's height is its shape, never its content: screens fill it and clip. */
+.phone .screen { position: absolute; inset: 0; }
 .glyph { width: 1.6em; height: 1.6em; flex: none; }
 .sample-tag { margin-left: auto; font: 700 .75em/1 var(--label); letter-spacing: .12em; text-transform: uppercase; padding: .3em .6em; border-radius: 3px; background: #14201b; color: #fff; }
 
@@ -118,7 +123,8 @@
 
 /* ---------- the player app (player/src/index.css, App.css) ---------- */
 .phone { --p-bg: #e8e6e0; --p-surface: #fbfaf7; --p-text: #15181d; --p-muted: #5b616b; --p-border: #d6d3cb; --p-sunken: #efede7; --p-blue: #2358a6; --p-orange: #eb6834; --p-orange-ink: #b4461b; --p-good: #0ca30c; --p-good-ink: #0b6b0b; --p-bad: #b3261e; color: var(--p-text); font: 400 1em/1.4 var(--sans); }
-.p-screen { display: flex; flex: 1; flex-direction: column; background: var(--p-surface); }
+.p-screen { display: flex; flex: 1; min-height: 0; flex-direction: column; background: var(--p-surface); }
+.p-scroll { flex: 1; min-height: 0; overflow: hidden; }
 .p-band { display: flex; align-items: center; justify-content: space-between; gap: .6em; margin: 0; padding: .6em .9em; background: var(--board); color: var(--ink); font: 700 1.05em/1.2 var(--label); text-transform: uppercase; letter-spacing: .06em; }
 .p-band .sample-tag { background: var(--lamp); color: var(--board); }
 .p-body { padding: .7em .9em; }
@@ -172,9 +178,12 @@
 .p-figure { margin: .1em 0 0; font: 900 4.2em/.95 var(--display); font-variant-numeric: tabular-nums; }
 .p-figure span { font: 700 .27em var(--label); letter-spacing: .08em; color: var(--p-muted); }
 .p-fold { display: flex; align-items: center; justify-content: space-between; margin: 0; padding: .6em .8em; background: #fff; border: 1px solid var(--p-border); border-radius: 4px; font: 700 1em var(--label); text-transform: uppercase; letter-spacing: .06em; }
-.p-anchor, .p-nightly { margin: 0; font-size: .95em; color: #454b55; }
-.p-nightly { display: flex; align-items: flex-start; gap: .4em; padding: .6em .7em; background: var(--p-sunken); border-radius: 4px; }
-.p-nightly svg { flex: none; margin-top: .15em; color: var(--p-orange-ink); }
+.p-anchor, .p-note { margin: 0; font-size: .95em; color: #454b55; }
+.p-note { display: flex; align-items: flex-start; gap: .4em; padding: .6em .7em; background: var(--p-sunken); border-radius: 4px; }
+.p-live { display: flex; align-items: center; gap: .6em; padding: .7em .85em; background: var(--board); color: var(--ink); border-radius: 4px; font: 600 1em/1.3 var(--label); letter-spacing: .02em; }
+.p-live-dot { width: .6em; height: .6em; flex: none; border-radius: 50%; background: var(--win-lamp, #46d37e); box-shadow: 0 0 .7em var(--win-lamp, #46d37e); animation: live-pulse 2s ease-in-out infinite; }
+@keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.p-note svg { flex: none; margin-top: .15em; color: var(--p-orange-ink); }
 
 /* ---------- the steps ---------- */
 .steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--rule); }

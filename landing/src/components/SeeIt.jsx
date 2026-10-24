@@ -4,7 +4,7 @@ import { useOnScreen, useReducedMotion } from '../lib/hooks.js'
 import { STEPS, SAMPLE, autoplays, nextStep, prevStep } from '../lib/loop.js'
 import Icon from './Icon.jsx'
 import { DoneScreen, ScoringScreen } from './seeit/UmpireScreens.jsx'
-import { MatchScreen, RatingScreen } from './seeit/PlayerScreens.jsx'
+import { LiveScreen, MatchScreen, RatingScreen } from './seeit/PlayerScreens.jsx'
 import './SeeIt.css'
 
 // The first tab: one sample rally followed through the apps in five
@@ -25,17 +25,17 @@ const END = 9
 // What the sample says in a line, and the longer sentence a screen reader gets.
 const SAY = [
   'The umpire taps how it ended.',
-  'The point lands on Rio’s phone.',
+  'The match lands on Rio’s phone.',
   'The umpire stars the rally.',
   'Rio watches it back.',
   'Many matches build Rio’s rating.',
 ]
 const READ = [
-  'The umpire taps Dink winner, then Rio. 7–5 becomes 8–5.',
-  'The point lands on Rio’s phone as box 13, and soft shots at the net go from 2 to 3.',
+  'The umpire taps Dink winner, then Rio. 7–5 becomes 8–5. Rio’s phone only says the match is being scored.',
+  'The match ends 11–6, Rio won. Every rally lands on Rio’s phone at once.',
   'After the match the umpire stars the rally: 3 of 5 highlights.',
   'Rio watches the 3 starred rallies back to back.',
-  'Rio’s rating is 1,709, built from many matches and updated every night at 3 AM.',
+  'Rio’s rating is 1,709, built from many matches and moved when each one ends.',
 ]
 
 // The amber streak: the point travelling from one screen to another.
@@ -81,7 +81,8 @@ export default function SeeIt() {
   // it is not already finished when the visitor gets there.
   if (onScreen !== wasOnScreen) {
     setWasOnScreen(onScreen)
-    if (onScreen) go(step)
+    // A paused visitor is holding the step; it stays as they left it.
+    if (onScreen && !paused) go(step)
   }
 
   // A step always starts from its first beat.
@@ -107,11 +108,13 @@ export default function SeeIt() {
   useEffect(() => {
     if (reduced) return
     const timers = BEATS[id].map(([ms, n]) => setTimeout(() => setBeat(n), ms))
-    const lights = { lands: ['[data-screen="tablet"]', '[data-fly="box"]'], reel: ['[data-screen="tablet"]', '[data-fly="video"]'] }[id]
+    const lights = { lands: ['[data-screen="tablet"]', '[data-screen="phone"]'], reel: ['[data-screen="tablet"]', '[data-fly="video"]'] }[id]
     if (lights) timers.push(setTimeout(() => fly(scene.current, streak.current, ...lights), 150))
     return () => timers.forEach(clearTimeout)
   }, [run, reduced, id])
 
+  // Until the match is over (and has reached the phone) the phone only says it is being scored.
+  const live = id === 'tap' || (id === 'lands' && b < 1)
   const umpireFocus = id === 'tap' || id === 'star'
   const players = AUDIENCES.players.actions
 
@@ -140,14 +143,15 @@ export default function SeeIt() {
 
           <div className={`device tablet ${umpireFocus ? 'focus' : 'rest'}`} data-screen="tablet" role="img" aria-label="The umpire app on a tablet">
             <div className="screens">
-              <div className={`screen${id === 'tap' || id === 'lands' ? '' : ' off'}`}><ScoringScreen id={id} beat={b} /></div>
-              <div className={`screen${id === 'tap' || id === 'lands' ? ' off' : ''}`}><DoneScreen id={id} beat={b} /></div>
+              <div className={`screen${id === 'tap' ? '' : ' off'}`}><ScoringScreen id={id} beat={b} /></div>
+              <div className={`screen${id === 'tap' ? ' off' : ''}`}><DoneScreen id={id} beat={b} /></div>
             </div>
           </div>
 
           <div className={`device phone ${umpireFocus ? 'rest' : 'focus'}`} data-screen="phone" role="img" aria-label="The player app on a phone">
             <div className="screens">
-              <div className={`screen${id === 'rating' ? ' off' : ''}`}><MatchScreen id={id} beat={b} still={reduced} /></div>
+              <div className={`screen${live ? '' : ' off'}`}><LiveScreen /></div>
+              <div className={`screen${live || id === 'rating' ? ' off' : ''}`}><MatchScreen id={id} beat={b} still={reduced} paused={paused} /></div>
               <div className={`screen${id === 'rating' ? '' : ' off'}`}><RatingScreen active={id === 'rating'} still={reduced} /></div>
             </div>
           </div>
@@ -165,8 +169,8 @@ export default function SeeIt() {
             </button>
           ))}
         </div>
-        {/* Spoken only when someone steps through; empty while the loop plays itself. */}
-        <p className="sr-only" aria-live="polite">{play ? '' : READ[step]}</p>
+        {/* Spoken only when the visitor is in control (paused, or reduced motion); empty while the loop plays itself or has scrolled away. */}
+        <p className="sr-only" aria-live="polite">{paused || reduced ? READ[step] : ''}</p>
       </div>
 
       <div className="ctas">

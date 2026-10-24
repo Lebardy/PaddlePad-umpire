@@ -4,6 +4,8 @@
 // real apps would show for this one rally, nothing more.
 // ============================================================
 
+import { ENDINGS } from './endings.js'
+
 export const STEPS = [
   { id: 'tap', label: 'Umpire taps', ms: 3600 },
   { id: 'lands', label: 'On Rio’s phone', ms: 3200 },
@@ -32,12 +34,45 @@ export function autoplays({ reducedMotion, onScreen, paused }) {
   return !reducedMotion && onScreen && !paused
 }
 
-// The game point by point, 1 = Rio won it. Rio's 7 and Dani's 5 are the
-// score before this rally; the last entry is the sample rally, point 13.
-export const POINTS = [1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]
-// The rallies the umpire has starred (1-based points). The last is the
-// sample rally, starred in step 3, so the star count goes 2 to 3.
+// The game rally by rally, as the umpire logged it: who ended it, how, and
+// when in the video. The first 13 are the game up to and including the
+// sample rally (point 13, 7-5 to 8-5); the rest are how Rio took it 11-6,
+// which is what the match page shows once the match has ended.
+// Whoever logged a winner won the rally; whoever logged a fault lost it.
+export const RALLIES = [
+  { by: 'Dani', key: 'out', at: '00:21' },
+  { by: 'Rio', key: 'dink_winner', at: '00:58' },
+  { by: 'Dani', key: 'lob', at: '01:20' },
+  { by: 'Rio', key: 'passing', at: '01:52' },
+  { by: 'Rio', key: 'net', at: '02:25' },
+  { by: 'Dani', key: 'drop_winner', at: '02:51' },
+  { by: 'Rio', key: 'drop_winner', at: '03:30' },
+  { by: 'Rio', key: 'dink_error', at: '04:02' },
+  { by: 'Rio', key: 'dink_winner', at: '04:31' },
+  { by: 'Rio', key: 'drop_winner', at: '05:30' },
+  { by: 'Dani', key: 'passing', at: '05:58' },
+  { by: 'Dani', key: 'net', at: '06:20' },
+  { by: 'Rio', key: 'dink_winner', at: '06:48' },
+  { by: 'Rio', key: 'net', at: '07:15' },
+  { by: 'Dani', key: 'out', at: '07:38' },
+  { by: 'Dani', key: 'kitchen', at: '07:55' },
+  { by: 'Rio', key: 'putaway', at: '08:15' },
+]
+// Who won each rally, 1 = Rio: a winner is the logger's, a fault the other side's.
+export const WON = RALLIES.map((r) => Number((r.by === 'Rio') === (ENDINGS.find((e) => e.key === r.key).outcome === 'winner')))
+export const POINTS = WON.slice(0, 13)
+export const LATER = WON.slice(13)
+// The rallies the umpire has starred (1-based). The last is the sample
+// rally, starred in step 3, so the star count goes 2 to 3.
 export const STARRED = [4, 10, 13]
-// The rest of the game after the sample rally: Rio takes it 11-6, which is
-// what the match page shows once the match has ended.
-export const LATER = [0, 1, 1, 1]
+
+// What Rio's phone says about this match once it is over. Rio and Dani
+// start it on these ratings, and every rally moves points by the real
+// rule (server/src/rally-rating.js: k x (1 - chance), all to the one who
+// ended it in singles) plus the match reward; scripts/check-seeit.mjs
+// replays the 17 rallies through that code and holds these numbers to it.
+export const RATED = { rio: 1647, dani: 1650 }
+export const ENDED = {
+  cost: { rallies: 2, ppr: -17 },
+  won: { rallies: 3, ppr: 23 },
+}

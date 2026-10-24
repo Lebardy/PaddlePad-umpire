@@ -1,5 +1,5 @@
 import { ENDINGS } from '../../lib/endings.js'
-import { SAMPLE } from '../../lib/loop.js'
+import { RALLIES, SAMPLE, STARRED } from '../../lib/loop.js'
 import Court from './Court.jsx'
 
 // The umpire app's two screens in this story, drawn from its own code:
@@ -41,6 +41,9 @@ function Header() {
 }
 
 const FINAL = [11, 6]
+
+// A rally the way the umpire's list words it.
+const words = (r) => `${ENDINGS.find((e) => e.key === r.key).label} — ${r.by}`
 
 // A score rolls like an odometer: both digits are there, the strip slides.
 function Roll({ from, to, rolled }) {
@@ -87,7 +90,7 @@ export function ScoringScreen({ id, beat }) {
   const scored = id !== 'tap' || beat >= 4
   const pressed = id === 'tap' && beat >= 1 && beat < 4
   const asking = id === 'tap' && beat >= 2 && beat < 4
-  const last = asking || pressed ? `${SAMPLE.ending} — who?` : scored ? `Last: ${SAMPLE.ending} — ${SAMPLE.player}` : 'Last: Into the net — Dani'
+  const last = asking || pressed ? `${SAMPLE.ending} — who?` : scored ? `Last: ${SAMPLE.ending} — ${SAMPLE.player}` : `Last: ${words(RALLIES[SAMPLE.before[0] + SAMPLE.before[1] - 1])}`
 
   return (
     <div className="u-screen">
@@ -127,16 +130,14 @@ export function ScoringScreen({ id, beat }) {
   )
 }
 
-// Newest first, as the real list is. The match ran on to 11-6 after the sample rally.
-const ROWS = [
-  { n: 17, words: 'Put-away — Rio', at: '08:15' },
-  { n: 13, words: 'Dink winner — Rio', at: '06:48' },
-  { n: 10, words: 'Drop winner — Rio', at: '05:30', starred: true },
-  { n: 4, words: 'Passing shot — Rio', at: '01:52', starred: true },
-]
+// The newest five rallies, newest first, as the real list shows them (it
+// scrolls; the starred rallies from earlier are further down).
+const ROWS = RALLIES.map((r, i) => ({ n: i + 1, words: words(r), at: r.at })).slice(-5).reverse()
 
 export function DoneScreen({ id, beat }) {
-  const stars = id === 'star' && beat < 1 ? SAMPLE.stars[0] : SAMPLE.stars[1]
+  // Nothing is starred when the match has only just ended; two are by the
+  // time the umpire starts; the sample rally is the third.
+  const starred = id === 'lands' ? [] : STARRED.filter((n) => n !== 13 || id !== 'star' || beat >= 1)
   return (
     <div className="u-screen">
       <Header />
@@ -145,19 +146,19 @@ export function DoneScreen({ id, beat }) {
       <section className="u-video">
         <h3>
           <Glyph d={PATHS.camera} />Video
-          <span className="u-count"><Glyph d={PATHS.star} />{stars}/5</span>
+          <span className="u-count"><Glyph d={PATHS.star} />{starred.length}/5</span>
         </h3>
         {/* The real screen plays the match video here; this one is a drawn court. */}
         <div className="u-player"><Court clip={3} playing={false} /></div>
         <ul>
           {ROWS.map((row) => {
-            const on = row.starred || (row.n === 13 && stars === SAMPLE.stars[1])
+            const on = starred.includes(row.n)
             return (
-              <li key={row.n} className={row.n === 13 ? 'is-sample' : undefined}>
+              <li key={row.n} className={row.n === STARRED.at(-1) ? 'is-sample' : undefined}>
                 <span className="u-words">{row.words}</span>
                 <span className="u-at">{row.at}</span>
                 <Glyph d={PATHS.play} className="u-play" />
-                <span className={`u-star${on ? ' is-on' : ''}${row.n === 13 && id === 'star' && on ? ' pop' : ''}`}>
+                <span className={`u-star${on ? ' is-on' : ''}${row.n === STARRED.at(-1) && id === 'star' && on ? ' pop' : ''}`}>
                   <Glyph d={PATHS.star} />
                 </span>
               </li>
