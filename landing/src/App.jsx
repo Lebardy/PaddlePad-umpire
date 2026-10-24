@@ -1,5 +1,8 @@
+import TopBoard from './components/TopBoard.jsx'
+
+// Task 6 replaces the See it placeholder.
 function App() {
-  return <main className="wrap"><h1>PaddlePad</h1></main>
+  return <TopBoard seeIt={<p>See it</p>} />
 }
 
 export default App

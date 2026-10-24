@@ -7,6 +7,8 @@
   --lamp: #ffb81c;
   --paper: #e8e6e0;
   --u-green: #1b6e4c;
+  /* The umpire green, lifted so it reads on the dark board. */
+  --umpire: #2fa36f;
 
   /* Big Shoulders is stadium signage: every figure and every heading.
      Barlow Condensed labels the cells; Barlow is for reading. */
