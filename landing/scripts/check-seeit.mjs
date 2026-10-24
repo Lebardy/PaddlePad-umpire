@@ -75,9 +75,10 @@ RALLIES.forEach((r) => {
 const sum = (key) => Math.round((ended[key] ?? []).reduce((a, b) => a + b, 0))
 check('"cost you most": the net, 2 rallies, and its PPR', [ended.net.length, sum('net')], [ENDED.cost.rallies, ENDED.cost.ppr])
 check('"won you most": dink winners, 3 rallies, and their PPR', [ended.dink_winner.length, sum('dink_winner')], [ENDED.won.rallies, ENDED.won.ppr])
-for (const outcome of ['winner', 'error']) {
-  const counts = Object.entries(ended).filter(([k]) => ENDINGS.find((e) => e.key === k).outcome === outcome).map(([, v]) => v.length)
-  check(`exactly one ${outcome} ending has the most rallies`, counts.filter((n) => n === Math.max(...counts)).length, 1)
+for (const [outcome, leader] of [['winner', 'dink_winner'], ['error', 'net']]) {
+  const rows = Object.entries(ended).filter(([k]) => ENDINGS.find((e) => e.key === k).outcome === outcome)
+  const most = Math.max(...rows.map(([, v]) => v.length))
+  check(`only ${leader} has the most ${outcome} rallies`, rows.filter(([, v]) => v.length === most).map(([k]) => k), [leader])
 }
 const reward = MATCH_REWARD * (1 - gameWinChance(expectedWin(RATED.rio, RATED.dani), { doubles: false, target: 11, firstServer: 'A' }))
 check('the rating the match leaves Rio on is the one step 5 shows', Math.round(rioPts + reward), SAMPLE.rating)

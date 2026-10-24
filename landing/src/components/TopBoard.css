@@ -21,7 +21,7 @@
 
 /* The narrowest phones: the four tabs and the name must fit in the width. */
 @media (max-width: 360px) {
-  .brand { margin-right: 8px; }
+  .brand { margin-right: 8px; font-size: 18px; }
   [role="tab"] { padding: 0 8px; min-width: 40px; }
   [role="tab"][aria-selected="true"] { padding: 0 8px; font-size: 14px; }
 }

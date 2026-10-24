@@ -115,8 +115,8 @@ export function MatchScreen({ id, beat, still }) {
           <ul>{won.map(([label, n]) => <Bar key={label} label={label} count={n} most={3} tone="is-won" />)}</ul>
           <h3 className="is-lost"><Icon name="offline" size={12} />Lost with a mistake</h3>
           <ul>{lost.map(([label, n]) => <Bar key={label} label={label} count={n} most={2} tone="is-lost" />)}</ul>
-          <p className="p-lead is-lost"><Icon name="offline" size={12} /><span><strong>Hitting into the net</strong> cost you most: {ENDED.cost.rallies} rallies, <span className="p-nums">{signed(ENDED.cost.ppr)} PPR</span></span></p>
-          <p className="p-lead is-won"><Icon name="trend" size={12} /><span><strong>Soft shots at the net</strong> won you most: {ENDED.won.rallies} rallies, <span className="p-nums">{signed(ENDED.won.ppr)} PPR</span></span></p>
+          <p className="p-lead is-lost"><Icon name="offline" size={12} /><span><strong>Hitting into the net</strong> cost you most: <span className="p-nums">{ENDED.cost.rallies} rallies, {signed(ENDED.cost.ppr)} PPR</span></span></p>
+          <p className="p-lead is-won"><Icon name="trend" size={12} /><span><strong>Soft shots at the net</strong> won you most: <span className="p-nums">{ENDED.won.rallies} rallies, {signed(ENDED.won.ppr)} PPR</span></span></p>
         </div>
       </div>
       <TabBar on="Matches" />
