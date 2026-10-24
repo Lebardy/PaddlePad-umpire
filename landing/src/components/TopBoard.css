@@ -9,6 +9,8 @@
 [role="tab"]:hover { color: var(--ink); }
 [role="tab"][aria-selected="true"] { background: var(--lamp); color: var(--board); }
 [role="tab"]:focus-visible { outline-offset: -3px; }
+/* The open tab is amber, so its ring turns dark to show. */
+[role="tab"][aria-selected="true"]:focus-visible { outline-color: var(--board); }
 /* On a phone only the open tab keeps its word; the others are icons. */
 @media (max-width: 860px) {
   [role="tab"] { padding: 0 12px; gap: 0; }

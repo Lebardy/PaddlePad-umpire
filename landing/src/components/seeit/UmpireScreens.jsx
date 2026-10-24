@@ -87,7 +87,7 @@ export function ScoringScreen({ id, beat }) {
   const scored = id !== 'tap' || beat >= 4
   const pressed = id === 'tap' && beat >= 1 && beat < 4
   const asking = id === 'tap' && beat >= 2 && beat < 4
-  const last = asking || pressed ? `${SAMPLE.ending} — who?` : scored ? `Last: ${SAMPLE.ending} — ${SAMPLE.player}` : 'Last: Put-away — Dani'
+  const last = asking || pressed ? `${SAMPLE.ending} — who?` : scored ? `Last: ${SAMPLE.ending} — ${SAMPLE.player}` : 'Last: Into the net — Dani'
 
   return (
     <div className="u-screen">

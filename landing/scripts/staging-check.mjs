@@ -2,11 +2,13 @@
 // ============================================================
 // The landing page on a real address (staging), seen by a real browser.
 //
-//   node landing/scripts/staging-check.mjs <landing-url> <player-url> <profile-dir> <out-dir>
+//   node landing/scripts/staging-check.mjs <landing-url> <player-url> <umpire-url> <profile-dir|-> <out-dir>
 //
+// <umpire-url> is the address the page's umpire links should go to.
 // <profile-dir> must be a browser profile where the OLD player app was
 // opened from <landing-url> (so it holds that app's service worker); the
-// check retires it, so the profile is good for one run. Pictures of each
+// check retires it, so the profile is good for one run. Pass - to skip
+// that part (a service that never had the old app). Pictures of each
 // section go to <out-dir>. Not named check-*.mjs, so `pnpm test` skips it.
 // Every browser is started muted.
 // ============================================================
@@ -16,14 +18,14 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const [landingArg, playerArg, profileDir, outDir] = process.argv.slice(2)
+const [landingArg, playerArg, umpireArg, profileDir, outDir] = process.argv.slice(2)
 if (!outDir) {
-  console.error('usage: staging-check.mjs <landing-url> <player-url> <profile-dir> <out-dir>')
+  console.error('usage: staging-check.mjs <landing-url> <player-url> <umpire-url> <profile-dir|-> <out-dir>')
   process.exit(2)
 }
 const LANDING = landingArg.replace(/\/$/, '')
 const PLAYER = playerArg.replace(/\/$/, '')
-const UMPIRE = 'https://web-staging-e8e9.up.railway.app'
+const UMPIRE = umpireArg.replace(/\/$/, '')
 const MAIL = 'mailto:jhlibrando.student@asiancollege.edu.ph'
 mkdirSync(outDir, { recursive: true })
 
@@ -81,7 +83,8 @@ const HEADLINE = `document.querySelector('h1.lamp-head')?.getAttribute('aria-lab
 
 // 1. The old player app's worker, planted in the given profile.
 console.log('1. Old worker')
-{
+if (profileDir === '-') console.log('  skipped (no profile given)')
+else {
   // Look before opening the page: opening it lets the new worker retire the old one.
   // Caches are counted on disk (the profile has only ever seen the landing address);
   // the browser only lists them from a page already on that address.
@@ -163,7 +166,7 @@ const rules = {}
     await b.js(`document.querySelector('.tally').scrollIntoView({ block: 'center' })`)
     await sleep(2200)
     const strip = await b.js(`[...document.querySelectorAll('.tally-cell b')].map((e) => e.textContent)`)
-    check(`${name}: the strip reads 1 / 18 / 5 / 3 AM`, JSON.stringify(strip) === JSON.stringify(['1', '18', '5', '3 AM']), JSON.stringify(strip))
+    check(`${name}: the strip reads 2 / 18 / 5 / 3 AM`, JSON.stringify(strip) === JSON.stringify(['2', '18', '5', '3 AM']), JSON.stringify(strip))
 
     const hrefs = await b.js(`[...new Set([...document.querySelectorAll('a[href]')].map((a) => a.getAttribute('href')))]`)
     const okHref = (x) => [PLAYER + '/', PLAYER + '/claim', UMPIRE + '/'].includes(x) || x.startsWith(MAIL) || x.startsWith('#')

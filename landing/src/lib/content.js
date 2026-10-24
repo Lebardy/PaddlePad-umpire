@@ -41,7 +41,7 @@ export const AUDIENCES = {
 }
 
 export const TALLY = [
-  { icon: 'tap', value: 1, label: 'Tap per rally' },
+  { icon: 'tap', value: 2, label: 'Taps per rally' },
   { icon: 'target', value: 18, label: 'Ways a rally ends' },
   { icon: 'star', value: 5, label: 'Highlights per match' },
   { icon: 'moon', value: '3 AM', label: 'Ratings refresh, Manila time' },

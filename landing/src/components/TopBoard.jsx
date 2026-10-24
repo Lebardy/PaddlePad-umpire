@@ -48,7 +48,6 @@ export default function TopBoard({ seeIt }) {
                 aria-selected={tab === t.id}
                 aria-label={t.label}
                 tabIndex={tab === t.id ? 0 : -1}
-                data-audience={t.id}
                 onClick={() => select(t.id)}
               >
                 <Icon name={t.icon} size={22} />

@@ -71,10 +71,18 @@ export default function SeeIt() {
   const [beat, setBeat] = useState(0)
   // Bumped on every go(), so pressing the step already shown replays it.
   const [run, setRun] = useState(0)
+  const [wasOnScreen, setWasOnScreen] = useState(false)
 
   const play = autoplays({ reducedMotion: reduced, onScreen, paused })
   const id = STEPS[step].id
   const b = reduced ? END : beat
+
+  // Coming on screen (or becoming the shown tab) starts the step over, so
+  // it is not already finished when the visitor gets there.
+  if (onScreen !== wasOnScreen) {
+    setWasOnScreen(onScreen)
+    if (onScreen) go(step)
+  }
 
   // A step always starts from its first beat.
   function go(i) {
@@ -86,6 +94,7 @@ export default function SeeIt() {
     go(i)
     setPaused(true)
   }
+
 
   // Only the loop moves on by itself, and only while it may play.
   useEffect(() => {
@@ -156,8 +165,8 @@ export default function SeeIt() {
             </button>
           ))}
         </div>
-        {/* Spoken only when someone steps through; silent while the loop plays itself. */}
-        <p className="sr-only" aria-live={play ? 'off' : 'polite'}>{READ[step]}</p>
+        {/* Spoken only when someone steps through; empty while the loop plays itself. */}
+        <p className="sr-only" aria-live="polite">{play ? '' : READ[step]}</p>
       </div>
 
       <div className="ctas">

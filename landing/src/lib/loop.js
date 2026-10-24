@@ -21,7 +21,7 @@ export const SAMPLE = {
   after: [8, 5],
   dinks: [2, 3],
   stars: [2, 3],
-  reel: { at: 1, of: 3 },
+  reel: { of: 3 },
   rating: 1709,
 }
 

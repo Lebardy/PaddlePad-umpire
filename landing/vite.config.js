@@ -19,11 +19,15 @@ function forwardNow(playerUrl) {
 })()`
   return {
     name: 'forward-now',
-    transformIndexHtml: (html) => html.replace('<!-- forward-now -->', `<script>\n${rule}${run}\n</script>`),
+    transformIndexHtml: (html) => html.replace('<!-- forward-now -->', () => `<script>\n${rule}${run}\n</script>`),
   }
 }
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_')
-  return { plugins: [react(), forwardNow(env.VITE_PLAYER_APP_URL ?? '')] }
+  // A build without these would quietly send nobody anywhere.
+  if (mode === 'production' && !(env.VITE_PLAYER_APP_URL && env.VITE_UMPIRE_APP_URL)) {
+    throw new Error('Set VITE_PLAYER_APP_URL and VITE_UMPIRE_APP_URL before building (locally: cp .env.example .env).')
+  }
+  return { plugins: [react(), forwardNow(env.VITE_PLAYER_APP_URL)] }
 })

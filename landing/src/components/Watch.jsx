@@ -15,7 +15,7 @@ export default function Watch() {
         <div className="watch-frame">
           <video ref={video} src="/launch.mp4" poster="/launch.jpg" controls preload="none" playsInline width="1920" height="1080" onPlay={() => setStarted(true)} />
           {!started && (
-            <button type="button" className="watch-play" aria-label="Play the launch video" onClick={() => video.current.play()}>
+            <button type="button" className="watch-play" aria-label="Play the launch video" onClick={() => { video.current.play(); video.current.focus() }}>
               <Icon name="play" size={44} />
             </button>
           )}

@@ -16,7 +16,7 @@ export default function Court({ clip, playing }) {
       <g fill="#eb6834"><circle cx="130" cy="62" r="5" /><rect x="125" y="68" width="10" height="16" rx="4" /></g>
       <g fill="#5b93ea"><circle cx="196" cy="140" r="7" /><rect x="188" y="148" width="16" height="22" rx="6" /></g>
       <g className={`ball c${clip}${playing ? '' : ' parked'}`} key={clip}>
-        <ellipse className="ball-shadow" rx="6" ry="2.2" fill="rgba(0,0,0,.4)" />
+        <ellipse rx="6" ry="2.2" fill="rgba(0,0,0,.4)" />
         <circle className="ball-dot" r="5" fill="#e8ff5a" />
       </g>
     </svg>

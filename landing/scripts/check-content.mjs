@@ -31,7 +31,7 @@ const nouns = [...block.matchAll(/\("([A-Z][\w -]+)", "([A-Z][\w -]+)"\)/g)].fla
 const fallback = pipeline.match(/DEFAULT_IDENTITY_NOUN = "([^"]+)"/)[1]
 
 const endings = RALLY_ENDINGS.length
-check('the tally reads 1 / <endings> / 5 / 3 AM', TALLY.map((t) => t.value), [1, endings, 5, '3 AM'])
+check('the tally reads 2 / <endings> / 5 / 3 AM', TALLY.map((t) => t.value), [2, endings, 5, '3 AM'])
 check('the endings count appears wherever endings are counted', (all.match(/\b(\d+) (ways|kinds of ending)/g) ?? []).every((s) => s.startsWith(`${endings} `)), true)
 check('the pipeline still has these five playstyle names', [...new Set([...nouns, fallback])].sort(), ['All-Court Player', 'Driver', 'Dropper', 'Net Player', 'Power Player'])
 check('every playstyle name appears in the Players facts', ['Dropper', 'Driver', 'Net Player', 'Power Player', 'All-Court'].every((n) => JSON.stringify(AUDIENCES.players).includes(n)), true)

@@ -54,7 +54,11 @@ export function MatchScreen({ id, beat, still }) {
   // After the match the page has every point; while it is live, up to the sample rally.
   const shown = filmed ? GAME.length : POINTS.length
   const dinks = landed ? SAMPLE.dinks[1] : DINKS_BEFORE
-  const won = [['Soft shots at the net', dinks], ['Soft drops they couldn’t reach', 2], ['Hard put-away shots', 1]]
+  // Every ending Rio's points had so far, most first as the real list is; the
+  // put-away is point 17, so it counts only once the match has run on.
+  const won = [['Soft shots at the net', dinks], ['Soft drops they couldn’t reach', 2], ['Shots past your opponent', 1], ['Hard put-away shots', filmed ? 1 : 0]]
+    .filter((r) => r[1] > 0)
+    .sort((a, b) => b[1] - a[1])
   const lost = [['Hitting into the net', 2], ['Missed soft shots at the net', 1]]
   const most = Math.max(...won.map((r) => r[1]))
   // The line under the lists names the ending they had most often; a tie names both.
@@ -92,7 +96,7 @@ export function MatchScreen({ id, beat, still }) {
               <span
                 key={i}
                 data-fly={i === 12 ? 'box' : undefined}
-                className={`p-box ${rioWon ? 'is-you' : 'is-them'}${picked === i ? ' is-picked' : ''}${hidden ? ' is-hidden' : ''}${i === 12 && id === 'lands' ? ' is-new' : ''}`}
+                className={`p-box ${rioWon ? 'is-you' : 'is-them'}${picked === i ? ' is-picked' : ''}${hidden ? ' is-hidden' : ''}`}
               >
                 {GAME[i].reached}
                 {stars.includes(i + 1) && <Icon name="star" size={9} />}
@@ -149,7 +153,7 @@ export function RatingScreen({ active, still }) {
   return (
     <div className="p-screen">
       <Band>Your rating</Band>
-      <div className={`p-body p-rating${active ? ' is-active' : ''}`}>
+      <div className={`p-body p-rating`}>
         <div className="p-step"><span className="p-n">1</span>PaddlePad Rating</div>
         <p className="p-figure">{points.toLocaleString('en-US')} <span>PPR</span></p>
         <p className="p-anchor">Everyone starts at 1,500.</p>
