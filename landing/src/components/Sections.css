@@ -18,6 +18,18 @@
   .tally-cell { padding: 18px 16px; }
 }
 
+/* ---------- watch ---------- */
+.watch { padding-block: clamp(40px, 7vw, 88px) 0; }
+.watch-title { margin: 0 0 clamp(24px, 4vw, 44px); font: 900 clamp(44px, 6vw, 88px)/.9 var(--display); text-transform: uppercase; }
+/* Fixed 16:9 so the page does not jump when the video loads. */
+.watch-frame { position: relative; aspect-ratio: 16 / 9; width: 100%; background: var(--raised); border: 2px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.watch-frame video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
+.watch-play { position: absolute; inset: 0; margin: auto; width: 96px; height: 96px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--lamp); color: var(--board); cursor: pointer; box-shadow: 0 0 36px rgba(255, 184, 28, .45); transition: transform .15s; }
+.watch-play svg { fill: currentColor; margin-left: 5px; }
+.watch-play:hover { transform: scale(1.06); }
+.watch-line { display: flex; align-items: center; gap: 10px; margin: 16px 0 0; font: 700 20px var(--label); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.watch-line svg { color: var(--lamp); flex: none; }
+
 /* ---------- how the rating works ---------- */
 .rating { padding-block: clamp(40px, 7vw, 88px); }
 .rating-title { margin: 0 0 clamp(24px, 4vw, 44px); font: 900 clamp(44px, 6vw, 88px)/.9 var(--display); text-transform: uppercase; text-wrap: balance; }
@@ -59,6 +71,8 @@
 /* Everything above stops moving: final state at once. */
 @media (prefers-reduced-motion: reduce) {
   .tally-cell b.flicker { animation: none; }
+  .watch-play { transition: none; }
+  .watch-play:hover { transform: none; }
   .rating-icon, .rating-step::before, .rating-step::after { transition: none !important; }
   .rating-steps .rating-icon { color: var(--lamp); border-color: var(--lamp); }
   .rating-step:not(:last-child)::after { background-position: left; }
