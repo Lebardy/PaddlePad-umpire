@@ -4,7 +4,7 @@
 const PATHS = {
   play: <polygon points="6 4 20 12 6 20 6 4" />,
   player: <><circle cx="12" cy="7" r="4" /><path d="M4 21v-1a7 7 0 0 1 16 0v1" /></>,
-  whistle: <><circle cx="8" cy="14" r="5" /><path d="M12 10.5L21 8v4h-6.5M8 11.5v2.5h2.5" /></>,
+  whistle: <><path d="M10.7 9H3v4h5.1" /><circle cx="14" cy="14" r="6" /><circle cx="14.5" cy="14.5" r="1.2" /><circle cx="19.8" cy="4.8" r="1.8" /><path d="M17.4 9l1.6-2.6" /></>,
   court: <><rect x="2" y="5" width="20" height="14" rx="1" /><path d="M12 5v14M2 12h7M15 12h7M9 5v14M15 5v14" /></>,
   trend: <><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></>,
   style: <><circle cx="6" cy="8" r="2" /><circle cx="17" cy="7" r="2" /><circle cx="9" cy="17" r="2" /><circle cx="18" cy="16" r="3" /></>,

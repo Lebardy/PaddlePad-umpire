@@ -32,7 +32,7 @@ export const AUDIENCES = {
   courts: {
     facts: [
       { icon: 'tablet', title: 'Courtside scoring', text: 'Your umpires, your matches, one record.' },
-      { icon: 'camera', title: 'Match video', text: 'Phones in holders at the courts film every match.' },
+      { icon: 'camera', title: 'Match video', text: 'Phones in holders at the courts can film each match.' },
       { icon: 'people', title: 'Open play', text: 'Spots, fees and who came, in one place.' },
       { icon: 'trophy', title: 'Match of the month', text: 'The best match on PaddlePad, with its highlights.' },
     ],

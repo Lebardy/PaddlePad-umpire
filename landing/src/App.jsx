@@ -1,8 +1,8 @@
 import TopBoard from './components/TopBoard.jsx'
+import SeeIt from './components/SeeIt.jsx'
 
-// Task 6 replaces the See it placeholder.
 function App() {
-  return <TopBoard seeIt={<p>See it</p>} />
+  return <TopBoard seeIt={<SeeIt />} />
 }
 
 export default App
