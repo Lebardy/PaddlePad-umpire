@@ -1,5 +1,5 @@
 import { ENDINGS } from '../../lib/endings.js'
-import { RALLIES, SAMPLE, STARRED } from '../../lib/loop.js'
+import { RALLIES, SAMPLE, SAMPLE_RALLY, STARRED_RALLIES } from '../../lib/loop.js'
 import Court from './Court.jsx'
 
 // The umpire app's two screens in this story, drawn from its own code:
@@ -90,7 +90,7 @@ export function ScoringScreen({ id, beat }) {
   const scored = id !== 'tap' || beat >= 4
   const pressed = id === 'tap' && beat >= 1 && beat < 4
   const asking = id === 'tap' && beat >= 2 && beat < 4
-  const last = asking || pressed ? `${SAMPLE.ending} — who?` : scored ? `Last: ${SAMPLE.ending} — ${SAMPLE.player}` : `Last: ${words(RALLIES[SAMPLE.before[0] + SAMPLE.before[1] - 1])}`
+  const last = asking || pressed ? `${SAMPLE.ending} — who?` : scored ? `Last: ${SAMPLE.ending} — ${SAMPLE.player}` : `Last: ${words(RALLIES[SAMPLE_RALLY - 2])}`
 
   return (
     <div className="u-screen">
@@ -130,14 +130,14 @@ export function ScoringScreen({ id, beat }) {
   )
 }
 
-// The newest five rallies, newest first, as the real list shows them (it
-// scrolls; the starred rallies from earlier are further down).
-const ROWS = RALLIES.map((r, i) => ({ n: i + 1, words: words(r), at: r.at })).slice(-5).reverse()
+// Five rows of the real list, newest first, scrolled down two rows (rallies
+// 25 to 21). The list has no numbers; n is only for finding the starred ones.
+const ROWS = RALLIES.map((r, i) => ({ n: i + 1, words: words(r), at: r.at })).slice(SAMPLE_RALLY - 1, SAMPLE_RALLY + 4).reverse()
 
 export function DoneScreen({ id, beat }) {
   // Nothing is starred when the match has only just ended; two are by the
   // time the umpire starts; the sample rally is the third.
-  const starred = id === 'lands' ? [] : STARRED.filter((n) => n !== 13 || id !== 'star' || beat >= 1)
+  const starred = id === 'lands' ? [] : STARRED_RALLIES.filter((n) => n !== SAMPLE_RALLY || id !== 'star' || beat >= 1)
   return (
     <div className="u-screen">
       <Header />
@@ -154,11 +154,11 @@ export function DoneScreen({ id, beat }) {
           {ROWS.map((row) => {
             const on = starred.includes(row.n)
             return (
-              <li key={row.n} className={row.n === STARRED.at(-1) ? 'is-sample' : undefined}>
+              <li key={row.n} className={row.n === SAMPLE_RALLY ? 'is-sample' : undefined}>
                 <span className="u-words">{row.words}</span>
                 <span className="u-at">{row.at}</span>
                 <Glyph d={PATHS.play} className="u-play" />
-                <span className={`u-star${on ? ' is-on' : ''}${row.n === STARRED.at(-1) && id === 'star' && on ? ' pop' : ''}`}>
+                <span className={`u-star${on ? ' is-on' : ''}${row.n === SAMPLE_RALLY && id === 'star' && on ? ' pop' : ''}`}>
                   <Glyph d={PATHS.star} />
                 </span>
               </li>

@@ -19,6 +19,13 @@
   [role="tab"][aria-selected="true"] span { display: inline; }
 }
 
+/* The narrowest phones: the four tabs and the name must fit in the width. */
+@media (max-width: 360px) {
+  .brand { margin-right: 8px; }
+  [role="tab"] { padding: 0 8px; min-width: 40px; }
+  [role="tab"][aria-selected="true"] { padding: 0 8px; font-size: 14px; }
+}
+
 /* ---------- the lamp headline ---------- */
 .lamp-head { margin: 0; padding-top: clamp(22px, 4vw, 44px); max-width: 16ch; font: 900 clamp(52px, 7.4vw, 112px)/.86 var(--display); text-transform: uppercase; letter-spacing: -.01em; }
 .lamp-word { display: inline-block; white-space: nowrap; }

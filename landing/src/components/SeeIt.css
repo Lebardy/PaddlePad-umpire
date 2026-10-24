@@ -65,6 +65,8 @@
 .roll-strip { display: flex; flex-direction: column; transition: transform .7s cubic-bezier(.2, 1, .3, 1); }
 .roll-strip i { display: block; height: 1.05em; font-style: normal; text-align: right; }
 .u-last { display: flex; align-items: center; justify-content: space-between; gap: .7em; margin: 0 1em .8em; padding: .3em .3em .3em .9em; background: var(--u-sunken); border-radius: 1em; font-weight: 600; font-size: .98em; }
+/* "Last: Into the net — Dani" wraps on a narrow tablet and "Dink winner — who?" doesn't; hold the taller height. */
+@container (max-width: 249px) { .u-last { min-height: 3.32em; } }
 .u-undo { display: inline-flex; align-items: center; gap: .3em; flex: none; min-height: 2.4em; padding: 0 .9em; border: 1.5px solid var(--u-ink); border-radius: .7em; background: #fff; font-weight: 700; }
 .u-undo .glyph { width: 1.3em; height: 1.3em; }
 .u-rally { display: grid; margin: 0 1em; }
@@ -130,8 +132,8 @@
 .p-body { padding: .7em .9em; }
 .p-video { aspect-ratio: 16 / 9; margin: -.7em -.9em 0; background: #0d1014; }
 .court { display: block; width: 100%; height: 100%; }
-.ball { animation: ground 1.2s linear infinite; }
-.ball-dot { animation: arc 1.2s ease-in-out infinite; }
+.ball { animation: ground 1.2s linear 1 both; }
+.ball-dot { animation: arc 1.2s ease-in-out 1 both; }
 .ball.parked, .ball.parked .ball-dot { animation-play-state: paused; animation-delay: -.6s; }
 .ball.c1 { --x0: 80px; --y0: 150px; --x1: 235px; --y1: 70px; --lift: 24px; }
 .ball.c2 { --x0: 240px; --y0: 150px; --x1: 110px; --y1: 76px; --lift: 42px; }
@@ -156,7 +158,6 @@
 .p-box.is-you { background: var(--p-blue); border-color: var(--p-blue); color: #fff; }
 .p-box svg { position: absolute; top: 1px; right: 1px; }
 .p-box.is-picked { outline: 3px solid var(--lamp); outline-offset: 1px; }
-.p-box.is-hidden { opacity: 0; transform: translateY(-1.2em) scale(.5); }
 .p-endings h3 { display: flex; align-items: center; gap: .35em; margin: .6em 0 .35em; font: 700 .95em var(--label); text-transform: uppercase; letter-spacing: .06em; }
 .p-endings h3:first-child { margin-top: 0; }
 .p-endings h3.is-won svg { color: var(--p-good); }
@@ -207,6 +208,7 @@
 .p-lead svg { flex: none; margin-top: .2em; }
 .p-lead.is-won svg { color: var(--p-good); }
 .p-lead.is-lost svg { color: var(--p-bad); }
+.p-nums { white-space: nowrap; }
 .p-lead strong { color: var(--p-text); }
 .p-card { margin: 0; padding: .6em .8em; background: #fff; border: 1px solid var(--p-border); border-radius: 4px; font-weight: 600; }
 .p-card small { display: block; font: 700 .85em var(--label); text-transform: uppercase; letter-spacing: .08em; color: var(--p-muted); }

@@ -151,7 +151,7 @@ export default function SeeIt() {
           <div className={`device phone ${umpireFocus ? 'rest' : 'focus'}`} data-screen="phone" role="img" aria-label="The player app on a phone">
             <div className="screens">
               <div className={`screen${live ? '' : ' off'}`}><LiveScreen /></div>
-              <div className={`screen${live || id === 'rating' ? ' off' : ''}`}><MatchScreen id={id} beat={b} still={reduced} paused={paused} /></div>
+              <div className={`screen${live || id === 'rating' ? ' off' : ''}`}><MatchScreen id={id} beat={b} still={reduced} /></div>
               <div className={`screen${id === 'rating' ? '' : ' off'}`}><RatingScreen active={id === 'rating'} still={reduced} /></div>
             </div>
           </div>

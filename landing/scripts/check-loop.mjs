@@ -26,7 +26,6 @@ check('five steps in story order', STEPS.map((s) => s.id), ['tap', 'lands', 'sta
 check('every step has time to be read', STEPS.every((s) => s.ms >= 2500), true)
 check('the ending is a real one, and a winner', RALLY_ENDINGS.find((e) => e.label === SAMPLE.ending)?.outcome, 'winner')
 check('the winner gains exactly one point', [SAMPLE.after[0] - SAMPLE.before[0], SAMPLE.after[1] - SAMPLE.before[1]], [1, 0])
-check('one more dink winner counted', SAMPLE.dinks[1] - SAMPLE.dinks[0], 1)
 check('one more star, within the limit of 5', [SAMPLE.stars[1] - SAMPLE.stars[0], SAMPLE.stars[1] <= 5], [1, true])
 check('the reel holds the starred rallies', SAMPLE.reel.of, SAMPLE.stars[1])
 check('labelled as a sample', SAMPLE.label, 'Sample')

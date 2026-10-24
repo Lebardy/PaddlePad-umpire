@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import Icon from '../Icon.jsx'
 import Court from './Court.jsx'
-import { ENDED, LATER, POINTS, SAMPLE, STARRED } from '../../lib/loop.js'
+import { ENDED, LATER, POINTS, RATED, SAMPLE, STARRED } from '../../lib/loop.js'
 
 // The player app's screens in this story, from its own code: the note a
 // player sees while their match is being scored (components/LiveNote.jsx),
@@ -63,7 +63,7 @@ export function LiveScreen() {
 }
 
 // The finished match, with every rally at once.
-export function MatchScreen({ id, beat, still, paused }) {
+export function MatchScreen({ id, beat, still }) {
   const filmed = id === 'star' || id === 'reel'
   const clip = id === 'reel' && !still ? Math.min(3, beat + 1) : 1
   const picked = id === 'reel' ? STARRED[clip - 1] - 1 : id === 'lands' ? 12 : null
@@ -82,7 +82,7 @@ export function MatchScreen({ id, beat, still, paused }) {
         <div className="p-body">
           {filmed && (
             <>
-              <div className="p-video" data-fly="video"><Court clip={clip} playing={id === 'reel' && !still && !paused} /></div>
+              <div className="p-video" data-fly="video"><Court clip={clip} playing={id === 'reel' && !still} /></div>
               <div className="p-highlights">
                 <span className="p-play" aria-hidden="true"><Icon name="play" size={14} /><Icon name="star" size={13} />{stars.length}</span>
                 {id === 'reel' && <span className="p-at">{clip} of {SAMPLE.reel.of}</span>}
@@ -115,8 +115,8 @@ export function MatchScreen({ id, beat, still, paused }) {
           <ul>{won.map(([label, n]) => <Bar key={label} label={label} count={n} most={3} tone="is-won" />)}</ul>
           <h3 className="is-lost"><Icon name="offline" size={12} />Lost with a mistake</h3>
           <ul>{lost.map(([label, n]) => <Bar key={label} label={label} count={n} most={2} tone="is-lost" />)}</ul>
-          <p className="p-lead is-lost"><Icon name="offline" size={12} /><span><strong>Hitting into the net</strong> cost you most: {ENDED.cost.rallies} rallies, {signed(ENDED.cost.ppr)} PPR</span></p>
-          <p className="p-lead is-won"><Icon name="trend" size={12} /><span><strong>Soft shots at the net</strong> won you most: {ENDED.won.rallies} rallies, {signed(ENDED.won.ppr)} PPR</span></p>
+          <p className="p-lead is-lost"><Icon name="offline" size={12} /><span><strong>Hitting into the net</strong> cost you most: {ENDED.cost.rallies} rallies, <span className="p-nums">{signed(ENDED.cost.ppr)} PPR</span></span></p>
+          <p className="p-lead is-won"><Icon name="trend" size={12} /><span><strong>Soft shots at the net</strong> won you most: {ENDED.won.rallies} rallies, <span className="p-nums">{signed(ENDED.won.ppr)} PPR</span></span></p>
         </div>
       </div>
       <TabBar on="Matches" />
@@ -154,7 +154,7 @@ function useCount(to, from, run) {
 }
 
 export function RatingScreen({ active, still }) {
-  const points = useCount(SAMPLE.rating, 1500, active && !still)
+  const points = useCount(SAMPLE.rating, RATED.rio, active && !still)
   return (
     <div className="p-screen">
       <div className="p-scroll">
