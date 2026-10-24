@@ -40,6 +40,8 @@ function Header() {
   )
 }
 
+const FINAL = [11, 6]
+
 // A score rolls like an odometer: both digits are there, the strip slides.
 function Roll({ from, to, rolled }) {
   return (
@@ -52,17 +54,18 @@ function Roll({ from, to, rolled }) {
   )
 }
 
-function Scoreboard({ rolled }) {
+// `final` is the finished match: 11-6, no serving side any more.
+function Scoreboard({ rolled, final }) {
   return (
     <div className="u-board">
-      <div className="u-side serving">
-        <span className="u-name is-server">{SAMPLE.player}</span>
-        <span className="u-value"><Roll from={SAMPLE.before[0]} to={SAMPLE.after[0]} rolled={rolled} /></span>
-        <span className="u-tag">Serving</span>
+      <div className={`u-side${final ? '' : ' serving'}`}>
+        <span className={`u-name${final ? '' : ' is-server'}`}>{SAMPLE.player}</span>
+        <span className="u-value">{final ? FINAL[0] : <Roll from={SAMPLE.before[0]} to={SAMPLE.after[0]} rolled={rolled} />}</span>
+        {!final && <span className="u-tag">Serving</span>}
       </div>
       <div className="u-side">
         <span className="u-name">{SAMPLE.opponent}</span>
-        <span className="u-value"><Roll from={SAMPLE.before[1]} to={SAMPLE.after[1]} rolled={rolled} /></span>
+        <span className="u-value">{final ? FINAL[1] : <Roll from={SAMPLE.before[1]} to={SAMPLE.after[1]} rolled={rolled} />}</span>
       </div>
     </div>
   )
@@ -124,10 +127,10 @@ export function ScoringScreen({ id, beat }) {
   )
 }
 
-// Newest first, as the real list is. The sample rally is the match's last.
+// Newest first, as the real list is. The match ran on to 11-6 after the sample rally.
 const ROWS = [
+  { n: 17, words: 'Put-away — Rio', at: '08:15' },
   { n: 13, words: 'Dink winner — Rio', at: '06:48' },
-  { n: 12, words: 'Put-away — Rio', at: '06:20' },
   { n: 10, words: 'Drop winner — Rio', at: '05:30', starred: true },
   { n: 4, words: 'Passing shot — Rio', at: '01:52', starred: true },
 ]
@@ -137,8 +140,8 @@ export function DoneScreen({ id, beat }) {
   return (
     <div className="u-screen">
       <Header />
-      <Scoreboard rolled />
-      <p className="u-complete">Match ended</p>
+      <Scoreboard final />
+      <p className="u-complete">{SAMPLE.player} won</p>
       <section className="u-video">
         <h3>
           <Glyph d={PATHS.camera} />Video

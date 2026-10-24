@@ -38,3 +38,6 @@ export const POINTS = [1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]
 // The rallies the umpire has starred (1-based points). The last is the
 // sample rally, starred in step 3, so the star count goes 2 to 3.
 export const STARRED = [4, 10, 13]
+// The rest of the game after the sample rally: Rio takes it 11-6, which is
+// what the match page shows once the match has ended.
+export const LATER = [0, 1, 1, 1]

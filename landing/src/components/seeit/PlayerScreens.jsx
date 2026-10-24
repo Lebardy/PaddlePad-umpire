@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import Icon from '../Icon.jsx'
 import Court from './Court.jsx'
-import { POINTS, SAMPLE, STARRED } from '../../lib/loop.js'
+import { LATER, POINTS, SAMPLE, STARRED } from '../../lib/loop.js'
 
 // The player app's two screens in this story, from its own code: a
 // match's Point by point page (player/src/screens/MatchDetail.jsx, with
@@ -13,10 +13,10 @@ import { POINTS, SAMPLE, STARRED } from '../../lib/loop.js'
 const GAME = (() => {
   let rio = 0
   let dani = 0
-  return POINTS.map((rioWon) => {
+  return [...POINTS, ...LATER].map((rioWon) => {
     if (rioWon) rio += 1
     else dani += 1
-    return { reached: rioWon ? rio : dani, score: `${rio}–${dani}` }
+    return { rioWon, reached: rioWon ? rio : dani, score: `${rio}–${dani}` }
   })
 })()
 
@@ -48,7 +48,11 @@ export function MatchScreen({ id, beat, still }) {
   const landed = id !== 'tap' && !(id === 'lands' && beat < 1)
   const clip = id === 'reel' && !still ? Math.min(3, beat + 1) : 1
   const picked = id === 'reel' ? STARRED[clip - 1] - 1 : id === 'lands' && landed ? 12 : null
-  const stars = STARRED.filter((n) => n !== 13 || id === 'reel')
+  // The star count follows the tablet: 3 once the umpire has starred the rally.
+  const third = id === 'reel' || (id === 'star' && beat >= 1)
+  const stars = STARRED.filter((n) => n !== 13 || third)
+  // After the match the page has every point; while it is live, up to the sample rally.
+  const shown = filmed ? GAME.length : POINTS.length
   const dinks = landed ? SAMPLE.dinks[1] : DINKS_BEFORE
   const won = [['Soft shots at the net', dinks], ['Soft drops they couldn’t reach', 2], ['Hard put-away shots', 1]]
   const lost = [['Hitting into the net', 2], ['Missed soft shots at the net', 1]]
@@ -81,7 +85,8 @@ export function MatchScreen({ id, beat, still }) {
           )}
         </p>
         <div className="p-boxes" role="presentation">
-          {POINTS.map((rioWon, i) => {
+          {GAME.map(({ rioWon }, i) => {
+            if (i >= shown) return null
             const hidden = i === 12 && !landed
             return (
               <span
@@ -139,23 +144,16 @@ function useCount(to, from, run) {
   return run ? Math.round(from + (to - from) * (1 - (1 - k) ** 3)) : to
 }
 
-const WEEK = [1682, 1688, 1684, 1695, 1701, 1709]
-
 export function RatingScreen({ active, still }) {
-  const points = useCount(SAMPLE.rating, WEEK[0], active && !still)
-  const lo = Math.min(...WEEK)
-  const line = WEEK.map((v, i) => `${(i / (WEEK.length - 1)) * 200},${32 - ((v - lo) / (Math.max(...WEEK) - lo)) * 28}`).join(' ')
+  const points = useCount(SAMPLE.rating, 1500, active && !still)
   return (
     <div className="p-screen">
       <Band>Your rating</Band>
       <div className={`p-body p-rating${active ? ' is-active' : ''}`}>
         <div className="p-step"><span className="p-n">1</span>PaddlePad Rating</div>
         <p className="p-figure">{points.toLocaleString('en-US')} <span>PPR</span></p>
-        <p className="p-week"><Icon name="trend" size={14} />Up {SAMPLE.rating - WEEK[0]} this week</p>
-        <svg className="p-line" viewBox="0 0 200 36" aria-hidden="true">
-          <polyline points={line} pathLength="1" fill="none" stroke="var(--p-blue)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
         <p className="p-anchor">Everyone starts at 1,500.</p>
+        <p className="p-fold">What’s moving it<Icon name="next" size={14} /></p>
         <p className="p-nightly"><Icon name="moon" size={14} />Built from many matches, updated every night at 3 AM</p>
         <div className="p-step"><span className="p-n">2</span>What to work on</div>
         <p className="p-card"><small>Your most common mistake</small>Hitting into the net</p>

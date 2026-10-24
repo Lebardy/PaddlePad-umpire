@@ -69,6 +69,8 @@ export default function SeeIt() {
   const [step, setStep] = useState(0)
   const [paused, setPaused] = useState(false)
   const [beat, setBeat] = useState(0)
+  // Bumped on every go(), so pressing the step already shown replays it.
+  const [run, setRun] = useState(0)
 
   const play = autoplays({ reducedMotion: reduced, onScreen, paused })
   const id = STEPS[step].id
@@ -78,6 +80,7 @@ export default function SeeIt() {
   function go(i) {
     setStep(i)
     setBeat(0)
+    setRun((r) => r + 1)
   }
   function press(i) {
     go(i)
@@ -98,7 +101,7 @@ export default function SeeIt() {
     const lights = { lands: ['[data-screen="tablet"]', '[data-fly="box"]'], reel: ['[data-screen="tablet"]', '[data-fly="video"]'] }[id]
     if (lights) timers.push(setTimeout(() => fly(scene.current, streak.current, ...lights), 150))
     return () => timers.forEach(clearTimeout)
-  }, [step, reduced, id])
+  }, [run, reduced, id])
 
   const umpireFocus = id === 'tap' || id === 'star'
   const players = AUDIENCES.players.actions
@@ -153,7 +156,8 @@ export default function SeeIt() {
             </button>
           ))}
         </div>
-        <p className="sr-only" aria-live="polite">{READ[step]}</p>
+        {/* Spoken only when someone steps through; silent while the loop plays itself. */}
+        <p className="sr-only" aria-live={play ? 'off' : 'polite'}>{READ[step]}</p>
       </div>
 
       <div className="ctas">
