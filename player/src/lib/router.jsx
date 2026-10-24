@@ -14,6 +14,7 @@
 
 import { useSyncExternalStore } from 'react'
 import { flushSync } from 'react-dom'
+import { claimFromPath } from './claimPath.js'
 
 const listeners = new Set()
 
@@ -135,13 +136,20 @@ export function restoreScroll() {
  *
  * A QR encodes the claim URL rather than the raw code, so a phone's
  * camera opens it directly and no scanner is needed inside the app.
- * Lives here with the other reads of location, and is used in two
- * places: the code panel prefills from it, and the gate opens on that
- * panel because of it.
+ * Lives here with the other reads of location: the code panel prefills
+ * from it, and `claimPanelFromUrl` below decides whether the gate opens
+ * on that panel.
  */
 export function claimCodeFromUrl() {
-  const match = window.location.pathname.match(/^\/claim\/(.+)$/)
-  return match ? decodeURIComponent(match[1]) : ''
+  return claimFromPath(window.location.pathname).code
+}
+
+/**
+ * True on any claim path, with or without a code. The sign-in screen
+ * opens on the code panel because of it.
+ */
+export function claimPanelFromUrl() {
+  return claimFromPath(window.location.pathname).open
 }
 
 export function matchPath(pattern, path) {

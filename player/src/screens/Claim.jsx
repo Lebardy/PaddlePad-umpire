@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { claim } from '../lib/api'
-import { claimCodeFromUrl } from '../lib/router'
+import { claimCodeFromUrl, claimPanelFromUrl } from '../lib/router'
 
 /**
  * Where a player enters the code their umpire gave them.
@@ -31,7 +31,7 @@ function Claim({ onClaimed, pausedNotice }) {
   // Without it, a refresh would re-fill a code the player may have since
   // corrected.
   useEffect(() => {
-    if (window.location.pathname.startsWith('/claim/')) {
+    if (claimPanelFromUrl()) {
       window.history.replaceState({}, '', '/')
     }
   }, [])
