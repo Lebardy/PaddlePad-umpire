@@ -33,7 +33,7 @@ import Icon from '../components/Icon'
 // Mirrors the check GoogleButton makes before rendering anything.
 const GOOGLE_ENABLED = Boolean(import.meta.env?.VITE_GOOGLE_CLIENT_ID)
 import { googleSignIn, loginPlayer, registerPlayer, takePausedNotice } from '../lib/api'
-import { claimCodeFromUrl } from '../lib/router'
+import { claimCodeFromUrl, claimPanelFromUrl } from '../lib/router'
 import { suggestUsername } from '../lib/username'
 
 const TABS = [
@@ -300,9 +300,13 @@ function GooglePending({ pending, onSignedIn, onCancel }) {
 }
 
 function SignIn({ onSignedIn }) {
-  // A scanned QR goes straight to the code panel with the field filled.
+  // A scanned QR goes straight to the code panel with the field filled,
+  // and hides the other ways in (below). A bare /claim -- the landing
+  // page's "Have a code?" -- opens the same panel, empty, but keeps
+  // Google and the other tabs: nobody has handed this visitor a code yet
+  // as far as we know.
   const [scanned] = useState(() => Boolean(claimCodeFromUrl()))
-  const [tab, setTab] = useState(() => (scanned ? 'code' : 'signin'))
+  const [tab, setTab] = useState(() => (claimPanelFromUrl() ? 'code' : 'signin'))
   // Read once, on mount, and removed from storage as it's read. Shown
   // here for the signin/create tabs; handed to Claim below so the code
   // tab -- the one a scanned QR lands on directly -- shows it too,
