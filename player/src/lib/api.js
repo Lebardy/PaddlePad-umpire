@@ -443,6 +443,17 @@ export function leaveOpenPlay(id) {
   return apiFetch(`/player/open-plays/${encodeURIComponent(id)}/join`, { method: 'DELETE' }).then((d) => d.openPlay)
 }
 
+/** The top of People: rivals and best partners, by name only. */
+export function fetchRivals({ signal } = {}) {
+  return apiFetch('/player/rivals', { signal })
+}
+
+/** Whether players near my rating who have never played me may see my name. */
+export async function setNearRatingName(on) {
+  const data = await apiFetch('/player/me/near-rating-name', { method: 'PUT', body: { on } })
+  return patchStoredPlayer(data.player)
+}
+
 /** How the visit went: a face (1-5) and chips. Saving again replaces it. */
 export function rateVisit(sessionId, { score, chips }) {
   return apiFetch(`/player/sessions/${encodeURIComponent(sessionId)}/rating`, { method: 'POST', body: { score, chips } }).then((d) => d.visit)

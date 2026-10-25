@@ -22,6 +22,7 @@ import { usePlayerData } from '../lib/PlayerData'
 import {
   linkGoogle,
   setCredentials,
+  setNearRatingName,
   unlinkGoogle,
   updateProfile,
 } from '../lib/api'
@@ -504,6 +505,31 @@ function ThemeChoice() {
   )
 }
 
+function NearRatingName({ player, onPlayerChange }) {
+  const [busy, setBusy] = useState(false)
+  const on = player.nearRatingName === true
+  async function flip() {
+    if (busy) return
+    setBusy(true)
+    try {
+      onPlayerChange(await setNearRatingName(!on))
+    } catch {
+      // Unchanged on failure: the switch keeps showing what is saved.
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <section className="you-section" aria-label="Near your rating">
+      <Head icon="equals">Near your rating</Head>
+      <button type="button" className="you-switch" role="switch" aria-checked={on} aria-busy={busy} onClick={flip}>
+        <span>Let players near my rating see my name</span>
+        <span className="you-switch-track" aria-hidden="true"><span /></span>
+      </button>
+    </section>
+  )
+}
+
 function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
   const joined = joinedLabel(player.claimedAt)
 
@@ -518,6 +544,8 @@ function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
       <ThemeChoice />
 
       <Details player={player} onPlayerChange={onPlayerChange} />
+
+      <NearRatingName player={player} onPlayerChange={onPlayerChange} />
 
       <LinkCode onPlayerChange={onPlayerChange} />
 

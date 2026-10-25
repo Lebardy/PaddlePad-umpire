@@ -1516,6 +1516,33 @@
 .person-when { font-size: 0.75rem; letter-spacing: 0.06em; color: var(--text-muted); white-space: nowrap; }
 .person-form { display: flex; gap: 2px; list-style: none; margin: 0; padding: 0; }
 
+/* Rivals and best partners: one short table under the facts strip. */
+.rivals {
+  background: var(--surface);
+  margin-inline: calc(var(--gutter) * -1);
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+@media (min-width: 640px) { .rivals { margin-inline: 0; } }
+.rivals-list { list-style: none; margin: 0; padding: 0; }
+.rivals-list li + li { border-top: 1px solid var(--border); }
+.rivals-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  padding: 0.4rem var(--gutter);
+  color: inherit;
+  text-decoration: none;
+}
+a.rivals-row:active { background: var(--surface-sunken); }
+.rivals-row svg { color: var(--primary); }
+.rivals-name { font-weight: 600; font-size: 0.98rem; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rivals-figure { font-family: var(--display); font-weight: 900; font-size: 1.15rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rivals-row--quiet, .rivals-row--quiet svg { color: var(--text-muted); }
+.rivals-row--quiet .rivals-name { font-weight: 500; }
+
 /* Appears with "Show all" once the list is long. 1rem stops iOS zooming
    in on focus. */
 .people-find {
@@ -3080,3 +3107,26 @@
 .visit-chip:disabled { cursor: progress; }
 .visit-ask { margin: 1rem 0 0.5rem; font-family: var(--label); font-weight: 700; font-size: 0.95rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-secondary); }
 .visit-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+/* The You switch: the whole row is the button. */
+.you-switch {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  width: 100%; min-height: 2.75rem; padding: 0.4rem 0;
+  background: none; border: 0; font: inherit; font-size: 0.95rem; color: var(--text-secondary);
+  text-align: left; cursor: pointer;
+}
+.you-switch:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: var(--radius-sm); }
+.you-switch-track {
+  flex: none; box-sizing: border-box; width: 2.75rem; height: 1.5rem; padding: 2px;
+  border: 2px solid var(--text-muted); border-radius: 999px; transition: background 0.15s ease, border-color 0.15s ease;
+}
+.you-switch-track span {
+  display: block; width: 1rem; height: 1rem; border-radius: 50%;
+  background: var(--text-muted); transition: transform 0.15s ease, background 0.15s ease;
+}
+.you-switch[aria-checked="true"] .you-switch-track { background: var(--lamp); border-color: var(--lamp); }
+.you-switch[aria-checked="true"] .you-switch-track span { transform: translateX(1.25rem); background: #15181d; }
+.you-switch[aria-busy="true"] { opacity: 0.6; }
+@media (prefers-reduced-motion: reduce) {
+  .you-switch-track, .you-switch-track span { transition: none; }
+}

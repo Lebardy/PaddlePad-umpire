@@ -33,6 +33,7 @@ import { findPeople, peopleFacts } from '../lib/peopleWords'
 import Avatar from '../components/Avatar'
 import Icon from '../components/Icon'
 import PlacesToPlay from '../components/PlacesToPlay'
+import RivalsBlock from '../components/RivalsBlock'
 
 // The last five results fit beside the name on a 320px phone.
 const FORM_SHOWN = 5
@@ -109,6 +110,8 @@ function People() {
           </li>
         ))}
       </ul>
+
+      <RivalsBlock />
 
       {searchable && (
         <input
