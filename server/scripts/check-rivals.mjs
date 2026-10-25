@@ -70,6 +70,9 @@ check('a closed or paused player (not in people) never appears',
   ids(blockFor({ ...base, ratings: new Map(), people: new Map([['p1', person('P1')]]), matches: [vs('p1', true), vs('p1', false), vs('p2', true), vs('p2', false)] }).rivals), ['p1'])
 people = new Map([['dani', person('Dani', { nameVisible: false })]])
 check('a hidden name is never named, even to an opponent', blockFor({ ...base, ratings: new Map(), people, matches: [vs('dani', true), vs('dani', false)] }).rivals[0].name, null)
+people = new Map([['dani', person('Dani')], ['x1', person('X1')], ['x2', person('X2')]])
+block = blockFor({ ...base, ratings: new Map(), people, matches: [vs('dani', true), vs('dani', false), withP('dani', true), withP('dani', true)] })
+check('a rival who is also a best partner is shown once, as the rival', [ids(block.rivals), ids(block.partners)], [['dani'], []])
 
 // Alert titles
 check('nobody going', alertTitle([]), null)

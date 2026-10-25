@@ -52,13 +52,15 @@ export function blockFor({ me, matches, ratings, people, minMatches }) {
     .sort((a, b) => a.gap - b.gap || byId(a, b))
     .map(({ id, kind }) => ({ id, kind, won: against.get(id)?.won ?? 0, lost: against.get(id)?.lost ?? 0 }))
 
+  const rivals = [...matchRivals, ...ratingRivals].slice(0, SHOWN)
+  // Someone shown as a rival is not shown again as a partner.
   const partners = [...together]
-    .filter(([id, r]) => people.has(id) && r.won >= 2)
+    .filter(([id, r]) => people.has(id) && r.won >= 2 && !rivals.some((v) => v.id === id))
     .map(([id, r]) => ({ id, wins: r.won, losses: r.lost }))
     .sort((a, b) => b.wins - a.wins || a.losses - b.losses || byId(a, b))
 
   return {
-    rivals: [...matchRivals, ...ratingRivals].slice(0, SHOWN).map((r) => ({ ...r, name: nameOf(r.id) })),
+    rivals: rivals.map((r) => ({ ...r, name: nameOf(r.id) })),
     partners: partners.slice(0, SHOWN).map((p) => ({ ...p, name: nameOf(p.id) })),
   }
 }
