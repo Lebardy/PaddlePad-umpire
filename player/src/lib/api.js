@@ -537,3 +537,18 @@ export function finishVideoUpload(matchId, deviceId) {
 export function removeMatchVideo(matchId) {
   return apiFetch(`/player/matches/${encodeURIComponent(matchId)}/video`, { method: 'DELETE' })
 }
+
+/** The server's public push key, or null while alerts are off there. */
+export function fetchPushKey() {
+  return apiFetch('/player/push/key').then((d) => d.key)
+}
+
+/** This phone wants alerts. `subscription` is PushSubscription.toJSON(). */
+export function savePush(subscription) {
+  return apiFetch('/player/push', { method: 'PUT', body: { endpoint: subscription.endpoint, keys: subscription.keys } })
+}
+
+/** This phone no longer wants alerts. */
+export function removePush(endpoint) {
+  return apiFetch('/player/push', { method: 'DELETE', body: { endpoint } })
+}

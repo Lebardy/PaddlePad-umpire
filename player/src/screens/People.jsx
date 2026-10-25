@@ -30,6 +30,7 @@ import { usePlayerData } from '../lib/PlayerData'
 import { peopleSummary, peopleTogether } from '../lib/derive'
 import { lastPlayedLabel } from '../lib/format'
 import { findPeople, peopleFacts } from '../lib/peopleWords'
+import AlertBell from '../components/AlertBell'
 import Avatar from '../components/Avatar'
 import Icon from '../components/Icon'
 import PlacesToPlay from '../components/PlacesToPlay'
@@ -111,7 +112,7 @@ function People() {
         ))}
       </ul>
 
-      <RivalsBlock />
+      <RivalsBlock bell={<AlertBell />} />
 
       {searchable && (
         <input

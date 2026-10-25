@@ -1543,6 +1543,42 @@ a.rivals-row:active { background: var(--surface-sunken); }
 .rivals-row--quiet, .rivals-row--quiet svg { color: var(--text-muted); }
 .rivals-row--quiet .rivals-name { font-weight: 500; }
 
+/* The open play bell under the rivals list. On = new words, a ring and a
+   tint, so it is never colour alone. */
+.alert-bell {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.4rem var(--gutter);
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.alert-bell svg { color: var(--primary); flex: none; }
+.alert-bell:active { background: var(--surface-sunken); }
+.alert-bell:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.alert-bell.is-on { background: var(--status-good-soft); box-shadow: inset 3px 0 0 var(--status-good); }
+.alert-bell.is-on svg { color: var(--status-good); }
+.alert-bell[aria-busy="true"] { opacity: 0.6; }
+.alert-bell-note {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0.75rem var(--gutter);
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.alert-bell-note svg { flex: none; }
+
 /* Appears with "Show all" once the list is long. 1rem stops iOS zooming
    in on focus. */
 .people-find {
