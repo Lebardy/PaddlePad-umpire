@@ -8,7 +8,7 @@
 
 import webpush from 'web-push'
 import { getRallyRatings } from './rally-rating-store.js'
-import { DAILY_CAP, alertTitle, pushGone, sendAfter } from './rivals.js'
+import { DAILY_CAP, alertTitle, goingFor, pushGone, sendAfter } from './rivals.js'
 import { blocksFor, counterparts, ratingNeighbours } from './rivals-store.js'
 import { manilaDayStart, openPlayWhen } from './visit-rules.js'
 
@@ -18,12 +18,20 @@ export function pushConfig() {
   return publicKey && privateKey && subject ? { publicKey, privateKey, subject } : null
 }
 
+const MAX_PHONES = 5
+
 export async function saveSubscription(query, playerId, { endpoint, keys }) {
   // A phone handed to another player moves with its endpoint.
   await query(
     `INSERT INTO push_subscriptions (endpoint, player_id, p256dh, auth) VALUES ($1, $2, $3, $4)
      ON CONFLICT (endpoint) DO UPDATE SET player_id = $2, p256dh = $3, auth = $4`,
     [endpoint, playerId, keys.p256dh, keys.auth],
+  )
+  // At most MAX_PHONES each, so one player cannot hand the sender a pile of endpoints; the newest stay.
+  await query(
+    `DELETE FROM push_subscriptions WHERE player_id = $1 AND endpoint NOT IN
+       (SELECT endpoint FROM push_subscriptions WHERE player_id = $1 ORDER BY created_at DESC, endpoint LIMIT ${MAX_PHONES})`,
+    [playerId],
   )
 }
 
@@ -47,7 +55,7 @@ export async function queueAlerts(query, openPlayId, joinerId, now) {
   if (reachable.length === 0) return 0
   const blocks = await blocksFor(query, reachable.map((r) => r.player_id))
   const receivers = [...blocks]
-    .filter(([, block]) => [...block.rivals, ...block.partners].some((p) => p.id === joinerId))
+    .filter(([, block]) => goingFor(block, [joinerId]).length > 0)
     .map(([id]) => id)
   if (receivers.length === 0) return 0
   // A sent alert is re-armed: the next send replaces it on the phone without a buzz.
@@ -66,6 +74,8 @@ export async function sendDueAlerts(query, now) {
   const config = pushConfig()
   const counts = { sent: 0, skipped: 0, gone: 0, failed: 0 }
   if (!config) return counts
+  // Held alerts wait out quiet hours; one armed just before 22:00 must not buzz after it.
+  if (sendAfter(now) > now) return counts
   webpush.setVapidDetails(config.subject, config.publicKey, config.privateKey)
   const { rows: due } = await query(
     `SELECT a.player_id, a.open_play_id, a.first_sent_at, o.starts_at, o.ends_at, o.facility_id, f.name AS facility_name,
@@ -77,7 +87,8 @@ export async function sendDueAlerts(query, now) {
        JOIN players p ON p.id = a.player_id
        LEFT JOIN open_play_joins j ON j.open_play_id = o.id
       WHERE a.state = 'waiting' AND a.send_after <= $1
-      GROUP BY a.player_id, a.open_play_id, a.first_sent_at, o.id, f.name, p.id`,
+      GROUP BY a.player_id, a.open_play_id, a.first_sent_at, o.id, f.name, p.id
+      ORDER BY o.starts_at`,
     [now],
   )
   if (due.length === 0) return counts
@@ -88,10 +99,7 @@ export async function sendDueAlerts(query, now) {
   )
   for (const row of due) {
     const block = blocks.get(row.player_id)
-    const going = [
-      ...block.rivals.filter((r) => row.going.includes(r.id)).map((r) => ({ kind: 'rival', name: r.name })),
-      ...block.partners.filter((p) => row.going.includes(p.id)).map((p) => ({ kind: 'partner', name: p.name })),
-    ]
+    const going = goingFor(block, row.going)
     const title = alertTitle(going)
     const first = row.first_sent_at === null
     const tooLate = new Date(row.starts_at) <= now || row.going.includes(row.player_id) || !title || !row.active
@@ -113,7 +121,7 @@ export async function sendDueAlerts(query, now) {
     const { rows: phones } = await query('SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE player_id = $1', [row.player_id])
     for (const phone of phones) {
       try {
-        await webpush.sendNotification({ endpoint: phone.endpoint, keys: { p256dh: phone.p256dh, auth: phone.auth } }, payload, { TTL: 6 * 60 * 60 })
+        await webpush.sendNotification({ endpoint: phone.endpoint, keys: { p256dh: phone.p256dh, auth: phone.auth } }, payload, { TTL: 6 * 60 * 60, timeout: 10_000 })
         counts.sent += 1
       } catch (error) {
         if (pushGone(error.statusCode)) {

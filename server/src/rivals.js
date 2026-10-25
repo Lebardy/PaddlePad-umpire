@@ -63,6 +63,24 @@ export function blockFor({ me, matches, ratings, people, minMatches }) {
   }
 }
 
+/**
+ * Who in `block` is going, each person once (a rival who is also a best
+ * partner counts as the rival), rivals first. A hidden name is only ever
+ * counted as "near your rating": anyone else without a name is not in the
+ * visible block, so they neither count nor trigger an alert.
+ */
+export function goingFor(block, joinedIds) {
+  const seen = new Set()
+  return [
+    ...block.rivals.map((r) => ({ ...r, as: 'rival' })),
+    ...block.partners.map((p) => ({ ...p, as: 'partner' })),
+  ].filter((p) => {
+    if (!joinedIds.includes(p.id) || seen.has(p.id) || !(p.name || p.kind === 'rating')) return false
+    seen.add(p.id)
+    return true
+  }).map((p) => ({ kind: p.as, name: p.name }))
+}
+
 /** "Dani and 2 rivals are going". `going` is in block order, rivals first. */
 export function alertTitle(going) {
   if (going.length === 0) return null
@@ -85,6 +103,17 @@ export function sendAfter(now) {
   if (hour >= 7 && hour < 22) return now
   const morning = new Date(manilaDayStart(now).getTime() + 7 * HOUR)
   return morning > now ? morning : new Date(morning.getTime() + 24 * HOUR)
+}
+
+const PUSH_HOSTS = /^(fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|([a-z0-9-]+\.)+(push\.apple\.com|notify\.windows\.com))$/
+const bytesOf = (text) => (/^[A-Za-z0-9_-]+$/.test(text) ? Buffer.from(text, 'base64url').length : -1)
+
+/** A phone's push subscription is only ever stored if it points at a real push service, so the api cannot be aimed elsewhere. */
+export function validSubscription(endpoint, keys) {
+  let url
+  try { url = new URL(endpoint) } catch { return false }
+  return url.protocol === 'https:' && PUSH_HOSTS.test(url.hostname)
+    && bytesOf(keys?.p256dh ?? '') === 65 && bytesOf(keys?.auth ?? '') === 16
 }
 
 /** The push service's way of saying this phone's subscription no longer exists. */

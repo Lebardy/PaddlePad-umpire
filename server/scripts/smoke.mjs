@@ -27,6 +27,7 @@
 //   6. a game to 15 is not declared won at 11            (point_target)
 // ============================================================
 
+import { randomBytes } from 'node:crypto'
 import { RALLY_ENDINGS, rallyEndingColumn } from '../src/rally-endings.js'
 import { NOT_LEFT_OPEN_MESSAGE, SESSION_REASON_MESSAGE } from '../src/overview-rules.js'
 import { manilaDayStart, openPlayWhen } from '../src/visit-rules.js'
@@ -1683,6 +1684,9 @@ async function main() {
     check('a switch that is not true or false -> 400', (await nrn({ on: 'yes' })).status === 400)
     check('the profile carries it',
       (await asPlayer('/player/me', { bearer: meToken })).body.player?.nearRatingName === true)
+    // The app reads the switch from the launch check, not /player/me.
+    check('the launch check carries it too',
+      (await asPlayer('/auth/player/me', { bearer: meToken })).body.player?.nearRatingName === true)
     check('and it goes back off', (await nrn({ on: false })).body.player?.nearRatingName === false)
   }
 
@@ -3673,10 +3677,16 @@ async function main() {
       console.log('  note: push keys not set on this server; alert checks skipped')
     } else {
       const push = (method, body) => asPlayer('/player/push', { method, bearer: two.token, body })
-      const endpoint = `https://push.invalid/smoke-${opStamp}`
+      // A valid shape on a real push host, so the push service refuses it (counted as failed or gone) and nothing is delivered.
+      const endpoint = `https://fcm.googleapis.com/fcm/send/smoke-${opStamp}`
+      const keys = { p256dh: randomBytes(65).toString('base64url'), auth: randomBytes(16).toString('base64url') }
       check('a subscription that is not https -> 400',
-        (await push('PUT', { endpoint: 'http://x', keys: { p256dh: 'smoke', auth: 'smoke' } })).status === 400)
-      check('a good subscription -> 204', (await push('PUT', { endpoint, keys: { p256dh: 'smoke', auth: 'smoke' } })).status === 204)
+        (await push('PUT', { endpoint: 'http://x', keys })).status === 400)
+      check('a subscription on a host that is not a push service -> 400',
+        (await push('PUT', { endpoint: 'https://example.com/x', keys })).status === 400)
+      check('keys of the wrong size -> 400',
+        (await push('PUT', { endpoint, keys: { p256dh: 'smoke', auth: 'smoke' } })).status === 400)
+      check('a good subscription -> 204', (await push('PUT', { endpoint, keys })).status === 204)
       // One and Two split two matches as opponents: rivals, so Two is due an alert when One joins.
       // The smoke cannot read the database; the api log should show `open play alerts queued 1 for <id>`.
       const opMatch2 = uuid()
@@ -3694,6 +3704,9 @@ async function main() {
       const alertJoin = await asPlayer(`/player/open-plays/${alertPlay.body.openPlay?.id}/join`, { method: 'POST', bearer: one.token })
       const joinMs = Date.now() - startedAt
       check('the joiner joins a fresh open play -> 200, in under 3 s', alertJoin.status === 200 && joinMs < 3000, `${alertJoin.status} ${joinMs} ms`)
+      // The sender runs every minute: wait for it so the send path runs once for real.
+      console.log('  waiting 70 s for the sender to run once (api log: open play alerts {...})')
+      await new Promise((resolve) => setTimeout(resolve, 70_000))
       check('removing the subscription -> 204', (await push('DELETE', { endpoint })).status === 204)
       check('removing without an endpoint -> 400', (await push('DELETE', {})).status === 400)
       await request(`/admin/facilities/${placeId}/open-plays/${alertPlay.body.openPlay?.id}`, { method: 'DELETE', bearer: opOwnerToken })

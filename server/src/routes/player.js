@@ -34,6 +34,7 @@ import {
 } from '../open-play-store.js'
 import { openPlayRow, ratingOpen, readRating } from '../visit-rules.js'
 import { blocksFor } from '../rivals-store.js'
+import { validSubscription } from '../rivals.js'
 import { pushConfig, queueAlerts, removeSubscription, saveSubscription } from '../open-play-alerts.js'
 
 const router = Router()
@@ -322,7 +323,7 @@ router.get('/rivals', async (req, res) => {
   const block = (await blocksFor(query, [req.player.id])).get(req.player.id)
   res.json({
     rivals: block.rivals.filter((r) => r.name).map(({ kind, name, won, lost }) => ({ kind, name, won, lost })),
-    nearRating: block.rivals.filter((r) => !r.name).length,
+    nearRating: block.rivals.filter((r) => !r.name && r.kind === 'rating').length,
     partners: block.partners.filter((p) => p.name).map(({ name, wins }) => ({ name, wins })),
   })
 })
@@ -590,6 +591,8 @@ router.post('/link', async (req, res) => {
       [target.id, source.id],
     )
     // Where both rated a session, the kept player's rating wins.
+    // A phone with alerts on keeps them under the surviving account.
+    await client.query('UPDATE push_subscriptions SET player_id = $2 WHERE player_id = $1', [target.id, source.id])
     await client.query(
       `INSERT INTO visit_ratings (player_id, session_id, facility_id, score, chips, updated_at)
        SELECT $2, session_id, facility_id, score, chips, updated_at FROM visit_ratings WHERE player_id = $1
@@ -624,7 +627,7 @@ router.post('/link', async (req, res) => {
               deactivated_at = NULL,
               closed_by_admin_at = NULL
         WHERE id = $1
-        RETURNING id, name, claimed_at, username, google_email`,
+        RETURNING id, name, claimed_at, username, google_email, near_rating_name`,
       // Google moves across with the username and password because the
       // row being deleted is the one holding it. The guard above
       // guarantees the surviving row has none of its own, so nothing is
@@ -723,7 +726,7 @@ const pushText = (value, max) => typeof value === 'string' && value.length > 0 &
 /** This phone wants alerts when a rival or best partner joins open play. */
 router.put('/push', async (req, res) => {
   const { endpoint, keys } = req.body ?? {}
-  if (!pushText(endpoint, 1000) || !endpoint.startsWith('https://') || !pushText(keys?.p256dh, 200) || !pushText(keys?.auth, 100)) {
+  if (!pushText(endpoint, 1000) || !validSubscription(endpoint, keys)) {
     return res.status(400).json({ error: 'That is not a push subscription' })
   }
   await saveSubscription(query, req.player.id, { endpoint, keys })

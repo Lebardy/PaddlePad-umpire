@@ -5,7 +5,7 @@
 //   node server/scripts/check-rivals.mjs
 // ============================================================
 
-import { alertTitle, blockFor, pushGone, sendAfter } from '../src/rivals.js'
+import { alertTitle, blockFor, goingFor, pushGone, sendAfter, validSubscription } from '../src/rivals.js'
 
 let pass = 0
 let fail = 0
@@ -80,6 +80,25 @@ check('named + 1 rival + 2 partners', alertTitle([{ kind: 'rival', name: 'Dani' 
 check('first named may be a partner', alertTitle([{ kind: 'rival', name: null }, { kind: 'partner', name: 'Rio' }]), 'Rio and 1 rival are going')
 check('one unnamed', alertTitle([{ kind: 'rival', name: null }]), 'A player near your rating is going')
 check('two unnamed', alertTitle([{ kind: 'rival', name: null }, { kind: 'rival', name: null }]), '2 players near your rating are going')
+
+// Who is going: each person once, hidden names only as "near your rating"
+const both = { rivals: [{ id: 'dani', kind: 'matches', name: 'Dani' }, { id: 'hid', kind: 'rating', name: null }, { id: 'hm', kind: 'matches', name: null }],
+  partners: [{ id: 'dani', name: 'Dani' }, { id: 'hp', name: null }, { id: 'rio', name: 'Rio' }] }
+check('a rival who is also a partner counts once, as the rival', goingFor(both, ['dani']), [{ kind: 'rival', name: 'Dani' }])
+check('a hidden rating rival counts, unnamed', goingFor(both, ['hid']), [{ kind: 'rival', name: null }])
+check('a hidden match rival or partner is not in the block', goingFor(both, ['hm', 'hp']), [])
+check('rivals first, then partners', goingFor(both, ['rio', 'dani']), [{ kind: 'rival', name: 'Dani' }, { kind: 'partner', name: 'Rio' }])
+
+// Subscriptions
+const key = (n) => Buffer.alloc(n, 7).toString('base64url')
+const good = 'https://fcm.googleapis.com/fcm/send/abc'
+check('a real push host with sized keys', validSubscription(good, { p256dh: key(65), auth: key(16) }), true)
+check('apple and mozilla and windows hosts', ['https://web.push.apple.com/x', 'https://updates.push.services.mozilla.com/x', 'https://db5.notify.windows.com/x']
+  .map((e) => validSubscription(e, { p256dh: key(65), auth: key(16) })), [true, true, true])
+check('http, localhost, odd hosts and a lookalike are refused', ['http://fcm.googleapis.com/x', 'https://:3000/x', 'https://localhost/x', 'https://push.invalid/x', 'https://evilpush.apple.com.example.com/x', 'https://notpush.apple.com/x']
+  .map((e) => validSubscription(e, { p256dh: key(65), auth: key(16) })), [false, false, false, false, false, false])
+check('keys of the wrong size or shape are refused', [[key(64), key(16)], [key(65), key(15)], ['smoke', 'smoke'], [undefined, undefined]]
+  .map(([p256dh, auth]) => validSubscription(good, { p256dh, auth })), [false, false, false, false])
 
 // Quiet hours (Manila = UTC+8)
 const at = (iso) => sendAfter(new Date(iso)).toISOString()
