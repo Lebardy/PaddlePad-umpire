@@ -21,7 +21,7 @@ import { OverviewSkeleton } from './components/Skeleton'
 import { usePlayerData } from './lib/PlayerData'
 import { PlayerDataProvider } from './lib/PlayerDataProvider'
 import { matchPath, navigate, restoreScroll, useRoute } from './lib/router'
-import { clearSession, getStoredPlayer, subscribeSessionEnded, verifySession } from './lib/api'
+import { clearSession, getStoredPlayer, stopAlerts, subscribeSessionEnded, verifySession } from './lib/api'
 import { SetupCard, SetupPrompt } from './components/SetupSignIn'
 import { applyTheme, getThemeChoice, watchSystemTheme } from './lib/theme'
 import { canReturnUnaided } from './lib/account'
@@ -236,13 +236,18 @@ function App() {
   // a profile edit, not just the launch check above. This mirrors that
   // into the player held here so the app actually lands back on
   // sign-in instead of looking signed in with a dead token.
-  useEffect(() => subscribeSessionEnded(() => setPlayer(null)), [])
+  useEffect(() => subscribeSessionEnded(() => {
+    stopAlerts(false)
+    setPlayer(null)
+  }), [])
 
   // The state reset on its own, with nothing to confirm. Deleting a
   // profile ends here too: that flow has already asked for a password
   // and said what it would destroy, and following it with "are you
   // sure you want to sign out?" would be absurd.
-  function handleSignedOut() {
+  async function handleSignedOut() {
+    // While the token still works, so the server stops too; never held up for more than 2 s.
+    await Promise.race([stopAlerts(true), new Promise((resolve) => setTimeout(resolve, 2000))])
     clearSession()
     setPlayer(null)
     navigate('/', { replace: true })

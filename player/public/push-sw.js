@@ -2,7 +2,8 @@
 // Shows an open play alert, and opens its place when tapped. The server
 // re-sends with the same tag to update it; `update` keeps that quiet.
 self.addEventListener('push', (event) => {
-  const alert = event.data ? event.data.json() : null
+  let alert = null
+  try { alert = event.data ? event.data.json() : null } catch { /* a malformed payload shows nothing */ }
   if (!alert) return
   event.waitUntil(self.registration.showNotification(alert.title, {
     body: alert.body,
@@ -16,13 +17,18 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const url = new URL(event.notification.data?.url ?? '/', self.location.origin).href
+  // Only ever this app's own pages; anything else opens the home page.
+  let target = new URL(event.notification.data?.url ?? '/', self.location.origin)
+  if (target.origin !== self.location.origin) target = new URL('/', self.location.origin)
+  const url = target.href
   event.waitUntil((async () => {
     const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     const tab = open.find((client) => client.url.startsWith(self.location.origin))
     if (tab) {
-      await tab.navigate(url)
-      return tab.focus()
+      // Focus first, then navigate: the navigated page is a new client, so the old handle can no longer be focused.
+      const focused = await tab.focus().catch(() => tab)
+      const opened = await focused.navigate(url).catch(() => null)
+      if (opened) return
     }
     return self.clients.openWindow(url)
   })())

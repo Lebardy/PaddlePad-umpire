@@ -548,6 +548,22 @@ export function savePush(subscription) {
   return apiFetch('/player/push', { method: 'PUT', body: { endpoint: subscription.endpoint, keys: subscription.keys } })
 }
 
+/**
+ * Ends this phone's alerts when the account leaves it. `tellServer` is
+ * false once the token is dead (the server then drops the row itself on
+ * its next send). Best effort: callers never wait on it for long.
+ */
+export async function stopAlerts(tellServer) {
+  try {
+    const subscription = await (await navigator.serviceWorker.ready).pushManager.getSubscription()
+    if (!subscription) return
+    if (tellServer) await removePush(subscription.endpoint).catch(() => {})
+    await subscription.unsubscribe()
+  } catch {
+    // no service worker or push here: nothing to stop
+  }
+}
+
 /** This phone no longer wants alerts. */
 export function removePush(endpoint) {
   return apiFetch('/player/push', { method: 'DELETE', body: { endpoint } })

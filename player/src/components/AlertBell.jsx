@@ -45,6 +45,8 @@ function AlertBell() {
     let subscription = null
     setState('busy')
     try {
+      // Asked before any await: iPhone only shows the prompt inside the tap.
+      const asked = was === 'on' ? null : Notification.requestPermission()
       const registration = await navigator.serviceWorker.ready
       if (was === 'on') {
         const existing = await registration.pushManager.getSubscription()
@@ -54,7 +56,7 @@ function AlertBell() {
         }
         return setState('off')
       }
-      if ((await Notification.requestPermission()) !== 'granted') return setState(Notification.permission === 'denied' ? 'blocked' : 'off')
+      if ((await asked) !== 'granted') return setState(Notification.permission === 'denied' ? 'blocked' : 'off')
       subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) })
       await savePush(subscription.toJSON())
       setState('on')
