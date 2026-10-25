@@ -2861,9 +2861,16 @@ async function main() {
         check('a player outside the match who names it in a beat is told nothing about it', (await pFilmingBeat(vOutsiderToken, pPhone)).body.taken == null)
         console.log('  (waiting 35 s, then the holder beats)')
         await new Promise((resolve) => setTimeout(resolve, 35_000))
+        // Team A serves first and wins this rally, so the score the next beat carries is 1-0 with A still serving.
+        const pPoint = await request(`/matches/${pMatch}/log`, {
+          method: 'PUT', bearer: token, body: { deviceId: 'smoke-tablet', events: [{ id: crypto.randomUUID(), seq: 0, type: 'rally', at: pStartedAt + 10_000, actingPlayerId: vPlayers[0], outcome: 'winner', zone: 'baseline' }], sentAt: Date.now() },
+        })
+        check('a rally is logged on the player match -> 200', pPoint.status === 200, JSON.stringify(pPoint.body).slice(0, 120))
         const pKeep = await asPlayer('/player/video/camera/beat', { method: 'POST', bearer: pTwoToken, body: { deviceId: pOtherPhone, state: 'filming', matchId: pMatch } })
         check("a beat that names the match answers 200 and names it", pKeep.status === 200 && pKeep.body.match?.id === pMatch, JSON.stringify(pKeep.body).slice(0, 120))
         check("and the holder's own beat is not told its match was taken", pKeep.body.taken == null, JSON.stringify(pKeep.body).slice(0, 160))
+        check("and its score reads the point: 1-0, A still serving",
+          pKeep.body.match?.score?.a === 1 && pKeep.body.match?.score?.b === 0 && pKeep.body.match?.score?.serving === 'A', JSON.stringify(pKeep.body.match?.score))
         console.log('  (waiting 35 s more, 70 s since the takeover)')
         await new Promise((resolve) => setTimeout(resolve, 35_000))
         const pStill = await pClaim(vPlayerToken, pPhone)

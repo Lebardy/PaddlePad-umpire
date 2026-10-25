@@ -154,7 +154,7 @@ function Camera() {
                 <span className="camera-line">
                   <span className="camera-dot" aria-hidden="true" />
                   <strong>Filming</strong>
-                  <span className="camera-clock">{state.startedAt ? clockText(now - state.startedAt) : '00:00'}</span>
+                  <span className="camera-clock" role="timer">{state.startedAt ? clockText(now - state.startedAt) : '00:00'}</span>
                 </span>
                 {score ? (
                   <span className="camera-score">
