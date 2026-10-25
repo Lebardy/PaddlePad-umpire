@@ -3665,6 +3665,28 @@ async function main() {
       JSON.stringify(race.map((r) => [r.status, r.body.error ?? r.body.openPlay?.count])))
     await request(`/admin/facilities/${placeId}/open-plays/${racePlay.body.openPlay?.id}`, { method: 'DELETE', bearer: opOwnerToken })
 
+    // --- push alerts: subscribe, join without waiting, unsubscribe ---
+    const pushKey = await asPlayer('/player/push/key', { bearer: two.token })
+    check('GET /player/push/key -> 200 with a key or null',
+      pushKey.status === 200 && (pushKey.body.key === null || typeof pushKey.body.key === 'string'), JSON.stringify(pushKey.body).slice(0, 80))
+    if (pushKey.body.key === null) {
+      console.log('  note: push keys not set on this server; alert checks skipped')
+    } else {
+      const push = (method, body) => asPlayer('/player/push', { method, bearer: two.token, body })
+      const endpoint = `https://push.invalid/smoke-${opStamp}`
+      check('a subscription that is not https -> 400',
+        (await push('PUT', { endpoint: 'http://x', keys: { p256dh: 'smoke', auth: 'smoke' } })).status === 400)
+      check('a good subscription -> 204', (await push('PUT', { endpoint, keys: { p256dh: 'smoke', auth: 'smoke' } })).status === 204)
+      const alertPlay = await addOpenPlay({ ...opBody, startsAt: manilaAt(4, 18), endsAt: manilaAt(4, 20) })
+      const startedAt = Date.now()
+      const alertJoin = await asPlayer(`/player/open-plays/${alertPlay.body.openPlay?.id}/join`, { method: 'POST', bearer: one.token })
+      const joinMs = Date.now() - startedAt
+      check('the joiner joins a fresh open play -> 200, in under 3 s', alertJoin.status === 200 && joinMs < 3000, `${alertJoin.status} ${joinMs} ms`)
+      check('removing the subscription -> 204', (await push('DELETE', { endpoint })).status === 204)
+      check('removing without an endpoint -> 400', (await push('DELETE', {})).status === 400)
+      await request(`/admin/facilities/${placeId}/open-plays/${alertPlay.body.openPlay?.id}`, { method: 'DELETE', bearer: opOwnerToken })
+    }
+
     // --- a paused player is not counted as going when it is cancelled ---
     const pausedBody = { ...opBody, startsAt: manilaAt(3, 18), endsAt: manilaAt(3, 20) }
     const pausedPlay = await addOpenPlay(pausedBody)

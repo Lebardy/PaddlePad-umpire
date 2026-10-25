@@ -34,6 +34,7 @@ import {
 } from '../open-play-store.js'
 import { openPlayRow, ratingOpen, readRating } from '../visit-rules.js'
 import { blocksFor } from '../rivals-store.js'
+import { pushConfig, queueAlerts, removeSubscription, saveSubscription } from '../open-play-alerts.js'
 
 const router = Router()
 
@@ -712,6 +713,30 @@ router.get('/open-plays', async (req, res) => {
   res.json({ openPlays: await openPlayRows(plays, req.player.id) })
 })
 
+/** The public key a phone needs to ask for alerts, or null while alerts are off here. */
+router.get('/push/key', (req, res) => {
+  res.json({ key: pushConfig()?.publicKey ?? null })
+})
+
+const pushText = (value, max) => typeof value === 'string' && value.length > 0 && value.length <= max
+
+/** This phone wants alerts when a rival or best partner joins open play. */
+router.put('/push', async (req, res) => {
+  const { endpoint, keys } = req.body ?? {}
+  if (!pushText(endpoint, 1000) || !endpoint.startsWith('https://') || !pushText(keys?.p256dh, 200) || !pushText(keys?.auth, 100)) {
+    return res.status(400).json({ error: 'That is not a push subscription' })
+  }
+  await saveSubscription(query, req.player.id, { endpoint, keys })
+  res.status(204).end()
+})
+
+/** This phone no longer wants alerts. */
+router.delete('/push', async (req, res) => {
+  if (!pushText(req.body?.endpoint, 1000)) return res.status(400).json({ error: 'An endpoint is required' })
+  await removeSubscription(query, req.player.id, req.body.endpoint)
+  res.status(204).end()
+})
+
 /** One tap to go; joining twice changes nothing. */
 router.post('/open-plays/:id/join', async (req, res) => {
   if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such open play' })
@@ -720,6 +745,10 @@ router.post('/open-plays/:id/join', async (req, res) => {
   const openPlay = await openPlayFor(req.params.id, req.player.id)
   if (!openPlay) return res.status(404).json({ error: 'No such open play' })
   res.json({ openPlay })
+  // After answering: a join is never slower for this, and an alert failure never fails a join.
+  queueAlerts(query, req.params.id, req.player.id, new Date())
+    .then((queued) => { if (queued > 0) console.log(`open play alerts queued ${queued} for ${req.params.id}`) })
+    .catch((error) => console.error('open play alerts failed:', error.message))
 })
 
 /** "Going" tapped again: leaves. */

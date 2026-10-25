@@ -29,6 +29,7 @@ import logoRoutes from './routes/logos.js'
 import videoRoutes from './routes/video.js'
 import { bucketConfig } from './bucket.js'
 import { tidyVideos } from './video-tidy.js'
+import { pushConfig, sendDueAlerts } from './open-play-alerts.js'
 
 const app = express()
 
@@ -259,6 +260,14 @@ migrate()
         .catch((error) => console.error('video clean-up failed:', error.message))
       setTimeout(tidy, 5 * 60_000).unref()
       setInterval(tidy, 24 * 60 * 60_000).unref()
+    }
+    // Open play alerts that are due, every minute; held ones wait in their table, so a restart loses nothing.
+    if (pushConfig()) {
+      setInterval(() => {
+        sendDueAlerts(query, new Date())
+          .then((c) => { if (c.sent + c.skipped + c.gone + c.failed > 0) console.log('open play alerts', JSON.stringify(c)) })
+          .catch((error) => console.error('open play alerts failed:', error.message))
+      }, 60_000).unref()
     }
   })
   .catch((error) => {
