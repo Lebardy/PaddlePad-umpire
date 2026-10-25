@@ -42,6 +42,7 @@ function AlertBell() {
   async function toggle() {
     if (state !== 'on' && state !== 'off') return
     const was = state
+    let subscription = null
     setState('busy')
     try {
       const registration = await navigator.serviceWorker.ready
@@ -54,10 +55,12 @@ function AlertBell() {
         return setState('off')
       }
       if ((await Notification.requestPermission()) !== 'granted') return setState(Notification.permission === 'denied' ? 'blocked' : 'off')
-      const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) })
+      subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) })
       await savePush(subscription.toJSON())
       setState('on')
     } catch {
+      // Subscribed here but the server never heard: drop it, or the next load says "on" with no alerts coming.
+      await subscription?.unsubscribe().catch(() => {})
       setState(was)
     }
   }
