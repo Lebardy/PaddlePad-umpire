@@ -2864,6 +2864,13 @@
 /* A long name wraps inside its own side; a cut name could hide whose match this is. */
 .camera-names { display: grid; gap: 0.3rem; min-width: 0; padding-left: 1.1rem; border-left: 1px solid rgba(255, 255, 255, 0.24); font-size: 0.92rem; line-height: 1.2; color: var(--board-muted); }
 .camera-dot { width: 1.1rem; height: 1.1rem; border-radius: 50%; background: var(--loss-lamp); box-shadow: 0 0 0 5px rgba(255, 111, 94, 0.28); flex: none; }
+.camera-score { display: grid; gap: 0.3rem; min-width: 0; padding-left: 1.1rem; border-left: 1px solid rgba(255, 255, 255, 0.24); font-size: 0.92rem; line-height: 1.2; color: var(--board-muted); }
+.camera-score-row { display: grid; grid-template-columns: 0.55rem minmax(0, 1fr) auto 1rem; align-items: center; column-gap: 0.6rem; }
+.camera-serve { width: 0.55rem; height: 0.55rem; border-radius: 50%; }
+.camera-serve.is-serving { background: var(--win-lamp); }
+.camera-score-name { min-width: 0; }
+.camera-points { font: 800 1.9rem/1 var(--display); font-variant-numeric: tabular-nums; color: var(--board-ink); text-align: right; }
+.camera-server { font: 700 0.9rem var(--label); color: var(--board-muted); }
 .camera-sending { display: grid; gap: 0.7rem; min-width: min(26rem, 78vw); }
 .camera-sending .camera-line { justify-content: space-between; }
 .camera-sending .camera-clock { color: var(--win-lamp); margin-left: auto; }
