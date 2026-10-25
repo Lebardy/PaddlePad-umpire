@@ -39,6 +39,7 @@ export async function queueAlerts(query, openPlayId, joinerId, now) {
   if (candidates.length === 0) return 0
   const { rows: reachable } = await query(
     `SELECT DISTINCT s.player_id FROM push_subscriptions s
+       JOIN players p ON p.id = s.player_id AND p.deactivated_at IS NULL AND p.paused_at IS NULL
       WHERE s.player_id = ANY($1::uuid[])
         AND NOT EXISTS (SELECT 1 FROM open_play_joins j WHERE j.open_play_id = $2 AND j.player_id = s.player_id)`,
     [candidates, openPlayId],
@@ -68,13 +69,15 @@ export async function sendDueAlerts(query, now) {
   webpush.setVapidDetails(config.subject, config.publicKey, config.privateKey)
   const { rows: due } = await query(
     `SELECT a.player_id, a.open_play_id, a.first_sent_at, o.starts_at, o.ends_at, o.facility_id, f.name AS facility_name,
+            (p.deactivated_at IS NULL AND p.paused_at IS NULL) AS active,
             COALESCE(array_agg(j.player_id) FILTER (WHERE j.player_id IS NOT NULL), '{}') AS going
        FROM open_play_alerts a
        JOIN open_plays o ON o.id = a.open_play_id
        JOIN facilities f ON f.id = o.facility_id
+       JOIN players p ON p.id = a.player_id
        LEFT JOIN open_play_joins j ON j.open_play_id = o.id
       WHERE a.state = 'waiting' AND a.send_after <= $1
-      GROUP BY a.player_id, a.open_play_id, a.first_sent_at, o.id, f.name`,
+      GROUP BY a.player_id, a.open_play_id, a.first_sent_at, o.id, f.name, p.id`,
     [now],
   )
   if (due.length === 0) return counts
@@ -91,7 +94,7 @@ export async function sendDueAlerts(query, now) {
     ]
     const title = alertTitle(going)
     const first = row.first_sent_at === null
-    const tooLate = new Date(row.starts_at) <= now || row.going.includes(row.player_id) || !title
+    const tooLate = new Date(row.starts_at) <= now || row.going.includes(row.player_id) || !title || !row.active
     const { rows: [{ today }] } = first
       ? await query('SELECT count(*)::int AS today FROM open_play_alerts WHERE player_id = $1 AND first_sent_at >= $2', [row.player_id, manilaDayStart(now)])
       : { rows: [{ today: 0 }] }

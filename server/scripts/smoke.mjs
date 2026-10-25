@@ -3677,6 +3677,18 @@ async function main() {
       check('a subscription that is not https -> 400',
         (await push('PUT', { endpoint: 'http://x', keys: { p256dh: 'smoke', auth: 'smoke' } })).status === 400)
       check('a good subscription -> 204', (await push('PUT', { endpoint, keys: { p256dh: 'smoke', auth: 'smoke' } })).status === 204)
+      // One and Two split two matches as opponents: rivals, so Two is due an alert when One joins.
+      // The smoke cannot read the database; the api log should show `open play alerts queued 1 for <id>`.
+      const opMatch2 = uuid()
+      await request('/matches', {
+        method: 'POST', bearer: opUmpireToken,
+        body: { id: opMatch2, sessionId: opSessionId, teamA: [two.id], teamB: [one.id], firstServer: { team: 'A', playerId: two.id } },
+      })
+      const opPlayed2 = await request(`/matches/${opMatch2}/log`, {
+        method: 'PUT', bearer: opUmpireToken,
+        body: { deviceId: DEVICE, events: Array.from({ length: 11 }, (_, i) => rally(i, two.id)) },
+      })
+      check('One and Two play a second match: a 1-1 record', opPlayed2.body.match?.status === 'completed', JSON.stringify(opPlayed2.body).slice(0, 100))
       const alertPlay = await addOpenPlay({ ...opBody, startsAt: manilaAt(4, 18), endsAt: manilaAt(4, 20) })
       const startedAt = Date.now()
       const alertJoin = await asPlayer(`/player/open-plays/${alertPlay.body.openPlay?.id}/join`, { method: 'POST', bearer: one.token })
