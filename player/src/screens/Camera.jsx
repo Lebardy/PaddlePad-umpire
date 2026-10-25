@@ -96,6 +96,7 @@ function Camera() {
   const upright = state.phase === 'waiting' && !state.wide && !state.sending
   const quality = Math.min(state.picture.width, state.picture.height) >= 1080 ? '1080P' : '720P'
   const names = state.match ? [state.match.teamA.join(' & '), state.match.teamB.join(' & ')] : []
+  const score = state.match?.score
   const covered = !filming && state.covered
 
   return (
@@ -153,9 +154,31 @@ function Camera() {
                 <span className="camera-line">
                   <span className="camera-dot" aria-hidden="true" />
                   <strong>Filming</strong>
-                  <span className="camera-clock">{state.startedAt ? clockText(now - state.startedAt) : '00:00'}</span>
+                  <span className="camera-clock" role="timer">{state.startedAt ? clockText(now - state.startedAt) : '00:00'}</span>
                 </span>
-                <span className="camera-names"><span>{names[0]}</span><span>{names[1]}</span></span>
+                {score ? (
+                  <span className="camera-score">
+                    {['A', 'B'].map((side, row) => (
+                      <span key={side} className="camera-score-row">
+                        <span className={score.serving === side ? 'camera-serve is-serving' : 'camera-serve'} aria-hidden="true" />
+                        <span className="camera-score-name">
+                          {score.serving === side && <span className="visually-hidden">serving </span>}
+                          {names[row]}
+                        </span>
+                        <span className="camera-points">{score[side.toLowerCase()]}</span>
+                        <span className="camera-server">
+                          {score.serving === side && score.server && (
+                            <>
+                              <span className="visually-hidden">server </span>{score.server}
+                            </>
+                          )}
+                        </span>
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  <span className="camera-names"><span>{names[0]}</span><span>{names[1]}</span></span>
+                )}
               </>
             )}
             {!filming && state.sending && (

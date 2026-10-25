@@ -16,7 +16,7 @@
 //   cameraId  the one in use
 //   picture   { width, height } as it is being shown
 //   wide      the picture is wider than tall; nothing is filmed until it is
-//   match     { id, teamA: [names], teamB: [names] } while filming
+//   match     { id, teamA: [names], teamB: [names], score? } while filming; score follows the beats
 //   startedAt when filming began, by this phone's clock
 //   sending   null, or { percent, failed, waiting } for the video going out
 //   offline   the last beat did not get through
@@ -142,6 +142,8 @@ export function createCameraSession({ deviceId, onChange }) {
       if (state.covered && state.covered.matchId !== answer.match?.id) set({ covered: null })
       if (action === 'start' && state.wide && mayClaim(state.covered, answer.match.id, Date.now())) await startFilming(answer.match)
       if (action === 'stop') stopFilming()
+      // The score on the screen follows the tablet: every beat about the match being filmed brings the latest.
+      if (filming && answer.match?.id === filming.matchId) set({ match: answer.match })
       if (state.offline) set({ offline: false })
     } catch {
       // Any failed beat is a dropped one (a restarting server answers 404 too); filming carries on and the next beat tries again.

@@ -2510,6 +2510,9 @@ async function main() {
         check('the next beat names it, with who is playing',
           named.body.match?.id === vMatch && named.body.match?.teamA?.length === 1 && /^Smoke Video One/.test(named.body.match.teamA[0]),
           JSON.stringify(named.body.match))
+        const at0 = named.body.match?.score
+        check('the named match carries its score: 0-0, A serving, no server number in singles',
+          at0?.a === 0 && at0?.b === 0 && at0?.serving === 'A' && at0?.server === null, JSON.stringify(at0))
 
         const noDevice = await request(`/video/matches/${vMatch}/claim`, { method: 'POST', bearer: token, body: {} })
         check('a claim with no device -> 400', noDevice.status === 400, String(noDevice.status))
@@ -2729,7 +2732,9 @@ async function main() {
           body: { deviceId: 'smoke-stranger-tablet', events: [{ id: crypto.randomUUID(), seq: 0, type: 'rally', at: Date.now(), actingPlayerId: sPlayers[0], outcome: 'winner', zone: 'baseline' }], sentAt: Date.now() },
         })
         check('the same match, once it is being scored, does -> 200', saved.status === 200, JSON.stringify(saved.body).slice(0, 100))
-        check('and the next beat names it', (await sBeat()).body.match?.id === sMatch)
+        const sNamed = (await sBeat()).body.match
+        check('and the next beat names it, with the score following the logged rally',
+          sNamed?.id === sMatch && sNamed.score?.a === 1 && sNamed.score?.b === 0 && sNamed.score?.serving === 'A', JSON.stringify(sNamed?.score))
 
         check('fix timing with no second -> 400',
           (await request(`/video/matches/${vMatch}/line-up`, { method: 'POST', bearer: token, body: { eventId: events[1].id, second: null } })).status === 400)
@@ -2829,6 +2834,9 @@ async function main() {
         check("a player's beat names the match they are playing, with the time",
           pNamed.status === 200 && pNamed.body.match?.id === pMatch && Math.abs(pNamed.body.now - Date.now()) < 60_000 && /^Smoke Video One/.test(pNamed.body.match?.teamA?.[0] ?? ''),
           JSON.stringify(pNamed.body).slice(0, 160))
+        check("a player's beat carries the score too: 0-0, A serving, no server number in singles",
+          pNamed.body.match?.score?.a === 0 && pNamed.body.match?.score?.b === 0 && pNamed.body.match?.score?.serving === 'A' && pNamed.body.match?.score?.server === null,
+          JSON.stringify(pNamed.body.match?.score))
         check('a player who is not in it is named no match', (await pBeat(vOutsiderToken)).body.match === null)
         check('a beat with no deviceId -> 400', (await asPlayer('/player/video/camera/beat', { method: 'POST', bearer: vPlayerToken, body: {} })).status === 400)
         check('a player who is not in the match cannot claim it -> 404', (await pClaim(vOutsiderToken, pPhone)).status === 404)
@@ -2853,9 +2861,16 @@ async function main() {
         check('a player outside the match who names it in a beat is told nothing about it', (await pFilmingBeat(vOutsiderToken, pPhone)).body.taken == null)
         console.log('  (waiting 35 s, then the holder beats)')
         await new Promise((resolve) => setTimeout(resolve, 35_000))
+        // Team A serves first and wins this rally, so the score the next beat carries is 1-0 with A still serving.
+        const pPoint = await request(`/matches/${pMatch}/log`, {
+          method: 'PUT', bearer: token, body: { deviceId: 'smoke-tablet', events: [{ id: crypto.randomUUID(), seq: 0, type: 'rally', at: pStartedAt + 10_000, actingPlayerId: vPlayers[0], outcome: 'winner', zone: 'baseline' }], sentAt: Date.now() },
+        })
+        check('a rally is logged on the player match -> 200', pPoint.status === 200, JSON.stringify(pPoint.body).slice(0, 120))
         const pKeep = await asPlayer('/player/video/camera/beat', { method: 'POST', bearer: pTwoToken, body: { deviceId: pOtherPhone, state: 'filming', matchId: pMatch } })
         check("a beat that names the match answers 200 and names it", pKeep.status === 200 && pKeep.body.match?.id === pMatch, JSON.stringify(pKeep.body).slice(0, 120))
         check("and the holder's own beat is not told its match was taken", pKeep.body.taken == null, JSON.stringify(pKeep.body).slice(0, 160))
+        check("and its score reads the point: 1-0, A still serving",
+          pKeep.body.match?.score?.a === 1 && pKeep.body.match?.score?.b === 0 && pKeep.body.match?.score?.serving === 'A', JSON.stringify(pKeep.body.match?.score))
         console.log('  (waiting 35 s more, 70 s since the takeover)')
         await new Promise((resolve) => setTimeout(resolve, 35_000))
         const pStill = await pClaim(vPlayerToken, pPhone)

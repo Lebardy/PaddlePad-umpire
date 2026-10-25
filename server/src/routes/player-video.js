@@ -14,6 +14,8 @@
 import { Router } from 'express'
 import { query, withTransaction } from '../db.js'
 import { requireActivePlayer, requirePlayer } from '../auth.js'
+import { liveScore } from '../live-score.js'
+import { eventFromRow } from '../pickleball.js'
 import { isUuid } from '../validate.js'
 import { bucketConfig, deleteFile } from '../bucket.js'
 import { CLAIM_SILENT_SECONDS, deviceName, findVideo, finishUpload, startUpload } from '../video-send.js'
@@ -85,7 +87,7 @@ router.post('/video/camera/beat', async (req, res) => {
   // so a match left open is not filmed when the next camera opens. The
   // claim, not the beat, says whether this phone may film it.
   const { rows } = await query(
-    `SELECT m.id, m.team_a, m.team_b
+    `SELECT m.id, m.team_a, m.team_b, m.first_server_team, m.first_server_player, m.right_start_a, m.right_start_b, m.point_target
        FROM matches m
        JOIN sessions s ON s.id = m.session_id
        LEFT JOIN match_videos v ON v.match_id = m.id
@@ -100,10 +102,11 @@ router.post('/video/camera/beat', async (req, res) => {
   const match = rows[0]
   if (!match) return res.json({ now: Date.now(), match: null, taken })
   const { rows: people } = await query('SELECT id, name FROM players WHERE id = ANY($1::uuid[])', [[...match.team_a, ...match.team_b]])
+  const { rows: events } = await query('SELECT id, type, payload FROM match_events WHERE match_id = $1 ORDER BY seq', [match.id])
   const nameOf = new Map(people.map((p) => [p.id, p.name]))
   res.json({
     now: Date.now(),
-    match: { id: match.id, teamA: match.team_a.map((id) => nameOf.get(id) ?? ''), teamB: match.team_b.map((id) => nameOf.get(id) ?? '') },
+    match: { id: match.id, teamA: match.team_a.map((id) => nameOf.get(id) ?? ''), teamB: match.team_b.map((id) => nameOf.get(id) ?? ''), score: liveScore(match, events.map(eventFromRow)) },
     taken,
   })
 })
