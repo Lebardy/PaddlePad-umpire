@@ -33,6 +33,7 @@ import {
   joinOpenPlay, leaveOpenPlay, levelLookup, loadOpenPlays, namedFor, saveRating, visitFor,
 } from '../open-play-store.js'
 import { openPlayRow, ratingOpen, readRating } from '../visit-rules.js'
+import { blocksFor } from '../rivals-store.js'
 
 const router = Router()
 
@@ -61,12 +62,14 @@ function profileOf(row) {
     // settings screen says which account it is so someone can tell
     // whether it is still theirs. Never matched on -- see schema.sql.
     googleEmail: row.google_email,
+    // === true so callers whose rows lack the column answer false.
+    nearRatingName: row.near_rating_name === true,
   }
 }
 
 router.get('/me', async (req, res) => {
   const { rows } = await query(
-    `SELECT id, name, claimed_at, username, google_email
+    `SELECT id, name, claimed_at, username, google_email, near_rating_name
        FROM players WHERE id = $1`,
     [req.player.id],
   )
@@ -284,7 +287,7 @@ router.patch('/me', async (req, res) => {
     ;({ rows } = await query(
       `UPDATE players SET name = $2
         WHERE id = $1
-        RETURNING id, name, claimed_at, username, google_email`,
+        RETURNING id, name, claimed_at, username, google_email, near_rating_name`,
       [req.player.id, name],
     ))
   } catch (err) {
@@ -299,6 +302,28 @@ router.patch('/me', async (req, res) => {
 
   if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
   res.json({ player: profileOf(rows[0]) })
+})
+
+/** Whether players near this player's rating who have never played them may see their name. */
+router.put('/me/near-rating-name', async (req, res) => {
+  if (typeof req.body?.on !== 'boolean') return res.status(400).json({ error: 'on must be true or false' })
+  const { rows } = await query(
+    `UPDATE players SET near_rating_name = $2 WHERE id = $1
+     RETURNING id, name, claimed_at, username, google_email, near_rating_name`,
+    [req.player.id, req.body.on],
+  )
+  if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
+  res.json({ player: profileOf(rows[0]) })
+})
+
+/** The top of People: rivals and best partners, by name only -- never another player's rating or id. */
+router.get('/rivals', async (req, res) => {
+  const block = (await blocksFor(query, [req.player.id])).get(req.player.id)
+  res.json({
+    rivals: block.rivals.filter((r) => r.name).map(({ kind, name, won, lost }) => ({ kind, name, won, lost })),
+    nearRating: block.rivals.filter((r) => !r.name).length,
+    partners: block.partners.filter((p) => p.name).map(({ name, wins }) => ({ name, wins })),
+  })
 })
 
 /**

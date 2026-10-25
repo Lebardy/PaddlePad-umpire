@@ -1642,6 +1642,48 @@ async function main() {
     check('the username they chose still signs them in -> 200', backIn.status === 200)
     check('and lands on the surviving record', backIn.body.player?.id === spelling,
       `${backIn.body.player?.id} vs ${spelling}`)
+
+    // --- rivals: two players who split two matches as opponents ---
+    const rivalsMe = await register({
+      name: `Smoke Rivals Me ${stamp3}`, username: `smk_rvm_${stamp3}`.slice(0, 20), password: PASSWORD,
+    })
+    if (rivalsMe.body.player?.id) selfRegistered.push(rivalsMe.body.player.id)
+    const meId = rivalsMe.body.player?.id
+    const meToken = rivalsMe.body.token
+    const foeName = `Smoke Rivals Foe ${stamp3}`
+    const foeId = await newPlayer(foeName)
+    const rivalsSid = await newSession(`Smoke Rivals Night ${stamp3}`, [meId, foeId])
+    // playMatch has team A's first player win, so swapping the sides
+    // makes it one win each: a close record.
+    const r1 = await playMatch(rivalsSid, [meId], [foeId])
+    const r2 = await playMatch(rivalsSid, [foeId], [meId])
+    check('two finished matches between the pair',
+      r1.status === 'completed' && r2.status === 'completed', `${r1.status}/${r2.status}`)
+
+    const rivalsRes = await asPlayer('/player/rivals', { bearer: meToken })
+    check('GET /player/rivals -> 200', rivalsRes.status === 200, String(rivalsRes.status))
+    check('it answers rivals, nearRating and partners and nothing else',
+      JSON.stringify(Object.keys(rivalsRes.body).sort()) === '["nearRating","partners","rivals"]',
+      JSON.stringify(Object.keys(rivalsRes.body)))
+    const rivalsText = JSON.stringify(rivalsRes.body)
+    check('no id and no rating-sized number in it',
+      !/[0-9a-f]{8}-[0-9a-f]{4}-/.test(rivalsText) &&
+        // JSON.parse's reviver sees real numbers only, not the digits in a name.
+        (() => { let big = false; JSON.parse(rivalsText, (_k, v) => { if (typeof v === 'number' && v > 1000) big = true; return v }); return !big })(),
+      rivalsText.slice(0, 160))
+    const foe = (rivalsRes.body.rivals ?? []).find((r) => r.name === foeName)
+    check('the opponent they split two matches with is a rival, by name, from their matches',
+      foe?.kind === 'matches' && foe.won === 1 && foe.lost === 1, JSON.stringify(rivalsRes.body.rivals))
+
+    // --- the near-rating-name switch ---
+    const nrn = (body) => asPlayer('/player/me/near-rating-name', { method: 'PUT', bearer: meToken, body })
+    const nrnOn = await nrn({ on: true })
+    check('turning the switch on -> 200 and says so',
+      nrnOn.status === 200 && nrnOn.body.player?.nearRatingName === true, JSON.stringify(nrnOn.body).slice(0, 120))
+    check('a switch that is not true or false -> 400', (await nrn({ on: 'yes' })).status === 400)
+    check('the profile carries it',
+      (await asPlayer('/player/me', { bearer: meToken })).body.player?.nearRatingName === true)
+    check('and it goes back off', (await nrn({ on: false })).body.player?.nearRatingName === false)
   }
 
   section('admin site — doors that need no owner')

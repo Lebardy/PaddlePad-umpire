@@ -914,3 +914,32 @@ CREATE TABLE IF NOT EXISTS visit_ratings (
     PRIMARY KEY (player_id, session_id)
 );
 CREATE INDEX IF NOT EXISTS visit_ratings_facility_idx ON visit_ratings (facility_id, updated_at);
+
+-- Whether players near this player's rating who have never played them
+-- may see their name among their rivals. Off until the player turns it
+-- on; a hidden name (name_visible) stays hidden whatever this says.
+ALTER TABLE players ADD COLUMN IF NOT EXISTS near_rating_name BOOLEAN NOT NULL DEFAULT false;
+
+-- One row per phone that asked to be told when a rival or partner joins
+-- open play. The endpoint is the phone's address at its push service.
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    endpoint    TEXT PRIMARY KEY,
+    player_id   UUID NOT NULL REFERENCES players (id) ON DELETE CASCADE,
+    p256dh      TEXT NOT NULL,
+    auth        TEXT NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS push_subscriptions_player_idx ON push_subscriptions (player_id);
+
+-- One alert per player per open play: waiting until send_after, then
+-- sent (first_sent_at set on the first push, which is the one that
+-- buzzes) or skipped (over the day's cap, already going, or started).
+CREATE TABLE IF NOT EXISTS open_play_alerts (
+    player_id     UUID NOT NULL REFERENCES players (id) ON DELETE CASCADE,
+    open_play_id  UUID NOT NULL REFERENCES open_plays (id) ON DELETE CASCADE,
+    state         TEXT NOT NULL CHECK (state IN ('waiting', 'sent', 'skipped')),
+    send_after    TIMESTAMPTZ NOT NULL,
+    first_sent_at TIMESTAMPTZ,
+    PRIMARY KEY (player_id, open_play_id)
+);
+CREATE INDEX IF NOT EXISTS open_play_alerts_due_idx ON open_play_alerts (send_after) WHERE state = 'waiting';
