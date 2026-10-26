@@ -27,6 +27,7 @@
 //   6. a game to 15 is not declared won at 11            (point_target)
 // ============================================================
 
+import { randomBytes } from 'node:crypto'
 import { RALLY_ENDINGS, rallyEndingColumn } from '../src/rally-endings.js'
 import { NOT_LEFT_OPEN_MESSAGE, SESSION_REASON_MESSAGE } from '../src/overview-rules.js'
 import { manilaDayStart, openPlayWhen } from '../src/visit-rules.js'
@@ -1642,6 +1643,51 @@ async function main() {
     check('the username they chose still signs them in -> 200', backIn.status === 200)
     check('and lands on the surviving record', backIn.body.player?.id === spelling,
       `${backIn.body.player?.id} vs ${spelling}`)
+
+    // --- rivals: two players who split two matches as opponents ---
+    const rivalsMe = await register({
+      name: `Smoke Rivals Me ${stamp3}`, username: `smk_rvm_${stamp3}`.slice(0, 20), password: PASSWORD,
+    })
+    if (rivalsMe.body.player?.id) selfRegistered.push(rivalsMe.body.player.id)
+    const meId = rivalsMe.body.player?.id
+    const meToken = rivalsMe.body.token
+    const foeName = `Smoke Rivals Foe ${stamp3}`
+    const foeId = await newPlayer(foeName)
+    const rivalsSid = await newSession(`Smoke Rivals Night ${stamp3}`, [meId, foeId])
+    // playMatch has team A's first player win, so swapping the sides
+    // makes it one win each: a close record.
+    const r1 = await playMatch(rivalsSid, [meId], [foeId])
+    const r2 = await playMatch(rivalsSid, [foeId], [meId])
+    check('two finished matches between the pair',
+      r1.status === 'completed' && r2.status === 'completed', `${r1.status}/${r2.status}`)
+
+    const rivalsRes = await asPlayer('/player/rivals', { bearer: meToken })
+    check('GET /player/rivals -> 200', rivalsRes.status === 200, String(rivalsRes.status))
+    check('it answers rivals, nearRating and partners and nothing else',
+      JSON.stringify(Object.keys(rivalsRes.body).sort()) === '["nearRating","partners","rivals"]',
+      JSON.stringify(Object.keys(rivalsRes.body)))
+    const rivalsText = JSON.stringify(rivalsRes.body)
+    check('no id and no rating-sized number in it',
+      !/[0-9a-f]{8}-[0-9a-f]{4}-/.test(rivalsText) &&
+        // JSON.parse's reviver sees real numbers only, not the digits in a name.
+        (() => { let big = false; JSON.parse(rivalsText, (_k, v) => { if (typeof v === 'number' && v > 1000) big = true; return v }); return !big })(),
+      rivalsText.slice(0, 160))
+    const foe = (rivalsRes.body.rivals ?? []).find((r) => r.name === foeName)
+    check('the opponent they split two matches with is a rival, by name, from their matches',
+      foe?.kind === 'matches' && foe.won === 1 && foe.lost === 1, JSON.stringify(rivalsRes.body.rivals))
+
+    // --- the near-rating-name switch ---
+    const nrn = (body) => asPlayer('/player/me/near-rating-name', { method: 'PUT', bearer: meToken, body })
+    const nrnOn = await nrn({ on: true })
+    check('turning the switch on -> 200 and says so',
+      nrnOn.status === 200 && nrnOn.body.player?.nearRatingName === true, JSON.stringify(nrnOn.body).slice(0, 120))
+    check('a switch that is not true or false -> 400', (await nrn({ on: 'yes' })).status === 400)
+    check('the profile carries it',
+      (await asPlayer('/player/me', { bearer: meToken })).body.player?.nearRatingName === true)
+    // The app reads the switch from the launch check, not /player/me.
+    check('the launch check carries it too',
+      (await asPlayer('/auth/player/me', { bearer: meToken })).body.player?.nearRatingName === true)
+    check('and it goes back off', (await nrn({ on: false })).body.player?.nearRatingName === false)
   }
 
   section('admin site — doors that need no owner')
@@ -3622,6 +3668,49 @@ async function main() {
         && race.filter((r) => r.status === 409 && r.body.error === 'This open play is full').length === 1,
       JSON.stringify(race.map((r) => [r.status, r.body.error ?? r.body.openPlay?.count])))
     await request(`/admin/facilities/${placeId}/open-plays/${racePlay.body.openPlay?.id}`, { method: 'DELETE', bearer: opOwnerToken })
+
+    // --- push alerts: subscribe, join without waiting, unsubscribe ---
+    const pushKey = await asPlayer('/player/push/key', { bearer: two.token })
+    check('GET /player/push/key -> 200 with a key or null',
+      pushKey.status === 200 && (pushKey.body.key === null || typeof pushKey.body.key === 'string'), JSON.stringify(pushKey.body).slice(0, 80))
+    if (pushKey.body.key === null) {
+      console.log('  note: push keys not set on this server; alert checks skipped')
+    } else {
+      const push = (method, body) => asPlayer('/player/push', { method, bearer: two.token, body })
+      // A valid shape on a real push host, so the push service refuses it (counted as failed or gone) and nothing is delivered.
+      const endpoint = `https://fcm.googleapis.com/fcm/send/smoke-${opStamp}`
+      const keys = { p256dh: randomBytes(65).toString('base64url'), auth: randomBytes(16).toString('base64url') }
+      check('a subscription that is not https -> 400',
+        (await push('PUT', { endpoint: 'http://x', keys })).status === 400)
+      check('a subscription on a host that is not a push service -> 400',
+        (await push('PUT', { endpoint: 'https://example.com/x', keys })).status === 400)
+      check('keys of the wrong size -> 400',
+        (await push('PUT', { endpoint, keys: { p256dh: 'smoke', auth: 'smoke' } })).status === 400)
+      check('a good subscription -> 204', (await push('PUT', { endpoint, keys })).status === 204)
+      // One and Two split two matches as opponents: rivals, so Two is due an alert when One joins.
+      // The smoke cannot read the database; the api log should show `open play alerts queued 1 for <id>`.
+      const opMatch2 = uuid()
+      await request('/matches', {
+        method: 'POST', bearer: opUmpireToken,
+        body: { id: opMatch2, sessionId: opSessionId, teamA: [two.id], teamB: [one.id], firstServer: { team: 'A', playerId: two.id } },
+      })
+      const opPlayed2 = await request(`/matches/${opMatch2}/log`, {
+        method: 'PUT', bearer: opUmpireToken,
+        body: { deviceId: DEVICE, events: Array.from({ length: 11 }, (_, i) => rally(i, two.id)) },
+      })
+      check('One and Two play a second match: a 1-1 record', opPlayed2.body.match?.status === 'completed', JSON.stringify(opPlayed2.body).slice(0, 100))
+      const alertPlay = await addOpenPlay({ ...opBody, startsAt: manilaAt(4, 18), endsAt: manilaAt(4, 20) })
+      const startedAt = Date.now()
+      const alertJoin = await asPlayer(`/player/open-plays/${alertPlay.body.openPlay?.id}/join`, { method: 'POST', bearer: one.token })
+      const joinMs = Date.now() - startedAt
+      check('the joiner joins a fresh open play -> 200, in under 3 s', alertJoin.status === 200 && joinMs < 3000, `${alertJoin.status} ${joinMs} ms`)
+      // The sender runs every minute: wait for it so the send path runs once for real.
+      console.log('  waiting 70 s for the sender to run once (api log: open play alerts {...})')
+      await new Promise((resolve) => setTimeout(resolve, 70_000))
+      check('removing the subscription -> 204', (await push('DELETE', { endpoint })).status === 204)
+      check('removing without an endpoint -> 400', (await push('DELETE', {})).status === 400)
+      await request(`/admin/facilities/${placeId}/open-plays/${alertPlay.body.openPlay?.id}`, { method: 'DELETE', bearer: opOwnerToken })
+    }
 
     // --- a paused player is not counted as going when it is cancelled ---
     const pausedBody = { ...opBody, startsAt: manilaAt(3, 18), endsAt: manilaAt(3, 20) }

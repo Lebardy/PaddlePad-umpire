@@ -443,6 +443,17 @@ export function leaveOpenPlay(id) {
   return apiFetch(`/player/open-plays/${encodeURIComponent(id)}/join`, { method: 'DELETE' }).then((d) => d.openPlay)
 }
 
+/** The top of People: rivals and best partners, by name only. */
+export function fetchRivals({ signal } = {}) {
+  return apiFetch('/player/rivals', { signal })
+}
+
+/** Whether players near my rating who have never played me may see my name. */
+export async function setNearRatingName(on) {
+  const data = await apiFetch('/player/me/near-rating-name', { method: 'PUT', body: { on } })
+  return patchStoredPlayer(data.player)
+}
+
 /** How the visit went: a face (1-5) and chips. Saving again replaces it. */
 export function rateVisit(sessionId, { score, chips }) {
   return apiFetch(`/player/sessions/${encodeURIComponent(sessionId)}/rating`, { method: 'POST', body: { score, chips } }).then((d) => d.visit)
@@ -525,4 +536,35 @@ export function finishVideoUpload(matchId, deviceId) {
 /** Removes the video this player filmed. */
 export function removeMatchVideo(matchId) {
   return apiFetch(`/player/matches/${encodeURIComponent(matchId)}/video`, { method: 'DELETE' })
+}
+
+/** The server's public push key, or null while alerts are off there. */
+export function fetchPushKey() {
+  return apiFetch('/player/push/key').then((d) => d.key)
+}
+
+/** This phone wants alerts. `subscription` is PushSubscription.toJSON(). */
+export function savePush(subscription) {
+  return apiFetch('/player/push', { method: 'PUT', body: { endpoint: subscription.endpoint, keys: subscription.keys } })
+}
+
+/**
+ * Ends this phone's alerts when the account leaves it. `tellServer` is
+ * false once the token is dead (the server then drops the row itself on
+ * its next send). Best effort: callers never wait on it for long.
+ */
+export async function stopAlerts(tellServer) {
+  try {
+    const subscription = await (await navigator.serviceWorker.ready).pushManager.getSubscription()
+    if (!subscription) return
+    if (tellServer) await removePush(subscription.endpoint).catch(() => {})
+    await subscription.unsubscribe()
+  } catch {
+    // no service worker or push here: nothing to stop
+  }
+}
+
+/** This phone no longer wants alerts. */
+export function removePush(endpoint) {
+  return apiFetch('/player/push', { method: 'DELETE', body: { endpoint } })
 }

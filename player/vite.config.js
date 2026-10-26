@@ -45,6 +45,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        // Open play alerts: the push and tap handlers live in public/push-sw.js.
+        importScripts: ['push-sw.js'],
         // Deliberately NO runtimeCaching for the API. A cached
         // /player/matches would render stale stats as though fresh,
         // which is worse than honestly showing nothing.

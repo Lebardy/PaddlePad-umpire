@@ -33,6 +33,9 @@ import {
   joinOpenPlay, leaveOpenPlay, levelLookup, loadOpenPlays, namedFor, saveRating, visitFor,
 } from '../open-play-store.js'
 import { openPlayRow, ratingOpen, readRating } from '../visit-rules.js'
+import { blocksFor } from '../rivals-store.js'
+import { validSubscription } from '../rivals.js'
+import { pushConfig, queueAlerts, removeSubscription, saveSubscription } from '../open-play-alerts.js'
 
 const router = Router()
 
@@ -61,12 +64,14 @@ function profileOf(row) {
     // settings screen says which account it is so someone can tell
     // whether it is still theirs. Never matched on -- see schema.sql.
     googleEmail: row.google_email,
+    // === true so callers whose rows lack the column answer false.
+    nearRatingName: row.near_rating_name === true,
   }
 }
 
 router.get('/me', async (req, res) => {
   const { rows } = await query(
-    `SELECT id, name, claimed_at, username, google_email
+    `SELECT id, name, claimed_at, username, google_email, near_rating_name
        FROM players WHERE id = $1`,
     [req.player.id],
   )
@@ -284,7 +289,7 @@ router.patch('/me', async (req, res) => {
     ;({ rows } = await query(
       `UPDATE players SET name = $2
         WHERE id = $1
-        RETURNING id, name, claimed_at, username, google_email`,
+        RETURNING id, name, claimed_at, username, google_email, near_rating_name`,
       [req.player.id, name],
     ))
   } catch (err) {
@@ -299,6 +304,28 @@ router.patch('/me', async (req, res) => {
 
   if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
   res.json({ player: profileOf(rows[0]) })
+})
+
+/** Whether players near this player's rating who have never played them may see their name. */
+router.put('/me/near-rating-name', async (req, res) => {
+  if (typeof req.body?.on !== 'boolean') return res.status(400).json({ error: 'on must be true or false' })
+  const { rows } = await query(
+    `UPDATE players SET near_rating_name = $2 WHERE id = $1
+     RETURNING id, name, claimed_at, username, google_email, near_rating_name`,
+    [req.player.id, req.body.on],
+  )
+  if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
+  res.json({ player: profileOf(rows[0]) })
+})
+
+/** The top of People: rivals and best partners, by name only -- never another player's rating or id. */
+router.get('/rivals', async (req, res) => {
+  const block = (await blocksFor(query, [req.player.id])).get(req.player.id)
+  res.json({
+    rivals: block.rivals.filter((r) => r.name).map(({ kind, name, won, lost }) => ({ kind, name, won, lost })),
+    nearRating: block.rivals.filter((r) => !r.name && r.kind === 'rating').length,
+    partners: block.partners.filter((p) => p.name).map(({ name, wins }) => ({ name, wins })),
+  })
 })
 
 /**
@@ -564,6 +591,8 @@ router.post('/link', async (req, res) => {
       [target.id, source.id],
     )
     // Where both rated a session, the kept player's rating wins.
+    // A phone with alerts on keeps them under the surviving account.
+    await client.query('UPDATE push_subscriptions SET player_id = $2 WHERE player_id = $1', [target.id, source.id])
     await client.query(
       `INSERT INTO visit_ratings (player_id, session_id, facility_id, score, chips, updated_at)
        SELECT $2, session_id, facility_id, score, chips, updated_at FROM visit_ratings WHERE player_id = $1
@@ -598,7 +627,7 @@ router.post('/link', async (req, res) => {
               deactivated_at = NULL,
               closed_by_admin_at = NULL
         WHERE id = $1
-        RETURNING id, name, claimed_at, username, google_email`,
+        RETURNING id, name, claimed_at, username, google_email, near_rating_name`,
       // Google moves across with the username and password because the
       // row being deleted is the one holding it. The guard above
       // guarantees the surviving row has none of its own, so nothing is
@@ -687,6 +716,30 @@ router.get('/open-plays', async (req, res) => {
   res.json({ openPlays: await openPlayRows(plays, req.player.id) })
 })
 
+/** The public key a phone needs to ask for alerts, or null while alerts are off here. */
+router.get('/push/key', (req, res) => {
+  res.json({ key: pushConfig()?.publicKey ?? null })
+})
+
+const pushText = (value, max) => typeof value === 'string' && value.length > 0 && value.length <= max
+
+/** This phone wants alerts when a rival or best partner joins open play. */
+router.put('/push', async (req, res) => {
+  const { endpoint, keys } = req.body ?? {}
+  if (!pushText(endpoint, 1000) || !validSubscription(endpoint, keys)) {
+    return res.status(400).json({ error: 'That is not a push subscription' })
+  }
+  await saveSubscription(query, req.player.id, { endpoint, keys })
+  res.status(204).end()
+})
+
+/** This phone no longer wants alerts. */
+router.delete('/push', async (req, res) => {
+  if (!pushText(req.body?.endpoint, 1000)) return res.status(400).json({ error: 'An endpoint is required' })
+  await removeSubscription(query, req.player.id, req.body.endpoint)
+  res.status(204).end()
+})
+
 /** One tap to go; joining twice changes nothing. */
 router.post('/open-plays/:id/join', async (req, res) => {
   if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such open play' })
@@ -695,6 +748,10 @@ router.post('/open-plays/:id/join', async (req, res) => {
   const openPlay = await openPlayFor(req.params.id, req.player.id)
   if (!openPlay) return res.status(404).json({ error: 'No such open play' })
   res.json({ openPlay })
+  // After answering: a join is never slower for this, and an alert failure never fails a join.
+  queueAlerts(query, req.params.id, req.player.id, new Date())
+    .then((queued) => { if (queued > 0) console.log(`open play alerts queued ${queued} for ${req.params.id}`) })
+    .catch((error) => console.error('open play alerts failed:', error.message))
 })
 
 /** "Going" tapped again: leaves. */
