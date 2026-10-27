@@ -70,7 +70,7 @@ check('players who have not played yet still show', allTimeLine({ players: { cou
   '3 players · 0 matches · 0 sessions')
 
 check('opens on Needs you when something waits', managerDefaultTab({ waiting: 2, live: 1 }), 'needs')
-check('else on Scoring now when live', managerDefaultTab({ waiting: 0, live: 1 }), 'now')
+check('else on Right now when live', managerDefaultTab({ waiting: 0, live: 1 }), 'now')
 check('else on Sessions', managerDefaultTab({ waiting: 0, live: 0 }), 'sessions')
 const at = Date.parse('2026-10-27T12:00:00Z')
 check('last 7 days', sinceFor('7', at), '2026-10-20T12:00:00.000Z')

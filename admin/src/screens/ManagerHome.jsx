@@ -108,10 +108,8 @@ export default function ManagerHome({ me, data, error, now, actions }) {
         ) : (
           <BoardStrip
             loading={!data && !error}
-            cellCount={5}
+            cellCount={3}
             cells={data ? [
-              { key: 'live', label: 'Live now', figure: data.sessions.length, lit: data.sessions.length > 0 },
-              { key: 'waiting', label: 'Waiting for you', figure: waiting },
               { key: 'matches', label: 'Matches this week', figure: data.totals.matches.newThisWeek },
               { key: 'sessions', label: 'Sessions this week', figure: data.totals.sessions.newThisWeek },
               { key: 'umpires', label: 'Umpires', figure: umpires.length },
@@ -129,7 +127,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
           onChange={setTab}
           tabs={[
             { id: 'needs', label: 'Needs you', icon: 'alert', count: data ? waiting : null },
-            { id: 'now', label: 'Scoring now', icon: 'live', count: data ? data.sessions.length : null },
+            { id: 'now', label: 'Right now', icon: 'live', count: data ? data.sessions.length : null },
             { id: 'sessions', label: 'Sessions', icon: 'calendar' },
             { id: 'place', label: 'Place & umpires', icon: 'pin' },
           ]}
