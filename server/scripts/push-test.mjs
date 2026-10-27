@@ -217,7 +217,7 @@ if (cmd === 'go') {
   }
   const openPlay = must(await api(`/admin/facilities/${facility}/open-plays`, {
     method: 'POST', bearer: owner,
-    body: { startsAt: start.toISOString(), endsAt: new Date(start.getTime() + 7_200_000).toISOString(), courts: 1, spots: 4, fee: '0', umpire: false, note: 'Phone test' },
+    body: { startsAt: start.toISOString(), endsAt: new Date(start.getTime() + 7_200_000).toISOString(), courts: 1, spots: 4, fee: '0', umpire: false, note: 'Everyone welcome' },
   }), 'adding the open play').openPlay
   process.env.PUSH_TEST_OPEN_PLAY = openPlay.id
   save()
