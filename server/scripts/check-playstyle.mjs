@@ -102,9 +102,9 @@ section('a style too small to average is never shown')
     [proof.other, proof.rows.map((r) => r.other)],
     [null, [null, null]],
     `under ${MIN_STYLE_MEMBERS} members an average describes individuals, so it is withheld — the group column still stands`)
-  check('the group average still counts them',
-    proof.rows[0].group, 2.4,
-    '(1.0 + 1.2 + 1.4 + 4.0 + 4.4) / 5 = 2.4 — they are counted, just never named')
+  check('the group average leaves them out',
+    proof.rows[0].group, 1.2,
+    '(1.0 + 1.2 + 1.4) / 3 = 1.2 — a two-person style is neither named nor counted')
 }
 
 // ============================================================
@@ -224,7 +224,7 @@ console.log('\nswing rows carry the averages they move around')
   const row = buildPlaystyleProof({ traits, mine: peers[0], peers }).rows[0]
   check('the player\'s own average sits beside their swing', row.center?.you, 0.48)
   check('the style\'s average is the members\' average', row.center?.style, 0.45)
-  check('the group\'s average is everyone\'s', row.center?.group, 0.4375)
+  check('the group\'s average is everyone\'s in a style of three or more', row.center?.group, 0.45, 'the lone style-1 player is left out: (.48+.42+.45)/3')
   const old = buildPlaystyleProof({
     traits,
     mine: { playstyle_cluster: 0, evidence: { winner_rate_std: 0.06 } },
@@ -243,13 +243,13 @@ console.log('\nswing rows carry the averages they move around')
   const thin = buildPlaystyleProof({
     traits,
     mine: peers[0],
-    peers: [peers[0], peers[1], { ...peers[2], evidence: evidenceOf(null, 0.07) }, peers[3]],
+    peers: [peers[0], peers[1], { ...peers[2], evidence: evidenceOf(null, 0.07) }, peers[3], peers[3], peers[3]],
   }).rows[0]
   check('a style of three with one null average gives no style average', thin.center?.style, null,
     'two centres would be averaged, and a two-person average stays hidden')
-  const pair = buildPlaystyleProof({ traits, mine: peers[0], peers: [peers[0], peers[1], peers[3]] }).rows[0]
+  const pair = buildPlaystyleProof({ traits, mine: peers[0], peers: [peers[0], peers[1], peers[3], peers[3], peers[3]] }).rows[0]
   check('a style of two gives no style average', pair.center?.style, null)
-  check('but the group average is still there', pair.center?.group != null, true)
+  check('but the group average is still there', pair.center?.group != null, true, 'the other style has three, so it is counted')
 }
 
 // ============================================================
@@ -311,14 +311,35 @@ check('a corner not in the name, half a spread out or more', standout(withYou(0.
 check('close to the average -> null', standout(withYou(0.52)), null, '(.52 - .5) / .1291 = .15, under half a spread')
 check('nothing outside the name -> null', standout(corners.map((c) => ({ ...c, inName: true }))), null, '')
 
+check('spread needs more than three values', [buildCorners({ traits: [], mine: everyone[0], compare: everyone.slice(0, 3), sameStyle: everyone })[2].mean,
+  buildCorners({ traits: [], mine: everyone[0], compare: everyone.slice(0, 3), sameStyle: everyone })[2].spread], [0.4, null],
+  'own value + average + spread of three would give the other two players away')
+
+section('a style of one cannot be subtracted out')
+{
+  // K=2, nine in style 0 and one alone in style 1. Before, everyone's
+  // average over 10 minus the style's average over 9 gave the one back.
+  const trait = [{ label: 'Streaky', feature: 'winner_rate_std', direction: 'above' }]
+  const run = (lone) => [...Array(9)].map((_, i) => peer(0, 1 + i / 10, 0.5, 'A')).concat(peer(1, lone, 0.5, 'B'))
+  const seen = (lone, i) => buildPlaystyleProof({ traits: trait, mine: run(lone)[i], peers: run(lone) })
+  check('the nine see nothing that depends on the lone player', seen(9, 0), seen(3, 0),
+    'everyone\'s average, spread, group and other all leave the lone player out')
+  const alone = seen(9, 9)
+  check('the lone player sees only their own number and the nine\'s average', [alone.rows[0].you, alone.rows[0].group, alone.rows[0].style, alone.corners[5].spread], [9, 1.4, null, 0.2582],
+    'the average is over the nine others (1.0 to 1.8), never over ten')
+}
+
 section('next level up')
 const lv = [{ name: 'Developing', groups: ['A'] }, { name: 'Advanced', groups: ['B'] }]
 const pl = (g, s) => ({ skill_group: g, playstyle_archetype: s })
 const run = [pl('A', 'X'), pl('B', 'Y'), pl('B', 'Y'), pl('B', 'Z'), pl('B', 'Y')]
-check('most common style one level up', nextLevelStyle({ peers: run, group: 'A', levels: lv }), { style: 'Y' }, 'Y 3, Z 1')
-check('top level -> null', nextLevelStyle({ peers: run, group: 'B', levels: lv }), null, '')
-check('fewer than three there -> null', nextLevelStyle({ peers: run.slice(0, 3), group: 'A', levels: lv }), null, '')
-check('no levels -> null', nextLevelStyle({ peers: run, group: 'A', levels: [] }), null, '')
+check('most common style one level up', nextLevelStyle({ peers: run, level: 'Developing', levels: lv }), { style: 'Y' }, 'Y 3, Z 1')
+check('plate at the top level -> null', nextLevelStyle({ peers: run, level: 'Advanced', levels: lv }), null, 'even if the player\'s skill group is not the top one')
+check('a plate that is not a run level -> null', nextLevelStyle({ peers: run, level: 'Expert', levels: lv }), null, '')
+check('fewer than three there -> null', nextLevelStyle({ peers: run.slice(0, 3), level: 'Developing', levels: lv }), null, '')
+check('no levels -> null', nextLevelStyle({ peers: run, level: 'Developing', levels: [] }), null, '')
+check('a tie for the top style -> null', nextLevelStyle({ peers: [pl('B', 'Y'), pl('B', 'Y'), pl('B', 'Y'), pl('B', 'Z'), pl('B', 'Z'), pl('B', 'Z')], level: 'Developing', levels: lv }), null, '3 and 3')
+check('three players in three styles -> null', nextLevelStyle({ peers: [pl('B', 'X'), pl('B', 'Y'), pl('B', 'Z')], level: 'Developing', levels: lv }), null, 'a lone style is not "many"')
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

@@ -579,12 +579,11 @@ export async function getStanding(query, playerId) {
     // that earned each word of it.
     playstyleArchetype: mine[0].playstyle_archetype ?? null,
     playstyle,
-    // The clustering's level-1 group and how many share it -- the players
-    // a style is compared with. Never who they are. The name is what the
+    // The clustering's level-1 group and how many share it. Never who they are. The name is what the
     // app strips from the front of the style name (lib/styleName.js).
     band: group ? { name: group, size: peers.filter((p) => p.skill_group === group).length } : null,
-    // The most common style one level up, for runs whose styles span levels.
-    meta: everyone ? nextLevelStyle({ peers, group, levels: mine[0].levels }) : null,
+    // The most common style one level up the plate, for runs whose styles span levels.
+    meta: everyone && level ? nextLevelStyle({ peers, level: level.name, levels: mine[0].levels }) : null,
     level,
   }
 }

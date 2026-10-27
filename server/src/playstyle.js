@@ -6,15 +6,13 @@
 // older runs.
 //
 // The pipeline names a player's style from where their cluster sits
-// against its skill group's average -- "Streaky" because the scoring
-// swings more than their group's, "Dropper" because they drop more. It
-// records which measurements chose which words (players.playstyle_traits)
-// but the words alone are an assertion. This turns them into something
-// checkable: for each word, the player's own number, their group's
-// average, and the average of the OTHER style in their group -- the
-// players the clustering separated them from. That last column is the
-// proof: it shows what they would have had to look like to be called
-// something else.
+// against everyone's average (older runs: their skill group's) --
+// "Streaky" because the scoring swings more than theirs, "Dropper"
+// because they drop more. It records which measurements chose which words
+// (players.playstyle_traits) but the words alone are an assertion. This
+// turns them into something checkable: for each word, the player's own
+// number, the average of their style and everyone's average. Older rows
+// also carry the average of the OTHER style, kept for the old app.
 //
 // Built from what is already stored. Every rated player's feature values
 // are in `evidence` for that run, beside their skill group and playstyle
@@ -27,22 +25,23 @@
 // style with fewer than MIN_STYLE_MEMBERS members is never averaged or
 // named at all -- in a cluster of one an average IS that person, which
 // is the same reason a hidden player is left off the monthly board
-// rather than blanked on it.
+// rather than blanked on it. The same players are also left out of
+// everyone's average and spread, or subtracting the style averages from
+// it would give the lone player's number back.
 // ============================================================
 
-// Three, the same floor the pipeline uses before it will cluster a
-// group's playstyles at all (see run.py), and the same floor the board
-// uses before naming anyone.
+// Three, the same floor the pipeline uses before it will cluster at all
+// (see run.py), and the same floor the board uses before naming anyone.
 export const MIN_STYLE_MEMBERS = 3
 
 // The two habits a style name's noun is chosen from, in the pipeline's
 // order (IDENTITY_DESCRIPTORS in ml/pipeline/clustering.py): drops
 // rather than drives picks Dropper or Driver, points won at the net
 // picks Net Player or Power Player. When neither stands out the noun is
-// "All-Court Player", and these two are its proof.
+// "All-Court Player", and these two are its proof (old app's rows only).
 export const IDENTITY_FEATURES = ['drop_preference_rate_mean', 'net_game_preference_rate_mean']
 
-// The average each swing measurement moves around, so the app can say
+// The average each swing measurement moves around, so the old app can say
 // "usually 4 to 5" rather than a bare standard deviation.
 export const SWING_CENTRE = {
   aggression_std: 'aggression_mean',
@@ -104,6 +103,7 @@ export function buildCorners({ traits, mine, compare, sameStyle }) {
     if (i === 5) [feature, word] = [sixth, SIXTH[sixth]]
     const trait = named.get(feature)
     const values = valuesOf(compare, feature)
+    const styleValues = valuesOf(sameStyle, feature)
     // A whole set of zeros is nothing recorded (see the proof rows below).
     const recorded = values.some((v) => v !== 0)
     const average = mean(values)
@@ -114,9 +114,10 @@ export function buildCorners({ traits, mine, compare, sameStyle }) {
       out: trait ? (trait.direction === 'above' ? 'higher' : 'lower') : out,
       inName: Boolean(trait),
       you: recorded && own !== null && own !== undefined && Number.isFinite(Number(own)) ? round(Number(own)) : null,
-      style: recorded && sameStyle.length >= MIN_STYLE_MEMBERS ? round(mean(valuesOf(sameStyle, feature))) : null,
+      style: recorded && styleValues.length >= MIN_STYLE_MEMBERS ? round(mean(styleValues)) : null,
       mean: recorded ? round(average) : null,
-      spread: recorded ? round(Math.sqrt(mean(values.map((v) => (v - average) ** 2)))) : null,
+      // Over three values or fewer, own value + average + spread give the others away.
+      spread: recorded && values.length > MIN_STYLE_MEMBERS ? round(Math.sqrt(mean(values.map((v) => (v - average) ** 2)))) : null,
     }
   })
 }
@@ -127,8 +128,8 @@ const SAYS = {
   'drop_efficiency_mean:higher': 'lands its drops',
   'drop_preference_rate_mean:higher': 'chooses drops over drives',
   'drop_preference_rate_mean:lower': 'chooses drives over drops',
-  'net_game_preference_rate_mean:higher': 'plays more at the net',
-  'net_game_preference_rate_mean:lower': 'plays more from the back',
+  'net_game_preference_rate_mean:higher': 'wins more of its points at the net',
+  'net_game_preference_rate_mean:lower': 'wins more of its points away from the net',
   'aggression_std:lower': 'finishes points the same way every match',
   'aggression_std:higher': 'mixes up how it finishes points',
   'winner_rate_std:lower': 'scores at an even pace',
@@ -158,12 +159,9 @@ const STANDS_OUT = {
   error_to_winner_ratio: 'fewer mistakes',
   drop_efficiency_mean: 'drops that land',
   drop_preference_rate_mean: 'choosing drops',
-  net_game_preference_rate_mean: 'playing at the net',
+  net_game_preference_rate_mean: 'winning at the net',
   aggression_std: 'finishing the same way every match',
   winner_rate_std: 'scoring at an even pace',
-  drop_efficiency_std: 'steady drops',
-  general_error_rate_std: 'keeping mistakes level',
-  dink_error_rate_std: 'a steady kitchen game',
 }
 
 /** The corner the player reaches furthest past the average (at least half a spread), not in the name: its words and which corner. */
@@ -178,21 +176,23 @@ export function standout(corners) {
 }
 
 /**
- * The style most common one level up, for a gentle line on the card. Levels
- * are the run's display levels (lowest first), each listing its skill
- * groups. Counts only, never who.
+ * The style most common one level up, for a gentle line on the card.
+ * `level` is the name on the player's level plate; `levels` are the run's
+ * display levels (lowest first), each listing its skill groups. Players
+ * count by their display level's groups. Null on a tie or under three
+ * players. Counts only, never who.
  */
-export function nextLevelStyle({ peers, group, levels }) {
+export function nextLevelStyle({ peers, level, levels }) {
   if (!Array.isArray(levels)) return null
-  const at = levels.findIndex((level) => level.groups?.includes(group))
+  const at = levels.findIndex((l) => l.name === level)
   const next = at >= 0 ? levels[at + 1] : null
   if (!next) return null
   const there = peers.filter((p) => next.groups.includes(p.skill_group) && p.playstyle_archetype)
-  if (there.length < MIN_STYLE_MEMBERS) return null
   const counts = new Map()
   for (const p of there) counts.set(p.playstyle_archetype, (counts.get(p.playstyle_archetype) ?? 0) + 1)
-  const [[style]] = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-  return { style }
+  const [top, runnerUp] = [...counts].sort((a, b) => b[1] - a[1])
+  if (!top || top[1] < MIN_STYLE_MEMBERS || top[1] === runnerUp?.[1]) return null
+  return { style: top[0] }
 }
 
 /**
@@ -205,7 +205,7 @@ export function nextLevelStyle({ peers, group, levels }) {
  * @param {Array<{playstyle_cluster, playstyle_archetype, evidence}>} input.peers
  *   everyone the style is compared with, this player included: the whole
  *   run when styles were found across everyone, else the skill group
- * @returns {null | {styleSize, other, rows}}
+ * @returns {null | {corners, takeaway, standout, styleSize, other, rows}}
  */
 export function buildPlaystyleProof({ traits, mine, peers }) {
   if (!Array.isArray(traits) || traits.length === 0) return null
@@ -213,10 +213,13 @@ export function buildPlaystyleProof({ traits, mine, peers }) {
 
   const sameStyle = peers.filter((p) => p.playstyle_cluster === mine.playstyle_cluster)
 
-  // The other styles in this group, largest first, ignoring any too
-  // small to average without describing one person. A group split into
-  // one style has no "other" -- and then the group average is the only
-  // honest comparison, which the rows still carry.
+  // Everyone's average and spread leave out players in styles too small
+  // to average (see PRIVACY above).
+  const sizeOf = (cluster) => peers.filter((p) => p.playstyle_cluster === cluster).length
+  const counted = peers.filter((p) => p.playstyle_cluster !== null && sizeOf(p.playstyle_cluster) >= MIN_STYLE_MEMBERS)
+
+  // The other styles, largest first, ignoring any too small to average
+  // without describing one person. Only the old app reads this.
   const others = [...new Set(peers.map((p) => p.playstyle_cluster))]
     .filter((cluster) => cluster !== null && cluster !== mine.playstyle_cluster)
     .map((cluster) => {
@@ -238,7 +241,7 @@ export function buildPlaystyleProof({ traits, mine, peers }) {
     // shots logged) as 0 rather than as missing. One zero can be real;
     // a whole group of zeros is nothing recorded, and bars at 0% would
     // tell every one of them they never drop.
-    const recorded = valuesOf(peers, feature).some((value) => value !== 0)
+    const recorded = valuesOf(counted, feature).some((value) => value !== 0)
     const shaped = {
       label: trait.label,
       feature,
@@ -251,7 +254,7 @@ export function buildPlaystyleProof({ traits, mine, peers }) {
       you: !recorded || own === null || own === undefined || !Number.isFinite(Number(own))
         ? null
         : round(Number(own)),
-      group: recorded ? round(mean(valuesOf(peers, feature))) : null,
+      group: recorded ? round(mean(valuesOf(counted, feature))) : null,
       other: recorded && other ? round(mean(valuesOf(other.members, feature))) : null,
       // The average of this player's own style. Every word in a style
       // name is chosen from where the STYLE sits against its group, not
@@ -260,7 +263,7 @@ export function buildPlaystyleProof({ traits, mine, peers }) {
       // group while 8 of those players' own numbers did not. Withheld
       // below MIN_STYLE_MEMBERS, where a style average describes the
       // other people in it.
-      style: recorded && sameStyle.length >= MIN_STYLE_MEMBERS
+      style: recorded && valuesOf(sameStyle, feature).length >= MIN_STYLE_MEMBERS
         ? round(mean(valuesOf(sameStyle, feature)))
         : null,
     }
@@ -277,7 +280,7 @@ export function buildPlaystyleProof({ traits, mine, peers }) {
         ? {
             you: round(Number(ownCentre)),
             style: shaped.style !== null && styleCentres.length >= MIN_STYLE_MEMBERS ? round(mean(styleCentres)) : null,
-            group: round(mean(centresOf(peers))),
+            group: round(mean(centresOf(counted))),
           }
         : null,
     }
@@ -295,7 +298,7 @@ export function buildPlaystyleProof({ traits, mine, peers }) {
 
   if (rows.length === 0) return null
 
-  const corners = buildCorners({ traits, mine, compare: peers, sameStyle })
+  const corners = buildCorners({ traits, mine, compare: counted, sameStyle })
 
   return {
     corners,

@@ -35,11 +35,9 @@ export const MIN_MATCHES_PER_PLAYER = 5
 // pipeline cannot run at all under this.
 export const MIN_PLAYERS = 3
 
-// The practical floor. The clustering is two-level -- it splits the
-// pool into skill groups, then clusters playstyles WITHIN each group --
-// and skips any group with fewer than three members. Below roughly
-// forty players the second level starts collapsing and the archetype,
-// the interesting half of the result, stops being produced.
+// The practical floor, kept from when playstyles were clustered inside
+// each skill group. They are now found across everyone and work from
+// three players, but with only a few the styles are coarse.
 export const RECOMMENDED_PLAYERS = 40
 
 export const RATING_GATE = {
