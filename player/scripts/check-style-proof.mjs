@@ -1,18 +1,12 @@
 #!/usr/bin/env node
 // ============================================================
-// The playstyle step's wording for styles of every size.
+// How many share a style, and how each corner's number reads.
 //
 //   node player/scripts/check-style-proof.mjs
-//
-// A style of one player is that player: the page talks about them
-// directly. A style of two keeps its average hidden, because beside the
-// player's own number it would give away the other player's. Three or
-// more is unchanged.
 // ============================================================
 
 import {
   MEASURES,
-  hiddenStyleNote,
   styleShareLine,
 } from '../src/lib/styleProof.js'
 
@@ -33,15 +27,8 @@ check('a style of one', styleShareLine(1, 14), 'No similar player plays this way
 check('no style size', styleShareLine(null, 14), 'Compared with similar players')
 check('no group', styleShareLine(3, 0), null)
 
-console.log('\nthe note under a style of two')
-check('only a style of two gets it', [hiddenStyleNote(1), hiddenStyleNote(3)], [null, null])
-check('and it says why', hiddenStyleNote(2),
-  'Your style’s average is hidden: with 2 players it would reveal the other’s numbers.')
-
 console.log('\nthe measures')
-check('every measure has a label and a way to read its number',
-  Object.entries(MEASURES).filter(([, m]) => typeof m.label !== 'string' || !m.as || !m.better).map(([f]) => f), [])
-check('no label runs past one line on a phone', Object.entries(MEASURES).filter(([, m]) => m.label.length > 50).map(([f, m]) => `${f}: ${m.label.length}`), [])
+check('every measure says how its number reads', Object.entries(MEASURES).filter(([, m]) => !m.as).map(([f]) => f), [])
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

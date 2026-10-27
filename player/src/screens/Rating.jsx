@@ -32,7 +32,7 @@ import { usePlayerData } from '../lib/PlayerData'
 import { navigate } from '../lib/router'
 import { endingPhrase, namedLeaders } from '../lib/endingWords'
 import { styleName } from '../lib/styleName'
-import { MEASURES, hiddenStyleNote, styleShareLine } from '../lib/styleProof'
+import { MEASURES, styleShareLine } from '../lib/styleProof'
 import { faultsToWorkOn } from '../lib/faultTips'
 import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
 import More from '../components/More'
@@ -341,8 +341,8 @@ function Playstyle({ standing, number }) {
   return (
     <Step number={number} icon="sparkle" title="Your playstyle" value={name} lead={<StyleEmblem name={name} />} before={<LevelPlate level={standing.level} />}>
       <p className="style-takeaway">{proof.takeaway}</p>
-      {proof.standout && <p className="style-standout"><i aria-hidden="true" />Your own standout: {proof.standout}.</p>}
-      <Fingerprint corners={proof.corners} />
+      {proof.standout && <p className="style-standout"><i aria-hidden="true" />Your own standout: {proof.standout.text}.</p>}
+      <Fingerprint corners={proof.corners} standout={proof.standout?.feature} />
       <ComparedWith band={band} styleSize={proof.styleSize} />
       {meta && (
         <p className="style-meta">
@@ -352,9 +352,6 @@ function Playstyle({ standing, number }) {
           </span>
         </p>
       )}
-      {hiddenStyleNote(proof.styleSize) && (
-        <p className="step-line">{hiddenStyleNote(proof.styleSize)}</p>
-      )}
 
       <More label="See the numbers">
         <ul className="numbers">
@@ -362,7 +359,7 @@ function Playstyle({ standing, number }) {
           {proof.corners.map((c) => {
             const as = MEASURES[c.feature]?.as ?? 'ratio'
             return (
-              <li key={c.feature}>
+              <li key={c.feature} className={c.inName ? 'is-named' : undefined}>
                 <span>{c.word}</span>
                 <span>{showValue(c.you, as)}</span>
                 <span>{showValue(c.style, as)}</span>

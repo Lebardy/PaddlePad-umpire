@@ -18,3 +18,19 @@ export function outline(reaches, { cx, cy, r }) {
     })
     .join(' ')
 }
+
+/**
+ * Where a corner's word sits, in the chart's own units. Top and bottom
+ * words go above and below their corner; the four slanted corners' words
+ * also go above (top pair) or below (bottom pair), pushed outward so a
+ * long word clears the hexagon's edge instead of crowding the side.
+ */
+export function labelSpot(i, { cx, cy, r }) {
+  const a = ((-90 + i * 60) * Math.PI) / 180
+  const x = cx + r * Math.cos(a)
+  const y = cy + r * Math.sin(a)
+  if (i === 0) return { x, y: y - 20 }
+  if (i === 3) return { x, y: y + 20 }
+  const out = Math.sign(Math.cos(a)) * 36
+  return { x: x + out, y: y + (Math.sin(a) < 0 ? -32 : 32) }
+}
