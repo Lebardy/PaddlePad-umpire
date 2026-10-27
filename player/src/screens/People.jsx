@@ -3,7 +3,8 @@
 //
 // Worth being precise about why this does not cross the line the app
 // draws around other people's data: every name here comes out of THIS
-// player's own match rows, which the server already sends. It answers
+// player's own match rows, which the server already sends (plus players
+// near your rating who turned their name switch on: no link, no results). It answers
 // "who do I play, and how does it go" -- a fact about the viewer's own
 // history. It is not a roster, not a leaderboard, and there is no way
 // from here to see anyone else's statistics.

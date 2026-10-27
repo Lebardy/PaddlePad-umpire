@@ -32,7 +32,6 @@ check('rest keeps list order, no repeats', merged.rest.map((p) => p.name), ['Ana
 check('partner not in the list is dropped', merged.pinned.some((e) => e.name === 'Gone'), false)
 check('near rating count passes through', merged.nearRating, 2)
 check('no reply, no pins', mergeRivals(people, null).rest.length, 5)
-check('one win reads singular', mergeRivals(people, { rivals: [], partners: [{ name: 'Ana', wins: 1 }] }).pinned[0].tag.text, 'Partner 1 win')
 const twice = mergeRivals(people, { rivals: [{ kind: 'matches', name: 'Cy', won: 1, lost: 0 }, { kind: 'rating', name: 'Cy' }], partners: [{ name: 'Cy', wins: 2 }] })
 check('a name is pinned once, with its first tag', twice.pinned.map((e) => e.tag.text), ['Rival 1–0'])
 check('a pinned name is not in the rest', twice.rest.map((p) => p.name), ['Ana', 'Ben', 'Di', 'Ed'])

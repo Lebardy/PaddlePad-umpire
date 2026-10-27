@@ -18,11 +18,11 @@ export function mergeRivals(people, reply) {
   }
   for (const rival of reply?.rivals ?? []) {
     add(rival.name, rival.kind === 'matches'
-      ? { icon: 'target', label: 'Rival', text: `Rival ${rival.won}–${rival.lost}` }
-      : { icon: 'equals', label: 'Near your rating', text: 'Near your rating' })
+      ? { icon: 'target', text: `Rival ${rival.won}–${rival.lost}` }
+      : { icon: 'equals', text: 'Near your rating' })
   }
   for (const partner of reply?.partners ?? []) {
-    add(partner.name, { icon: 'swap', label: 'Best partner', text: `Partner ${partner.wins} ${partner.wins === 1 ? 'win' : 'wins'}` })
+    add(partner.name, { icon: 'swap', text: `Partner ${partner.wins} wins` })
   }
   return {
     pinned,

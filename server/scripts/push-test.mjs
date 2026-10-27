@@ -68,13 +68,13 @@ if (!process.env.SMOKE_OWNER_EMAIL || !process.env.SMOKE_OWNER_PASSWORD) {
   process.exit(1)
 }
 
-const SET = ['ME', 'ONE', 'TWO'].flatMap((k) => [`PUSH_TEST_${k}_NAME`, `PUSH_TEST_${k}_USER`, `PUSH_TEST_${k}_PASS`]).concat('PUSH_TEST_FACILITY')
+const SET = KEYS.filter((k) => k !== 'PUSH_TEST_OPEN_PLAY')
 if (cmd === 'pick' && SET.some((k) => process.env[k])) {
   console.error('server/.env.push-test already holds a player set (whole or part); pick will not claim more')
   process.exit(1)
 }
 if (cmd !== 'pick' && !SET.every((k) => process.env[k])) {
-  console.error('no saved player set; run pick first')
+  console.error("no saved player set here; run pick first (the set may be saved in another folder's server/.env.push-test)")
   process.exit(1)
 }
 
@@ -114,6 +114,10 @@ async function pickAndClaim() {
   for (let after = ''; ;) {
     const page = must(await api(`/admin/players?status=active${after && `&after=${encodeURIComponent(after)}`}`, { bearer: owner }), 'listing players')
     for (const p of page.players) {
+      if (p.username?.startsWith('pt_')) {
+        console.error("a push test set already exists on staging; copy its server/.env.push-test here")
+        process.exit(1)
+      }
       everyone.set(p.id, { name: p.name, nameVisible: true, nearRatingName: false })
       if (!p.username && p.signInMethods.every((m) => m === 'claim code') && !real.has(same(p.name)) && !/phone|smoke/i.test(p.name)) {
         eligible.set(p.id, everyone.get(p.id))
@@ -204,7 +208,6 @@ const join = async (rival, openPlayId) => {
 if (cmd === 'go') {
   const now = new Date()
   if (sendAfter(now) > now) console.log('warning: quiet hours (22:00-07:00 Manila); the alert is held until 07:00')
-  console.log('note: the API cannot say how many first alerts the player had today; the cap is 3 a day, so after 3 go runs no buzz comes')
   await cancelOpenPlay()
   // The next full hour after the next one; tomorrow 18:00 when that falls outside 6 am-8 pm.
   let start = new Date(Math.ceil((now.getTime() + 3_600_000) / 3_600_000) * 3_600_000)

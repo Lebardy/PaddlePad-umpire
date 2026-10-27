@@ -87,7 +87,7 @@ function AlertSwitch() {
         Alerts
       </h2>
       {state === 'install' || state === 'blocked' ? (
-        <p className="alert-bell-note" ref={note} tabIndex={-1}>{words}</p>
+        <p ref={note} tabIndex={-1}>{words}</p>
       ) : (
         <button type="button" className="you-switch" role="switch" aria-checked={state === 'on'} aria-busy={busy} onClick={toggle}>
           <span>Alert me when a rival or partner joins open play</span>
