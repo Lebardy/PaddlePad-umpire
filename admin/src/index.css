@@ -608,33 +608,6 @@ td.table-foot { display: table-cell; }
 
 /* --- The Overview: the live board, right now, totals, worth a look --- */
 
-/* --- The live board: the page's first and biggest thing --- */
-.live-board {
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.35fr);
-  border-bottom: 6px solid var(--lamp);
-}
-.live-cell { padding: 1.4rem 1.5rem 1.5rem; border-left: 1px solid var(--board-rule); display: grid; align-content: start; gap: 0.5rem; min-width: 0; }
-.live-cell:first-child { border-left: 0; }
-.live-label { display: flex; align-items: center; gap: 0.55rem; font-family: var(--label); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-size: 1rem; color: var(--board-muted); }
-.live-figure {
-  font-family: var(--display); font-weight: 900; font-variant-numeric: tabular-nums; line-height: 0.82;
-  font-size: clamp(6rem, 11vw, 9.5rem); color: var(--lamp); text-shadow: 0 0 34px var(--lamp-glow);
-}
-.live-figure.is-zero { color: var(--board-muted); text-shadow: none; opacity: 0.55; }
-.live-split { display: flex; align-items: flex-end; gap: 1.1rem; flex-wrap: wrap; }
-.live-split .live-figure { flex: none; }
-.live-sub { font-family: var(--display); font-weight: 800; font-size: 2.1rem; line-height: 1; color: var(--board-ink); }
-.live-sub small { display: block; margin-top: 0.3rem; font-family: var(--label); font-weight: 700; font-size: 0.95rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--board-muted); }
-/* The on-air lamp: lit and breathing while anything is going on. */
-.on-air { width: 0.7rem; height: 0.7rem; border-radius: 2px; background: var(--loss-lamp); box-shadow: 0 0 10px var(--loss-lamp); animation: breathe 1.8s ease-in-out infinite; }
-.on-air.is-off { background: var(--none-lamp); box-shadow: none; animation: none; }
-@keyframes breathe { 50% { opacity: 0.35; } }
-@media (prefers-reduced-motion: reduce) { .on-air { animation: none; } }
-
-/* A quiet day: one line in place of three giant zeros. */
-.live-board.live-quiet { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 1.25rem; padding: 0.95rem 1.5rem; }
-.live-quiet-note { color: var(--board-muted); }
-
 .overview-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 1rem 2rem; padding: 1.6rem 1.5rem 1.3rem; border-bottom: 1px solid var(--board-rule); }
 .overview-head h1 { margin: 0; font-family: var(--display); font-weight: 900; font-size: 3.4rem; line-height: 0.92; text-transform: uppercase; }
 .overview-head p { margin: 0.6rem 0 0; color: var(--board-muted); }
@@ -642,9 +615,6 @@ td.table-foot { display: table-cell; }
 .as-of { font-family: var(--label); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.85rem; color: var(--board-muted); text-align: right; }
 .as-of b { color: var(--lamp); font-weight: 700; }
 
-/* --- The sheet: right now + totals side by side, then the warnings --- */
-.sheet-split { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: 1.5rem; align-items: start; }
-@media (max-width: 1180px) { .sheet-split { grid-template-columns: minmax(0, 1fr) 17rem; } }
 /* --- A manager's home: their place in a rail, one feed beside it --- */
 .home-title { display: flex; align-items: center; gap: 0.75rem; }
 .home-title .fac-logo { width: 3.4rem; height: 3.4rem; font-size: 1.4rem; flex: none; }
@@ -703,8 +673,6 @@ a.btn-quiet { color: var(--text); }
 .total-label { font-family: var(--label); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.92rem; color: var(--text-secondary); }
 .total-figure { font-family: var(--display); font-weight: 900; font-size: 2.2rem; line-height: 1; font-variant-numeric: tabular-nums; }
 .total-new { grid-column: 1 / -1; font-size: 0.88rem; color: var(--text-muted); }
-/* On a quiet day the totals run across the page under Worth a look. */
-.totals-head { margin-top: 2rem; }
 .totals-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
 .totals-row .total + .total { border-top: 0; border-left: 1px solid var(--border); }
 /* Six do not fit one row on a 1024 screen: two rows of three, the figures keep their size. */
@@ -1000,6 +968,20 @@ tr.is-voided .reason { opacity: 0.6; }
 .rows-skeleton { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 @keyframes ghost { to { opacity: 0.55; } }
 @media (prefers-reduced-motion: reduce) { .ghost { animation: none; } }
+/* Worth a look: reason chips, then two filters. */
+.worth-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0 0.75rem; }
+.worth-chip {
+  display: inline-flex; align-items: center; gap: 0.5rem; min-height: 2.75rem; padding: 0.35rem 0.5rem 0.35rem 0.85rem;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--surface);
+  color: var(--text-secondary); font-weight: 600; cursor: pointer;
+}
+.worth-chip:hover { border-color: var(--primary); color: var(--primary); }
+.worth-chip[aria-pressed='true'] { background: var(--button); color: var(--button-ink); border-color: var(--button); }
+.worth-chip[aria-pressed='true'] .tab-count { background: rgba(255, 255, 255, 0.2); color: inherit; }
+.worth-filters { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; }
+.worth-filters label { display: grid; gap: 0.35rem; }
+.worth-filters span { font-size: 0.85rem; color: var(--text-muted); }
+.worth-filters select { min-height: 2.75rem; min-width: 10rem; }
 @media (max-width: 640px) {
   .strip-cell { flex: 1 1 33%; min-width: 0; padding-inline: 0.75rem; }
   .strip-cell:first-child { padding-left: 0.75rem; }
