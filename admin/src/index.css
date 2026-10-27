@@ -936,6 +936,8 @@ tr.is-voided .reason { opacity: 0.6; }
 .board-strip { display: flex; flex-wrap: wrap; border-top: 1px solid var(--board-rule); }
 .strip-cell { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.65rem 1rem; border-left: 1px solid var(--board-rule); min-width: 7.5rem; }
 .strip-cell:first-child { border-left: 0; padding-left: 0; }
+/* The owner's strip sits straight on the board, which has no side padding of its own. */
+.board-texture > .board-strip { padding-inline: 1.5rem; }
 .strip-label { font-family: var(--label); font-weight: 700; font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--board-muted); }
 .strip-figure { font-family: var(--display); font-weight: 900; font-size: 1.75rem; line-height: 1; color: var(--board-ink); font-variant-numeric: tabular-nums; }
 .strip-sub { font-size: 0.8rem; color: var(--board-muted); }
