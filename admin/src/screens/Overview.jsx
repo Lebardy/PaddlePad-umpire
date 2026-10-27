@@ -168,7 +168,7 @@ export default function Overview({ me, facilityLabel }) {
             {data && <div className="as-of">Up to date as of <b>{clockText(data.asOf)}</b> · refreshes every 30 s</div>}
           </div>
         </div>
-        <BoardStrip loading={loading} cellCount={7} cells={loading ? [] : ownerCells(data)} />
+        <BoardStrip loading={loading && !error} cellCount={7} cells={loading ? [] : ownerCells(data)} />
       </header>
 
       <div className="sheet">
@@ -185,7 +185,7 @@ export default function Overview({ me, facilityLabel }) {
           ]}
         />
         <div id="overview-panel" role="tabpanel" aria-labelledby={`overview-tab-${tab ?? 'look'}`} aria-busy={loading || undefined}>
-          {loading ? <RowsSkeleton rows={6} /> : tab === 'now' ? (
+          {loading ? (!data && error ? null : <RowsSkeleton rows={6} />) : tab === 'now' ? (
             data.sessions.length === 0
               ? <p className="empty">Nothing live right now.</p>
               : data.sessions.map((s) => <SessionCard key={s.id} session={s} showFacility={showFacility} now={now} />)

@@ -85,14 +85,14 @@ function WarningRow({ warning, showFacility, now, actions }) {
   )
 }
 
-const MATCH_NOTE = 'Last 30 days · Void takes a match out of stats and ratings; it can be undone'
+const MATCH_NOTE = 'Void takes a match out of stats and ratings; it can be undone'
 
 /** What a chip says once everything under it is cleared, and its note. */
 const CHIP_TEXT = {
-  stuck: { empty: ['Nothing stuck', 'No match in the last 30 days was left running.'] },
-  ended_early: { empty: ['Nothing ended early', 'Every match in the last 30 days was played to the end.'] },
-  shutout: { empty: ['No shutouts', 'No match in the last 30 days ended with a side on 0.'] },
-  length: { empty: ['Nothing too short or long', 'Every match in the last 30 days took a normal length of time.'] },
+  stuck: { empty: ['Nothing stuck', 'No match in this window was left running.'] },
+  ended_early: { empty: ['Nothing ended early', 'Every match in this window was played to the end.'] },
+  shutout: { empty: ['No shutouts', 'No match in this window ended with a side on 0.'] },
+  length: { empty: ['Nothing too short or long', 'Every match in this window took a normal length of time.'] },
   left_open: { note: 'Sessions nobody ended · Close tidies them up; the umpire can reopen', empty: ['No sessions left open', 'Every session has been ended.'] },
   duplicates: { note: 'Only you see this · across every facility', empty: ['No likely duplicate players', 'Every player name looks like a different person.'] },
 }
@@ -168,7 +168,9 @@ export default function WorthALook({ warnings, leftOpen, duplicates, showFacilit
 
   function pick(set, value) { set(value); setShowAll(false) }
 
-  const found = filterWorth(data, { chip, umpire, days })
+  // A refresh can drop the picked umpire; then show everyone rather than a hidden filter.
+  const who = umpireChoices(data).includes(umpire) ? umpire : ''
+  const found = filterWorth(data, { chip, umpire: who, days })
   const total = found.warnings.length + found.leftOpen.length + found.duplicates.length
   const room = showAll ? total : SHOWN
   const shownWarnings = found.warnings.slice(0, room)
@@ -189,7 +191,7 @@ export default function WorthALook({ warnings, leftOpen, duplicates, showFacilit
       <div className="worth-filters">
         <label>
           <span>Umpire</span>
-          <select value={umpire} onChange={(e) => pick(setUmpire, e.target.value)}>
+          <select value={who} onChange={(e) => pick(setUmpire, e.target.value)}>
             <option value="">Any</option>
             {umpireChoices(data).map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
@@ -207,8 +209,8 @@ export default function WorthALook({ warnings, leftOpen, duplicates, showFacilit
         <AllClear
           title={text ? text.empty[0] : 'Nothing worth a look'}
           text={text ? text.empty[1] : duplicates
-            ? 'No odd matches in the last 30 days, no sessions left open, and no likely duplicate players.'
-            : 'No odd matches in the last 30 days, and no sessions left open.'}
+            ? 'No odd matches in this window, no sessions left open, and no likely duplicate players.'
+            : 'No odd matches in this window, and no sessions left open.'}
         />
       ) : (
         <>

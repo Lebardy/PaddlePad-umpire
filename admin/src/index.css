@@ -606,7 +606,7 @@ td.table-foot { display: table-cell; }
 }
 .setting-body p { margin: 0; }
 
-/* --- The Overview: the live board, right now, totals, worth a look --- */
+/* --- The Overview: the page head, the live cards, the totals rows, worth a look --- */
 
 .overview-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 1rem 2rem; padding: 1.6rem 1.5rem 1.3rem; border-bottom: 1px solid var(--board-rule); }
 .overview-head h1 { margin: 0; font-family: var(--display); font-weight: 900; font-size: 3.4rem; line-height: 0.92; text-transform: uppercase; }
@@ -671,12 +671,6 @@ a.btn-quiet { color: var(--text); }
 .total-new { grid-column: 1 / -1; font-size: 0.88rem; color: var(--text-muted); }
 .totals-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
 .totals-row .total + .total { border-top: 0; border-left: 1px solid var(--border); }
-/* Six do not fit one row on a 1024 screen: two rows of three, the figures keep their size. */
-@media (max-width: 1180px) {
-  .totals-six { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .totals-row.totals-six > :nth-child(n + 4) { border-top: 1px solid var(--border); }
-  .totals-row.totals-six > :nth-child(4) { border-left: 0; }
-}
 .total-new b { color: var(--status-good); font-weight: 700; }
 :root[data-theme='dark'] .total-new b { color: var(--win-lamp); }
 .total-rating { padding: 0.9rem 1rem; background: var(--board); color: var(--board-ink); }

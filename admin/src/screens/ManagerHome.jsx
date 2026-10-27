@@ -64,6 +64,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
     setUmpireId(next.umpireId)
     setWhen(next.when)
     setPast(null)
+    setPastError(null)
     loadPast(next)
   }
 
@@ -92,6 +93,8 @@ export default function ManagerHome({ me, data, error, now, actions }) {
   const allTime = data && allTimeLine(data.totals)
   const [tab, setTab] = useTabParam(['needs', 'now', 'sessions', 'place'], data ? managerDefaultTab({ waiting, live: data.sessions.length }) : null)
   const current = tab ?? 'sessions'
+  // Until the first answer picks a tab, show the skeleton rather than Sessions and then jump.
+  const settling = tab === null && !error
 
   return (
     <section>
@@ -104,7 +107,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
           <p className="page-board-intro">Nothing has been scored here yet.</p>
         ) : (
           <BoardStrip
-            loading={!data}
+            loading={!data && !error}
             cellCount={5}
             cells={data ? [
               { key: 'live', label: 'Live now', figure: data.sessions.length, lit: data.sessions.length > 0 },
@@ -132,7 +135,9 @@ export default function ManagerHome({ me, data, error, now, actions }) {
           ]}
         />
         <div id="home-panel" role="tabpanel" aria-labelledby={`home-tab-${current}`} aria-busy={!data || undefined}>
-          {current === 'needs' && (!data ? <RowsSkeleton rows={4} /> : (
+          {settling && <RowsSkeleton rows={4} />}
+
+          {!settling && current === 'needs' && (!data ? <RowsSkeleton rows={4} /> : (
             <>
               {noUmpires && (
                 <p className="notice home-invite">
@@ -146,13 +151,13 @@ export default function ManagerHome({ me, data, error, now, actions }) {
             </>
           ))}
 
-          {current === 'now' && (!data ? <RowsSkeleton rows={4} /> : (
+          {!settling && current === 'now' && (!data ? <RowsSkeleton rows={4} /> : (
             data.sessions.length === 0
               ? <p className="empty">Nothing live right now.</p>
               : data.sessions.map((session) => <SessionCard key={session.id} session={session} now={now} />)
           ))}
 
-          {current === 'sessions' && (
+          {!settling && current === 'sessions' && (
             <>
               <div className="worth-filters">
                 <label>
@@ -173,7 +178,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
               </div>
               {pastError && <p className="form-error" role="alert">{pastError}</p>}
               {!past && !pastError && <RowsSkeleton rows={5} />}
-              {past?.sessions.length === 0 && <p className="empty">No sessions yet.</p>}
+              {past?.sessions.length === 0 && <p className="empty">No sessions.</p>}
               {past?.sessions.length > 0 && (
                 <div className="table-wrap">
                   <table className="table log">
