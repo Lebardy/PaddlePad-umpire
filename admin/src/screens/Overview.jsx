@@ -185,7 +185,7 @@ export default function Overview({ me, facilityLabel }) {
           ]}
         />
         <div id="overview-panel" role="tabpanel" aria-labelledby={`overview-tab-${tab ?? 'look'}`} aria-busy={loading || undefined}>
-          {loading ? (!data && error ? null : <RowsSkeleton rows={6} />) : tab === 'now' ? (
+          {loading ? (error ? null : <RowsSkeleton rows={6} />) : tab === 'now' ? (
             data.sessions.length === 0
               ? <p className="empty">Nothing live right now.</p>
               : data.sessions.map((s) => <SessionCard key={s.id} session={s} showFacility={showFacility} now={now} />)

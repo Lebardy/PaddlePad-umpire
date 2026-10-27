@@ -137,7 +137,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
         <div id="home-panel" role="tabpanel" aria-labelledby={`home-tab-${current}`} aria-busy={!data || undefined}>
           {settling && <RowsSkeleton rows={4} />}
 
-          {!settling && current === 'needs' && (!data ? <RowsSkeleton rows={4} /> : (
+          {!settling && current === 'needs' && (!data ? (error ? null : <RowsSkeleton rows={4} />) : (
             <>
               {noUmpires && (
                 <p className="notice home-invite">
@@ -151,7 +151,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
             </>
           ))}
 
-          {!settling && current === 'now' && (!data ? <RowsSkeleton rows={4} /> : (
+          {!settling && current === 'now' && (!data ? (error ? null : <RowsSkeleton rows={4} />) : (
             data.sessions.length === 0
               ? <p className="empty">Nothing live right now.</p>
               : data.sessions.map((session) => <SessionCard key={session.id} session={session} now={now} />)
