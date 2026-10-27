@@ -30,6 +30,7 @@ import GoogleButton from '../components/GoogleButton'
 import { canReturnUnaided } from '../lib/account'
 import { THEMES, getThemeChoice, setThemeChoice } from '../lib/theme'
 import Icon from '../components/Icon'
+import AlertSwitch from '../components/AlertSwitch'
 import More from '../components/More'
 import Avatar from '../components/Avatar'
 import DeleteProfile from './DeleteProfile'
@@ -546,6 +547,8 @@ function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
       <Details player={player} onPlayerChange={onPlayerChange} />
 
       <NearRatingName player={player} onPlayerChange={onPlayerChange} />
+
+      <AlertSwitch />
 
       <LinkCode onPlayerChange={onPlayerChange} />
 

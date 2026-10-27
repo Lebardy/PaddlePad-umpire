@@ -24,17 +24,17 @@
 // the "You've beaten" count now rides in the title line.
 // ============================================================
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from '../components/Link'
 import { usePlayerData } from '../lib/PlayerData'
+import { fetchRivals } from '../lib/api'
 import { peopleSummary, peopleTogether } from '../lib/derive'
 import { lastPlayedLabel } from '../lib/format'
 import { findPeople, peopleFacts } from '../lib/peopleWords'
-import AlertBell from '../components/AlertBell'
+import { mergeRivals } from '../lib/peopleTags'
 import Avatar from '../components/Avatar'
 import Icon from '../components/Icon'
 import PlacesToPlay from '../components/PlacesToPlay'
-import RivalsBlock from '../components/RivalsBlock'
 
 // The last five results fit beside the name on a 320px phone.
 const FORM_SHOWN = 5
@@ -50,14 +50,24 @@ function roleLine(person) {
   return parts.join(' · ')
 }
 
-function PersonRow({ person }) {
+function Tag({ tag }) {
   return (
-    <li>
+    <span className="person-tag">
+      <Icon name={tag.icon} size={14} label={tag.label} />
+      {tag.text}
+    </span>
+  )
+}
+
+// A tag says more than the role line, so it takes its place.
+function PersonRow({ person, tag, split }) {
+  return (
+    <li className={split ? 'person-split' : undefined}>
       <Link className="person-row" to={`/people/${encodeURIComponent(person.name)}`}>
         <Avatar name={person.name} size="sm" />
         <span className="person-main">
           <span className="person-name">{person.name}</span>
-          <span className="person-roles">{roleLine(person)}</span>
+          {tag ? <Tag tag={tag} /> : <span className="person-roles">{roleLine(person)}</span>}
         </span>
         <span className="person-side">
           <span className="person-when">{lastPlayedLabel(person.lastPlayed)}</span>
@@ -80,12 +90,34 @@ function PersonRow({ person }) {
   )
 }
 
+// A stranger who chose to be named: no page to open, no results to show.
+function StrangerRow({ name, tag }) {
+  return (
+    <li>
+      <span className="person-row">
+        <Avatar name={name} size="sm" />
+        <span className="person-main">
+          <span className="person-name">{name}</span>
+          <Tag tag={tag} />
+        </span>
+      </span>
+    </li>
+  )
+}
+
 function People() {
   const { matches } = usePlayerData()
   const people = peopleTogether(matches)
   const summary = peopleSummary(matches)
   const [showAll, setShowAll] = useState(false)
   const [query, setQuery] = useState('')
+  // The list shows at once; the tags join it if and when the server answers.
+  const [rivals, setRivals] = useState(null)
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchRivals({ signal: controller.signal }).then(setRivals).catch(() => {})
+    return () => controller.abort()
+  }, [])
 
   if (people.length === 0) {
     return (
@@ -97,7 +129,12 @@ function People() {
   }
 
   const searchable = showAll && people.length > SEARCH_FROM
-  const shown = showAll ? findPeople(people, query) : people.slice(0, ROWS_SHOWN)
+  // Pinned rows do not count toward ROWS_SHOWN: the plain list keeps its ten.
+  const { pinned, rest, nearRating } = mergeRivals(people, rivals)
+  const searching = query.trim() !== ''
+  const shownPinned = showAll ? findPeople(pinned, query) : pinned
+  const shownRest = showAll ? findPeople(rest, query) : rest.slice(0, ROWS_SHOWN)
+  const none = shownPinned.length + shownRest.length === 0
 
   return (
     <div className="people-screen">
@@ -112,8 +149,6 @@ function People() {
         ))}
       </ul>
 
-      <RivalsBlock bell={<AlertBell />} />
-
       {searchable && (
         <input
           id="people-find"
@@ -126,17 +161,28 @@ function People() {
         />
       )}
 
-      {shown.length > 0 ? (
+      {!none ? (
         <ul className="person-list">
-          {shown.map((person) => (
-            <PersonRow key={person.name} person={person} />
+          {shownPinned.map(({ name, person, tag }) =>
+            person ? <PersonRow key={name} person={person} tag={tag} /> : <StrangerRow key={name} name={name} tag={tag} />,
+          )}
+          {nearRating > 0 && !searching && (
+            <li>
+              <span className="person-row person-row--quiet">
+                <Icon name="equals" size={18} />
+                <span>{nearRating} more near your rating</span>
+              </span>
+            </li>
+          )}
+          {shownRest.map((person, i) => (
+            <PersonRow key={person.name} person={person} split={i === 0 && (shownPinned.length > 0 || nearRating > 0)} />
           ))}
         </ul>
       ) : (
         <p className="muted-inline people-none">No one called &ldquo;{query.trim()}&rdquo;.</p>
       )}
 
-      {people.length > ROWS_SHOWN && !showAll && (
+      {rest.length > ROWS_SHOWN && !showAll && (
         <button type="button" className="show-all" onClick={() => setShowAll(true)}>
           Show all {people.length}
         </button>
