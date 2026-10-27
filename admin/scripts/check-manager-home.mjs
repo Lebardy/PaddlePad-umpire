@@ -7,7 +7,7 @@
 // ============================================================
 
 import {
-  allTimeLine, missingLine, needsFlag, placeFacts, sessionLine, sessionNeeds, umpireLine, waitingCount,
+  allTimeLine, managerDefaultTab, missingLine, needsFlag, placeFacts, sessionLine, sessionNeeds, sinceFor, umpireLine, waitingCount,
 } from '../src/lib/managerHome.js'
 
 let pass = 0
@@ -68,6 +68,14 @@ check('singulars in the all-time line', allTimeLine({ players: { count: 1 }, mat
 check('an empty facility has no all-time line', allTimeLine({ players: { count: 0 }, matches: { count: 0 }, sessions: { count: 0 } }), null)
 check('players who have not played yet still show', allTimeLine({ players: { count: 3 }, matches: { count: 0 }, sessions: { count: 0 } }),
   '3 players · 0 matches · 0 sessions')
+
+check('opens on Needs you when something waits', managerDefaultTab({ waiting: 2, live: 1 }), 'needs')
+check('else on Scoring now when live', managerDefaultTab({ waiting: 0, live: 1 }), 'now')
+check('else on Sessions', managerDefaultTab({ waiting: 0, live: 0 }), 'sessions')
+const at = Date.parse('2026-10-27T12:00:00Z')
+check('last 7 days', sinceFor('7', at), '2026-10-20T12:00:00.000Z')
+check('last 30 days', sinceFor('30', at), '2026-09-27T12:00:00.000Z')
+check('everything', sinceFor('all', at), null)
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

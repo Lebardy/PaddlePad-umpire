@@ -370,8 +370,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .cell-main { display: block; overflow-wrap: anywhere; }
 .cell-sub { display: block; margin-top: 0.15rem; color: var(--text-muted); font-size: 0.9rem; overflow-wrap: anywhere; }
 .name-line { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-.table a.row-link, .home-rail a.row-link { color: inherit; text-decoration: none; }
-.table a.row-link:hover, .table a.row-link:focus-visible, .home-rail a.row-link:hover, .home-rail a.row-link:focus-visible { text-decoration: underline; }
+.table a.row-link, .home-place a.row-link { color: inherit; text-decoration: none; }
+.table a.row-link:hover, .table a.row-link:focus-visible, .home-place a.row-link:hover, .home-place a.row-link:focus-visible { text-decoration: underline; }
 /* A link that opens a match shows it without a hover, which a tablet does not have: underlined, in the link colour. */
 .table a.match-link { color: var(--primary); text-decoration: underline; text-underline-offset: 0.2em; }
 .table tr.row-clickable { cursor: pointer; }
@@ -615,25 +615,21 @@ td.table-foot { display: table-cell; }
 .as-of { font-family: var(--label); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.85rem; color: var(--board-muted); text-align: right; }
 .as-of b { color: var(--lamp); font-weight: 700; }
 
-/* --- A manager's home: their place in a rail, one feed beside it --- */
+/* --- A manager's home --- */
 .home-title { display: flex; align-items: center; gap: 0.75rem; }
 .home-title .fac-logo { width: 3.4rem; height: 3.4rem; font-size: 1.4rem; flex: none; }
-.home-split { grid-template-columns: 19rem minmax(0, 1fr); align-items: start; }
-.home-rail, .home-feed { display: grid; gap: 1.5rem; min-width: 0; }
+.home-place { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2rem; align-items: start; }
+.page-board > .board-strip { grid-column: 1 / -1; }
 .home-gap { margin-top: 0.75rem; }
 .home-invite { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0; }
 .home-flag { width: 1%; text-align: right; }
 .home-flag .icon, .cell-sub .icon { margin-right: 0.25em; }
-.home-feed .table-wrap + .table-wrap, .home-feed .notice + .table-wrap { margin-top: 0.75rem; }
+.home-invite + .table-wrap, .table-wrap + .table-wrap { margin-top: 0.75rem; }
 /* A link that looks like one of the site's buttons. */
 a.btn-primary, a.btn-quiet { display: inline-flex; align-items: center; text-decoration: none; }
 a.btn-quiet { color: var(--text); }
-/* Tablet width: the feed first, the rail's two blocks side by side under it. */
-@media (max-width: 1180px) {
-  .home-split { grid-template-columns: minmax(0, 1fr); }
-  .home-numbers { justify-items: start; }
-  .home-numbers .as-of { text-align: left; }
-  .home-rail { order: 1; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+@media (max-width: 640px) {
+  .home-place { grid-template-columns: minmax(0, 1fr); }
 }
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem; }
 .section-head .section-title { margin: 0; }

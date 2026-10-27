@@ -56,3 +56,14 @@ export function allTimeLine(totals) {
     countWord(totals.sessions.count, 'session', 'sessions'),
   ].join(' · ')
 }
+
+/** Where a manager's page opens: what needs them, else what is live, else the history. */
+export function managerDefaultTab({ waiting, live }) {
+  if (waiting > 0) return 'needs'
+  return live > 0 ? 'now' : 'sessions'
+}
+
+/** The start of the Sessions "When" filter, or null for everything. */
+export function sinceFor(when, now = Date.now()) {
+  return when === 'all' ? null : new Date(now - Number(when) * 86_400_000).toISOString()
+}
