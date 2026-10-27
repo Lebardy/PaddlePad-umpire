@@ -10,8 +10,8 @@ that repo does not:
      anything, so under-played players are left out rather than grouped
      from arithmetic that cannot describe them.
 
-  2. It loops over however many skill groups the clustering actually
-     found, instead of hardcoding two.
+  2. It finds playstyles once across everyone, so a style can hold
+     players from several skill groups.
 
   3. It refuses to publish a snapshot that lost players on the way
      through.
@@ -576,7 +576,7 @@ def to_payload(final, evidence_df, gate_report, structure_report, match_count):
                 row["playstyle_archetype"]
             ),
             # What the archetype name was built from. A list, or None for
-            # a group too small to cluster -- which has no name either.
+            # fewer than three players overall -- which has no name either.
             "playstyleTraits": traits if isinstance(traits, list) else None,
             "evidence": evidence,
             "matchCount": int(row.get("match_count") or 0),
