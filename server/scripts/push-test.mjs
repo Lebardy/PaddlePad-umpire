@@ -12,7 +12,8 @@
 //
 // pick finds a seeded player with 2+ rivals from the seeded matches, then
 // claims that player and two rivals and gives each a username and password.
-// Eligible: no login beyond a claim code, and not on SEED_REAL_PEOPLE. It needs
+// Eligible: no login beyond a claim code, not on SEED_REAL_PEOPLE, and no
+// "Phone"/"Smoke" test leftover. It needs
 // --env-file=<main folder>/server/.env.seed for SEED_REAL_PEOPLE and
 // SEED_UMPIRE_PASSWORD, and refuses if server/.env.push-test already holds a
 // set. Each login is saved the moment it is made. The other commands never
@@ -158,20 +159,27 @@ async function pickAndClaim() {
     must(await api('/auth/player/credentials', { method: 'POST', bearer: got.token, body: { username, password } }), 'setting a login')
     return got
   }
-  // Names show by construction here (everyone is treated as visible); the three are claimed only now, and each login is saved at once.
+  // The admin list does not say whose name is hidden, so the server confirms the rivals by name once the
+  // first player is claimed -- before anyone else is. Each login is saved the moment it exists.
   const c = candidates[0]
   if (!c) { console.error('no seeded player has 2 rivals who can be claimed'); process.exit(1) }
   const set = (k, id, name) => {
     const username = `pt_${randomBytes(4).toString('hex')}`
     const password = randomBytes(12).toString('hex')
-    return claim(id, username, password).then(() => {
+    return claim(id, username, password).then((got) => {
       Object.assign(process.env, { [`PUSH_TEST_${k}_NAME`]: name, [`PUSH_TEST_${k}_USER`]: username, [`PUSH_TEST_${k}_PASS`]: password })
       save()
+      return got
     })
   }
   process.env.PUSH_TEST_FACILITY = c.home
-  await set('ME', c.me, eligible.get(c.me).name)
+  const { token } = await set('ME', c.me, eligible.get(c.me).name)
   const [one, two] = c.rivals
+  const shown = must(await api('/player/rivals', { bearer: token }), 'reading rivals').rivals.map((r) => r.name)
+  if (!shown.includes(one.name) || !shown.includes(two.name)) {
+    console.error(`${eligible.get(c.me).name} is saved, but the server does not show ${one.name} and ${two.name} as rivals; stopped before claiming them`)
+    process.exit(1)
+  }
   await set('ONE', one.id, one.name)
   await set('TWO', two.id, two.name)
   console.log(`chosen: ${eligible.get(c.me).name}, ${c.people} people played, rivals ${one.name} (${one.won}-${one.lost}), ${two.name} (${two.won}-${two.lost}); place ${facilities.find((f) => f.id === c.home).name}${c.open ? '' : ' (no open plays yet)'}`)
