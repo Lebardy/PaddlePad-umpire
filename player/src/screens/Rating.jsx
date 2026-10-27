@@ -6,24 +6,21 @@
 //   1  the player's rally points, and every kind of rally moving them --
 //      worked out rally by rally in the API, never compared with anyone
 //   2  what to work on: their most frequent faults, each with one tip
-//   3  how they play: a playstyle found among the players closest to
-//      their level, each word proven with numbers
+//   3  how they play: a playstyle found across everyone, drawn as a
+//      six-corner fingerprint with the numbers one tap away
 //
 // Step 1 shows whenever the player has five matches, whether or not
 // the nightly run has rated them, and so does step 2. Step 3 needs that
 // run.
 //
-// The player's skill group is one line inside the playstyle step -- the
-// only place it matters. The pipeline's label for the group ("Group 3")
-// is dropped from style names for the same reason; see lib/styleName.js.
+// The pipeline's label for the skill group ("Group 3") is dropped from
+// style names; see lib/styleName.js.
 //
-// Each word in the style name shows this player's own number, the
-// average of players with their style and their group's average, with
-// an arrow and a short line saying which way the style leans. Nobody's
-// individual numbers but their own; see server/src/playstyle.js.
+// The fingerprint puts this player's own numbers beside the average of
+// their style and everyone's average. Nobody's individual numbers but
+// their own; see server/src/playstyle.js.
 //
-// It never shows a ranking and never anyone else's score. Why is one
-// tap away at the bottom.
+// It never shows a ranking and never anyone else's score.
 // ============================================================
 
 import { useEffect, useState } from 'react'
@@ -32,7 +29,7 @@ import { usePlayerData } from '../lib/PlayerData'
 import { navigate } from '../lib/router'
 import { endingPhrase, namedLeaders } from '../lib/endingWords'
 import { styleName } from '../lib/styleName'
-import { MEASURES, styleShareLine } from '../lib/styleProof'
+import { MEASURES, lowerIsMore, metaLine, shownNumber, styleShareLine } from '../lib/styleProof'
 import { faultsToWorkOn } from '../lib/faultTips'
 import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
 import More from '../components/More'
@@ -295,13 +292,7 @@ function WorkOn({ rallyRating }) {
   )
 }
 
-/**
- * Step 3: how the player plays, with the numbers that chose its words.
- *
- * The skill group's only job for a player is to say who their style is
- * compared with, so it is said here, in one line, where it is used.
- */
-/** How many in the player's group share the style. */
+/** How many share the player's style. */
 function ComparedWith({ band, styleSize }) {
   if (!band?.size) return null
   return (
@@ -324,7 +315,7 @@ function Playstyle({ standing, number }) {
     )
   }
 
-  if (!proof) {
+  if (!proof?.corners) {
     return (
       <Step number={number} icon="sparkle" title="Your playstyle" value={name} lead={<StyleEmblem name={name} />} before={<LevelPlate level={standing.level} />}>
         <p className="step-line">
@@ -336,8 +327,7 @@ function Playstyle({ standing, number }) {
     )
   }
 
-  const { meta } = standing
-  const nextUp = meta && meta.style !== standing.playstyleArchetype
+  const meta = metaLine(standing.meta, standing.playstyleArchetype, band?.name)
   return (
     <Step number={number} icon="sparkle" title="Your playstyle" value={name} lead={<StyleEmblem name={name} />} before={<LevelPlate level={standing.level} />}>
       <p className="style-takeaway">{proof.takeaway}</p>
@@ -347,23 +337,24 @@ function Playstyle({ standing, number }) {
       {meta && (
         <p className="style-meta">
           <Icon name="trendUp" size={20} />
-          <span>
-            {nextUp ? <>At the next level up, many play as <b>{styleName(meta.style, band?.name)}s</b>.</> : 'Your style is the most common one level up.'}
-          </span>
+          <span>{meta.before}{meta.style && <b>{meta.style}</b>}{meta.after}</span>
         </p>
       )}
 
       <More label="See the numbers">
         <ul className="numbers">
-          <li className="numbers-head" aria-hidden="true"><span /><span>You</span><span>Your style</span><span>Everyone</span></li>
+          <li className="numbers-head"><span /><span>You</span><span>Your style</span><span>Everyone</span></li>
           {proof.corners.map((c) => {
             const as = MEASURES[c.feature]?.as ?? 'ratio'
             return (
               <li key={c.feature} className={c.inName ? 'is-named' : undefined}>
-                <span>{c.word}</span>
-                <span>{showValue(c.you, as)}</span>
-                <span>{showValue(c.style, as)}</span>
-                <span>{showValue(c.mean, as)}</span>
+                <span>
+                  {c.word}
+                  {lowerIsMore(c) && <Icon name="arrowDown" size={14} label="lower means more of this word" />}
+                </span>
+                <span>{showValue(shownNumber(c.you, c), as)}</span>
+                <span>{showValue(shownNumber(c.style, c), as)}</span>
+                <span>{showValue(shownNumber(c.mean, c), as)}</span>
               </li>
             )
           })}

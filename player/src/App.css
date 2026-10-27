@@ -1439,6 +1439,7 @@
 .numbers li + li { border-top: 1px solid var(--border); }
 .numbers li span + span { text-align: right; }
 .numbers li:not(.numbers-head) span:first-child { font-family: var(--label); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+.numbers li svg { margin-left: 0.25rem; vertical-align: -2px; color: var(--text-muted); }
 .numbers-head { font-family: var(--label); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
 
 /* ============ People ============ */

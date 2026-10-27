@@ -8,6 +8,9 @@ export function reach(value, corner) {
   return Math.min(1, Math.max(0.06, 0.5 + 0.25 * z))
 }
 
+/** The style shape shows when any corner has a style value; a corner without one sits at the average. */
+export const hasStyle = (corners) => corners.some((c) => typeof c.style === 'number')
+
 /** SVG points for six corners clockwise from the top; a missing reach sits at the average. */
 export function outline(reaches, { cx, cy, r }) {
   return reaches
