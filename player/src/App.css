@@ -1519,18 +1519,10 @@
 .person-tag { display: flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; font-weight: 600; color: var(--primary); white-space: nowrap; }
 .person-tag svg { flex: none; }
 .person-row--quiet { display: flex; min-height: 2.75rem; color: var(--text-muted); font-size: 0.9rem; }
-.person-list li.person-split { border-top: 4px solid var(--border); }
+.person-list li.person-split { border-top: 4px solid var(--text-muted); }
 
 /* The notes under the You alert switch. */
-.alert-bell-note {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-}
-.alert-bell-note svg { flex: none; }
+.alert-bell-note { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
 
 /* Appears with "Show all" once the list is long. 1rem stops iOS zooming
    in on focus. */
@@ -3116,6 +3108,9 @@
 .you-switch[aria-checked="true"] .you-switch-track { background: var(--lamp); border-color: var(--lamp); }
 .you-switch[aria-checked="true"] .you-switch-track span { transform: translateX(1.25rem); background: #15181d; }
 .you-switch[aria-busy="true"] { opacity: 0.6; }
+/* On the light page the lamp yellow vanishes: use the amber the page uses for links. */
+:root:not([data-theme='dark']) .you-switch[aria-checked="true"] .you-switch-track { background: var(--primary); border-color: var(--primary); }
+:root:not([data-theme='dark']) .you-switch[aria-checked="true"] .you-switch-track span { background: var(--surface); }
 @media (prefers-reduced-motion: reduce) {
   .you-switch-track, .you-switch-track span { transition: none; }
 }

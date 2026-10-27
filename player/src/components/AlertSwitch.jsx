@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fetchPushKey, removePush, savePush } from '../lib/api'
 import Icon from './Icon'
 
@@ -21,6 +21,8 @@ function AlertSwitch() {
   const [state, setState] = useState('loading') // loading | hidden | install | blocked | off | on
   const [key, setKey] = useState(null)
   const [busy, setBusy] = useState(false)
+  const note = useRef(null)
+  const tapped = useRef(false)
 
   useEffect(() => {
     let live = true
@@ -45,6 +47,7 @@ function AlertSwitch() {
     const was = state
     let subscription = null
     setBusy(true)
+    tapped.current = true
     try {
       // Asked before any await: iPhone only shows the prompt inside the tap.
       const asked = was === 'on' ? null : Notification.requestPermission()
@@ -70,8 +73,13 @@ function AlertSwitch() {
     }
   }
 
+  // Refusing the permission swaps the switch for the note: keep the keyboard on the page.
+  useEffect(() => {
+    if (state === 'blocked' && tapped.current) note.current?.focus()
+  }, [state])
+
   if (state === 'loading' || state === 'hidden') return null
-  const note = state === 'install' ? 'Add PaddlePad to your Home Screen first' : 'Notifications are blocked in your phone’s settings'
+  const words = state === 'install' ? 'Add PaddlePad to your Home Screen first' : 'Notifications are blocked in your phone’s settings'
   return (
     <section className="you-section" aria-label="Alerts">
       <h2 className="you-head">
@@ -79,7 +87,7 @@ function AlertSwitch() {
         Alerts
       </h2>
       {state === 'install' || state === 'blocked' ? (
-        <p className="alert-bell-note">{note}</p>
+        <p className="alert-bell-note" ref={note} tabIndex={-1}>{words}</p>
       ) : (
         <button type="button" className="you-switch" role="switch" aria-checked={state === 'on'} aria-busy={busy} onClick={toggle}>
           <span>Alert me when a rival or partner joins open play</span>

@@ -53,7 +53,7 @@ function roleLine(person) {
 function Tag({ tag }) {
   return (
     <span className="person-tag">
-      <Icon name={tag.icon} size={14} label={tag.label} />
+      <Icon name={tag.icon} size={14} />
       {tag.text}
     </span>
   )
@@ -175,7 +175,7 @@ function People() {
             </li>
           )}
           {shownRest.map((person, i) => (
-            <PersonRow key={person.name} person={person} split={i === 0 && (shownPinned.length > 0 || nearRating > 0)} />
+            <PersonRow key={person.name} person={person} split={i === 0 && (shownPinned.length > 0 || (nearRating > 0 && !searching))} />
           ))}
         </ul>
       ) : (
