@@ -306,7 +306,7 @@ check('all-court gets its own phrase', takeaway([{ label: 'Steady', feature: 'ag
 
 section('standout')
 const withYou = (you) => corners.map((c, i) => ({ ...c, you: i === 1 ? you : c.you }))
-check('a corner not in the name, half a spread out or more', standout(withYou(0.7)), 'drops that land',
+check('a corner not in the name, half a spread out or more', standout(withYou(0.7)), { text: 'drops that land', feature: corners[1].feature },
   'Precise is not in the name; (.7 - .5) / .1291 = 1.55 spreads out, 0.5 needed')
 check('close to the average -> null', standout(withYou(0.52)), null, '(.52 - .5) / .1291 = .15, under half a spread')
 check('nothing outside the name -> null', standout(corners.map((c) => ({ ...c, inName: true }))), null, '')

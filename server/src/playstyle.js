@@ -166,7 +166,7 @@ const STANDS_OUT = {
   dink_error_rate_std: 'a steady kitchen game',
 }
 
-/** The corner the player reaches furthest past the average (at least half a spread), not in the name. */
+/** The corner the player reaches furthest past the average (at least half a spread), not in the name: its words and which corner. */
 export function standout(corners) {
   let best = null
   for (const c of corners) {
@@ -174,7 +174,7 @@ export function standout(corners) {
     const z = ((c.you - c.mean) / c.spread) * (c.out === 'lower' ? -1 : 1)
     if (z >= 0.5 && (!best || z > best.z)) best = { z, feature: c.feature }
   }
-  return best ? STANDS_OUT[best.feature] : null
+  return best ? { text: STANDS_OUT[best.feature], feature: best.feature } : null
 }
 
 /**
