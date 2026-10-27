@@ -1,6 +1,10 @@
 // ============================================================
 // Proof for a playstyle name.
 //
+// "Peers" below are everyone the style was compared with: the whole run
+// for runs whose styles were found across everyone, the skill group for
+// older runs.
+//
 // The pipeline names a player's style from where their cluster sits
 // against its skill group's average -- "Streaky" because the scoring
 // swings more than their group's, "Dropper" because they drop more. It
@@ -67,6 +71,127 @@ function valuesOf(rows, feature) {
     .filter((value) => Number.isFinite(value))
 }
 
+// The fingerprint's six corners, in drawing order: [feature, word, the way
+// that word points]. A corner whose measurement gave a word in the name
+// shows THAT word instead (Driver for Dropper, Streaky for Consistent), so
+// "further out = more of the word shown" always holds.
+const CORNERS = [
+  ['error_to_winner_ratio', 'Clean', 'lower'],
+  ['drop_efficiency_mean', 'Precise', 'higher'],
+  ['drop_preference_rate_mean', 'Dropper', 'higher'],
+  ['net_game_preference_rate_mean', 'Net Player', 'higher'],
+  ['aggression_std', 'Steady', 'lower'],
+  ['winner_rate_std', 'Consistent', 'lower'],
+]
+
+// The sixth corner is about steadiness, which several measurements can
+// name. Steady keeps corner five; the name's other steadiness measure, if
+// any, takes corner six so every word in a name is on the chart.
+const SIXTH = {
+  winner_rate_std: 'Consistent',
+  drop_efficiency_std: 'Reliable',
+  general_error_rate_std: 'Composed',
+  dink_error_rate_std: 'Solid-Net',
+}
+
+export function buildCorners({ traits, mine, compare, sameStyle }) {
+  const named = new Map(traits.filter((t) => t.feature).map((t) => [t.feature, t]))
+  const sixth = Object.keys(SIXTH).find((f) => f !== 'winner_rate_std' && named.has(f)) ?? 'winner_rate_std'
+  return CORNERS.map(([feature, word, out], i) => {
+    if (i === 5) [feature, word] = [sixth, SIXTH[sixth]]
+    const trait = named.get(feature)
+    const values = valuesOf(compare, feature)
+    // A whole set of zeros is nothing recorded (see the proof rows below).
+    const recorded = values.some((v) => v !== 0)
+    const average = mean(values)
+    const own = mine.evidence?.[feature]
+    return {
+      word: trait ? trait.label : word,
+      feature,
+      out: trait ? (trait.direction === 'above' ? 'higher' : 'lower') : out,
+      inName: Boolean(trait),
+      you: recorded && own !== null && own !== undefined && Number.isFinite(Number(own)) ? round(Number(own)) : null,
+      style: recorded && sameStyle.length >= MIN_STYLE_MEMBERS ? round(mean(valuesOf(sameStyle, feature))) : null,
+      mean: recorded ? round(average) : null,
+      spread: recorded ? round(Math.sqrt(mean(values.map((v) => (v - average) ** 2)))) : null,
+    }
+  })
+}
+
+// One phrase per word, in everyday words, for the line under the name.
+const SAYS = {
+  'error_to_winner_ratio:lower': 'makes fewer mistakes',
+  'drop_efficiency_mean:higher': 'lands its drops',
+  'drop_preference_rate_mean:higher': 'drops more than it drives',
+  'drop_preference_rate_mean:lower': 'drives more than it drops',
+  'net_game_preference_rate_mean:higher': 'wins more at the net',
+  'net_game_preference_rate_mean:lower': 'wins more from the back',
+  'aggression_std:lower': 'finishes points the same way every match',
+  'aggression_std:higher': 'mixes up how it finishes points',
+  'winner_rate_std:lower': 'scores at an even pace',
+  'winner_rate_std:higher': 'scores in streaks',
+  'drop_efficiency_std:lower': 'lands drops just as well every match',
+  'drop_efficiency_std:higher': 'has drops that come and go',
+  'general_error_rate_std:lower': 'keeps its mistakes level',
+  'general_error_rate_std:higher': 'has mistakes that come and go',
+  'dink_error_rate_std:lower': 'stays solid at the net',
+  'dink_error_rate_std:higher': 'has net mistakes that come and go',
+}
+
+/** "Your style makes fewer mistakes, … and drives more than it drops." */
+export function takeaway(traits) {
+  const parts = traits
+    .map((t) => (t.feature ? SAYS[`${t.feature}:${t.direction === 'above' ? 'higher' : 'lower'}`] : 'plays every part of the court'))
+    .filter(Boolean)
+  if (parts.length === 0) return null
+  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`
+  return `Your style ${list}.`
+}
+
+// What a player does better than most, for corners their name does not
+// mention. Only the corner's own (default) way, so it is always a
+// compliment.
+const STANDS_OUT = {
+  error_to_winner_ratio: 'fewer mistakes',
+  drop_efficiency_mean: 'drops that land',
+  drop_preference_rate_mean: 'choosing drops',
+  net_game_preference_rate_mean: 'winning at the net',
+  aggression_std: 'finishing the same way every match',
+  winner_rate_std: 'scoring at an even pace',
+  drop_efficiency_std: 'drops that land every match',
+  general_error_rate_std: 'keeping mistakes level',
+  dink_error_rate_std: 'a solid net game',
+}
+
+/** The corner the player reaches furthest past the average (at least half a spread), not in the name. */
+export function standout(corners) {
+  let best = null
+  for (const c of corners) {
+    if (c.inName || c.you === null || !c.spread) continue
+    const z = ((c.you - c.mean) / c.spread) * (c.out === 'lower' ? -1 : 1)
+    if (z >= 0.5 && (!best || z > best.z)) best = { z, feature: c.feature }
+  }
+  return best ? STANDS_OUT[best.feature] : null
+}
+
+/**
+ * The style most common one level up, for a gentle line on the card. Levels
+ * are the run's display levels (lowest first), each listing its skill
+ * groups. Counts only, never who.
+ */
+export function nextLevelStyle({ peers, group, levels }) {
+  if (!Array.isArray(levels)) return null
+  const at = levels.findIndex((level) => level.groups?.includes(group))
+  const next = at >= 0 ? levels[at + 1] : null
+  if (!next) return null
+  const there = peers.filter((p) => next.groups.includes(p.skill_group) && p.playstyle_archetype)
+  if (there.length < MIN_STYLE_MEMBERS) return null
+  const counts = new Map()
+  for (const p of there) counts.set(p.playstyle_archetype, (counts.get(p.playstyle_archetype) ?? 0) + 1)
+  const [[style]] = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+  return { style }
+}
+
 /**
  * The rows behind a playstyle name.
  *
@@ -75,7 +200,8 @@ function valuesOf(rows, feature) {
  *   what the pipeline built the name from, in name order
  * @param {object} input.mine this player's rating row (cluster + evidence)
  * @param {Array<{playstyle_cluster, playstyle_archetype, evidence}>} input.peers
- *   every rated player in the same skill group, this player included
+ *   everyone the style is compared with, this player included: the whole
+ *   run when styles were found across everyone, else the skill group
  * @returns {null | {styleSize, other, rows}}
  */
 export function buildPlaystyleProof({ traits, mine, peers }) {
@@ -166,7 +292,12 @@ export function buildPlaystyleProof({ traits, mine, peers }) {
 
   if (rows.length === 0) return null
 
+  const corners = buildCorners({ traits, mine, compare: peers, sameStyle })
+
   return {
+    corners,
+    takeaway: takeaway(traits),
+    standout: standout(corners),
     // How many share this player's style, so the page can say "one of 9
     // in this style" without naming any of them.
     styleSize: sameStyle.length,

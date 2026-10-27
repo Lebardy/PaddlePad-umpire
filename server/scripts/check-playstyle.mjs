@@ -10,7 +10,7 @@
 // worked out from the numbers beside it before the code ran.
 // ============================================================
 
-import { buildPlaystyleProof, MIN_STYLE_MEMBERS } from '../src/playstyle.js'
+import { buildPlaystyleProof, buildCorners, takeaway, standout, nextLevelStyle, MIN_STYLE_MEMBERS } from '../src/playstyle.js'
 
 let pass = 0
 let fail = 0
@@ -251,6 +251,60 @@ console.log('\nswing rows carry the averages they move around')
   check('a style of two gives no style average', pair.center?.style, null)
   check('but the group average is still there', pair.center?.group != null, true)
 }
+
+// ============================================================
+section('fingerprint corners')
+// ============================================================
+// Six players; values chosen so the averages are round.
+//   drop preference .2 .4 .6 .8 .5 .5 -> mean .5, squared gaps .09 .01 .01 .09 0 0 -> /6 = .0333, sd .1826
+//   drop efficiency .3 .4 .5 .6 .7 .5  -> mean .5, squared gaps .04 .01 0 .01 .04 0 -> /6 = .01667, sd .1291
+const ev = (o) => ({ evidence: { error_to_winner_ratio: 1, drop_efficiency_mean: 0.5, drop_preference_rate_mean: 0.5,
+  net_game_preference_rate_mean: 0.5, aggression_std: 0.2, winner_rate_std: 0.1, drop_efficiency_std: 0.3, ...o } })
+const everyone = [[0.2, 0.3], [0.4, 0.4], [0.6, 0.5], [0.8, 0.6], [0.5, 0.7], [0.5, 0.5]]
+  .map(([d, e]) => ev({ drop_preference_rate_mean: d, drop_efficiency_mean: e }))
+const driverTraits = [
+  { label: 'Clean', feature: 'error_to_winner_ratio', family: 'precision', direction: 'below', z: -0.4 },
+  { label: 'Inconsistent', feature: 'drop_efficiency_std', family: 'consistency', direction: 'above', z: 0.5 },
+  { label: 'Driver', feature: 'drop_preference_rate_mean', family: 'identity', direction: 'below', z: -0.6 },
+]
+const corners = buildCorners({ traits: driverTraits, mine: everyone[0], compare: everyone, sameStyle: everyone.slice(0, 3) })
+check('six corners in the fixed order, name words flipped in',
+  corners.map((c) => c.word), ['Clean', 'Precise', 'Driver', 'Net Player', 'Steady', 'Inconsistent'],
+  'Driver replaces Dropper; Inconsistent (drop_efficiency_std) takes the sixth corner from Consistent')
+check('a name word points its corner its own way', corners.map((c) => c.out),
+  ['lower', 'higher', 'lower', 'higher', 'lower', 'higher'], 'further out = more of the word shown')
+check('only the name words are boxed', corners.map((c) => c.inName), [true, false, true, false, false, true], '')
+check('average and spread are everyone\'s', [corners[2].mean, corners[2].spread], [0.5, 0.1826],
+  'mean of .2 .4 .6 .8 .5 .5 = .5; population sd = .1826')
+check('the style average is the style\'s own', corners[2].style, 0.4, '(.2+.4+.6)/3 = .4')
+check('the style average needs three players', buildCorners({ traits: driverTraits, mine: everyone[0], compare: everyone,
+  sameStyle: everyone.slice(0, 2) }).every((c) => c.style === null), true, 'two players would give each other away')
+check('All-Court boxes neither identity corner', buildCorners({ traits: [{ label: 'All-Court Player', family: 'identity' }],
+  mine: everyone[0], compare: everyone, sameStyle: everyone }).map((c) => c.word),
+  ['Clean', 'Precise', 'Dropper', 'Net Player', 'Steady', 'Consistent'], 'no feature, so the default words stay')
+
+section('takeaway')
+check('one sentence from the name words, in name order', takeaway(driverTraits),
+  'Your style makes fewer mistakes, has drops that come and go and drives more than it drops.', '')
+check('all-court gets its own phrase', takeaway([{ label: 'Steady', feature: 'aggression_std', direction: 'below' },
+  { label: 'All-Court Player', family: 'identity' }]),
+  'Your style finishes points the same way every match and plays every part of the court.', '')
+
+section('standout')
+const withYou = (you) => corners.map((c, i) => ({ ...c, you: i === 1 ? you : c.you }))
+check('a corner not in the name, half a spread out or more', standout(withYou(0.7)), 'drops that land',
+  'Precise is not in the name; (.7 - .5) / .1291 = 1.55 spreads out, 0.5 needed')
+check('close to the average -> null', standout(withYou(0.52)), null, '(.52 - .5) / .1291 = .15, under half a spread')
+check('nothing outside the name -> null', standout(corners.map((c) => ({ ...c, inName: true }))), null, '')
+
+section('next level up')
+const lv = [{ name: 'Developing', groups: ['A'] }, { name: 'Advanced', groups: ['B'] }]
+const pl = (g, s) => ({ skill_group: g, playstyle_archetype: s })
+const run = [pl('A', 'X'), pl('B', 'Y'), pl('B', 'Y'), pl('B', 'Z'), pl('B', 'Y')]
+check('most common style one level up', nextLevelStyle({ peers: run, group: 'A', levels: lv }), { style: 'Y' }, 'Y 3, Z 1')
+check('top level -> null', nextLevelStyle({ peers: run, group: 'B', levels: lv }), null, '')
+check('fewer than three there -> null', nextLevelStyle({ peers: run.slice(0, 3), group: 'A', levels: lv }), null, '')
+check('no levels -> null', nextLevelStyle({ peers: run, group: 'A', levels: [] }), null, '')
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
