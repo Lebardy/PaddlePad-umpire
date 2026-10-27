@@ -1419,14 +1419,14 @@
 }
 .print-word.is-right { transform: translate(0, -50%); }
 .print-word.is-left { transform: translate(-100%, -50%); }
-.print-word.is-named { padding: 0.3rem 0.35rem; border-radius: 4px; background: var(--board); color: var(--lamp); }
+.print-word.is-named { padding: 0.3rem 0.35rem; border: 1px solid var(--board-rule); border-radius: 4px; background: var(--board); color: var(--lamp); }
 .print-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; margin-top: 0.7rem; font-size: 0.85rem; color: var(--text-secondary); }
 .print-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
 .print-legend small { flex-basis: 100%; font-size: 0.85rem; color: var(--text-secondary); }
 .print-key { display: inline-block; flex: none; }
 .key-you { width: 0.9rem; height: 3px; background: var(--series-1); }
 .key-style { width: 0.8rem; height: 0.8rem; background: color-mix(in srgb, var(--lamp) 45%, transparent); border: 1.5px solid var(--primary); }
-.key-name { width: 0.9rem; height: 0.9rem; border-radius: 3px; background: var(--board); }
+.key-name { width: 0.9rem; height: 0.9rem; border-radius: 3px; background: var(--board); border: 1px solid var(--lamp); }
 .style-meta { display: flex; align-items: center; gap: 0.6rem; margin: 0.9rem 0 0; padding: 0.65rem 0.8rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font-size: 0.92rem; }
 .style-meta svg { flex: none; color: var(--primary); }
 .numbers { list-style: none; padding: 0; margin: 0; }
