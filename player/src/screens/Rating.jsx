@@ -32,26 +32,16 @@ import { usePlayerData } from '../lib/PlayerData'
 import { navigate } from '../lib/router'
 import { endingPhrase, namedLeaders } from '../lib/endingWords'
 import { styleName } from '../lib/styleName'
-import { MEASURES, hiddenStyleNote, styleShareLine, swingBands, swingLine, traitLine, verdictWay } from '../lib/styleProof'
+import { MEASURES, hiddenStyleNote, styleShareLine } from '../lib/styleProof'
 import { faultsToWorkOn } from '../lib/faultTips'
 import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
 import More from '../components/More'
 import Collapsible from '../components/Collapsible'
 import ShotProfile from '../components/ShotProfile'
 import Icon from '../components/Icon'
-import StyleEmblem, { WordMark } from '../components/StyleEmblem'
+import Fingerprint from '../components/Fingerprint'
+import StyleEmblem from '../components/StyleEmblem'
 import LevelPlate from '../components/LevelPlate'
-
-
-// Said only where there IS a direction. Most of these measurements are
-// style rather than quality -- the model works playstyles out
-// separately from the rating, so "steady" is not a better way to play
-// than "streaky" -- and a row that announced "neither is better" said
-// nothing while taking up the space of something that did.
-const DIRECTION = {
-  higher: 'higher is better',
-  lower: 'lower is better',
-}
 
 function showValue(value, as) {
   if (value === null || value === undefined) return '—'
@@ -306,122 +296,6 @@ function WorkOn({ rallyRating }) {
 }
 
 /**
- * The proof rows gathered by word. Every adjective has one measurement;
- * the all-court noun arrives as two rows marked neutral (see
- * server/src/playstyle.js) and is shown as one word with both under it.
- */
-function proofItems(rows) {
-  const items = []
-  for (const row of rows) {
-    const last = items[items.length - 1]
-    if (row.neutral && last?.neutral && last.label === row.label) last.rows.push(row)
-    else items.push({ label: row.label, neutral: Boolean(row.neutral), rows: [row] })
-  }
-  return items
-}
-
-/**
- * The one sentence under "All-Court Player", naming only the habits that
- * have something recorded and saying which do not.
- */
-function allCourtSentence(rows) {
-  const shown = rows.filter((row) => row.you !== null).map((row) => MEASURES[row.feature]?.label ?? row.feature)
-  const missing = rows.some((row) => row.feature === 'drop_preference_rate_mean' && row.you === null)
-  if (shown.length === 0) {
-    return 'All-court means your style doesn’t lean towards dropping or driving, or towards the net or power — there is nothing recorded yet to show it.'
-  }
-  return `Your style sits close to similar players on ${shown.join(' and ')}, so it’s called all-court — your own numbers can lean one way${
-    missing ? ', and no third shots are recorded yet to compare drops with drives' : ''
-  }.`
-}
-
-/** One measurement: you, your style, your group and the other style, as bars. */
-function ProofMeasure({ row, proof, word = null, withVerdict = false }) {
-  const measure = MEASURES[row.feature] ?? {
-    label: row.feature, as: 'ratio', better: 'neither',
-  }
-  // Every word is chosen from where the player's STYLE sits against their
-  // group, so the style's bar is the one that proves it; the player's own
-  // number stays first so they can see where they sit inside it.
-  const hasStyle = row.style !== null && row.style !== undefined
-  const bars = [
-    { who: 'you', value: row.you, mine: true },
-    ...(hasStyle ? [{ who: 'your style', value: row.style }] : []),
-    { who: 'similar players', value: row.group },
-  ]
-  // Bars are drawn against the biggest of them, so a row is read by
-  // comparing its own bars and nothing else.
-  const widest = Math.max(...bars.map((b) => Math.abs(b.value ?? 0)), 0.0001)
-
-  // One short line, said as a direction, never a size: on staging the
-  // style's number pointed the word's way for all 124 words, but most
-  // gaps were small. No line when the numbers can't point (a style of two
-  // has no average; see lib/styleProof.js).
-  const line = traitLine(row, proof?.styleSize)
-  const way = verdictWay(row, proof?.styleSize)
-  const lineShown = Boolean(withVerdict && word && row.you !== null && line)
-  // A swing row says what the player usually does; a run from before the
-  // averages were sent keeps the bars. Only a row with a line can need
-  // decimals to agree with it.
-  const bands = swingBands(row, measure, lineShown ? (proof?.styleSize === 1 ? 'you' : 'your style') : null, lineShown ? way : null)
-
-  return (
-    <>
-      <div className="proof-head">
-        {word && <span className="proof-word"><WordMark word={word} />{word}</span>}
-        <span className="proof-measure">{bands ? `${measure.thing}, usually` : measure.label}</span>
-        {DIRECTION[measure.better] && (
-          <span className="proof-better">{DIRECTION[measure.better]}</span>
-        )}
-      </div>
-
-      {/* Nothing recorded is said, not drawn as an empty bar that would
-          read as zero: no third shots logged is not "never drops". */}
-      {row.you === null ? (
-        <p className="proof-verdict">Nothing recorded for this yet.</p>
-      ) : bands ? (
-        <ul className="swing-bands">
-          {bands.bands.map((band) => (
-            <li key={band.who} className={band.mine ? 'is-you' : undefined}>
-              <span className="proof-who">{band.who}</span>
-              <span className="swing-track" aria-hidden="true">
-                <span className="swing-band" style={{ '--left': ((band.low - bands.lo) / (bands.hi - bands.lo)) * 100, '--width': ((band.high - band.low) / (bands.hi - bands.lo)) * 100 }} />
-              </span>
-              <span className="proof-number">{band.words}</span>
-            </li>
-          ))}
-          <li className="swing-scale" aria-hidden="true"><span />
-            <span className="swing-ends"><span>{bands.lo}{bands.unit}</span><span>{bands.hi}{bands.unit}</span></span><span />
-          </li>
-        </ul>
-      ) : (
-        <ul className="proof-bars">
-          {bars.map((bar) => (
-            <li key={bar.who} className={bar.mine ? 'is-you' : undefined}>
-              <span className="proof-who">{bar.who}</span>
-              <span className="proof-track">
-                <span
-                  className="proof-fill"
-                  style={{ width: `${Math.round((Math.abs(bar.value ?? 0) / widest) * 100)}%` }}
-                />
-              </span>
-              <span className="proof-number">{showValue(bar.value, measure.as)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {lineShown && (
-        <p className="proof-verdict">
-          <Icon name={way === 'higher' ? 'arrowUp' : 'arrowDown'} size={15} />
-          {bands ? swingLine(way, proof?.styleSize) : line}
-        </p>
-      )}
-    </>
-  )
-}
-
-/**
  * Step 3: how the player plays, with the numbers that chose its words.
  *
  * The skill group's only job for a player is to say who their style is
@@ -462,49 +336,41 @@ function Playstyle({ standing, number }) {
     )
   }
 
+  const { meta } = standing
+  const nextUp = meta && meta.style !== standing.playstyleArchetype
   return (
     <Step number={number} icon="sparkle" title="Your playstyle" value={name} lead={<StyleEmblem name={name} />} before={<LevelPlate level={standing.level} />}>
+      <p className="style-takeaway">{proof.takeaway}</p>
+      {proof.standout && <p className="style-standout"><i aria-hidden="true" />Your own standout: {proof.standout}.</p>}
+      <Fingerprint corners={proof.corners} />
       <ComparedWith band={band} styleSize={proof.styleSize} />
-
-      <ul className="proof" aria-label="Why this name">
-        {proofItems(proof.rows).map((item) =>
-          item.neutral ? (
-            // "All-Court Player": chosen because NEITHER habit stood out,
-            // so both are shown under the one word, and the sentence
-            // says that rather than "yours is less than".
-            <li key={`neutral-${item.label}`} className="proof-row">
-              <div className="proof-head">
-                <span className="proof-word"><WordMark word={item.label} />{item.label}</span>
-              </div>
-              {/* A habit with nothing recorded gets no row of its own: it
-                  has nothing to show, and a stray "nothing recorded" line
-                  between two headings read as clutter. The one sentence
-                  below says it instead. */}
-              {item.rows.filter((row) => row.you !== null).map((row) => (
-                <ProofMeasure key={row.feature} row={row} proof={proof} />
-              ))}
-              <p className="proof-verdict">{allCourtSentence(item.rows)}</p>
-            </li>
-          ) : (
-            <li key={item.rows[0].feature} className="proof-row">
-              <ProofMeasure row={item.rows[0]} proof={proof} word={item.label} withVerdict />
-            </li>
-          ),
-        )}
-      </ul>
-
+      {meta && (
+        <p className="style-meta">
+          <Icon name="trendUp" size={20} />
+          <span>
+            {nextUp ? <>At the next level up, many play as <b>{styleName(meta.style, band?.name)}s</b>.</> : 'Your style is the most common one level up.'}
+          </span>
+        </p>
+      )}
       {hiddenStyleNote(proof.styleSize) && (
         <p className="step-line">{hiddenStyleNote(proof.styleSize)}</p>
       )}
 
-      <More label="How this was worked out">
-        <p>
-          Similar players are split again by how they play. Each word is
-          the measurement where your style sits furthest from their
-          average. The bars show averages only, never
-          anyone&rsquo;s numbers but yours, and none for a style of fewer
-          than three.
-        </p>
+      <More label="See the numbers">
+        <ul className="numbers">
+          <li className="numbers-head" aria-hidden="true"><span /><span>You</span><span>Your style</span><span>Everyone</span></li>
+          {proof.corners.map((c) => {
+            const as = MEASURES[c.feature]?.as ?? 'ratio'
+            return (
+              <li key={c.feature}>
+                <span>{c.word}</span>
+                <span>{showValue(c.you, as)}</span>
+                <span>{showValue(c.style, as)}</span>
+                <span>{showValue(c.mean, as)}</span>
+              </li>
+            )
+          })}
+        </ul>
       </More>
     </Step>
   )
