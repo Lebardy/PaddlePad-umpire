@@ -217,7 +217,7 @@ else:
             break
     else:
         print("       no three-group seed found in 40 tries; "
-              "the loop is still what makes it safe")
+              "the integrity check is still what makes it safe")
 
 
 print("\ngroup names")
