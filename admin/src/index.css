@@ -139,7 +139,7 @@ button, input, select { font: inherit; color: inherit; }
 ::selection { background: var(--lamp); color: #15181d; }
 input { caret-color: var(--primary); }
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-html { scrollbar-color: var(--border) var(--bg); }
+html { scrollbar-color: var(--border) var(--bg); scrollbar-gutter: stable; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* Narrower than a large tablet: say so, and show nothing else. */
@@ -937,7 +937,8 @@ tr.is-voided .reason { opacity: 0.6; }
 .strip-cell { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.65rem 1rem; border-left: 1px solid var(--board-rule); min-width: 7.5rem; }
 .strip-cell:first-child { border-left: 0; padding-left: 0; }
 /* The owner's strip sits straight on the board, which has no side padding of its own. */
-.board-texture > .board-strip { padding-inline: 1.5rem; }
+.board-texture:not(.page-board) > .board-strip { padding-inline: 1.5rem; }
+.overview-board { border-bottom: 4px solid var(--lamp); }
 .strip-label { font-family: var(--label); font-weight: 700; font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--board-muted); }
 .strip-figure { font-family: var(--display); font-weight: 900; font-size: 1.75rem; line-height: 1; color: var(--board-ink); font-variant-numeric: tabular-nums; }
 .strip-sub { font-size: 0.8rem; color: var(--board-muted); }
@@ -954,14 +955,19 @@ tr.is-voided .reason { opacity: 0.6; }
 .ghost { display: block; border-radius: var(--radius-sm); background: var(--border); animation: ghost 1.2s ease-in-out infinite alternate; }
 .board-strip .ghost { background: var(--board-raised); }
 .ghost-label { width: 4.5rem; height: 0.7rem; }
+.board-strip .strip-cell:last-child .ghost-figure { width: 8rem; }
+.as-of { min-height: 1.3rem; }
+.as-of .ghost { margin: 0.3rem 0 0 auto; background: var(--board-raised); }
 .ghost-figure { width: 3rem; height: 1.6rem; }
 .ghost-count { display: inline-block; width: 1.6rem; height: 1.1rem; }
-.ghost-row { height: 2.9rem; margin-bottom: 1px; }
+.ghost-row { height: 2.9rem; border-radius: 0; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--border) 45%, transparent); }
+.ghost-row:last-child { border-bottom: 0; }
 .rows-skeleton { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 @keyframes ghost { to { opacity: 0.55; } }
 @media (prefers-reduced-motion: reduce) { .ghost { animation: none; } }
 /* Worth a look: reason chips, then two filters. */
-.worth-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0 0.75rem; }
+.worth-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin: 1rem 0 0.75rem; }
+.worth-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .worth-chip {
   display: inline-flex; align-items: center; gap: 0.5rem; min-height: 2.75rem; padding: 0.35rem 0.5rem 0.35rem 0.85rem;
   border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--surface);
@@ -970,10 +976,14 @@ tr.is-voided .reason { opacity: 0.6; }
 .worth-chip:hover { border-color: var(--primary); color: var(--primary); }
 .worth-chip[aria-pressed='true'] { background: var(--button); color: var(--button-ink); border-color: var(--button); }
 .worth-chip[aria-pressed='true'] .tab-count { background: rgba(255, 255, 255, 0.2); color: inherit; }
-.worth-filters { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; }
-.worth-filters label { display: grid; gap: 0.35rem; }
-.worth-filters span { font-size: 0.85rem; color: var(--text-muted); }
-.worth-filters select { min-height: 2.75rem; min-width: 10rem; }
+.worth-chip:has(.tab-count.is-zero) { opacity: 0.55; }
+.worth-filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+.worth-bar .worth-filters { margin: 0 0 0 auto; }
+.worth-filters label { display: flex; align-items: center; gap: 0.4rem; color: var(--text-muted); }
+.worth-filters select {
+  min-height: 2.75rem; min-width: 9rem; padding: 0.4rem 0.7rem;
+  background: var(--surface); color: var(--text); border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+}
 @media (max-width: 640px) {
   .strip-cell { flex: 1 1 33%; min-width: 0; padding-inline: 0.75rem; }
   .strip-cell:first-child { padding-left: 0.75rem; }

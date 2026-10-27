@@ -4,7 +4,7 @@ import { Ghost } from './Skeleton'
 /**
  * The page's own sections, one shown at a time. Arrow keys move between
  * them as a tablist should; a count is dimmed at 0 and a ghost while the
- * page is still loading.
+ * page is still loading. With no `current` nothing is selected yet.
  */
 export default function PageTabs({ label, tabs, current, onChange, idPrefix }) {
   function onKeyDown(event) {
@@ -18,7 +18,7 @@ export default function PageTabs({ label, tabs, current, onChange, idPrefix }) {
   }
   return (
     <div className="page-tabs" role="tablist" aria-label={label} onKeyDown={onKeyDown}>
-      {tabs.map((tab) => (
+      {tabs.map((tab, i) => (
         <button
           key={tab.id}
           id={`${idPrefix}-tab-${tab.id}`}
@@ -26,7 +26,7 @@ export default function PageTabs({ label, tabs, current, onChange, idPrefix }) {
           role="tab"
           aria-selected={tab.id === current}
           aria-controls={`${idPrefix}-panel`}
-          tabIndex={tab.id === current ? 0 : -1}
+          tabIndex={tab.id === current || (current == null && i === 0) ? 0 : -1}
           onClick={() => onChange(tab.id)}
         >
           <Icon name={tab.icon} />

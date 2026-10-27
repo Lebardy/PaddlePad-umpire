@@ -47,7 +47,7 @@ export function umpireChoices({ warnings, leftOpen }) {
   return [...new Set([...warnings.map((w) => w.umpireName), ...leftOpen.map((s) => s.openedBy)].filter(Boolean))].sort()
 }
 
-const newLine = (n) => (n === 0 ? 'none this week' : `+${n} this week`)
+const newLine = (n) => `+${n} this week`
 /** The owner's number strip: what is live, then the totals. */
 export function ownerCells({ live, totals }) {
   return [

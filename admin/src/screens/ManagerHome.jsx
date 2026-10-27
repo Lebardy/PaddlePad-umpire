@@ -5,7 +5,7 @@ import BoardStrip from '../components/BoardStrip'
 import PageBoard from '../components/PageBoard'
 import PageTabs from '../components/PageTabs'
 import SessionCard from '../components/SessionCard'
-import { RowsSkeleton } from '../components/Skeleton'
+import { Ghost, RowsSkeleton } from '../components/Skeleton'
 import { AllClear, LeftOpenTable, MatchTable } from '../components/WorthALook'
 import { fetchFacility, listPastSessions } from '../lib/api'
 import { clockText, dayHeading, timeOfDay } from '../lib/format'
@@ -102,7 +102,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
         title={<span className="home-title"><FacilityLogo name={name} logoUrl={facility?.logoUrl} />{name}</span>}
         intro={facility?.area}
       >
-        {data && <div className="as-of">Up to date as of <b>{clockText(data.asOf)}</b></div>}
+        <div className="as-of">{data ? <>Up to date as of <b>{clockText(data.asOf)}</b></> : <Ghost variant="label" style={{ width: '14rem' }} />}</div>
         {data?.totals.sessions.count === 0 ? (
           <p className="page-board-intro">Nothing has been scored here yet.</p>
         ) : (
@@ -125,7 +125,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
         <PageTabs
           idPrefix="home"
           label="Overview"
-          current={current}
+          current={tab}
           onChange={setTab}
           tabs={[
             { id: 'needs', label: 'Needs you', icon: 'alert', count: data ? waiting : null },
@@ -134,7 +134,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
             { id: 'place', label: 'Place & umpires', icon: 'pin' },
           ]}
         />
-        <div id="home-panel" role="tabpanel" aria-labelledby={`home-tab-${current}`} aria-busy={!data || undefined}>
+        <div id="home-panel" role="tabpanel" aria-labelledby={tab ? `home-tab-${tab}` : undefined} aria-busy={!data || undefined}>
           {settling && <RowsSkeleton rows={4} />}
 
           {!settling && current === 'needs' && (!data ? (error ? null : <RowsSkeleton rows={4} />) : (
@@ -161,15 +161,15 @@ export default function ManagerHome({ me, data, error, now, actions }) {
             <>
               <div className="worth-filters">
                 <label>
-                  <span>Umpire</span>
-                  <select value={umpireId} onChange={(e) => filterBy({ umpireId: e.target.value, when })}>
+                  <Icon name="clipboard" size={16} />
+                  <select aria-label="Umpire" value={umpireId} onChange={(e) => filterBy({ umpireId: e.target.value, when })}>
                     <option value="">Any</option>
                     {umpires.map((umpire) => <option key={umpire.id} value={umpire.id}>{umpire.name}</option>)}
                   </select>
                 </label>
                 <label>
-                  <span>When</span>
-                  <select value={when} onChange={(e) => filterBy({ umpireId, when: e.target.value })}>
+                  <Icon name="calendar" size={16} />
+                  <select aria-label="When" value={when} onChange={(e) => filterBy({ umpireId, when: e.target.value })}>
                     <option value="7">Last 7 days</option>
                     <option value="30">Last 30 days</option>
                     <option value="all">Everything</option>
@@ -228,7 +228,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
           {current === 'place' && (
             <div className="home-place">
               <div>
-                <h2 className="section-title"><Icon name="pin" />Your place</h2>
+                <h2 className="section-title"><Icon name="pin" /><span className="sr-only">Place</span></h2>
                 {facilityError && <p className="form-error" role="alert">{facilityError}</p>}
                 {!facility && !facilityError && <RowsSkeleton rows={4} />}
                 {facility && (
@@ -245,7 +245,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
               </div>
 
               <div>
-                <h2 className="section-title"><Icon name="clipboard" />Your umpires</h2>
+                <h2 className="section-title"><Icon name="clipboard" /><span className="sr-only">Umpires</span></h2>
                 {!data && <RowsSkeleton rows={4} />}
                 {data && (
                   <>

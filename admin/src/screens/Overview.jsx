@@ -5,7 +5,7 @@ import BoardStrip from '../components/BoardStrip'
 import MergeDialog from '../components/MergeDialog'
 import SessionCard from '../components/SessionCard'
 import PageTabs from '../components/PageTabs'
-import { RowsSkeleton } from '../components/Skeleton'
+import { Ghost, RowsSkeleton } from '../components/Skeleton'
 import VoidDialog from '../components/VoidDialog'
 import WorthALook from '../components/WorthALook'
 import { fetchOverview, markLooksFine, markNotSamePerson, unvoidMatch } from '../lib/api'
@@ -153,7 +153,7 @@ export default function Overview({ me, facilityLabel }) {
   const showFacility = isOwner && !facilityId
   return (
     <section>
-      <header className="board-texture">
+      <header className="board-texture overview-board">
         <div className="overview-head">
           <div>
             <h1>Overview</h1>
@@ -165,7 +165,7 @@ export default function Overview({ me, facilityLabel }) {
           </div>
           <div className="board-head-group">
             <FacilityPicker me={me} value={facilityId} onChange={setFacilityId} includeAll variant="board" />
-            {data && <div className="as-of">Up to date as of <b>{clockText(data.asOf)}</b> · refreshes every 30 s</div>}
+            <div className="as-of">{data ? <>Up to date as of <b>{clockText(data.asOf)}</b> · refreshes every 30 s</> : <Ghost variant="label" style={{ width: '14rem' }} />}</div>
           </div>
         </div>
         <BoardStrip loading={loading && !error} cellCount={7} cells={loading ? [] : ownerCells(data)} />
@@ -173,18 +173,17 @@ export default function Overview({ me, facilityLabel }) {
 
       <div className="sheet">
         {error && <p className="form-error" role="alert">{error}</p>}
-        {facilityId && data && <p className="hint">Players counts everyone who has played at {data.facilityName}.</p>}
         <PageTabs
           idPrefix="overview"
           label="Overview"
-          current={tab ?? 'look'}
+          current={tab}
           onChange={setTab}
           tabs={[
             { id: 'now', label: 'Right now', icon: 'live', count: loading ? null : data.sessions.length },
             { id: 'look', label: 'Worth a look', icon: 'alert', count: loading ? null : worthChips(data)[0].count },
           ]}
         />
-        <div id="overview-panel" role="tabpanel" aria-labelledby={`overview-tab-${tab ?? 'look'}`} aria-busy={loading || undefined}>
+        <div id="overview-panel" role="tabpanel" aria-labelledby={tab ? `overview-tab-${tab}` : undefined} aria-busy={loading || undefined}>
           {loading ? (error ? null : <RowsSkeleton rows={6} />) : tab === 'now' ? (
             data.sessions.length === 0
               ? <p className="empty">Nothing live right now.</p>

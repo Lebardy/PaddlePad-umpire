@@ -38,7 +38,7 @@ check('duplicates ignore filters', filterWorth(data, { chip: 'all', umpire: 'Pao
 check('umpire choices', umpireChoices(data), ['Noel Garcia', 'Paolo Sy', 'Tessa Ramos'])
 const totals = { players: { count: 1200, newThisWeek: 0 }, matches: { count: 3, newThisWeek: 2 }, sessions: { count: 1, newThisWeek: 1 }, umpires: { active: 2, notActive: 1 }, ratings: null }
 check('owner strip', ownerCells({ live: { sessions: 0 }, totals }).map((c) => [c.key, c.figure, c.sub]),
-  [['live', 0, 'Nothing live'], ['players', '1,200', 'none this week'], ['matches', '3', '+2 this week'], ['sessions', '1', '+1 this week'], ['umpires', 2, '1 not scoring'], ['ratings', 'Not yet', '']])
+  [['live', 0, 'Nothing live'], ['players', '1,200', '+0 this week'], ['matches', '3', '+2 this week'], ['sessions', '1', '+1 this week'], ['umpires', 2, '1 not scoring'], ['ratings', 'Not yet', '']])
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

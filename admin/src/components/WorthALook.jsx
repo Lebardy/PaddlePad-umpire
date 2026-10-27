@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Icon from './Icon'
 import VideoMark from './VideoMark'
 import { Link } from '../lib/router'
 import { agoText, countWord, formatWhen } from '../lib/format'
@@ -84,8 +85,6 @@ function WarningRow({ warning, showFacility, now, actions }) {
     </tr>
   )
 }
-
-const MATCH_NOTE = 'Void takes a match out of stats and ratings; it can be undone'
 
 /** What a chip says once everything under it is cleared, and its note. */
 const CHIP_TEXT = {
@@ -181,6 +180,7 @@ export default function WorthALook({ warnings, leftOpen, duplicates, showFacilit
 
   return (
     <div>
+      <div className="worth-bar">
       <div className="worth-chips" role="group" aria-label="Why it’s worth a look">
         {worthChips(data).map((c) => (
           <button key={c.id} type="button" className="worth-chip" aria-pressed={chip === c.id} onClick={() => pick(setChip, c.id)}>
@@ -190,19 +190,20 @@ export default function WorthALook({ warnings, leftOpen, duplicates, showFacilit
       </div>
       <div className="worth-filters">
         <label>
-          <span>Umpire</span>
-          <select value={who} onChange={(e) => pick(setUmpire, e.target.value)}>
+          <Icon name="clipboard" size={16} />
+          <select aria-label="Umpire" value={who} onChange={(e) => pick(setUmpire, e.target.value)}>
             <option value="">Any</option>
             {umpireChoices(data).map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
         </label>
         <label>
-          <span>When</span>
-          <select value={days} onChange={(e) => pick(setDays, Number(e.target.value))}>
+          <Icon name="calendar" size={16} />
+          <select aria-label="When" value={days} onChange={(e) => pick(setDays, Number(e.target.value))}>
             <option value={7}>Last 7 days</option>
             <option value={30}>Last 30 days</option>
           </select>
         </label>
+      </div>
       </div>
 
       {total === 0 ? (
@@ -218,7 +219,7 @@ export default function WorthALook({ warnings, leftOpen, duplicates, showFacilit
           {shownLeftOpen.length > 0 && <LeftOpenTable sessions={shownLeftOpen} showFacility={showFacility} actions={actions} />}
           {shownDuplicates.length > 0 && <DuplicatePlayers pairs={shownDuplicates} actions={duplicateActions} />}
           <div className="table-foot">
-            <span>Showing {shown} of {total} · {text?.note ?? MATCH_NOTE}</span>
+            <span>Showing {shown} of {total}{text?.note && ` · ${text.note}`}</span>
             {shown < total && <button type="button" className="btn-quiet btn-small" onClick={() => setShowAll(true)}>Show {total - shown} more</button>}
           </div>
         </>
