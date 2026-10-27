@@ -4248,7 +4248,8 @@ async function main() {
 main().catch(async (error) => {
   console.error('\nsmoke test crashed:', error)
   // A crash used to skip the tidy and leave "Smoke ..." players on staging.
-  await closeOpenSessions().catch(() => {})
+  // Tidy first: it removes the sessions too, and closing them can hang after a dropped connection.
   await tidyStaging()?.catch(() => {})
+  await closeOpenSessions().catch(() => {})
   process.exit(1)
 })
