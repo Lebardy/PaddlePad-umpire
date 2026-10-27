@@ -1,8 +1,8 @@
 /**
  * How this player finishes points, and how they play the third shot --
  * step 4 of the Rating screen, which gives it its heading. It moved there
- * from the Overview. "Drop over drive" did not come with it: the Dropper
- * bar in the playstyle step already shows how often they choose the drop.
+ * from the Overview. "Drop over drive" did not come with it: the
+ * playstyle fingerprint already shows how often they choose the drop.
  *
  * Two forms, chosen by what each piece of data is doing:
  *

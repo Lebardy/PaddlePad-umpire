@@ -15,7 +15,7 @@
 // ============================================================
 
 import { deriveMatchState, eventFromRow } from './pickleball.js'
-import { buildPlaystyleProof } from './playstyle.js'
+import { buildPlaystyleProof, nextLevelStyle } from './playstyle.js'
 import { levelForPlayer } from './levels.js'
 import { rallyMatchFor } from './rally-rating.js'
 import { getRallyRatings } from './rally-rating-store.js'
@@ -517,7 +517,9 @@ export async function getStanding(query, playerId) {
   // they missed would describe a group they were not part of.
   const { rows: mine } = await query(
     `SELECT r.run_id, r.skill_group, r.playstyle_cluster,
-            r.playstyle_archetype, r.playstyle_traits, r.evidence
+            r.playstyle_archetype, r.playstyle_traits, r.evidence,
+            run.notes->'structure'->>'playstyleScope' AS scope,
+            run.notes->'structure'->'levels' AS levels
        FROM player_ratings r
        JOIN rating_runs run ON run.id = r.run_id
       WHERE r.player_id = $1
@@ -534,15 +536,17 @@ export async function getStanding(query, playerId) {
 
   const { run_id: runId, skill_group: group } = mine[0]
 
-  // Everyone in the player's group, for its size and for the averages
-  // that prove the style name -- see playstyle.js, including why a style
-  // of one or two is never averaged.
+  // Styles found across everyone are compared with everyone in the run;
+  // older runs found them inside each skill group. Either way, these are
+  // the averages that prove the style name -- see playstyle.js, including
+  // why a style of one or two is never averaged.
+  const everyone = mine[0].scope === 'everyone'
   const { rows: peers } = group
     ? await query(
-        `SELECT playstyle_cluster, playstyle_archetype, evidence
+        `SELECT skill_group, playstyle_cluster, playstyle_archetype, evidence
            FROM player_ratings
-          WHERE run_id = $1 AND skill_group = $2`,
-        [runId, group],
+          WHERE run_id = $1 AND ($3 OR skill_group = $2)`,
+        [runId, group, everyone],
       )
     : { rows: [] }
 
@@ -575,10 +579,11 @@ export async function getStanding(query, playerId) {
     // that earned each word of it.
     playstyleArchetype: mine[0].playstyle_archetype ?? null,
     playstyle,
-    // The clustering's level-1 group and how many share it -- the players
-    // a style is compared with. Never who they are. The name is what the
+    // The clustering's level-1 group and how many share it. Never who they are. The name is what the
     // app strips from the front of the style name (lib/styleName.js).
-    band: group ? { name: group, size: peers.length } : null,
+    band: group ? { name: group, size: peers.filter((p) => p.skill_group === group).length } : null,
+    // The most common style one level up the plate, for runs whose styles span levels.
+    meta: everyone && level ? nextLevelStyle({ peers, level: level.name, levels: mine[0].levels }) : null,
     level,
   }
 }

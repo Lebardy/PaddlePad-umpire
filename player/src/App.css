@@ -1394,80 +1394,53 @@
 .part-arm.is-ahead { left: 50%; background: var(--series-1); }
 .part-arm.is-behind { right: 50%; background: var(--text-muted); }
 
-/* Proof for the playstyle name. */
-.proof { list-style: none; padding: 0; margin: 1rem 0 0; }
-.proof-row + .proof-row { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
-.proof-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.45rem; }
-.proof-word {
-  font-family: var(--label);
-  font-size: 1.1rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.proof-measure { font-size: 0.88rem; color: var(--text-secondary); }
-.proof-better {
-  font-family: var(--label);
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  border: 1px solid var(--border);
-  border-radius: 2px;
-  padding: 0 0.4rem;
-  margin-left: auto;
-}
-.proof-bars,
-.swing-bands { list-style: none; padding: 0; margin: 0.55rem 0 0; }
-/* Bar rows and band rows share one grid, so every track in the list ends
-   at the same place. */
-.proof-bars li,
-.swing-bands li {
-  display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr) 6rem;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.15rem 0;
-}
-.proof-who { font-size: 0.84rem; line-height: 1.25; color: var(--text-muted); }
-.proof-bars li.is-you .proof-who { color: var(--text); font-weight: 700; }
-.proof-track { height: 0.7rem; border-radius: 1px; background: var(--surface-sunken); overflow: hidden; }
-.proof-fill { display: block; height: 100%; background: var(--text-muted); }
-.proof-bars li.is-you .proof-fill { background: var(--series-1); }
-.proof-number { font-size: 0.84rem; font-variant-numeric: tabular-nums; text-align: right; color: var(--text-muted); }
-.proof-bars li.is-you .proof-number { color: var(--text); font-weight: 700; }
-.proof-verdict { display: flex; align-items: center; gap: 0.3rem; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin-top: 0.5rem; }
-.proof-verdict svg { flex: none; }
-/* A swing row: each band is what that player usually does, on one scale. */
-.swing-bands li.is-you .proof-who,
-.swing-bands li.is-you .proof-number { color: var(--text); font-weight: 700; }
-.swing-bands .proof-number { white-space: nowrap; }
-.swing-track { position: relative; height: 22px; }
-.swing-track::before { content: ''; position: absolute; left: 0; right: 0; top: 10px; height: 2px; background: var(--border); }
-.swing-band {
+/* The playstyle card: takeaway, standout, the six-corner fingerprint. */
+.style-takeaway { font-size: 1.05rem; font-weight: 600; line-height: 1.35; color: var(--text); margin: 0.9rem 0 0; }
+.style-standout { display: flex; align-items: center; gap: 0.5rem; font-size: 0.92rem; color: var(--text-secondary); margin: 0.5rem 0 0; }
+.style-standout i { flex: none; width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--series-1); }
+.print { margin: 1rem 0 0; }
+.print-plot { position: relative; }
+.print-chart { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+.print-chart svg { display: block; width: 100%; height: auto; }
+.print-ring { fill: none; stroke: var(--border); }
+.print-style { fill: color-mix(in srgb, var(--lamp) 35%, transparent); stroke: var(--primary); stroke-width: 2; }
+.print-you { fill: none; stroke: var(--series-1); stroke-width: 2.5; stroke-linejoin: round; }
+.print-dot { fill: var(--series-1); }
+.print-word {
   position: absolute;
-  top: 4px;
-  height: 14px;
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--text-muted) 70%, var(--surface));
-  /* --left and --width are percents of the track. A band too narrow to
-     see (matches that never vary) is a 10px pill centred where it sits,
-     kept inside the track. */
-  left: clamp(0px, calc((var(--left) + var(--width) / 2) * 1% - max(var(--width) * 0.5%, 5px)), calc(100% - 10px));
-  width: max(var(--width) * 1%, 10px);
-}
-.swing-bands li.is-you .swing-band { background: var(--series-1); }
-.swing-ends {
-  display: flex;
-  justify-content: space-between;
   font-family: var(--label);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
+  font-size: min(0.9rem, 3.7vw);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
   color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
+  transform: translate(-50%, -50%);
 }
+.print-word.is-standout { color: var(--series-1); }
+.print-word.is-standout::before { content: ''; display: inline-block; width: 0.4rem; height: 0.4rem; margin-right: 0.3rem; border-radius: 50%; background: var(--series-1); }
+.print-word.is-named { padding: 0.3rem min(0.35rem, 1vw); border: 1.5px solid var(--lamp); border-radius: 4px; background: var(--board); color: var(--lamp); }
+.print-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; padding: 0 0.9rem 0.8rem; font-size: 0.85rem; color: var(--text-secondary); }
+.print-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+.print-legend small { flex-basis: 100%; font-size: 0.85rem; color: var(--text-secondary); }
+:root[data-theme='dark'] .print-style { fill: color-mix(in srgb, var(--lamp) 55%, transparent); }
+:root[data-theme='dark'] .key-style { background: color-mix(in srgb, var(--lamp) 55%, transparent); }
+.print-key { display: inline-block; flex: none; }
+.key-you { width: 0.9rem; height: 3px; background: var(--series-1); }
+.key-style { width: 0.8rem; height: 0.8rem; background: color-mix(in srgb, var(--lamp) 45%, transparent); border: 1.5px solid var(--primary); }
+.key-name { width: 0.9rem; height: 0.9rem; border-radius: 3px; background: var(--board); border: 1.5px solid var(--lamp); }
+.style-meta { display: flex; align-items: center; gap: 0.6rem; margin: 0.9rem 0 0; padding: 0.65rem 0.8rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font-size: 0.92rem; }
+.style-meta svg { flex: none; color: var(--primary); }
+.numbers { list-style: none; padding: 0; margin: 0; }
+.numbers li { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); gap: 0.5rem; align-items: baseline; padding: 0.3rem 0; font-variant-numeric: tabular-nums; font-size: 0.88rem; }
+.numbers li.is-named { padding-left: 0.5rem; box-shadow: inset 3px 0 var(--lamp); }
+.numbers li.is-named span:first-child { color: var(--primary); }
+.numbers li + li { border-top: 1px solid var(--border); }
+.numbers li span + span { text-align: right; }
+.numbers li:not(.numbers-head) span:first-child { font-family: var(--label); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+.numbers li svg { margin-left: 0.25rem; vertical-align: -2px; color: var(--text-muted); }
+.numbers-head { font-family: var(--label); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
 
 /* ============ People ============ */
 
@@ -2145,11 +2118,6 @@ a.person-row:active { background: var(--surface-sunken); }
 .pip { height: 2.7rem; padding: 0.45rem; background: var(--board); color: var(--lamp); border: 1.5px solid var(--lamp); border-top: 0; border-radius: 0 0 2px 2px; }
 .pip + .pip { border-left: 0; }
 .pip .mark { width: 100%; height: 100%; }
-.proof-word { display: inline-flex; align-items: center; gap: 0.4rem; }
-.proof-word .mark { flex: none; width: 1.6rem; height: 1.6rem; padding: 0.24rem; background: var(--board); color: var(--lamp); border-radius: 2px; }
-.proof-word .mini { flex: none; width: 1.6rem; }
-/* With a picture in front of the word, the row lines up on centres. */
-.proof-head { align-items: center; }
 
 /* The emblem draws itself the first time it is scrolled to: the court's
    lines, the net, the lit part switching on, then the marks docking. */
@@ -2436,10 +2404,6 @@ a.person-row:active { background: var(--surface-sunken); }
 .graph-span { grid-column: 1 / -1; margin: 0; }
 .points-basis { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem; }
 .moving { margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
-
-/* The all-court word carries two measurements; keep them apart. */
-.proof-bars + .proof-head,
-.proof-verdict + .proof-head { margin-top: 0.8rem; }
 
 /* Step 1's arithmetic: gains green, losses red, and the sum beneath. */
 .part .is-up { color: var(--status-good); }
@@ -3009,7 +2973,7 @@ a.person-row:active { background: var(--surface-sunken); }
 :root[data-theme='dark'] .level-row.is-mine .level-row-emblem { color: var(--lamp); --emblem-cut: color-mix(in srgb, var(--lamp) 12%, var(--surface)); }
 
 /* The share line under the style, with its people icon. */
-.share-line { display: flex; align-items: center; gap: 8px; }
+.share-line { display: flex; align-items: center; gap: 8px; margin-top: 0.4rem; line-height: 1.3; }
 .share-line svg { flex: none; color: var(--text-muted); }
 
 @media (prefers-reduced-motion: reduce) {

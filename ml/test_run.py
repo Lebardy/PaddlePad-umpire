@@ -171,6 +171,21 @@ check("and how many components carried how much of the spread",
       str(extraction))
 print(f"       groups found: {structure['skillGroups']}")
 
+# Styles are found once over every player, so a style can hold players
+# from several skill groups, and its name has no group word in front.
+check("every player keeps a real skill group",
+      set(final["skill_group"]) <= set(structure["skillGroups"]),
+      f"{set(final['skill_group']) - set(structure['skillGroups'])}")
+check("the run says styles were found across everyone",
+      structure.get("playstyleScope") == "everyone", str(structure.get("playstyleScope")))
+style_names = final["playstyle_archetype"].dropna()
+check("no style name starts with a group or pool word",
+      not style_names.str.match(r"^(Everyone|Developing|Intermediate|Advanced|Higher|Lower|Group) ").any(),
+      str(style_names.unique()[:5]))
+check("one cluster id means one style name across the run",
+      final.dropna(subset=["playstyle_cluster"]).groupby("playstyle_cluster")["playstyle_archetype"].nunique().max() == 1,
+      "a cluster id was reused by two styles")
+
 # THE REGRESSION THIS FILE EXISTS FOR.
 #
 # The reference driver in the ML repo hardcodes two skill groups and
@@ -202,7 +217,7 @@ else:
             break
     else:
         print("       no three-group seed found in 40 tries; "
-              "the loop is still what makes it safe")
+              "the integrity check is still what makes it safe")
 
 
 print("\ngroup names")
