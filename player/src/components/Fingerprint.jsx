@@ -9,14 +9,14 @@
 
 import { outline, reach } from '../lib/fingerprint'
 
-const BOX = { cx: 195, cy: 190, r: 100 }
+const BOX = { cx: 195, cy: 190, r: 92 }
 const RINGS = [0.25, 0.75, 1]
 const flat = (k) => outline(Array(6).fill(k), BOX)
 // Label spots: the viewBox is 390 wide and 296 tall starting at y 50.
 const place = (i) => {
   const a = ((-90 + i * 60) * Math.PI) / 180
   const side = i === 0 || i === 3 ? 'mid' : i < 3 ? 'right' : 'left'
-  const gap = side === 'mid' ? 20 : 8
+  const gap = side === 'mid' ? 20 : 6
   const x = BOX.cx + BOX.r * Math.cos(a) + (side === 'right' ? gap : side === 'left' ? -gap : 0)
   const y = BOX.cy + BOX.r * Math.sin(a) + (side === 'mid' ? (i === 0 ? -gap : gap) : 0)
   return { side, style: { left: `${(x / 390) * 100}%`, top: `${((y - 50) / 296) * 100}%` } }

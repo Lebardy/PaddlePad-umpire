@@ -1408,7 +1408,7 @@
 .print-word {
   position: absolute;
   font-family: var(--label);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.02em;
@@ -1419,7 +1419,7 @@
 }
 .print-word.is-right { transform: translate(0, -50%); }
 .print-word.is-left { transform: translate(-100%, -50%); }
-.print-word.is-named { padding: 0.3rem 0.4rem; border-radius: 4px; background: var(--board); color: var(--lamp); }
+.print-word.is-named { padding: 0.3rem 0.35rem; border-radius: 4px; background: var(--board); color: var(--lamp); }
 .print-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; margin-top: 0.7rem; font-size: 0.85rem; color: var(--text-secondary); }
 .print-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
 .print-legend small { flex-basis: 100%; font-size: 0.85rem; color: var(--text-secondary); }
