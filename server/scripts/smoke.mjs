@@ -139,6 +139,24 @@ async function closeOpenSessions(umpireId = null) {
   return left
 }
 
+/** Asks staging to remove what this run made; null when this server is not staging. */
+function tidyStaging() {
+  if (!(/staging|localhost|127\.0\.0\.1/.test(API) && process.env.SMOKE_INTERNAL_KEY)) return null
+  return fetch(`${API}/internal/smoke-tidy`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-internal-key': process.env.SMOKE_INTERNAL_KEY },
+    body: JSON.stringify({
+      umpireIds: [...made.umpireIds],
+      adminIds: [...made.adminIds],
+      facilityIds: [...made.facilityIds],
+      playerIds: [...made.playerIds, ...selfRegistered],
+      inviteCodes: [...made.inviteCodes],
+      nightsOf: smokeUmpireId,
+      activityOf: smokeOwnerId,
+    }),
+  })
+}
+
 // Guards the tidy below from tidying its own requests.
 let tidying = false
 
@@ -4211,20 +4229,8 @@ async function main() {
   // Staging turns this route on with SMOKE_TIDY=on; production does not
   // have it. Without it, every run left its umpires, admins, places,
   // players and nights behind, and staging filled up with them.
-  if (/staging|localhost|127\.0\.0\.1/.test(API) && process.env.SMOKE_INTERNAL_KEY) {
-    const tidy = await fetch(`${API}/internal/smoke-tidy`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-key': process.env.SMOKE_INTERNAL_KEY },
-      body: JSON.stringify({
-        umpireIds: [...made.umpireIds],
-        adminIds: [...made.adminIds],
-        facilityIds: [...made.facilityIds],
-        playerIds: [...made.playerIds, ...selfRegistered],
-        inviteCodes: [...made.inviteCodes],
-        nightsOf: smokeUmpireId,
-        activityOf: smokeOwnerId,
-      }),
-    })
+  const tidy = await tidyStaging()
+  if (tidy) {
     const removed = await tidy.json().catch(() => ({}))
     check('what this run made is removed again -> 200', tidy.status === 200,
       tidy.status === 404 ? 'SMOKE_TIDY is not on for this server' : JSON.stringify(removed).slice(0, 120))
@@ -4239,7 +4245,11 @@ async function main() {
   process.exit(fail ? 1 : 0)
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   console.error('\nsmoke test crashed:', error)
+  // A crash used to skip the tidy and leave "Smoke ..." players on staging.
+  // Tidy first: it removes the sessions too, and closing them can hang after a dropped connection.
+  await tidyStaging()?.catch(() => {})
+  await closeOpenSessions().catch(() => {})
   process.exit(1)
 })
