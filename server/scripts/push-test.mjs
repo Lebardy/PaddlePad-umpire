@@ -118,7 +118,7 @@ for (const [key, p] of Object.entries(PEOPLE)) {
 if (cmd === 'code') {
   console.log(`On the phone, open ${PLAY}`)
   console.log(`Sign in with username ${PEOPLE.phone.username} and password ${password}`)
-  console.log('Then turn the alert bell on and allow notifications.')
+  console.log('Then open You, turn Alerts on and allow notifications.')
   process.exit(0)
 }
 
