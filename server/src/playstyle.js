@@ -65,9 +65,12 @@ function round(value) {
   return value === null ? null : Math.round(value * 10_000) / 10_000
 }
 
+// A missing value is left out: Number(null) is 0 and would drag the average.
 function valuesOf(rows, feature) {
   return rows
-    .map((row) => Number(row.evidence?.[feature]))
+    .map((row) => row.evidence?.[feature])
+    .filter((value) => value !== null && value !== undefined)
+    .map(Number)
     .filter((value) => Number.isFinite(value))
 }
 
@@ -122,20 +125,20 @@ export function buildCorners({ traits, mine, compare, sameStyle }) {
 const SAYS = {
   'error_to_winner_ratio:lower': 'makes fewer mistakes',
   'drop_efficiency_mean:higher': 'lands its drops',
-  'drop_preference_rate_mean:higher': 'drops more than it drives',
-  'drop_preference_rate_mean:lower': 'drives more than it drops',
-  'net_game_preference_rate_mean:higher': 'wins more at the net',
-  'net_game_preference_rate_mean:lower': 'wins more from the back',
+  'drop_preference_rate_mean:higher': 'chooses drops over drives',
+  'drop_preference_rate_mean:lower': 'chooses drives over drops',
+  'net_game_preference_rate_mean:higher': 'plays more at the net',
+  'net_game_preference_rate_mean:lower': 'plays more from the back',
   'aggression_std:lower': 'finishes points the same way every match',
   'aggression_std:higher': 'mixes up how it finishes points',
   'winner_rate_std:lower': 'scores at an even pace',
   'winner_rate_std:higher': 'scores in streaks',
-  'drop_efficiency_std:lower': 'lands drops just as well every match',
-  'drop_efficiency_std:higher': 'has drops that come and go',
+  'drop_efficiency_std:lower': 'keeps its drops steady from match to match',
+  'drop_efficiency_std:higher': 'has good and bad drop days',
   'general_error_rate_std:lower': 'keeps its mistakes level',
-  'general_error_rate_std:higher': 'has mistakes that come and go',
-  'dink_error_rate_std:lower': 'stays solid at the net',
-  'dink_error_rate_std:higher': 'has net mistakes that come and go',
+  'general_error_rate_std:higher': 'has good and bad days for mistakes',
+  'dink_error_rate_std:lower': 'keeps its kitchen game steady',
+  'dink_error_rate_std:higher': 'has good and bad days in the kitchen',
 }
 
 /** "Your style makes fewer mistakes, … and drives more than it drops." */
@@ -155,12 +158,12 @@ const STANDS_OUT = {
   error_to_winner_ratio: 'fewer mistakes',
   drop_efficiency_mean: 'drops that land',
   drop_preference_rate_mean: 'choosing drops',
-  net_game_preference_rate_mean: 'winning at the net',
+  net_game_preference_rate_mean: 'playing at the net',
   aggression_std: 'finishing the same way every match',
   winner_rate_std: 'scoring at an even pace',
-  drop_efficiency_std: 'drops that land every match',
+  drop_efficiency_std: 'steady drops',
   general_error_rate_std: 'keeping mistakes level',
-  dink_error_rate_std: 'a solid net game',
+  dink_error_rate_std: 'a steady kitchen game',
 }
 
 /** The corner the player reaches furthest past the average (at least half a spread), not in the name. */

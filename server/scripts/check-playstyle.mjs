@@ -283,9 +283,23 @@ check('All-Court boxes neither identity corner', buildCorners({ traits: [{ label
   mine: everyone[0], compare: everyone, sameStyle: everyone }).map((c) => c.word),
   ['Clean', 'Precise', 'Dropper', 'Net Player', 'Steady', 'Consistent'], 'no feature, so the default words stay')
 
+for (const [label, feature] of [['Composed', 'general_error_rate_std'], ['Solid-Net', 'dink_error_rate_std']]) {
+  const c = buildCorners({ traits: [{ label, feature, family: 'consistency', direction: 'below', z: -0.5 }],
+    mine: everyone[0], compare: everyone.map((e) => ({ evidence: { ...e.evidence, [feature]: 0.2 } })), sameStyle: everyone })
+  check(`${label} takes the sixth corner`, [c[5].word, c[5].feature, c[5].out, c[5].inName], [label, feature, 'lower', true],
+    'the name\'s other steadiness measure shows in place of Consistent')
+}
+const zeros = buildCorners({ traits: [], mine: { evidence: { aggression_std: 0 } }, compare: [{ evidence: { aggression_std: 0 } }, { evidence: { aggression_std: 0 } }], sameStyle: everyone })
+check('a comparison set of all zeros gives nulls', [zeros[4].you, zeros[4].style, zeros[4].mean, zeros[4].spread], [null, null, null, null],
+  'nothing recorded is not the same as everyone at zero')
+const withGap = buildCorners({ traits: [], mine: everyone[0], sameStyle: everyone,
+  compare: [...everyone, { evidence: { ...everyone[0].evidence, drop_preference_rate_mean: null } }] })
+check('a peer with a null value does not change mean or spread', [withGap[2].mean, withGap[2].spread], [0.5, 0.1826],
+  'Number(null) is 0, which would pull the mean to .43 and widen the spread')
+
 section('takeaway')
 check('one sentence from the name words, in name order', takeaway(driverTraits),
-  'Your style makes fewer mistakes, has drops that come and go and drives more than it drops.', '')
+  'Your style makes fewer mistakes, has good and bad drop days and chooses drives over drops.', '')
 check('all-court gets its own phrase', takeaway([{ label: 'Steady', feature: 'aggression_std', direction: 'below' },
   { label: 'All-Court Player', family: 'identity' }]),
   'Your style finishes points the same way every match and plays every part of the court.', '')
