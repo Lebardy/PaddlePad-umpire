@@ -6,7 +6,7 @@ import { bucketConfig } from '../bucket.js'
 import { recordActivity } from '../admin-activity.js'
 import {
   CONFIRM_MERGE_MESSAGE, NOT_FLAGGED_MESSAGE, NOT_LEFT_OPEN_MESSAGE, NOT_OVERVIEW_VOID_MESSAGE, REASONS, SESSION_REASON_MESSAGE,
-  hasSignIn, mergeRefusal, pairKey, readVoidReason,
+  hasSignIn, mergeRefusal, pairKey, readPastSessionFilters, readVoidReason,
 } from '../overview-rules.js'
 import {
   closeSession, loadMatchForAction, loadOverview, loadPastSessions, loadSessionForAction, matchLabel, matchReasonsNow, mergePlayers, sessionLabel,
@@ -57,7 +57,9 @@ router.get('/', async (req, res) => {
 /** Finished sessions, five at a time, for a manager's home page. Read-only. */
 router.get('/past-sessions', async (req, res) => {
   const filter = facilityFilterFor(req.admin, isUuid(req.query.facilityId) ? req.query.facilityId : null)
-  res.json(await loadPastSessions(query, filter, req.query.before))
+  const narrow = readPastSessionFilters(req.query)
+  if (narrow.error) return res.status(400).json({ error: narrow.error })
+  res.json(await loadPastSessions(query, filter, req.query.before, narrow))
 })
 
 router.post('/looks-fine', async (req, res) => {
