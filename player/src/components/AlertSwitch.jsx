@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fetchPushKey, removePush, savePush } from '../lib/api'
 import Icon from './Icon'
 
@@ -12,14 +12,17 @@ const iPhone = /iPhone|iPad|iPod/.test(navigator.userAgent)
 const standalone = window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true
 
 /**
- * "Tell me when they join open play". Asks the phone only when tapped.
- * Hidden where alerts are off on the server or the browser cannot push;
+ * "Alert me when a rival or partner joins open play", a section of You. Asks the phone only when tapped.
+ * Hidden, heading and all, where alerts are off on the server or the browser cannot push;
  * on an iPhone outside the Home Screen it says how to get there, since
  * Apple allows web push only from there.
  */
-function AlertBell() {
-  const [state, setState] = useState('loading') // loading | hidden | install | blocked | off | on | busy
+function AlertSwitch() {
+  const [state, setState] = useState('loading') // loading | hidden | install | blocked | off | on
   const [key, setKey] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const note = useRef(null)
+  const tapped = useRef(false)
 
   useEffect(() => {
     let live = true
@@ -40,10 +43,11 @@ function AlertBell() {
   }, [])
 
   async function toggle() {
-    if (state !== 'on' && state !== 'off') return
+    if (busy || (state !== 'on' && state !== 'off')) return
     const was = state
     let subscription = null
-    setState('busy')
+    setBusy(true)
+    tapped.current = true
     try {
       // Asked before any await: iPhone only shows the prompt inside the tap.
       const asked = was === 'on' ? null : Notification.requestPermission()
@@ -64,25 +68,34 @@ function AlertBell() {
       // Subscribed here but the server never heard: drop it, or the next load says "on" with no alerts coming.
       await subscription?.unsubscribe().catch(() => {})
       setState(was)
+    } finally {
+      setBusy(false)
     }
   }
 
+  // Refusing the permission swaps the switch for the note: keep the keyboard on the page.
+  useEffect(() => {
+    if (state === 'blocked' && tapped.current) note.current?.focus()
+  }, [state])
+
   if (state === 'loading' || state === 'hidden') return null
-  if (state === 'install' || state === 'blocked') {
-    return (
-      <p className="alert-bell-note">
-        <Icon name="bell" size={18} />
-        {state === 'install' ? 'Add PaddlePad to your Home Screen first' : 'Notifications are blocked in your phone’s settings'}
-      </p>
-    )
-  }
-  const on = state === 'on'
+  const words = state === 'install' ? 'Add PaddlePad to your Home Screen first' : 'Notifications are blocked in your phone’s settings'
   return (
-    <button type="button" className={on ? 'alert-bell is-on' : 'alert-bell'} aria-pressed={on} aria-busy={state === 'busy'} onClick={toggle}>
-      <Icon name="bell" size={20} />
-      {on ? 'Alerts on' : 'Tell me when they join open play'}
-    </button>
+    <section className="you-section" aria-label="Alerts">
+      <h2 className="you-head">
+        <Icon name="bell" size={16} />
+        Alerts
+      </h2>
+      {state === 'install' || state === 'blocked' ? (
+        <p ref={note} tabIndex={-1}>{words}</p>
+      ) : (
+        <button type="button" className="you-switch" role="switch" aria-checked={state === 'on'} aria-busy={busy} onClick={toggle}>
+          <span>Alert me when a rival or partner joins open play</span>
+          <span className="you-switch-track" aria-hidden="true"><span /></span>
+        </button>
+      )}
+    </section>
   )
 }
 
-export default AlertBell
+export default AlertSwitch

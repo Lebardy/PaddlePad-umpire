@@ -1508,7 +1508,7 @@
   color: inherit;
   text-decoration: none;
 }
-.person-row:active { background: var(--surface-sunken); }
+a.person-row:active { background: var(--surface-sunken); }
 .person-main { display: flex; flex-direction: column; min-width: 0; }
 .person-name { font-weight: 600; font-size: 0.98rem; line-height: 1.25; overflow-wrap: anywhere; }
 .person-roles { font-size: 0.8rem; color: var(--text-muted); }
@@ -1516,68 +1516,10 @@
 .person-when { font-size: 0.75rem; letter-spacing: 0.06em; color: var(--text-muted); white-space: nowrap; }
 .person-form { display: flex; gap: 2px; list-style: none; margin: 0; padding: 0; }
 
-/* Rivals and best partners: one short table under the facts strip. */
-.rivals {
-  background: var(--surface);
-  margin-inline: calc(var(--gutter) * -1);
-  margin-bottom: 1.25rem;
-  border-bottom: 1px solid var(--border);
-}
-@media (min-width: 640px) { .rivals { margin-inline: 0; } }
-.rivals-list { list-style: none; margin: 0; padding: 0; }
-.rivals-list li + li { border-top: 1px solid var(--border); }
-.rivals-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.75rem;
-  min-height: 2.75rem;
-  padding: 0.4rem var(--gutter);
-  color: inherit;
-  text-decoration: none;
-}
-a.rivals-row:active { background: var(--surface-sunken); }
-.rivals-row svg { color: var(--primary); }
-.rivals-name { font-weight: 600; font-size: 0.98rem; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rivals-figure { font-family: var(--display); font-weight: 900; font-size: 1.15rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.rivals-row--quiet, .rivals-row--quiet svg { color: var(--text-muted); }
-.rivals-row--quiet .rivals-name { font-weight: 500; }
-
-/* The open play bell under the rivals list. On = new words, a tint and
-   a green icon, so it is never colour alone. */
-.alert-bell {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  width: 100%;
-  min-height: 2.75rem;
-  padding: 0.4rem var(--gutter);
-  border: 0;
-  border-top: 1px solid var(--border);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-}
-.alert-bell svg { color: var(--primary); flex: none; }
-.alert-bell:active { background: var(--surface-sunken); }
-.alert-bell:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
-.alert-bell.is-on { background: var(--status-good-soft); }
-.alert-bell.is-on svg { color: var(--status-good); }
-.alert-bell[aria-busy="true"] { opacity: 0.6; }
-.alert-bell-note {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin: 0;
-  padding: 0.75rem var(--gutter);
-  border-top: 1px solid var(--border);
-  color: var(--text-muted);
-  font-size: 0.9rem;
-}
-.alert-bell-note svg { flex: none; }
+.person-tag { display: flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; font-weight: 600; color: var(--primary); white-space: nowrap; }
+.person-tag svg { flex: none; }
+.person-row--quiet { display: flex; min-height: 2.75rem; color: var(--text-muted); font-size: 0.9rem; }
+.person-list li.person-split { border-top: 4px solid var(--text-muted); }
 
 /* Appears with "Show all" once the list is long. 1rem stops iOS zooming
    in on focus. */
@@ -3160,8 +3102,8 @@ a.rivals-row:active { background: var(--surface-sunken); }
   display: block; width: 1rem; height: 1rem; border-radius: 50%;
   background: var(--text-muted); transition: transform 0.15s ease, background 0.15s ease;
 }
-.you-switch[aria-checked="true"] .you-switch-track { background: var(--lamp); border-color: var(--lamp); }
-.you-switch[aria-checked="true"] .you-switch-track span { transform: translateX(1.25rem); background: #15181d; }
+.you-switch[aria-checked="true"] .you-switch-track { background: var(--primary); border-color: var(--primary); }
+.you-switch[aria-checked="true"] .you-switch-track span { transform: translateX(1.25rem); background: var(--surface); }
 .you-switch[aria-busy="true"] { opacity: 0.6; }
 @media (prefers-reduced-motion: reduce) {
   .you-switch-track, .you-switch-track span { transition: none; }
