@@ -2,20 +2,21 @@
 // ============================================================
 // Sets off an open play phone alert on demand, on STAGING only.
 //
-//   node --env-file=server/.env.smoke server/scripts/push-test.mjs <code|go|more|clean>
+//   node --env-file=server/.env.smoke server/scripts/push-test.mjs <pick|code|go|more|clean>
 //
+//   pick   once: chooses and claims the player and two rivals (see below)
 //   code   how to sign in on the phone as the chosen seeded player (then tap the switch)
 //   go     opens an open play at that player's place; rival 1 joins -> buzz
 //   more   rival 2 joins the same one -> the alert updates, no buzz
 //   clean  removes that open play and its joins (safe to run twice)
 //
-// The first run picks one synthetic seeded player with 2+ real rivals
-// from the seeded matches, then claims that player and two rivals and
-// gives each a username and password (nobody on SEED_REAL_PEOPLE, no
-// one already claimed). That first run also needs
+// pick finds a seeded player with 2+ rivals from the seeded matches, then
+// claims that player and two rivals and gives each a username and password.
+// Eligible: no login beyond a claim code, and not on SEED_REAL_PEOPLE. It needs
 // --env-file=<main folder>/server/.env.seed for SEED_REAL_PEOPLE and
-// SEED_UMPIRE_PASSWORD. Everything chosen is saved in the git-ignored
-// server/.env.push-test, so later runs need only the smoke env file.
+// SEED_UMPIRE_PASSWORD, and refuses if server/.env.push-test already holds a
+// set. Each login is saved the moment it is made. The other commands never
+// pick or claim; they need only the smoke env file.
 // Needs SMOKE_OWNER_EMAIL and SMOKE_OWNER_PASSWORD, as the smoke test does.
 // ============================================================
 
@@ -57,12 +58,22 @@ function must(res, what, ok = [200, 201, 204]) {
 }
 
 const cmd = process.argv[2]
-if (!['code', 'go', 'more', 'clean'].includes(cmd)) {
-  console.error('usage: node --env-file=server/.env.smoke server/scripts/push-test.mjs <code|go|more|clean>')
+if (!['pick', 'code', 'go', 'more', 'clean'].includes(cmd)) {
+  console.error('usage: node --env-file=server/.env.smoke server/scripts/push-test.mjs <pick|code|go|more|clean>')
   process.exit(1)
 }
 if (!process.env.SMOKE_OWNER_EMAIL || !process.env.SMOKE_OWNER_PASSWORD) {
   console.error('SMOKE_OWNER_EMAIL and SMOKE_OWNER_PASSWORD are needed (use --env-file=server/.env.smoke)')
+  process.exit(1)
+}
+
+const SET = ['ME', 'ONE', 'TWO'].flatMap((k) => [`PUSH_TEST_${k}_NAME`, `PUSH_TEST_${k}_USER`, `PUSH_TEST_${k}_PASS`]).concat('PUSH_TEST_FACILITY')
+if (cmd === 'pick' && SET.some((k) => process.env[k])) {
+  console.error('server/.env.push-test already holds a player set (whole or part); pick will not claim more')
+  process.exit(1)
+}
+if (cmd !== 'pick' && !SET.every((k) => process.env[k])) {
+  console.error('no saved player set; run pick first')
   process.exit(1)
 }
 
@@ -86,12 +97,13 @@ if (cmd === 'clean') {
   process.exit(0)
 }
 
-// --- first run: pick a seeded player with real rivals, claim them, keep their logins ---
+// --- pick: a seeded player with real rivals, claimed with their logins saved as they are made ---
 async function pickAndClaim() {
   const PASSWORD = process.env.SEED_UMPIRE_PASSWORD
-  const real = new Set((process.env.SEED_REAL_PEOPLE ?? '').split(',').map((n) => n.trim().toLowerCase()).filter(Boolean))
+  const same = (name) => name.trim().replace(/\s+/g, ' ').toLowerCase()
+  const real = new Set((process.env.SEED_REAL_PEOPLE ?? '').split(',').map(same).filter(Boolean))
   if (!PASSWORD || !real.size) {
-    console.error('First run: add --env-file=<main folder>/server/.env.seed (SEED_UMPIRE_PASSWORD and SEED_REAL_PEOPLE)')
+    console.error('pick: add --env-file=<main folder>/server/.env.seed (SEED_UMPIRE_PASSWORD and SEED_REAL_PEOPLE)')
     process.exit(1)
   }
   // `everyone` is who the server counts as a rival (so the top 3 match its own); `eligible` is who may be claimed:
@@ -102,7 +114,7 @@ async function pickAndClaim() {
     const page = must(await api(`/admin/players?status=active${after && `&after=${encodeURIComponent(after)}`}`, { bearer: owner }), 'listing players')
     for (const p of page.players) {
       everyone.set(p.id, { name: p.name, nameVisible: true, nearRatingName: false })
-      if (!p.username && p.signInMethods.every((m) => m === 'claim code') && !real.has(p.name.toLowerCase()) && !/phone|smoke/i.test(p.name)) {
+      if (!p.username && p.signInMethods.every((m) => m === 'claim code') && !real.has(same(p.name)) && !/phone|smoke/i.test(p.name)) {
         eligible.set(p.id, everyone.get(p.id))
       }
     }
@@ -132,7 +144,8 @@ async function pickAndClaim() {
     const rivals = blockFor({ me, matches: mine, ratings: new Map(), people: everyone, minMatches: 1 }).rivals.filter((r) => eligible.has(r.id))
     if (rivals.length < 2) continue
     const seen = new Set(mine.flatMap((m) => [...m.teamA, ...m.teamB]))
-    const homes = Map.groupBy(mine, (m) => m.facility?.id)
+    const homes = Map.groupBy(mine.filter((m) => m.facility), (m) => m.facility.id)
+    if (homes.size === 0) continue
     const home = [...homes].sort((a, b) => b[1].length - a[1].length)[0][0]
     candidates.push({ me, rivals, people: seen.size - 1, home, open: withOpenPlay.get(home) ?? false })
   }
@@ -145,35 +158,26 @@ async function pickAndClaim() {
     must(await api('/auth/player/credentials', { method: 'POST', bearer: got.token, body: { username, password } }), 'setting a login')
     return got
   }
-  const login = () => randomBytes(12).toString('hex')
-  for (const c of candidates) {
-    const mine = { id: c.me, username: `pt_${randomBytes(4).toString('hex')}`, password: login() }
-    const got = await claim(c.me, mine.username, mine.password)
-    // The server's own list is the check that the rivals really show with names.
-    const shown = must(await api('/player/rivals', { bearer: got.token }), 'reading rivals').rivals.filter((r) => r.kind === 'matches')
-    const two = c.rivals.filter((r) => shown.some((s) => s.name === r.name)).slice(0, 2)
-    if (two.length < 2) { console.log('skipped one candidate: its rivals do not show with names'); continue }
-    const names = [eligible.get(c.me).name]
-    for (const [k, r] of [['ONE', two[0]], ['TWO', two[1]]]) {
-      const rival = { username: `pt_${randomBytes(4).toString('hex')}`, password: login() }
-      await claim(r.id, rival.username, rival.password)
-      process.env[`PUSH_TEST_${k}_NAME`] = r.name
-      process.env[`PUSH_TEST_${k}_USER`] = rival.username
-      process.env[`PUSH_TEST_${k}_PASS`] = rival.password
-      names.push(`${r.name} (${r.won}-${r.lost})`)
-    }
-    process.env.PUSH_TEST_ME_NAME = eligible.get(c.me).name
-    process.env.PUSH_TEST_ME_USER = mine.username
-    process.env.PUSH_TEST_ME_PASS = mine.password
-    process.env.PUSH_TEST_FACILITY = c.home
-    save()
-    console.log(`chosen: ${names[0]}, ${c.people} people played, rivals ${names.slice(1).join(', ')}; place ${facilities.find((f) => f.id === c.home)?.name}${c.open ? '' : ' (no open plays yet)'}`)
-    return
+  // Names show by construction here (everyone is treated as visible); the three are claimed only now, and each login is saved at once.
+  const c = candidates[0]
+  if (!c) { console.error('no seeded player has 2 rivals who can be claimed'); process.exit(1) }
+  const set = (k, id, name) => {
+    const username = `pt_${randomBytes(4).toString('hex')}`
+    const password = randomBytes(12).toString('hex')
+    return claim(id, username, password).then(() => {
+      Object.assign(process.env, { [`PUSH_TEST_${k}_NAME`]: name, [`PUSH_TEST_${k}_USER`]: username, [`PUSH_TEST_${k}_PASS`]: password })
+      save()
+    })
   }
-  console.error('no seeded player could be claimed with 2 rivals')
-  process.exit(1)
+  process.env.PUSH_TEST_FACILITY = c.home
+  await set('ME', c.me, eligible.get(c.me).name)
+  const [one, two] = c.rivals
+  await set('ONE', one.id, one.name)
+  await set('TWO', two.id, two.name)
+  console.log(`chosen: ${eligible.get(c.me).name}, ${c.people} people played, rivals ${one.name} (${one.won}-${one.lost}), ${two.name} (${two.won}-${two.lost}); place ${facilities.find((f) => f.id === c.home).name}${c.open ? '' : ' (no open plays yet)'}`)
+  process.exit(0)
 }
-if (!process.env.PUSH_TEST_ME_USER) await pickAndClaim()
+if (cmd === 'pick') await pickAndClaim()
 
 const me = who('ME')
 if (cmd === 'code') {
