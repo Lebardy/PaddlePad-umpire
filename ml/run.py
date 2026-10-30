@@ -10,8 +10,8 @@ that repo does not:
      anything, so under-played players are left out rather than grouped
      from arithmetic that cannot describe them.
 
-  2. It loops over however many skill groups the clustering actually
-     found, instead of hardcoding two.
+  2. It finds playstyles once across everyone, so a style can hold
+     players from several skill groups.
 
   3. It refuses to publish a snapshot that lost players on the way
      through.
@@ -51,9 +51,16 @@ from pipeline.clustering import (
     cluster_playstyles,
     interpret_playstyle_clusters,
     apply_playstyle_archetypes,
+    _skill_group_prefix,
 )
 
 RANDOM_STATE = 42
+
+# Level 2 looks at every player at once (owner, 2026-10-28): inside one
+# skill level there were too few players, so each level split into broad
+# styles whose words often did not fit their members. One pool fits them
+# better and lets the same style show up at several levels.
+STYLE_POOL = "Everyone"
 
 # The player's own feature values behind their archetype, so a playstyle
 # can be explained rather than merely asserted. These are the columns the
@@ -367,28 +374,32 @@ def run_pipeline(gated_df, rally_points):
         skill_clustered, rally_points
     )
 
-    # ---- Level 2: playstyles within each group ---------------------
+    # ---- Level 2: playstyles across everyone -----------------------
     playstyle_features = create_playstyle_features(profiles)
 
     # Skill's influence is removed from the playstyle features first, so
     # the archetypes describe how someone plays rather than how well --
     # otherwise Level 2 just rediscovers Level 1 in disguise.
     #
-    # What counts as "how well" is the players' rally points. Measured
-    # on the synthetic pool, whose players have a hidden ability, over
-    # ten random starts: with the rally points subtracted, ability
-    # explained 0.09 of the playstyle spread, which is the chance level
-    # (0.09), i.e. nothing. See ml/scripts/playstyle_truth_check.py,
-    # which reruns it.
+    # What counts as "how well" is the players' rally points. The check
+    # on the synthetic pool (hidden ability, ten random starts) found
+    # ability explained 0.09 of the playstyle spread, the chance level --
+    # but that was the OLD per-group design. It has NOT been re-run for
+    # styles found across everyone; ml/scripts/playstyle_truth_check.py
+    # still asks the per-group question.
     with_skill = playstyle_features.merge(
         skill_clustered[["player_id", "skill_group", "rally_points"]],
         on="player_id",
         how="inner",
         validate="one_to_one",
     )
+    # Skill is taken out across everyone too, because the styles below are
+    # found across everyone: a style can then hold players of any level.
     adjusted = residualize_playstyle_features(
-        with_skill, target_column="rally_points"
-    )
+        with_skill.assign(style_pool=STYLE_POOL),
+        target_column="rally_points",
+        group_column="style_pool",
+    ).drop(columns="style_pool")
     scaled_playstyle, _ = scale_playstyle_features(
         prepare_playstyle_features(adjusted)
     )
@@ -416,65 +427,44 @@ def run_pipeline(gated_df, rally_points):
         .merge(components, on="player_id", how="inner", validate="one_to_one")
     )
 
-    # THE FIX.
-    #
-    # The reference driver names exactly two groups, "Developing /
-    # Lower-Performance" and "Higher-Performance", and passes them to a
-    # build_final_player_profiles that takes exactly two arguments. But
-    # interpret_skill_clusters can return THREE groups, the third being
-    # "Intermediate-Performance". When it does, every player in that
-    # group is dropped from the output with no error and no warning --
-    # they are simply not in the results, and nothing anywhere says so.
-    #
-    # Looping over what the clustering actually produced costs nothing
-    # and cannot go stale when the naming logic changes.
     groups = sorted(playstyle_cluster_data["skill_group"].unique())
-    branches = []
-    unclustered = []
+    pool = playstyle_cluster_data.assign(skill_group=STYLE_POOL)
 
-    for group in groups:
-        members = playstyle_cluster_data[
-            playstyle_cluster_data["skill_group"] == group
-        ]
-        # choose_playstyle_k raises below three members. Those
-        # players keep their skill group -- only the archetype is
-        # unavailable. That is a smaller loss than failing the whole
-        # run, and much smaller than dropping them silently.
-        if len(members) < 3:
-            unclustered.append(group)
-            branches.append(members.assign(playstyle_cluster=pd.NA,
-                                           playstyle_archetype=pd.NA,
-                                           playstyle_traits=None))
-            continue
-
-        group_data, best_k, _ = choose_playstyle_k(
-            playstyle_cluster_data, group, k_min=2, k_max=5,
-            random_state=RANDOM_STATE, features=component_columns,
-        )
-        clustered, _, _ = cluster_playstyles(
-            group_data, best_k, random_state=RANDOM_STATE,
-            features=component_columns,
-        )
-        # traits_out collects what each name was actually built from --
-        # which measurement chose each word, which way it pointed, how
-        # far from this group's average. It travels to the app so a
-        # player can check the name against their own numbers instead of
-        # taking it on faith.
-        traits_map = {}
-        archetype_map, _, _ = interpret_playstyle_clusters(
-            group_data, clustered, playstyle_features, traits_out=traits_map
-        )
-        branches.append(
-            apply_playstyle_archetypes(clustered, archetype_map, traits_map)
-        )
-
-    final = pd.concat(branches, ignore_index=True)
+    # apply_gate already refuses fewer than three players, so the style
+    # step always has enough to cluster.
+    pool_data, best_k, _ = choose_playstyle_k(
+        pool, STYLE_POOL, k_min=2, k_max=5,
+        random_state=RANDOM_STATE, features=component_columns,
+    )
+    clustered, _, _ = cluster_playstyles(
+        pool_data, best_k, random_state=RANDOM_STATE,
+        features=component_columns,
+    )
+    # traits_out collects what each name was actually built from --
+    # which measurement chose each word, which way it pointed, how
+    # far from everyone's average. It travels to the app so a
+    # player can check the name against their own numbers instead of
+    # taking it on faith.
+    traits_map = {}
+    archetype_map, _, _ = interpret_playstyle_clusters(
+        pool_data, clustered, playstyle_features, traits_out=traits_map
+    )
+    styled = apply_playstyle_archetypes(clustered, archetype_map, traits_map)
+    # The pipeline starts a name with its group's word; the pool is
+    # everyone, so there is no word to give.
+    styled["playstyle_archetype"] = styled["playstyle_archetype"].str.removeprefix(
+        f"{_skill_group_prefix(STYLE_POOL)} "
+    )
+    final = styled.drop(columns="skill_group").merge(
+        skill_clustered[["player_id", "skill_group"]],
+        on="player_id", how="left", validate="one_to_one",
+    )
 
     # ---- Integrity: nobody may vanish ------------------------------
     #
     # A partial snapshot that looks complete is worse than no snapshot,
     # because nothing downstream could ever detect it. This is the check
-    # whose absence made the bug above invisible for as long as it was.
+    # whose absence once made a vanished-player bug invisible.
     went_in = set(gated_df["player_id"].unique())
     came_out = set(final["player_id"])
     if went_in != came_out:
@@ -530,8 +520,11 @@ def run_pipeline(gated_df, rally_points):
         # Level 2. Recorded with the run because it is part of what the
         # archetypes mean.
         "residualisedBy": "rally_points",
+        # Where the styles were found. Older runs found them inside each
+        # skill group; the api compares a player with the same set.
+        "playstyleScope": "everyone",
         "skillK": int(best_skill_k),
-        "groupsTooSmallToCluster": unclustered,
+        "groupsTooSmallToCluster": [],
         # What the style K-Means actually saw. Recorded for the same
         # reason as residualisedBy: it changes what the archetypes mean.
         "styleExtraction": {
@@ -574,7 +567,7 @@ def to_payload(final, evidence_df, gate_report, structure_report, match_count):
                 row["playstyle_archetype"]
             ),
             # What the archetype name was built from. A list, or None for
-            # a group too small to cluster -- which has no name either.
+            # fewer than three players overall -- which has no name either.
             "playstyleTraits": traits if isinstance(traits, list) else None,
             "evidence": evidence,
             "matchCount": int(row.get("match_count") or 0),
