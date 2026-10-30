@@ -67,3 +67,18 @@ export function waitingReentry(events, teamA) {
 export function reentryMismatch(waitingTeam, teamA, rally) {
   return Boolean(waitingTeam) && rallyWinnerTeam(teamA, rally) !== waitingTeam
 }
+
+/** The newest ruling on a match: this phone's unsent ones come after anything the server lists (newest first). */
+export function newestRuling(queued, rulings) {
+  const unsent = queued.at(-1)
+  return unsent ? { kind: unsent.kind, targetEventId: unsent.targetEventId, state: 'queued' } : (rulings[0] ?? null)
+}
+
+/**
+ * Whether the scorekeeper's phone must give the tapping up: it was scoring
+ * and no longer is, or its upload was refused (only a moved lease does that).
+ * Never for a finished match: finishing ends the split, nothing was taken back.
+ */
+export function keeperMustYield({ isKeeper, wasScoring, blockedLog, completed }) {
+  return !completed && (wasScoring || (isKeeper && blockedLog))
+}

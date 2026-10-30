@@ -204,14 +204,27 @@ async function push(entry, payload) {
     return
   }
   if (entry.kind === 'scorekeeper') {
-    const scorekeeper = await api.setScorekeeper(payload.id, {
-      umpireId: payload.scorekeeperAsk?.umpireId ?? null,
-      deviceId: outbox.getDeviceId(),
-    })
+    const askedId = payload.scorekeeperAsk?.umpireId ?? null
+    let scorekeeper
+    try {
+      scorekeeper = await api.setScorekeeper(payload.id, { umpireId: askedId, deviceId: outbox.getDeviceId() })
+    } catch (error) {
+      const refused = error.status >= 400 && error.status < 500 && error.status !== 401 && error.status !== 429
+      if (!refused) throw error
+      // The server's copy moved first (the scorekeeper started, the match
+      // ended). Show what is true instead of dead-lettering, which would
+      // freeze every pull of this match. A failed re-read retries the push.
+      const remote = await api.fetchMatch(payload.id)
+      const match = getMatch(payload.id)
+      if (match && (match.scorekeeperAsk?.umpireId ?? null) === askedId) {
+        replaceServerState({ matches: [remote], force: true })
+      }
+      return
+    }
     // Only if the umpire has not picked someone else meanwhile: that
     // newer ask is still queued and the next push sends it.
     const match = getMatch(payload.id)
-    if (match && (match.scorekeeperAsk?.umpireId ?? null) === (payload.scorekeeperAsk?.umpireId ?? null)) {
+    if (match && (match.scorekeeperAsk?.umpireId ?? null) === askedId) {
       saveMatch({ ...match, scorekeeper, scorekeeperAsk: undefined })
     }
     return
@@ -450,8 +463,9 @@ export async function yieldMatch(matchId) {
  * @param {object} [options]
  * @param {'server'|'mine'} [options.resolution] choice for a diverged log
  * @param {string|null} [options.remoteLast] last server event id the choice was made against
+ * @param {boolean} [options.adopt] always carry on from the server's log (taking scoring back from a scorekeeper)
  */
-export async function takeOverMatch(matchId, { resolution, remoteLast } = {}) {
+export async function takeOverMatch(matchId, { resolution, remoteLast, adopt } = {}) {
   const deviceId = outbox.getDeviceId()
 
   const before = getMatch(matchId)
@@ -497,6 +511,10 @@ export async function takeOverMatch(matchId, { resolution, remoteLast } = {}) {
     await drain()
     return { status: 'pushed', events: localEvents.length }
   }
+
+  // The scorekeeper's phone is the only writer during a split, so a copy
+  // here that looks ahead is only stale (they undid a rally since the last poll).
+  if (adopt) return adoptServer()
 
   if (relation === 'diverged') {
     if (choice === 'server') return adoptServer()
