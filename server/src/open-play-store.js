@@ -165,3 +165,14 @@ export async function loadCourtState(query, openPlayIds) {
   for (const row of taken) at(row.open_play_id, row.court).session = { startedBy: row.started_by ?? 'another umpire', ended: row.ended }
   return state
 }
+
+/** The umpires a manager can put on a court: at this place, not paused, not closed. */
+export async function loadFacilityUmpires(query, facilityId) {
+  const { rows } = await query(
+    `SELECT id, name FROM umpires
+      WHERE facility_id = $1 AND paused_at IS NULL AND closed_at IS NULL
+      ORDER BY name`,
+    [facilityId],
+  )
+  return rows
+}

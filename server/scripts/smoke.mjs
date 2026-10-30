@@ -3826,6 +3826,71 @@ async function main() {
       const after = await request('/open-plays/today', { bearer: opUmpireToken })
       check('the lookup now shows Court 1 started',
         after.body.openPlays?.find((p) => p.id === courtPlayId)?.courts[0]?.started === true, JSON.stringify(after.body).slice(0, 160))
+
+      // A bad open play id never refuses the session either.
+      const junk = await request('/sessions', {
+        method: 'POST', bearer: opUmpireToken,
+        body: { id: uuid(), startsAt: new Date().toISOString(), openPlayId: 'not-a-uuid', court: 1 },
+      })
+      check('starting a court of a junk open play id -> 201 plain with the notice',
+        junk.status === 201 && /^Session · /.test(junk.body.session?.name ?? '') && /Saved as a plain session\.$/.test(junk.body.courtNotice ?? ''),
+        JSON.stringify(junk.body).slice(0, 200))
+
+      // The manager's roster: a second umpire at the same place (registered
+      // like the first, so the run's tidy removes it with the others).
+      const ramilInvite = await request('/admin/invites', {
+        method: 'POST', bearer: opOwnerToken, body: { note: 'smoke open play', facilityId: placeId },
+      })
+      const ramil = await request('/auth/register', {
+        method: 'POST',
+        body: {
+          email: `smoke.openplay.umpire2.${opStamp}@example.com`, name: 'Ramil Ocampo',
+          password: `smk-${uuid()}`, invite: ramilInvite.body.invite?.code,
+        },
+      })
+      check('a second umpire joins that place -> 201', ramil.status === 201, String(ramil.status))
+      const guestsRoster = await request(`/admin/facilities/${placeId}/guests`, { bearer: opOwnerToken })
+      const roster = guestsRoster.body.openPlays?.find((p) => p.id === courtPlayId)?.courtRoster
+      check('the guests page lists a roster of 2 courts, Court 1 started, and both umpires',
+        roster?.length === 2 && !!roster[0].session?.startedBy && roster[1].session === null &&
+          [opUmpire.body.umpire?.id, ramil.body.umpire?.id].every((id) => guestsRoster.body.umpires?.some((u) => u.id === id)),
+        JSON.stringify(guestsRoster.body).slice(0, 200))
+      const courtUrl = (n) => `/admin/facilities/${placeId}/open-plays/${courtPlayId}/courts/${n}`
+      const assign2 = await request(courtUrl(2), { method: 'PUT', bearer: opOwnerToken, body: { umpireId: ramil.body.umpire?.id } })
+      check('putting the second umpire on Court 2 -> 200', assign2.status === 200 && assign2.body.court?.court === 2 && assign2.body.court?.umpire?.id === ramil.body.umpire?.id,
+        JSON.stringify(assign2.body).slice(0, 160))
+      const twice = await request(courtUrl(1), { method: 'PUT', bearer: opOwnerToken, body: { umpireId: ramil.body.umpire?.id } })
+      check('the same umpire on Court 1 too -> 409 "… is on Court 2"',
+        twice.status === 409 && /is on Court 2$/.test(twice.body.error ?? ''), `${twice.status} ${twice.body.error}`)
+      const firstSees = await request('/open-plays/today', { bearer: opUmpireToken })
+      const secondSees = await request('/open-plays/today', { bearer: ramil.body.token })
+      const courtTwo = (res) => res.body.openPlays?.find((p) => p.id === courtPlayId)?.courts[1]
+      check('Court 2 reads "other" to the first umpire and "me" to the second',
+        courtTwo(firstSees)?.assignedTo === 'other' && courtTwo(secondSees)?.assignedTo === 'me',
+        `${courtTwo(firstSees)?.assignedTo} ${courtTwo(secondSees)?.assignedTo}`)
+      const notMine = await request('/sessions', {
+        method: 'POST', bearer: opUmpireToken,
+        body: { id: uuid(), startsAt: new Date().toISOString(), openPlayId: courtPlayId, court: 2 },
+      })
+      check("the first umpire starting Court 2 -> 201 plain, \"Court 2 is Ramil's tonight\"",
+        notMine.status === 201 && /^Session · /.test(notMine.body.session?.name ?? '') &&
+          /^Court 2 is \w+'s tonight\. Saved as a plain session\.$/.test(notMine.body.courtNotice ?? ''),
+        JSON.stringify(notMine.body).slice(0, 200))
+      const freed = await request(courtUrl(2), { method: 'PUT', bearer: opOwnerToken, body: { umpireId: null } })
+      check('leaving Court 2 open to anyone -> 200, umpire null', freed.status === 200 && freed.body.court?.umpire === null, JSON.stringify(freed.body).slice(0, 160))
+      const cancelStarted = await request(`/admin/facilities/${placeId}/open-plays/${courtPlayId}`, { method: 'DELETE', bearer: opOwnerToken })
+      check('cancelling once a court has started -> 409 "Courts already started"',
+        cancelStarted.status === 409 && cancelStarted.body.error === 'Courts already started', `${cancelStarted.status} ${cancelStarted.body.error}`)
+      const noUmpirePlay = await addOpenPlay({
+        startsAt: new Date(nextHour.getTime() + 24 * 3_600_000).toISOString(),
+        endsAt: new Date(nextHour.getTime() + 25 * 3_600_000).toISOString(),
+        courts: 2, spots: 8, fee: '', umpire: false, note: '',
+      })
+      const noUmpireAssign = await request(
+        `/admin/facilities/${placeId}/open-plays/${noUmpirePlay.body.openPlay?.id}/courts/1`,
+        { method: 'PUT', bearer: opOwnerToken, body: { umpireId: ramil.body.umpire?.id } },
+      )
+      check('assigning on an open play with no umpire -> 409', noUmpireAssign.status === 409, `${noUmpirePlay.status} ${noUmpireAssign.status}`)
     }
   }
 
