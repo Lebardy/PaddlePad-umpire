@@ -1,26 +1,34 @@
 import { useCallback, useEffect, useState } from 'react'
-import Icon from '../components/Icon'
 import CloseSessionDialog from '../components/CloseSessionDialog'
+import Icon from '../components/Icon'
 import FacilityPicker from '../components/FacilityPicker'
-import LiveBoard from '../components/LiveBoard'
+import BoardStrip from '../components/BoardStrip'
 import MergeDialog from '../components/MergeDialog'
 import SessionCard from '../components/SessionCard'
-import Totals from '../components/Totals'
+import PageTabs from '../components/PageTabs'
+import { Ghost, RowsSkeleton } from '../components/Skeleton'
 import VoidDialog from '../components/VoidDialog'
 import WorthALook from '../components/WorthALook'
 import { fetchOverview, markLooksFine, markNotSamePerson, unvoidMatch } from '../lib/api'
 import { clockText } from '../lib/format'
+import { useTabParam } from '../lib/tabParam'
+import { ownerCells, worthChips } from '../lib/worthFilters'
 import ManagerHome from './ManagerHome'
 
 const REFRESH_MS = 30_000
 
-/** The landing page: what's going on right now, the totals, and anything worth a look. */
-export default function Overview({ me, facilityLabel }) {
+/** The landing page: a number strip, then what's going on right now and anything worth a look in two tabs. */
+export default function Overview({ me }) {
   const isOwner = me.role === 'owner'
   const [facilityId, setFacilityId] = useState('')
   const [data, setData] = useState(null)
+  // Which facility `data` is for: a switch shows ghosts, the 30-second refresh does not.
+  const [dataFor, setDataFor] = useState(null)
   const [error, setError] = useState(null)
   const [now, setNow] = useState(() => Date.now())
+  const loading = !data || dataFor !== facilityId
+  // Open on what is happening if anything is, else on what needs a look.
+  const [tab, setTab] = useTabParam(['now', 'look'], loading ? null : data.live.sessions > 0 ? 'now' : 'look')
 
   // Everything a pop-up or a row action touches lives apart from `data`,
   // so the 30-second refresh never closes an open dialog or wipes a
@@ -34,7 +42,7 @@ export default function Overview({ me, facilityLabel }) {
 
   const load = useCallback(() => {
     return fetchOverview({ facilityId: isOwner ? facilityId : undefined })
-      .then((next) => { setData(next); setNow(Date.now()); setError(null) })
+      .then((next) => { setData(next); setDataFor(facilityId); setNow(Date.now()); setError(null) })
       .catch((err) => setError(err.message))
   }, [isOwner, facilityId])
 
@@ -146,31 +154,37 @@ export default function Overview({ me, facilityLabel }) {
   const showFacility = isOwner && !facilityId
   return (
     <section>
-      <header className="board-texture">
+      <header className="board-texture overview-board">
         <div className="overview-head">
           <div>
             <h1>Overview</h1>
-            <p>
-              {isOwner && !facilityId
-                ? <><strong>Every facility</strong>, right now.</>
-                : <><strong>{data?.facilityName ?? facilityLabel ?? 'Your facility'}</strong>, right now.</>}
-            </p>
           </div>
           <div className="board-head-group">
             <FacilityPicker me={me} value={facilityId} onChange={setFacilityId} includeAll variant="board" />
-            {data && <div className="as-of">Up to date as of <b>{clockText(data.asOf)}</b> · refreshes every 30 s</div>}
+            <div className="as-of">{data ? <>Up to date as of <b>{clockText(data.asOf)}</b></> : <Ghost variant="label" style={{ width: '14rem' }} />}</div>
           </div>
         </div>
-        {data && <LiveBoard live={data.live} />}
+        <BoardStrip loading={loading && !error} cellCount={7} cells={loading ? [] : ownerCells(data)} />
       </header>
 
       <div className="sheet">
         {error && <p className="form-error" role="alert">{error}</p>}
-        {!data && !error && <p className="empty">Loading…</p>}
-        {data && (data.sessions.length === 0 ? (
-          // A quiet day: nothing is live, so what needs a look comes first
-          // and the totals sit in one row under it.
-          <>
+        <PageTabs
+          idPrefix="overview"
+          label="Overview"
+          current={tab}
+          onChange={setTab}
+          tabs={[
+            { id: 'now', label: 'Right now', icon: 'live', count: loading ? null : data.sessions.length },
+            { id: 'look', label: 'Worth a look', icon: 'alert', count: loading ? null : worthChips(data)[0].count },
+          ]}
+        />
+        <div id="overview-panel" role="tabpanel" aria-labelledby={tab ? `overview-tab-${tab}` : undefined} aria-busy={loading || undefined}>
+          {loading ? (error ? null : <RowsSkeleton rows={6} />) : tab === 'now' ? (
+            data.sessions.length === 0
+              ? <p className="empty"><Icon name="live" size={20} /> Nothing live right now.</p>
+              : data.sessions.map((s) => <SessionCard key={s.id} session={s} showFacility={showFacility} now={now} />)
+          ) : (
             <WorthALook
               warnings={data.warnings}
               leftOpen={data.leftOpen}
@@ -180,33 +194,8 @@ export default function Overview({ me, facilityLabel }) {
               actions={warningActions}
               duplicateActions={duplicateActions}
             />
-            <div className="section-head totals-head"><h2 className="section-title"><Icon name="sum" />Totals</h2></div>
-            <Totals totals={data.totals} isOwner={isOwner} facilityName={data.facilityName} row />
-          </>
-        ) : (
-          <>
-            <div className="sheet-split">
-              <div>
-                <div className="section-head"><h2 className="section-title"><Icon name="live" />Right now</h2>
-                  <span className="section-count">Newest session first</span></div>
-                {data.sessions.map((s) => <SessionCard key={s.id} session={s} showFacility={showFacility} now={now} />)}
-              </div>
-              <aside>
-                <div className="section-head"><h2 className="section-title"><Icon name="sum" />Totals</h2></div>
-                <Totals totals={data.totals} isOwner={isOwner} facilityName={data.facilityName} />
-              </aside>
-            </div>
-            <WorthALook
-              warnings={data.warnings}
-              leftOpen={data.leftOpen}
-              duplicates={data.duplicates}
-              showFacility={showFacility}
-              now={now}
-              actions={warningActions}
-              duplicateActions={duplicateActions}
-            />
-          </>
-        ))}
+          )}
+        </div>
       </div>
 
       {dialogs}

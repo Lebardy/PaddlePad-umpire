@@ -4222,6 +4222,17 @@ async function main() {
       pastAAskingForB.status === 200 &&
       JSON.stringify((pastAAskingForB.body.sessions ?? []).map((s) => s.id)) === JSON.stringify(pastAIds),
       JSON.stringify(pastAAskingForB.body).slice(0, 120))
+    const byUmpire = await request(`/admin/overview/past-sessions?umpireId=${umpireAId}`, { bearer: adminAToken })
+    check("past sessions by umpire -> only that umpire's",
+      byUmpire.status === 200 && byUmpire.body.sessions.length > 0 && byUmpire.body.sessions.every((s) => s.openedBy === umpAName), JSON.stringify(byUmpire.body).slice(0, 120))
+    const sinceTomorrow = await request(`/admin/overview/past-sessions?since=${encodeURIComponent(new Date(Date.now() + 86_400_000).toISOString())}`, { bearer: adminAToken })
+    check('past sessions since tomorrow -> none', sinceTomorrow.status === 200 && sinceTomorrow.body.sessions.length === 0, JSON.stringify(sinceTomorrow.body).slice(0, 120))
+    const badSince = await request('/admin/overview/past-sessions?since=yesterday', { bearer: adminAToken })
+    check('past sessions with an unreadable date -> 400', badSince.status === 400, String(badSince.status))
+    const badUmpire = await request('/admin/overview/past-sessions?umpireId=nope', { bearer: adminAToken })
+    check('past sessions with a bad umpire -> 400', badUmpire.status === 400, String(badUmpire.status))
+    const otherUmpire = await request(`/admin/overview/past-sessions?umpireId=${umpireBId}`, { bearer: adminAToken })
+    check("a manager filtering by another facility's umpire sees nothing", otherUmpire.status === 200 && otherUmpire.body.sessions.length === 0, JSON.stringify(otherUmpire.body).slice(0, 120))
     const session2Voided = await request(`/sessions/${session2Id}/void`, { method: 'POST', bearer: umpAToken, body: { reason: 'smoke test' } })
     const pastWithoutVoided = await request('/admin/overview/past-sessions', { bearer: adminAToken })
     check('a voided session is not a past session',

@@ -230,5 +230,18 @@ section('void reasons')
     rules.readVoidReason('  Umpire forgot  ', rules.SESSION_REASON_MESSAGE), { reason: 'Umpire forgot' })
 }
 
+section('past-sessions filters')
+{
+  const UID = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
+  const read = rules.readPastSessionFilters
+  check('no filters', read({}), { umpireId: null, since: null })
+  check('an umpire', read({ umpireId: UID }), { umpireId: UID, since: null })
+  check('a since date', read({ since: '2026-10-20T00:00:00.000Z' }).since?.toISOString(), '2026-10-20T00:00:00.000Z')
+  check('both', Object.keys(read({ umpireId: UID, since: '2026-10-20T00:00:00Z' })), ['umpireId', 'since'])
+  check('bad umpire', read({ umpireId: 'nope' }), { error: 'That umpire is not known here' })
+  check('bad date', read({ since: 'yesterday' }), { error: 'That date is not readable' })
+  check('empty strings mean no filter', read({ umpireId: '', since: '' }), { umpireId: null, since: null })
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

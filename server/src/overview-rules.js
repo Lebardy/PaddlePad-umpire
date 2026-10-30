@@ -5,6 +5,8 @@
 // scripts/check-overview-rules.mjs.
 // ============================================================
 
+import { isUuid } from './validate.js'
+
 export const WINDOW_DAYS = 30
 export const STUCK_MS = 3 * 60 * 60_000
 export const SHORT_MS = 3 * 60_000
@@ -296,4 +298,12 @@ export function readVoidReason(value, message = VOID_REASON_MESSAGE) {
   const reason = String(value ?? '').trim()
   if (!reason || reason.length > VOID_REASON_MAX) return { error: message }
   return { reason }
+}
+
+/** The manager's session-history filters, read from the query string. Empty means "no filter". */
+export function readPastSessionFilters({ umpireId, since } = {}) {
+  if (umpireId && !isUuid(umpireId)) return { error: 'That umpire is not known here' }
+  const date = since ? new Date(since) : null
+  if (date && Number.isNaN(date.getTime())) return { error: 'That date is not readable' }
+  return { umpireId: umpireId || null, since: date }
 }

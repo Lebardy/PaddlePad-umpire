@@ -460,14 +460,17 @@ const PAST_SESSIONS_PAGE = 5
  * first match, or by when it was opened if nobody played in it. Open
  * sessions are left out: the Overview shows those as live or left open.
  */
-export async function loadPastSessions(queryFn, filter, before) {
+export async function loadPastSessions(queryFn, filter, before, { umpireId = null, since = null } = {}) {
   const params = []
   const scope = scopeCondition(filter, params, 's.facility_id')
+  let narrow = ''
+  if (umpireId) { params.push(umpireId); narrow = ` AND s.created_by = $${params.length}` }
   const cursor = readCursor(before)
   let older = 'TRUE'
+  if (since) { params.push(since); older = `p.started_at >= $${params.length}::timestamptz` }
   if (cursor) {
     params.push(cursor.createdAt, cursor.id)
-    older = `(p.started_at, p.id) < ($${params.length - 1}::timestamptz, $${params.length}::uuid)`
+    older += ` AND (p.started_at, p.id) < ($${params.length - 1}::timestamptz, $${params.length}::uuid)`
   }
   params.push(PAST_SESSIONS_PAGE + 1)
   // One more than a page, to know whether there is an older page.
@@ -483,7 +486,7 @@ export async function loadPastSessions(queryFn, filter, before) {
               (SELECT count(*)::int FROM session_players sp WHERE sp.session_id = s.id) AS players
          FROM sessions s
          LEFT JOIN umpires u ON u.id = s.created_by
-        WHERE s.ended_at IS NOT NULL AND s.voided_at IS NULL AND ${scope}) p
+        WHERE s.ended_at IS NOT NULL AND s.voided_at IS NULL AND ${scope}${narrow}) p
       WHERE ${older}
       ORDER BY p.started_at DESC, p.id DESC
       LIMIT $${params.length}`,
