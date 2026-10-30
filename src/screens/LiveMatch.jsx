@@ -18,7 +18,7 @@ import * as sync from '../lib/sync'
 import { getDeviceId, pending as queued } from '../lib/outbox'
 import { useSyncStatus } from '../lib/useSyncStatus'
 import { useRulingsPoller } from '../lib/scorekeeping'
-import { reentryMismatch, waitingReentry } from '../../server/src/scorekeeper-rules.js'
+import { keeperMustYield, reentryMismatch, waitingReentry } from '../../server/src/scorekeeper-rules.js'
 import { getStoredUmpire } from '../lib/api'
 import { askScorekeeper, getMatch } from '../lib/storage'
 import MatchOverview from './MatchOverview'
@@ -251,24 +251,19 @@ function LiveMatch({ matchId, onBack }) {
     (team) => (team === 'A' ? sideA : sideB)?.map((id) => knownPlayers.find((p) => p.id === id)?.name ?? '?').join(' / '),
     [sideA, sideB, knownPlayers],
   )
-  const [banner, clearBanner] = useRulingsPoller(matchId, iScore && isScorer, teamWords)
   const [takenBack, setTakenBack] = useState(null)
+  const [gone, setGone] = useState(false)
 
   // Scoring is taken back when the lease moves, the split ends, or this
   // phone's next upload is refused. Only a phone that WAS scoring as the
-  // scorekeeper reacts, and only once.
+  // scorekeeper reacts, and only once; a refused upload says the same
+  // even on a screen opened afterwards.
   useSyncStatus()
   const blockedLog = queued().some((e) => e.kind === 'log' && e.entityId === matchId && e.state === 'blocked')
   const wasScoring = useRef(false)
   const yielding = useRef(false)
-  useEffect(() => {
-    if (iScore && isScorer && !blockedLog) {
-      wasScoring.current = true
-      return
-    }
-    // Finishing the match ends the split on the server; that is not a take-back.
-    if (match?.status === 'completed') wasScoring.current = false
-    if (!wasScoring.current || yielding.current) return
+  const yieldNow = useCallback(() => {
+    if (yielding.current) return
     yielding.current = true
     sync.yieldMatch(matchId).then(
       (result) => {
@@ -277,6 +272,16 @@ function LiveMatch({ matchId, onBack }) {
       },
       () => {}, // Offline: the next render tries again.
     ).finally(() => { yielding.current = false })
+  }, [matchId])
+  const [banner, clearBanner] = useRulingsPoller(matchId, iScore && isScorer && match?.status !== 'completed', teamWords, yieldNow)
+  useEffect(() => {
+    if (iScore && isScorer && !blockedLog) {
+      wasScoring.current = true
+      return
+    }
+    // Finishing the match ends the split on the server; that is not a take-back.
+    if (match?.status === 'completed') wasScoring.current = false
+    if (keeperMustYield({ isKeeper, wasScoring: wasScoring.current, blockedLog, completed: match?.status === 'completed' })) yieldNow()
   })
 
   useEffect(() => {
@@ -284,7 +289,8 @@ function LiveMatch({ matchId, onBack }) {
     let timer = null
 
     const refresh = () => {
-      sync.pullMatch(matchId, { signal: controller.signal }).catch(() => {})
+      // A 404 is the main umpire cancelling the match under the overview.
+      sync.pullMatch(matchId, { signal: controller.signal }).catch((error) => error.status === 404 && setGone(true))
     }
     refresh()
 
@@ -414,11 +420,24 @@ function LiveMatch({ matchId, onBack }) {
       </div>
     )
   }
+  if (iRunIt && gone) {
+    return (
+      <div className="live-match">
+        <div className="scorekeeper-wait" role="status">
+          <div className="wait-card">
+            <Icon name="x" size={32} />
+            <strong>Match cancelled</strong>
+            <button onClick={() => { deleteMatch(matchId); onBack() }}><Icon name="check" size={20} />Done</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
   if (iRunIt && split.state === 'scoring') {
     return (
       <div className="live-match">
         <button className="back-link" onClick={onBack}>&larr; Back</button>
-        <MatchOverview match={match} name={name} onTakeBack={() => sync.takeOverMatch(matchId).catch(() => alert('Needs a connection'))} />
+        <MatchOverview match={match} name={name} onTakeBack={() => sync.takeOverMatch(matchId, { adopt: true }).catch((error) => alert(error.status ? error.message : 'Needs a connection'))} />
       </div>
     )
   }
@@ -434,7 +453,7 @@ function LiveMatch({ matchId, onBack }) {
             <strong>{split.state === 'declined' ? `${split.name} said not now` : match.scorekeeperAsk ? `Sending to ${split.name}` : `Waiting for ${split.name}`}</strong>
             <div className="overview-actions">
               {split.state === 'declined' && <button onClick={() => setPicking(true)}><Icon name="people" size={20} />Someone else</button>}
-              <button className="btn-quiet" onClick={() => askScorekeeper(matchId, null)}><Icon name="play" size={20} />Keep scoring</button>
+              <button className="btn-quiet" onClick={() => { askScorekeeper(matchId, null); sync.flush() }}><Icon name="play" size={20} />Keep scoring</button>
             </div>
           </div>
         </div>
@@ -697,14 +716,19 @@ function LiveMatch({ matchId, onBack }) {
                 Scorekeeper
               </button>
             )}
-            <button className="end-early" onClick={handleEndEarly}>
-              <Icon name="flag" size={18} />
-              End match early
-            </button>
-            <button className="cancel-match" onClick={handleCancel}>
-              <Icon name="x" size={18} />
-              Cancel match
-            </button>
+            {/* The match stays the main umpire's to end or cancel. */}
+            {!isKeeper && (
+              <>
+                <button className="end-early" onClick={handleEndEarly}>
+                  <Icon name="flag" size={18} />
+                  End match early
+                </button>
+                <button className="cancel-match" onClick={handleCancel}>
+                  <Icon name="x" size={18} />
+                  Cancel match
+                </button>
+              </>
+            )}
           </section>
         </>
       )}

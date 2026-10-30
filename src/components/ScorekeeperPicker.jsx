@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Icon from './Icon'
 import { fetchScorekeepers } from '../lib/api'
 import { askScorekeeper } from '../lib/storage'
+import { flush } from '../lib/sync'
 
 /** Lists the other umpires at this place; picking one asks them to tap this match. Online only. */
 function ScorekeeperPicker({ matchId, onClose }) {
@@ -22,7 +23,7 @@ function ScorekeeperPicker({ matchId, onClose }) {
       <ul>
         {umpires?.map((u) => (
           <li key={u.id}>
-            <button onClick={() => { askScorekeeper(matchId, u); onClose() }}>
+            <button onClick={() => { askScorekeeper(matchId, u); flush(); onClose() }}>
               <Icon name="user" size={18} />{u.name}
             </button>
           </li>

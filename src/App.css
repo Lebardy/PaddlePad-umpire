@@ -1958,6 +1958,7 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
 .ruling-state { font-size: 0.9rem; font-weight: 600; color: var(--text-muted); }
 .ruling-state.is-refused { color: var(--danger); background: var(--danger-soft); border-radius: var(--radius-sm); padding: 0.4rem 0.6rem; }
 .ruling-state.is-applied { display: inline-flex; align-items: center; gap: 0.35rem; }
+.overview-stray { display: flex; align-items: center; gap: 0.35rem; }
 .ruling-state.is-applied svg { color: var(--primary); }
 .overview-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .overview-actions button,

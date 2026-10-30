@@ -2,8 +2,9 @@ import { useState } from 'react'
 import Icon from '../components/Icon'
 import { deriveMatchState, currentServerPlayerId } from '../lib/pickleball'
 import { queueRuling } from '../lib/storage'
+import { flush } from '../lib/sync'
 import { useQueuedRulings } from '../lib/useLocalStore'
-import { rallyWinnerTeam, rulingProblem, waitingReentry } from '../../server/src/scorekeeper-rules.js'
+import { newestRuling, rallyWinnerTeam, rulingProblem, waitingReentry } from '../../server/src/scorekeeper-rules.js'
 import { legacyRallyLabel, rallyEnding } from '../lib/outcomes'
 
 const KIND_WORDS = { stands: 'Stands', overturned: 'Overturned', replay: 'Replay', wrongWinner: 'Wrong winner' }
@@ -32,12 +33,16 @@ function MatchOverview({ match, name, onTakeBack }) {
   const mine = lastRally && queued.find((r) => r.matchId === match.id && r.targetEventId === lastRally.id)
   const theirs = lastRally && (match.rulings ?? []).find((r) => r.targetEventId === lastRally.id)
   const ruling = mine ? { kind: mine.kind, state: 'queued' } : theirs
-  const recent = (match.rulings ?? [])[0]
+  // The newest ruling may be on a rally the card has moved past; its outcome still shows.
+  const mineAll = queued.filter((r) => r.matchId === match.id)
+  const newest = newestRuling(mineAll, match.rulings ?? [])
+  const stray = newest && newest.targetEventId !== subject?.id && (newest.state === 'queued' || newest.state === 'refused') ? newest : null
   const seenAgo = match.scorekeeper?.seenAt ? Date.now() - new Date(match.scorekeeper.seenAt).getTime() : null
-  const canRule = lastRally && !ruling && rulingProblem(match.events, lastRally.id) === null
+  const canRule = lastRally && !ruling && mineAll.length === 0 && rulingProblem(match.events, lastRally.id) === null
 
   function rule(kind) {
     queueRuling(match.id, lastRally.id, kind)
+    flush()
     setChoosing(false)
   }
 
@@ -52,11 +57,18 @@ function MatchOverview({ match, name, onTakeBack }) {
         {seenAgo !== null && seenAgo > SEEN_LATE_MS && <span className="seen-late"> · seen {Math.round(seenAgo / 1000)} s ago</span>}
       </p>
 
-      {reenter && <p className="overview-wait"><Icon name="timer" size={18} />Waiting: point to {teamWords(reenter)}</p>}
+      {stray && (
+        <p className={`ruling-state overview-stray is-${stray.state}`} role="status">
+          <Icon name={stray.state === 'queued' ? 'timer' : 'alert'} size={16} />
+          {KIND_WORDS[stray.kind]} · {stray.state === 'refused' ? stray.refused : STATE_WORDS.queued}
+        </p>
+      )}
+
+      {reenter && <p className="overview-wait"><Icon name="timer" size={18} />Waiting: rally to {teamWords(reenter)}</p>}
 
       {subject && (
         <section className={`last-rally${appliedNote?.was ? ' is-removed' : ''}`} aria-label="Last rally">
-          <strong>{teamWords(rallyWinnerTeam(match.teamA, subject))} won the point</strong>
+          <strong>{teamWords(rallyWinnerTeam(match.teamA, subject))} won the rally</strong>
           <span>{rallyEnding(subject.detail)?.label ?? legacyRallyLabel(subject.outcome, subject.zone)} — {name(subject.actingPlayerId)}</span>
           {appliedNote && (
             <span className="ruling-state is-applied" role="status">
@@ -84,7 +96,6 @@ function MatchOverview({ match, name, onTakeBack }) {
           )}
         </section>
       )}
-      {!subject && recent?.state === 'refused' && <p className="ruling-state is-refused" role="status">{recent.refused}</p>}
 
       <ol className="overview-rallies" aria-label="Earlier rallies">
         {rallies.map((r) => (
