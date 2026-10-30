@@ -3935,7 +3935,7 @@ async function main() {
     await asMain(`/matches/${skMatch}/log`, { method: 'PUT', body: { deviceId: mainDevice, events: [r0] } })
 
     const colleagues = await asMain('/scorekeeping/umpires')
-    check('the picker lists the other umpire, not me', colleagues.body.umpires?.some((u) => u.id === skId) && colleagues.body.umpires.length === 1, JSON.stringify(colleagues.body))
+    check('the picker lists the other umpire, not me', colleagues.body.umpires?.some((u) => u.id === skId) && !colleagues.body.umpires.some((u) => u.id === opUmpire.body.umpire?.id), JSON.stringify(colleagues.body))
     const bySk = await asSk(`/scorekeeping/${skMatch}`, { method: 'PUT', body: { umpireId: skId, deviceId: skDevice } })
     check('only the match umpire may pick a scorekeeper -> 403', bySk.status === 403, String(bySk.status))
     const asked = await asMain(`/scorekeeping/${skMatch}`, { method: 'PUT', body: { umpireId: skId, deviceId: mainDevice } })
@@ -3963,7 +3963,8 @@ async function main() {
     await asSk(`/matches/${skMatch}/log`, { method: 'PUT', body: { deviceId: skDevice, events: [r0, r1, note] } })
     const afterStands = await asMain(`/matches/${skMatch}`)
     check('the note in the log marks it applied; the score is unchanged',
-      afterStands.body.match?.rulings?.[0]?.state === 'applied' && afterStands.body.match.scorekeeper?.state === 'scoring',
+      afterStands.body.match?.rulings?.[0]?.state === 'applied' && afterStands.body.match.scorekeeper?.state === 'scoring'
+        && afterStands.body.match.events?.length === 3 && [r0.id, r1.id].every((id) => afterStands.body.match.events.some((e) => e.id === id)),
       JSON.stringify(afterStands.body.match?.rulings))
     const late = await asMain(`/scorekeeping/${skMatch}/rulings`, { method: 'POST', body: { id: uuid(), targetEventId: r0.id, kind: 'replay' } })
     check('a ruling on an older rally -> 409 too late', late.status === 409 && /^Too late/.test(late.body.error ?? ''), JSON.stringify(late.body))
@@ -3974,17 +3975,20 @@ async function main() {
     await asMain(`/scorekeeping/${skMatch}/rulings`, { method: 'POST', body: { id: replayId, targetEventId: r3.id, kind: 'replay' } })
     const replayNote = { id: replayId, seq: 3, type: 'ruling', at: Date.now(), targetEventId: r3.id, kind: 'replay', ruledBy: null, was: { actingPlayerId: players[0].id, outcome: 'winner', zone: 'open' } }
     const replayed = await asSk(`/matches/${skMatch}/log`, { method: 'PUT', body: { deviceId: skDevice, events: [r0, r1, note, replayNote] } })
-    check('Replay: the rally is gone, the note stays, applied', replayed.status === 200 && replayed.body.match?.rulings?.find((r) => r.id === replayId)?.state === 'applied', JSON.stringify(replayed.body.match?.rulings))
+    check('Replay: the rally is gone, the note stays, applied', replayed.status === 200 && replayed.body.match?.rulings?.find((r) => r.id === replayId)?.state === 'applied'
+      && !replayed.body.match.events?.some((e) => e.id === r3.id) && replayed.body.match.events?.some((e) => e.id === replayId && e.type === 'ruling'), JSON.stringify(replayed.body.match?.rulings))
 
     const r4 = rally(4, players[1].id)
     await asSk(`/matches/${skMatch}/log`, { method: 'PUT', body: { deviceId: skDevice, events: [r0, r1, note, replayNote, r4] } })
     const leftWaiting = uuid()
-    await asMain(`/scorekeeping/${skMatch}/rulings`, { method: 'POST', body: { id: leftWaiting, targetEventId: r4.id, kind: 'overturned' } })
+    const waitingRuling = await asMain(`/scorekeeping/${skMatch}/rulings`, { method: 'POST', body: { id: leftWaiting, targetEventId: r4.id, kind: 'overturned' } })
     const back = await asMain(`/matches/${skMatch}/claim`, { method: 'POST', body: { deviceId: mainDevice, force: true } })
     const afterBack = await asMain(`/matches/${skMatch}`)
     check('taking scoring back ends the split and refuses what was waiting',
       back.status === 200 && afterBack.body.match?.scorekeeper?.state === null && afterBack.body.match.scorekeeper.id === skId
-        && afterBack.body.match.rulings?.find((r) => r.id === leftWaiting)?.state === 'refused',
+        && waitingRuling.status === 201
+        && afterBack.body.match.rulings?.find((r) => r.id === leftWaiting)?.state === 'refused'
+        && afterBack.body.match.rulings.find((r) => r.id === leftWaiting).refused === 'Scoring was taken back.',
       JSON.stringify(afterBack.body.match?.scorekeeper))
     const skLate = await asSk(`/matches/${skMatch}/log`, { method: 'PUT', body: { deviceId: skDevice, events: [r0, r1, note, replayNote, r4, rally(5, players[1].id)] } })
     check("Paolo's next upload -> 409", skLate.status === 409, String(skLate.status))
