@@ -8,6 +8,7 @@ const PATHS = {
   calendar: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
   camera: 'M3 7h12v10H3zM15 10l6-3v10l-6-3',
   check: 'M5 12l5 5 9-10',
+  court: 'M3 5h18v14H3zM12 5v14M3 12h18',
   clipboard: 'M9 3h6v4H9zM9 5H6v16h12V5h-3M9 12h6M9 16h4',
   clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2',
   copy: 'M9 9h11v11H9zM5 15H4V4h11v1',

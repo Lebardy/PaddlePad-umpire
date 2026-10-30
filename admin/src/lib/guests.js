@@ -72,3 +72,6 @@ export function whenWords(startsAt, endsAt) {
   const sameHalf = (from < 12) === (to < 12)
   return `${dayText(startsAt)} · ${sameHalf ? from % 12 || 12 : hourText(from)}–${hourText(to)}`
 }
+
+/** "2 / 3": courts with an umpire who can still start them, of all courts. */
+export const courtCount = (roster) => `${roster.filter((c) => c.umpire && c.umpire.active !== false).length} / ${roster.length}`
