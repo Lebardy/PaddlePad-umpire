@@ -16,6 +16,7 @@ const PATHS = {
   chevron: 'M9 6l6 6-6 6',
   court: 'M3 5h18v14H3zM12 5v14M3 12h18',
   flag: 'M5 21V4M5 4h11l-2 4 2 4H5',
+  home: 'M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10',
   key: 'M8 19a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM11 12l9-9M16 7l3 3',
   list: 'M9 6h11M9 12h11M9 18h11M4 6v.01M4 12v.01M4 18v.01',
   lock: 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4',

@@ -1903,6 +1903,24 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
   margin: 0 auto;
 }
 .scorekeeper-wait { justify-items: center; text-align: center; padding-top: 2rem; }
+.wait-card {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 24rem;
+  padding: calc(1.5rem - 1.5px) 1.25rem;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+.wait-card > svg { color: var(--primary); }
+.wait-card > strong { font-family: var(--display); font-size: 1.6rem; line-height: 1.1; text-wrap: balance; overflow-wrap: anywhere; }
+.wait-card > p { margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--text-muted); }
+.wait-card > button { width: 100%; }
+.wait-card .overview-actions { justify-content: center; width: 100%; }
+.wait-card .overview-actions button { flex: 1 1 auto; }
 .big-score {
   font-family: var(--display);
   font-size: clamp(3.6rem, 16vw, 5.5rem);
@@ -1944,6 +1962,7 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
 .overview-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .overview-actions button,
 .take-back,
+.wait-card > button,
 .scorekeeper-picker li button {
   display: inline-flex;
   align-items: center;

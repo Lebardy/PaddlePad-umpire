@@ -404,8 +404,12 @@ function LiveMatch({ matchId, onBack }) {
       <div className="live-match">
         <button className="back-link" onClick={onBack}>&larr; Back</button>
         <div className="scorekeeper-wait" role="status">
-          <Icon name="undo" size={24} />
-          <p>{match.recordedByName?.split(' ')[0]} took scoring back{takenBack.unsaved ? ` · ${takenBack.unsaved} taps not saved` : ''}</p>
+          <div className="wait-card">
+            <Icon name="undo" size={32} />
+            <strong>{match.recordedByName?.split(' ')[0]} took scoring back</strong>
+            {takenBack.unsaved > 0 && <p>{takenBack.unsaved} taps not saved</p>}
+            <button onClick={onBack}><Icon name="home" size={20} />Home</button>
+          </div>
         </div>
       </div>
     )
@@ -425,13 +429,13 @@ function LiveMatch({ matchId, onBack }) {
         <button className="back-link" onClick={onBack}>&larr; Back</button>
         <div className="scorekeeper-wait" role="status">
           <span className="big-score">{score.A}–{score.B}</span>
-          <p>
-            <Icon name={split.state === 'declined' ? 'x' : 'timer'} size={18} />
-            {split.state === 'declined' ? `${split.name} said not now` : match.scorekeeperAsk ? `Sending to ${split.name}` : `Waiting for ${split.name}`}
-          </p>
-          <div className="overview-actions">
-            {split.state === 'declined' && <button onClick={() => setPicking(true)}><Icon name="people" size={18} />Someone else</button>}
-            <button className="btn-quiet" onClick={() => askScorekeeper(matchId, null)}><Icon name="play" size={18} />Keep scoring</button>
+          <div className="wait-card">
+            <Icon name={split.state === 'declined' ? 'x' : 'timer'} size={32} />
+            <strong>{split.state === 'declined' ? `${split.name} said not now` : match.scorekeeperAsk ? `Sending to ${split.name}` : `Waiting for ${split.name}`}</strong>
+            <div className="overview-actions">
+              {split.state === 'declined' && <button onClick={() => setPicking(true)}><Icon name="people" size={20} />Someone else</button>}
+              <button className="btn-quiet" onClick={() => askScorekeeper(matchId, null)}><Icon name="play" size={20} />Keep scoring</button>
+            </div>
           </div>
         </div>
         {picking && <ScorekeeperPicker matchId={matchId} onClose={() => setPicking(false)} />}
