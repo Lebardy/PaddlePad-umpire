@@ -991,3 +991,5 @@ tr.is-voided .reason { opacity: 0.6; }
 .live-lamp { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--win-lamp); box-shadow: 0 0 6px var(--win-lamp); flex: none; }
 /* A row's Cancel and its Confirm / Not now are a finger's size on a tablet. */
 .guests-table .btn-small { min-height: 2.75rem; }
+/* The refusal ("Courts already started") reads on one line under Cancel, not in a three-line sliver. */
+.guests-table .row-actions > .row-error { white-space: nowrap; }
