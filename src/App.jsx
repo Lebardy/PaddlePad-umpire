@@ -225,6 +225,7 @@ function App() {
             {view.name === 'home' && (
               <Home
                 onOpenSession={openSession}
+                onOpenMatch={openMatch}
                 onOpenGuide={() => setView({ name: 'guide' })}
                 umpire={umpire}
                 onOpenPlayers={() => setView({ name: 'players' })}

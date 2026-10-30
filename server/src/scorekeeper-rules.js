@@ -62,3 +62,8 @@ export function waitingReentry(events, teamA) {
   if (last?.type !== 'ruling' || !last.was || last.kind === 'replay') return null
   return rallyWinnerTeam(teamA, last.was) === 'A' ? 'B' : 'A'
 }
+
+/** True when a rally entered after an overturned call gives the point to the other team than the one ruled for. */
+export function reentryMismatch(waitingTeam, teamA, rally) {
+  return Boolean(waitingTeam) && rallyWinnerTeam(teamA, rally) !== waitingTeam
+}

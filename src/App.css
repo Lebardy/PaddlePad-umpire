@@ -1996,3 +1996,31 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
 .picker-head .icon-solo { min-width: 2.75rem; min-height: 2.75rem; background: none; border: none; color: var(--text-muted); cursor: pointer; }
 .scorekeeper-picker ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
 .scorekeeper-picker li button { width: 100%; justify-content: flex-start; background: var(--bg-elevated); border-color: var(--border); color: var(--text); }
+
+/* Scorekeeper split: the card on Home, and the scoring screen's strip and ruling banner. */
+.scorekeeper-card {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  padding: calc(1rem - 1px);
+  background: var(--bg-elevated);
+  border: 2px solid var(--primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+.scorekeeper-card > strong { display: flex; align-items: center; gap: 0.4rem; font-size: 1.15rem; }
+.scoring-for { display: flex; align-items: center; gap: 0.35rem; margin: 0 0 0.5rem; color: var(--text-muted); font-size: 0.9rem; font-weight: 600; }
+.ruling-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.75rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: var(--radius-sm);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.ruling-banner span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ruling-banner .icon-solo { flex: none; min-width: 2.75rem; min-height: 2.75rem; background: none; border: none; color: inherit; cursor: pointer; }

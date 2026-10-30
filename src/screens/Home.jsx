@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react'
 import Icon from '../components/Icon'
 import { sessionName } from '../lib/sessionName'
 import { createSession, dismissCourtNotice } from '../lib/storage'
+import { answerScorekeeping } from '../lib/api'
+import { getDeviceId } from '../lib/outbox'
+import * as sync from '../lib/sync'
+import { useScorekeeping } from '../lib/scorekeeping'
 import { hoursWords, startableCourts, useTodayCourts } from '../lib/courts'
 import { useCourtNotices, useSessions } from '../lib/useLocalStore'
 
@@ -36,13 +40,16 @@ function SessionList({ sessions, onOpenSession, showOwner = false }) {
   )
 }
 
-function Home({ onOpenSession, onOpenGuide, onOpenPlayers, onOpenCamera, umpire }) {
+function Home({ onOpenSession, onOpenMatch, onOpenGuide, onOpenPlayers, onOpenCamera, umpire }) {
   // Subscribed rather than read during render: previously this never
   // updated after a write, and only looked correct because navigating
   // away unmounted the screen.
   const sessions = useSessions()
   const notices = useCourtNotices()
   const openPlays = useTodayCourts()
+  const asked = useScorekeeping()
+  const [busy, setBusy] = useState(null)
+  const [failed, setFailed] = useState(null)
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     // The name preview follows the clock; half a minute is fine-grained enough.
@@ -69,6 +76,27 @@ function Home({ onOpenSession, onOpenGuide, onOpenPlayers, onOpenCamera, umpire 
     } catch {
       // It will ask once more next launch. Harmless.
     }
+  }
+
+  async function startScoring(m) {
+    setBusy(m.id)
+    setFailed(null)
+    try {
+      if (m.state === 'asked') await answerScorekeeping(m.id, { deviceId: getDeviceId(), start: true })
+      // The match and its players are the other umpire's: fetch both before opening it.
+      await Promise.all([sync.pullMatch(m.id), sync.pullSession(m.sessionId)])
+      onOpenMatch(m.id, m.sessionId)
+    } catch {
+      setFailed(m.id)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function notNow(m) {
+    setBusy(m.id)
+    await answerScorekeeping(m.id, { deviceId: getDeviceId(), start: false }).catch(() => setFailed(m.id))
+    setBusy(null)
   }
 
   function startCourt(card) {
@@ -125,6 +153,18 @@ function Home({ onOpenSession, onOpenGuide, onOpenPlayers, onOpenCamera, umpire 
             <Icon name="x" size={18} className="icon-solo" />
           </button>
         </div>
+      ))}
+
+      {asked.map((m) => (
+        <section key={m.id} className="scorekeeper-card" aria-label="Score a match">
+          <strong><Icon name="people" size={18} />{m.state === 'scoring' ? 'Scoring for' : 'Score for'} {m.umpireName?.split(' ')[0]}</strong>
+          <span className="court-card-hours">{m.court ? `Court ${m.court}` : m.sessionName}</span>
+          <div className="overview-actions">
+            <button onClick={() => startScoring(m)} disabled={busy === m.id}><Icon name="play" size={18} />{m.state === 'scoring' ? 'Continue' : 'Start'}</button>
+            {m.state === 'asked' && <button className="btn-quiet" onClick={() => notNow(m)} disabled={busy === m.id}>Not now</button>}
+          </div>
+          {failed === m.id && <p className="form-error" role="alert">Needs a connection</p>}
+        </section>
       ))}
 
       {/* Courts first: on an open play night the umpire's own court is the one thing to tap. */}

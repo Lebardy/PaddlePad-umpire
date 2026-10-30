@@ -211,7 +211,7 @@ async function push(entry, payload) {
     // Only if the umpire has not picked someone else meanwhile: that
     // newer ask is still queued and the next push sends it.
     const match = getMatch(payload.id)
-    if ((match?.scorekeeperAsk?.umpireId ?? null) === (payload.scorekeeperAsk?.umpireId ?? null)) {
+    if (match && (match.scorekeeperAsk?.umpireId ?? null) === (payload.scorekeeperAsk?.umpireId ?? null)) {
       saveMatch({ ...match, scorekeeper, scorekeeperAsk: undefined })
     }
     return
@@ -387,6 +387,24 @@ export function compareLogs(local, remote) {
   }
   if (local.length === remote.length) return 'same'
   return local.length < remote.length ? 'server-ahead' : 'local-ahead'
+}
+
+/**
+ * The match's own umpire took scoring back from this scorekeeper's phone.
+ * Adopts the server's log and reports how many of this phone's taps never
+ * reached it (they are not kept: the umpire is the one responsible now).
+ */
+export async function yieldMatch(matchId) {
+  const remote = await api.fetchMatch(matchId)
+  setReachable(true)
+  const localEvents = getMatch(matchId)?.events ?? []
+  const known = new Set((remote.events ?? []).map((e) => e.id))
+  const unsaved = localEvents.filter((e) => !known.has(e.id)).length
+  replaceServerState({ matches: [remote], force: true })
+  outbox.resolve(outbox.outboxKey('log', matchId))
+  outbox.discardDead(outbox.outboxKey('log', matchId))
+  notify()
+  return { unsaved }
 }
 
 /**
