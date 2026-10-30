@@ -16,6 +16,10 @@ import TakeoverNotice from '../components/TakeoverNotice'
 import MatchVideo from '../components/MatchVideo'
 import * as sync from '../lib/sync'
 import { getDeviceId } from '../lib/outbox'
+import { getStoredUmpire } from '../lib/api'
+import { askScorekeeper } from '../lib/storage'
+import MatchOverview from './MatchOverview'
+import ScorekeeperPicker from '../components/ScorekeeperPicker'
 import { LEASE_MINUTES } from '../../server/src/scoring-lease.js'
 import { deriveMatchState, currentServerPlayerId, courtSides } from '../lib/pickleball'
 import { isSameThirdShot, waitingThirdShot } from '../lib/thirdShot'
@@ -32,6 +36,8 @@ import {
 // enough to be negligible, fast enough that a watcher isn't looking at
 // a score several rallies out of date.
 const WATCH_POLL_MS = 8_000
+// The match umpire follows a scorekeeper closely: the overview is their only view.
+const SPLIT_POLL_MS = 2_000
 
 // Remembered so the explanation is open for someone's first night and
 // out of the way by their tenth -- the same bargain as the guide nudge
@@ -192,6 +198,7 @@ function describeEvent(event, name) {
 function LiveMatch({ matchId, onBack }) {
   const match = useMatch(matchId)
   const [showHistory, setShowHistory] = useState(false)
+  const [picking, setPicking] = useState(false)
   // The ending picked by the first tap, waiting for the player.
   const [pending, setPending] = useState(null)
   // A half-finished pick must not survive into a different match, or
@@ -225,6 +232,12 @@ function LiveMatch({ matchId, onBack }) {
   const isScorer = !scoringDevice || scoringDevice === getDeviceId()
   // A finished or voided match no longer changes, so watching it is pointless.
   const watching = !isScorer && match?.status === 'in_progress' && !match.voidedAt
+  // A match made on this phone has no recordedBy until the server's copy is adopted.
+  const me = getStoredUmpire()?.id
+  const split = match?.scorekeeper?.state ? match.scorekeeper : null
+  const iRunIt = Boolean(split) && (match.recordedBy ?? me) === me
+  const polling = watching || iRunIt
+  const pollMs = iRunIt ? SPLIT_POLL_MS : WATCH_POLL_MS
 
   useEffect(() => {
     const controller = new AbortController()
@@ -235,19 +248,19 @@ function LiveMatch({ matchId, onBack }) {
     }
     refresh()
 
-    if (watching) {
+    if (polling) {
       const tick = () => {
         if (document.visibilityState === 'visible') refresh()
-        timer = setTimeout(tick, WATCH_POLL_MS)
+        timer = setTimeout(tick, pollMs)
       }
-      timer = setTimeout(tick, WATCH_POLL_MS)
+      timer = setTimeout(tick, pollMs)
     }
 
     return () => {
       controller.abort()
       if (timer) clearTimeout(timer)
     }
-  }, [matchId, watching])
+  }, [matchId, polling, pollMs])
 
   function name(id) {
     return knownPlayers.find((p) => p.id === id)?.name ?? '?'
@@ -336,6 +349,37 @@ function LiveMatch({ matchId, onBack }) {
 
   // match.teamA / match.events were dereferenced unguarded below.
   if (!match) return <NotFound what="match" onBack={onBack} />
+
+  // While a scorekeeper holds or is asked for the taps, no scoring control is
+  // reachable here: the ask is sent after this phone's earlier taps, so none may follow it.
+  if (iRunIt && split.state === 'scoring') {
+    return (
+      <div className="live-match">
+        <button className="back-link" onClick={onBack}>&larr; Back</button>
+        <MatchOverview match={match} name={name} onTakeBack={() => sync.takeOverMatch(matchId).catch(() => alert('Needs a connection'))} />
+      </div>
+    )
+  }
+  if (iRunIt) {
+    const score = deriveMatchState(match).score
+    return (
+      <div className="live-match">
+        <button className="back-link" onClick={onBack}>&larr; Back</button>
+        <div className="scorekeeper-wait" role="status">
+          <span className="big-score">{score.A}–{score.B}</span>
+          <p>
+            <Icon name={split.state === 'declined' ? 'x' : 'timer'} size={18} />
+            {split.state === 'declined' ? `${split.name} said not now` : match.scorekeeperAsk ? `Sending to ${split.name}` : `Waiting for ${split.name}`}
+          </p>
+          <div className="overview-actions">
+            {split.state === 'declined' && <button onClick={() => setPicking(true)}><Icon name="people" size={18} />Someone else</button>}
+            <button className="btn-quiet" onClick={() => askScorekeeper(matchId, null)}><Icon name="play" size={18} />Keep scoring</button>
+          </div>
+        </div>
+        {picking && <ScorekeeperPicker matchId={matchId} onClose={() => setPicking(false)} />}
+      </div>
+    )
+  }
 
   const derived = deriveMatchState(match)
   const players = [...match.teamA, ...match.teamB]
@@ -566,6 +610,8 @@ function LiveMatch({ matchId, onBack }) {
         )}
       </div>
 
+      {picking && <ScorekeeperPicker matchId={matchId} onClose={() => setPicking(false)} />}
+
       {match.status === 'in_progress' && (
         <>
           <RallyLegend />
@@ -573,6 +619,12 @@ function LiveMatch({ matchId, onBack }) {
           {/* Kept well below the scoring buttons, where no rally tap can
               land on them by accident. */}
           <section className="match-controls" aria-label="Match">
+            {isScorer && (match.recordedBy ?? me) === me && (
+              <button className="btn-quiet" onClick={() => setPicking(true)}>
+                <Icon name="people" size={18} />
+                Scorekeeper
+              </button>
+            )}
             <button className="end-early" onClick={handleEndEarly}>
               <Icon name="flag" size={18} />
               End match early
