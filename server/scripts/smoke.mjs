@@ -4245,11 +4245,24 @@ async function main() {
   process.exit(fail ? 1 : 0)
 }
 
-main().catch(async (error) => {
-  console.error('\nsmoke test crashed:', error)
-  // A crash used to skip the tidy and leave "Smoke ..." players on staging.
-  // Tidy first: it removes the sessions too, and closing them can hang after a dropped connection.
+// Tidy first: it removes the sessions too, and closing them can hang after a dropped connection.
+async function tidyAndExit() {
   await tidyStaging()?.catch(() => {})
   await closeOpenSessions().catch(() => {})
   process.exit(1)
+}
+
+main().catch(async (error) => {
+  console.error('\nsmoke test crashed:', error)
+  // A crash used to skip the tidy and leave "Smoke ..." players on staging.
+  await tidyAndExit()
 })
+
+// A stop from outside (a timeout running out, Ctrl+C) skipped the tidy too.
+// `once`, so a second Ctrl+C still quits straight away.
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  process.once(signal, async () => {
+    console.error(`\nsmoke test stopped (${signal}), tidying staging first`)
+    await tidyAndExit()
+  })
+}
