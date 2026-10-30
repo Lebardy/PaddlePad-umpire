@@ -3817,6 +3817,20 @@ async function main() {
       })
       check('resending the same session changes nothing, no notice',
         resend.status === 201 && !resend.body.courtNotice && resend.body.session?.court === 1, JSON.stringify(resend.body).slice(0, 160))
+      // Void the court's session, start the court again, then restore the first: 200, and it gives the court up.
+      const voidCourt = (id, voided) => request(`/sessions/${id}/void`, { method: 'POST', bearer: opUmpireToken, body: { voided } })
+      const voidedFirst = await voidCourt(courtSessionId, true)
+      const restart = await request('/sessions', {
+        method: 'POST', bearer: opUmpireToken,
+        body: { id: uuid(), startsAt: new Date().toISOString(), openPlayId: courtPlayId, court: 1 },
+      })
+      const restored = await voidCourt(courtSessionId, false)
+      const heldNow = await request('/open-plays/today', { bearer: opUmpireToken })
+      check('restoring a voided court session whose court was started again -> 200, it gives the court up, the new one keeps it',
+        voidedFirst.status === 200 && restart.body.session?.court === 1 && restored.status === 200
+          && !restored.body.session?.court && !restored.body.session?.openPlayId
+          && heldNow.body.openPlays?.find((p) => p.id === courtPlayId)?.courts[0]?.started === true,
+        `${voidedFirst.status} ${restored.status} ${JSON.stringify(restored.body).slice(0, 120)}`)
       const plain = await request('/sessions', { method: 'POST', bearer: opUmpireToken, body: { id: uuid(), startsAt: new Date().toISOString() } })
       check('a plain one-tap session -> "Session · …"',
         plain.status === 201 && /^Session · \w{3} \w{3} \d{1,2}, \d{1,2}(:\d{2})? [AP]M$/.test(plain.body.session?.name ?? ''), JSON.stringify(plain.body).slice(0, 160))

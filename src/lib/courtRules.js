@@ -21,7 +21,7 @@ export function hoursWords(startsAt, endsAt) {
 
 /** Courts this umpire may start now: theirs or nobody's, not started, not already started on this phone. Theirs first. */
 export function startableCourts(openPlays, sessions, now) {
-  const here = new Set(sessions.filter((s) => s.openPlayId && s.court).map((s) => `${s.openPlayId}:${s.court}`))
+  const here = new Set(sessions.filter((s) => s.openPlayId && s.court && !s.voidedAt).map((s) => `${s.openPlayId}:${s.court}`))
   return openPlays
     .filter((p) => now >= Date.parse(p.startsAt) - LEAD_MS && now <= Date.parse(p.endsAt))
     .flatMap((p) => p.courts

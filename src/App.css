@@ -592,7 +592,7 @@ section {
 .court-card-hours { font-size: 0.88rem; color: var(--text-muted); }
 .court-card button,
 .new-session button { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; }
-.court-card button { width: 100%; min-height: 2.75rem; }
+.court-card button { width: 100%; min-height: 2.75rem; border: 2px solid var(--primary); }
 /* An open court is a choice, not the umpire's own: Start is outlined so "yours" stays the loud one. */
 .court-card:not(.is-mine) button { background: transparent; color: var(--primary); border: 2px solid var(--primary); }
 .court-card:not(.is-mine) button:hover { background: var(--primary-soft); }

@@ -26,6 +26,8 @@ check('mine and open courts, not others', ids(startableCourts([play([c(1, 'other
 check('a started court is gone', ids(startableCourts([play([c(2, 'me', true), c(3)])], [], NOW)), '3')
 check('a court this phone already started (not yet sent) is gone',
   ids(startableCourts([play([c(2, 'me'), c(3)])], [{ openPlayId: 'op1', court: 3 }], NOW)), '2*')
+check('a voided session no longer hides its court',
+  ids(startableCourts([play([c(3)])], [{ openPlayId: 'op1', court: 3, voidedAt: 1 }], NOW)), '3')
 check('more than an hour early: nothing', ids(startableCourts([play([c(2, 'me')])], [], Date.parse('2026-10-30T08:59:00Z'))), '')
 check('after the end: nothing (a stale cache)', ids(startableCourts([play([c(2, 'me')])], [], Date.parse('2026-10-30T13:01:00Z'))), '')
 check('mine first', ids(startableCourts([play([c(1), c(2, 'me')])], [], NOW)), '2*,1')

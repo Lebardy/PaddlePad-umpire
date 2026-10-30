@@ -139,7 +139,7 @@ function Home({ onOpenSession, onOpenGuide, onOpenPlayers, onOpenCamera, umpire 
                   <span className={`court-chip ${card.mine ? 'is-mine' : 'is-open'}`}>{card.mine ? 'yours' : 'open'}</span>
                 </div>
                 <span className="court-card-hours">Open play · {hoursWords(card.startsAt, card.endsAt)}</span>
-                <button onClick={() => startCourt(card)}><Icon name="play" />Start</button>
+                <button onClick={() => startCourt(card)} aria-label={`Start Court ${card.court}`}><Icon name="play" />Start</button>
               </li>
             ))}
           </ul>
@@ -149,7 +149,7 @@ function Home({ onOpenSession, onOpenGuide, onOpenPlayers, onOpenCamera, umpire 
       <section className="new-session" aria-labelledby="new-session-title">
         <h2 id="new-session-title">New session</h2>
         <p className="new-session-name">{sessionName({ startsAt: now })}</p>
-        <button onClick={startPlain}><Icon name="plus" />Start</button>
+        <button onClick={startPlain} aria-label="Start a new session"><Icon name="plus" />Start</button>
       </section>
 
       <h2>Your sessions</h2>

@@ -297,15 +297,28 @@ router.post('/:id/void', async (req, res) => {
 
   const params = [req.params.id, voided, req.umpire.id, reason]
   const scope = umpireScope(req.umpire.facilityId, params, 'facility_id')
-  const { rows } = await query(
-    `UPDATE sessions
-        SET voided_at = CASE WHEN $2 THEN now() END,
-            voided_by = CASE WHEN $2 THEN $3::uuid END,
-            void_reason = CASE WHEN $2 THEN $4 END
-      WHERE id = $1 AND ${scope}
-      RETURNING id`,
-    params,
-  )
+  // Restoring when another live session now holds the court: give the court up
+  // and become a plain session, as a refused start is stored.
+  const taken = `NOT $2 AND EXISTS (SELECT 1 FROM sessions o WHERE o.open_play_id = sessions.open_play_id
+    AND o.court = sessions.court AND o.voided_at IS NULL AND o.id <> sessions.id)`
+  let rows
+  try {
+    ;({ rows } = await query(
+      `UPDATE sessions
+          SET voided_at = CASE WHEN $2 THEN now() END,
+              voided_by = CASE WHEN $2 THEN $3::uuid END,
+              void_reason = CASE WHEN $2 THEN $4 END,
+              court = CASE WHEN ${taken} THEN NULL ELSE court END,
+              open_play_id = CASE WHEN ${taken} THEN NULL ELSE open_play_id END
+        WHERE id = $1 AND ${scope}
+        RETURNING id`,
+      params,
+    ))
+  } catch (err) {
+    // Two restores or a start raced for the court after the check above.
+    if (err.code === '23505') return res.status(409).json({ error: 'That court was just started by someone else' })
+    throw err
+  }
   if (rows.length === 0) return res.status(404).json({ error: 'No such session' })
   invalidateRallyRatings()
 
