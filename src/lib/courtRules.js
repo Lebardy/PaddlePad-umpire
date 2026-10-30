@@ -4,14 +4,15 @@
 // ============================================================
 
 const LEAD_MS = 60 * 60_000 // matches COURT_LEAD_MS on the server
-const HOUR = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', hour12: true })
+const HOUR = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', hour12: true })
 
+// Minutes only when not :00, the same rule as session names.
 const hourParts = (iso) => {
   const parts = Object.fromEntries(HOUR.formatToParts(new Date(iso)).map((p) => [p.type, p.value]))
-  return [parts.hour, parts.dayPeriod]
+  return [parts.minute === '00' ? parts.hour : `${parts.hour}:${parts.minute}`, parts.dayPeriod]
 }
 
-/** "6–9 PM", or "10 AM–2 PM" across noon. */
+/** "6–9 PM", "6:30–9 PM", or "10 AM–2:30 PM" across noon. */
 export function hoursWords(startsAt, endsAt) {
   const [from, fromHalf] = hourParts(startsAt)
   const [to, toHalf] = hourParts(endsAt)

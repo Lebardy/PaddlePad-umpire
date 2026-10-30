@@ -686,6 +686,11 @@ export function clearLocalData() {
   write(MATCHES_KEY, [])
   write(TOMBSTONES_KEY, { matches: [], sessions: [] })
   clearOutbox()
+  // The next umpire on a shared phone must not see this one's courts as "yours".
+  try {
+    localStorage.removeItem('paddlepad.todayCourts')
+  } catch { /* private mode */ }
+  writeJSON(COURT_NOTICES_KEY, {})
 }
 
 // ============================================================

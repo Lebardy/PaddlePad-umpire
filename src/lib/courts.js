@@ -11,7 +11,8 @@ const CACHE_KEY = 'paddlepad.todayCourts'
 
 function readCache() {
   try {
-    return JSON.parse(localStorage.getItem(CACHE_KEY) ?? '[]')
+    const cached = JSON.parse(localStorage.getItem(CACHE_KEY) ?? '[]')
+    return Array.isArray(cached) ? cached : []
   } catch {
     return []
   }
@@ -24,7 +25,8 @@ export function useTodayCourts() {
     let live = true
     const refresh = () => fetchTodayCourts()
       .then((next) => {
-        if (!live) return
+        // An api older than this app answers without a list: keep what we have.
+        if (!live || !Array.isArray(next)) return
         setOpenPlays(next)
         try { localStorage.setItem(CACHE_KEY, JSON.stringify(next)) } catch { /* cache only */ }
       })
