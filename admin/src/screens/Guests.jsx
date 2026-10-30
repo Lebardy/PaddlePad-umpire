@@ -198,17 +198,22 @@ export default function Guests({ me, facilityLabel }) {
 /** One court: the manager picks who umpires it; the rest is read-only. */
 function CourtCard({ facilityId, play, slot, umpires, onSaved }) {
   const [state, setState] = useState(null) // null | 'saving' | 'saved' | error text
+  // The pick shows straight away; otherwise the select snaps back to the old umpire until the list reloads.
+  const [picked, setPicked] = useState(null)
   const takenElsewhere = new Set(play.courtRoster.filter((c) => c.court !== slot.court && c.umpire).map((c) => c.umpire.id))
   async function change(event) {
     if (state === 'saving') return // aria-disabled keeps focus but does not block changes
+    const value = event.target.value
+    setPicked(value)
     setState('saving')
     try {
-      await setCourtUmpire(facilityId, play.id, slot.court, event.target.value || null)
+      await setCourtUmpire(facilityId, play.id, slot.court, value || null)
+      await onSaved().catch(() => {}) // the save stood; a failed reload only leaves the old list showing
       setState('saved')
-      onSaved()
     } catch (err) {
       setState(err.message)
     }
+    setPicked(null)
   }
   const id = `court-${play.id}-${slot.court}`
   return (
@@ -218,7 +223,7 @@ function CourtCard({ facilityId, play, slot, umpires, onSaved }) {
         {/* always in the page, so a screen reader hears the words when they appear */}
         <span className="court-saved" role="status">{state === 'saved' && <><Icon name="check" />Saved</>}</span>
       </div>
-      <select id={id} value={slot.umpire?.id ?? ''} onChange={change} aria-disabled={state === 'saving'}>
+      <select id={id} value={picked ?? slot.umpire?.id ?? ''} onChange={change} aria-disabled={state === 'saving'}>
         <option value="">Anyone</option>
         {slot.umpire && slot.umpire.active === false && <option value={slot.umpire.id}>{slot.umpire.name} (can’t start)</option>}
         {umpires.map((u) => (
