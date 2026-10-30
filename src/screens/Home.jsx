@@ -47,7 +47,7 @@ function Home({ onOpenSession, onOpenMatch, onOpenGuide, onOpenPlayers, onOpenCa
   const sessions = useSessions()
   const notices = useCourtNotices()
   const openPlays = useTodayCourts()
-  const asked = useScorekeeping()
+  const [asked, refreshAsked] = useScorekeeping()
   const [busy, setBusy] = useState(null)
   const [failed, setFailed] = useState(null)
   const [now, setNow] = useState(() => Date.now())
@@ -78,6 +78,13 @@ function Home({ onOpenSession, onOpenMatch, onOpenGuide, onOpenPlayers, onOpenCa
     }
   }
 
+  // The ask was withdrawn or given to someone else (409/403): say so and drop the card.
+  function fail(m, error) {
+    const withdrawn = error.status === 409 || error.status === 403
+    setFailed({ id: m.id, text: withdrawn ? 'Request withdrawn' : 'Needs a connection' })
+    if (withdrawn) refreshAsked()
+  }
+
   async function startScoring(m) {
     setBusy(m.id)
     setFailed(null)
@@ -86,8 +93,8 @@ function Home({ onOpenSession, onOpenMatch, onOpenGuide, onOpenPlayers, onOpenCa
       // The match and its players are the other umpire's: fetch both before opening it.
       await Promise.all([sync.pullMatch(m.id), sync.pullSession(m.sessionId)])
       onOpenMatch(m.id, m.sessionId)
-    } catch {
-      setFailed(m.id)
+    } catch (error) {
+      fail(m, error)
     } finally {
       setBusy(null)
     }
@@ -95,7 +102,13 @@ function Home({ onOpenSession, onOpenMatch, onOpenGuide, onOpenPlayers, onOpenCa
 
   async function notNow(m) {
     setBusy(m.id)
-    await answerScorekeeping(m.id, { deviceId: getDeviceId(), start: false }).catch(() => setFailed(m.id))
+    setFailed(null)
+    try {
+      await answerScorekeeping(m.id, { deviceId: getDeviceId(), start: false })
+      await refreshAsked() // the card goes now, not at the next poll
+    } catch (error) {
+      fail(m, error)
+    }
     setBusy(null)
   }
 
@@ -161,9 +174,9 @@ function Home({ onOpenSession, onOpenMatch, onOpenGuide, onOpenPlayers, onOpenCa
           <span className="court-card-hours">{m.court ? `Court ${m.court}` : m.sessionName}</span>
           <div className="overview-actions">
             <button onClick={() => startScoring(m)} disabled={busy === m.id}><Icon name="play" size={18} />{m.state === 'scoring' ? 'Continue' : 'Start'}</button>
-            {m.state === 'asked' && <button className="btn-quiet" onClick={() => notNow(m)} disabled={busy === m.id}>Not now</button>}
+            {m.state === 'asked' && <button className="btn-quiet" onClick={() => notNow(m)} disabled={busy === m.id}><Icon name="x" size={18} />Not now</button>}
           </div>
-          {failed === m.id && <p className="form-error" role="alert">Needs a connection</p>}
+          {failed?.id === m.id && <p className="form-error" role="alert">{failed.text}</p>}
         </section>
       ))}
 

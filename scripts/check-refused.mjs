@@ -44,6 +44,8 @@ check('a player this device has forgotten is a question mark', words('matchVoid'
 check('a session that is gone says so', words('roster', 'nope'), 'The players in a session no longer on this device')
 check('a match that is gone says so', words('log', 'nope'), 'The rallies of a match no longer on this device')
 check('deletes have no record left to name', words('matchDelete', 'm1'), 'Deleting a match')
+check('a scorekeeper request is named', words('scorekeeper', 'm1'), 'Scorekeeper request')
+check('a ruling is named', words('ruling', 'r1'), 'Ruling')
 check('and neither do session deletes', words('sessionDelete', 's1'), 'Deleting a session')
 check('an unknown kind is still a line', words('later', 'x'), 'A change')
 
