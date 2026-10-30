@@ -618,6 +618,13 @@ export function replaceServerState({
         // is the scorer, so a watching device never refreshes its screen.
         scoringDevice: m.scoringDevice ?? null,
         scoringClaimedAt: m.scoringClaimedAt ?? null,
+        // Whose match it is, and who taps it: the overview and both
+        // phones of a scorekeeper split pick their screen from these.
+        recordedBy: m.recordedBy ?? null,
+        recordedByName: m.recordedByName ?? null,
+        scorekeeper: m.scorekeeper ?? null,
+        // Like events, only the single-match fetch carries rulings.
+        rulings: m.rulings ? m.rulings.map((r) => ({ ...r })) : (local.find((l) => l.id === m.id)?.rulings ?? []),
         // A match list carries no events -- only the single-match fetch
         // does. Defaulting to [] here would wipe the local log of an
         // already-synced match every time the session screen refreshed.

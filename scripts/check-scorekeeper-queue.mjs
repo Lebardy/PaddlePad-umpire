@@ -87,5 +87,13 @@ rulingAnswer = 409
 await sync.drain()
 check('a refused ruling is sent once and dropped', [rulingCalls, storage.getQueuedRulings().length], [2, 0])
 
+// A pull keeps whose match it is and who taps; a list pull keeps local rulings.
+const fromServer = { ...base, startedAt: new Date(1).toISOString(), recordedBy: 'u1', recordedByName: 'Joy', scorekeeper: { id: UMP, name: 'Ana', state: 'scoring', seenAt: null } }
+storage.replaceServerState({ matches: [{ ...fromServer, events: [rally], rulings: [{ id: 'r1', kind: 'stands' }] }] })
+storage.replaceServerState({ matches: [fromServer] })
+const pulled = storage.getMatch(MID)
+check('a pulled match keeps recordedBy and scorekeeper', [pulled.recordedBy, pulled.recordedByName, pulled.scorekeeper.state], ['u1', 'Joy', 'scoring'])
+check('a pull without rulings keeps the local ones', pulled.rulings.map((r) => r.id), ['r1'])
+
 console.log(`\n${pass} ok / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)
