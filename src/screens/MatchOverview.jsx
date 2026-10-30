@@ -22,7 +22,10 @@ function MatchOverview({ match, name, onTakeBack }) {
   const last = match.events.at(-1)
   const lastRally = last?.type === 'rally' ? last : null
   const reenter = waitingReentry(match.events, match.teamA)
-  const rallies = match.events.filter((e) => e.type === 'rally').slice(-6).reverse()
+  // The card shows the last rally, or after a ruling the rally it ruled on (a replaced one lives on in `was`).
+  const appliedNote = last?.type === 'ruling' ? last : null
+  const subject = lastRally ?? (appliedNote && (appliedNote.was ?? match.events.at(-2)))
+  const rallies = match.events.filter((e) => e.type === 'rally' && e.id !== subject?.id).slice(-5).reverse()
   const teamWords = (team) => (team === 'A' ? match.teamA : match.teamB).map(name).join(' / ')
 
   // The newest word on the last rally: this phone's unsent one first, then the server's.
@@ -51,10 +54,15 @@ function MatchOverview({ match, name, onTakeBack }) {
 
       {reenter && <p className="overview-wait"><Icon name="timer" size={18} />Replay: point to {teamWords(reenter)}</p>}
 
-      {lastRally && (
+      {subject && (
         <section className="last-rally" aria-label="Last rally">
-          <strong>{teamWords(rallyWinnerTeam(match.teamA, lastRally))} won the point</strong>
-          <span>{rallyEnding(lastRally.detail)?.label ?? legacyRallyLabel(lastRally.outcome, lastRally.zone)} — {name(lastRally.actingPlayerId)}</span>
+          <strong>{teamWords(rallyWinnerTeam(match.teamA, subject))} won the point</strong>
+          <span>{rallyEnding(subject.detail)?.label ?? legacyRallyLabel(subject.outcome, subject.zone)} — {name(subject.actingPlayerId)}</span>
+          {appliedNote && (
+            <span className="ruling-state is-applied" role="status">
+              <Icon name="check" size={16} />{KIND_WORDS[appliedNote.kind]} · Applied
+            </span>
+          )}
           {ruling && (
             <span className={`ruling-state is-${ruling.state}`} role="status">
               {KIND_WORDS[ruling.kind]} · {ruling.state === 'refused' ? ruling.refused : STATE_WORDS[ruling.state]}
@@ -76,10 +84,10 @@ function MatchOverview({ match, name, onTakeBack }) {
           )}
         </section>
       )}
-      {!lastRally && recent?.state === 'refused' && <p className="ruling-state is-refused" role="status">{recent.refused}</p>}
+      {!subject && recent?.state === 'refused' && <p className="ruling-state is-refused" role="status">{recent.refused}</p>}
 
       <ol className="overview-rallies" aria-label="Earlier rallies">
-        {rallies.slice(1).map((r) => (
+        {rallies.map((r) => (
           <li key={r.id}>{teamWords(rallyWinnerTeam(match.teamA, r))} · {rallyEnding(r.detail)?.label ?? legacyRallyLabel(r.outcome, r.zone)}</li>
         ))}
       </ol>

@@ -620,7 +620,7 @@ function LiveMatch({ matchId, onBack }) {
               land on them by accident. */}
           <section className="match-controls" aria-label="Match">
             {isScorer && (match.recordedBy ?? me) === me && (
-              <button className="btn-quiet" onClick={() => setPicking(true)}>
+              <button onClick={() => setPicking(true)}>
                 <Icon name="people" size={18} />
                 Scorekeeper
               </button>

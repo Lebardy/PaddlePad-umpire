@@ -1937,12 +1937,12 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
 .last-rally > span { color: var(--text-muted); overflow-wrap: anywhere; }
 .ruling-state { font-size: 0.9rem; font-weight: 600; color: var(--text-muted); }
 .ruling-state.is-refused { color: var(--danger); background: var(--danger-soft); border-radius: var(--radius-sm); padding: 0.4rem 0.6rem; }
+.ruling-state.is-applied { display: inline-flex; align-items: center; gap: 0.35rem; }
 .ruling-state.is-applied svg { color: var(--primary); }
 .overview-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .overview-actions button,
 .take-back,
-.scorekeeper-picker li button,
-.match-controls .btn-quiet {
+.scorekeeper-picker li button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1957,13 +1957,11 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
   font-weight: 600;
   cursor: pointer;
 }
-.overview-actions button.btn-quiet,
-.take-back.btn-quiet,
-.match-controls .btn-quiet,
-.btn-quiet {
+.overview-actions .btn-quiet,
+.take-back.btn-quiet {
   background: var(--bg-elevated);
   border-color: var(--border);
-  color: var(--text);
+  color: var(--text-muted);
 }
 .overview-actions .icon-solo { min-width: 2.75rem; padding: 0; background: var(--bg-elevated); border-color: var(--border); color: var(--text-muted); }
 .overview-rallies {
