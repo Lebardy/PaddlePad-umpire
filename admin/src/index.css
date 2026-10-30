@@ -985,7 +985,8 @@ tr.is-voided .reason { opacity: 0.6; }
 .court-card-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; min-height: 1.5rem; }
 .court-card label { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 700; }
 .court-card select { width: 100%; min-height: 2.75rem; padding: 0.4rem 0.6rem; background: var(--bg); border: 1.5px solid var(--border); border-radius: var(--radius-sm); }
-.court-saved { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--status-good); font-weight: 600; }
+.court-saved { display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 600; }
+.court-saved svg { color: var(--status-good); }
 .court-state { display: flex; align-items: center; gap: 0.45rem; color: var(--text-muted); font-size: 0.9rem; }
 .live-lamp { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--win-lamp); box-shadow: 0 0 6px var(--win-lamp); flex: none; }
 /* A row's Cancel and its Confirm / Not now are a finger's size on a tablet. */

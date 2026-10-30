@@ -200,6 +200,7 @@ function CourtCard({ facilityId, play, slot, umpires, onSaved }) {
   const [state, setState] = useState(null) // null | 'saving' | 'saved' | error text
   const takenElsewhere = new Set(play.courtRoster.filter((c) => c.court !== slot.court && c.umpire).map((c) => c.umpire.id))
   async function change(event) {
+    if (state === 'saving') return // aria-disabled keeps focus but does not block changes
     setState('saving')
     try {
       await setCourtUmpire(facilityId, play.id, slot.court, event.target.value || null)
@@ -214,9 +215,10 @@ function CourtCard({ facilityId, play, slot, umpires, onSaved }) {
     <div className="court-card">
       <div className="court-card-head">
         <label htmlFor={id}><Icon name="court" />Court {slot.court}</label>
-        {state === 'saved' && <span className="court-saved"><Icon name="check" />Saved</span>}
+        {/* always in the page, so a screen reader hears the words when they appear */}
+        <span className="court-saved" role="status">{state === 'saved' && <><Icon name="check" />Saved</>}</span>
       </div>
-      <select id={id} value={slot.umpire?.id ?? ''} onChange={change} disabled={state === 'saving'}>
+      <select id={id} value={slot.umpire?.id ?? ''} onChange={change} aria-disabled={state === 'saving'}>
         <option value="">Anyone</option>
         {slot.umpire && slot.umpire.active === false && <option value={slot.umpire.id}>{slot.umpire.name} (can’t start)</option>}
         {umpires.map((u) => (
