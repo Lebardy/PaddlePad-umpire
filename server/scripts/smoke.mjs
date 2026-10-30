@@ -3906,6 +3906,96 @@ async function main() {
       )
       check('assigning on an open play with no umpire -> 409', noUmpireAssign.status === 409, `${noUmpirePlay.status} ${noUmpireAssign.status}`)
     }
+
+    section('scorekeeper split — a second umpire taps, the match umpire rules')
+    // A second umpire at the same place, with a realistic name; the block's tidy removes the place and both.
+    const skInvite = await request('/admin/invites', { method: 'POST', bearer: opOwnerToken, body: { note: 'smoke scorekeeper', facilityId: placeId } })
+    const skJoined = await request('/auth/register', {
+      method: 'POST',
+      body: { email: `smoke.scorekeeper.${opStamp}@example.com`, name: 'Paolo Reyes', password: `smk-${uuid()}`, invite: skInvite.body.invite?.code },
+    })
+    check('a second umpire joins the place -> 201', skJoined.status === 201, String(skJoined.status))
+    const skToken = skJoined.body.token
+    const skId = skJoined.body.umpire?.id
+    const asMain = (path, options = {}) => request(path, { ...options, bearer: opUmpireToken })
+    const asSk = (path, options = {}) => request(path, { ...options, bearer: skToken })
+    const mainDevice = `${DEVICE}-main`
+    const skDevice = `${DEVICE}-sk`
+
+    const skSession = uuid()
+    await asMain('/sessions', { method: 'POST', body: { id: skSession, startsAt: new Date().toISOString() } })
+    await asMain(`/sessions/${skSession}/players`, { method: 'PUT', body: { playerIds: [players[0].id, players[1].id] } })
+    const skMatch = uuid()
+    const madeMatch = await asMain('/matches', {
+      method: 'POST',
+      body: { id: skMatch, sessionId: skSession, teamA: [players[0].id], teamB: [players[1].id], firstServer: { team: 'A', playerId: players[0].id } },
+    })
+    check('the main umpire starts a singles match -> 201', madeMatch.status === 201, String(madeMatch.status))
+    const r0 = rally(0, players[0].id)
+    await asMain(`/matches/${skMatch}/log`, { method: 'PUT', body: { deviceId: mainDevice, events: [r0] } })
+
+    const colleagues = await asMain('/scorekeeping/umpires')
+    check('the picker lists the other umpire, not me', colleagues.body.umpires?.some((u) => u.id === skId) && colleagues.body.umpires.length === 1, JSON.stringify(colleagues.body))
+    const bySk = await asSk(`/scorekeeping/${skMatch}`, { method: 'PUT', body: { umpireId: skId, deviceId: skDevice } })
+    check('only the match umpire may pick a scorekeeper -> 403', bySk.status === 403, String(bySk.status))
+    const asked = await asMain(`/scorekeeping/${skMatch}`, { method: 'PUT', body: { umpireId: skId, deviceId: mainDevice } })
+    check('the main umpire asks Paolo -> asked', asked.status === 200 && asked.body.scorekeeper?.state === 'asked', JSON.stringify(asked.body))
+    const waiting = await asSk('/scorekeeping/waiting')
+    check("it waits on Paolo's Home", waiting.body.matches?.some((m) => m.id === skMatch && m.state === 'asked'), JSON.stringify(waiting.body))
+    const notNow = await asSk(`/scorekeeping/${skMatch}/answer`, { method: 'POST', body: { deviceId: skDevice, start: false } })
+    check('Not now -> declined', notNow.body.state === 'declined', JSON.stringify(notNow.body))
+    await asMain(`/scorekeeping/${skMatch}`, { method: 'PUT', body: { umpireId: skId, deviceId: mainDevice } })
+    const started = await asSk(`/scorekeeping/${skMatch}/answer`, { method: 'POST', body: { deviceId: skDevice, start: true } })
+    check('asked again, Start -> scoring', started.body.state === 'scoring', JSON.stringify(started.body))
+    const mainTaps = await asMain(`/matches/${skMatch}/log`, { method: 'PUT', body: { deviceId: mainDevice, events: [r0, rally(1, players[0].id)] } })
+    check("the main umpire's phone can no longer write the log -> 409", mainTaps.status === 409, String(mainTaps.status))
+
+    const r1 = rally(1, players[1].id, 'error')
+    await asSk(`/matches/${skMatch}/log`, { method: 'PUT', body: { deviceId: skDevice, events: [r0, r1] } })
+    const standsId = uuid()
+    const stands = await asMain(`/scorekeeping/${skMatch}/rulings`, { method: 'POST', body: { id: standsId, targetEventId: r1.id, kind: 'stands' } })
+    check('a ruling on the last rally -> 201 waiting', stands.status === 201, String(stands.status))
+    const again = await asMain(`/scorekeeping/${skMatch}/rulings`, { method: 'POST', body: { id: standsId, targetEventId: r1.id, kind: 'stands' } })
+    check('resending the same ruling -> 200, nothing new', again.status === 200, String(again.status))
+    const pendingForSk = await asSk(`/scorekeeping/${skMatch}/rulings`)
+    check("Paolo's phone sees it waiting", pendingForSk.body.rulings?.length === 1 && pendingForSk.body.rulings[0].id === standsId, JSON.stringify(pendingForSk.body))
+    const note = { id: standsId, seq: 2, type: 'ruling', at: Date.now(), targetEventId: r1.id, kind: 'stands', ruledBy: null }
+    await asSk(`/matches/${skMatch}/log`, { method: 'PUT', body: { deviceId: skDevice, events: [r0, r1, note] } })
+    const afterStands = await asMain(`/matches/${skMatch}`)
+    check('the note in the log marks it applied; the score is unchanged',
+      afterStands.body.match?.rulings?.[0]?.state === 'applied' && afterStands.body.match.scorekeeper?.state === 'scoring',
+      JSON.stringify(afterStands.body.match?.rulings))
+    const late = await asMain(`/scorekeeping/${skMatch}/rulings`, { method: 'POST', body: { id: uuid(), targetEventId: r0.id, kind: 'replay' } })
+    check('a ruling on an older rally -> 409 too late', late.status === 409 && /^Too late/.test(late.body.error ?? ''), JSON.stringify(late.body))
+
+    const r3 = rally(3, players[0].id)
+    await asSk(`/matches/${skMatch}/log`, { method: 'PUT', body: { deviceId: skDevice, events: [r0, r1, note, r3] } })
+    const replayId = uuid()
+    await asMain(`/scorekeeping/${skMatch}/rulings`, { method: 'POST', body: { id: replayId, targetEventId: r3.id, kind: 'replay' } })
+    const replayNote = { id: replayId, seq: 3, type: 'ruling', at: Date.now(), targetEventId: r3.id, kind: 'replay', ruledBy: null, was: { actingPlayerId: players[0].id, outcome: 'winner', zone: 'open' } }
+    const replayed = await asSk(`/matches/${skMatch}/log`, { method: 'PUT', body: { deviceId: skDevice, events: [r0, r1, note, replayNote] } })
+    check('Replay: the rally is gone, the note stays, applied', replayed.status === 200 && replayed.body.match?.rulings?.find((r) => r.id === replayId)?.state === 'applied', JSON.stringify(replayed.body.match?.rulings))
+
+    const r4 = rally(4, players[1].id)
+    await asSk(`/matches/${skMatch}/log`, { method: 'PUT', body: { deviceId: skDevice, events: [r0, r1, note, replayNote, r4] } })
+    const leftWaiting = uuid()
+    await asMain(`/scorekeeping/${skMatch}/rulings`, { method: 'POST', body: { id: leftWaiting, targetEventId: r4.id, kind: 'overturned' } })
+    const back = await asMain(`/matches/${skMatch}/claim`, { method: 'POST', body: { deviceId: mainDevice, force: true } })
+    const afterBack = await asMain(`/matches/${skMatch}`)
+    check('taking scoring back ends the split and refuses what was waiting',
+      back.status === 200 && afterBack.body.match?.scorekeeper?.state === null && afterBack.body.match.scorekeeper.id === skId
+        && afterBack.body.match.rulings?.find((r) => r.id === leftWaiting)?.state === 'refused',
+      JSON.stringify(afterBack.body.match?.scorekeeper))
+    const skLate = await asSk(`/matches/${skMatch}/log`, { method: 'PUT', body: { deviceId: skDevice, events: [r0, r1, note, replayNote, r4, rally(5, players[1].id)] } })
+    check("Paolo's next upload -> 409", skLate.status === 409, String(skLate.status))
+    const skNoMore = await asSk(`/scorekeeping/${skMatch}/rulings`)
+    check('and he can no longer read rulings -> 403', skNoMore.status === 403, String(skNoMore.status))
+
+    const elsewhere = await call(`/scorekeeping/${skMatch}/rulings`, { method: 'POST', body: { id: uuid(), targetEventId: r4.id, kind: 'stands' } })
+    check("another place's umpire -> 404", elsewhere.status === 404, String(elsewhere.status))
+    const junk = await asMain('/scorekeeping/not-a-uuid/rulings', { method: 'POST', body: {} })
+    check('a junk match id -> 404, never 500', junk.status === 404, String(junk.status))
+    await asMain(`/matches/${skMatch}`, { method: 'DELETE', body: { deviceId: mainDevice } })
   }
 
   section('admin site — overview')
