@@ -77,10 +77,10 @@ function WarningRow({ warning, showFacility, now, actions }) {
               <button type="button" className="btn-quiet btn-small" disabled={busy} onClick={() => actions.undo(warning.matchId)}>Undo</button>
             </>
           ) : (
-            <>
+            <span className="icon-pair">
               <button type="button" className="btn-quiet btn-small btn-icon" disabled={busy} onClick={handleLooksFine} title="Looks fine" aria-label="Looks fine"><Icon name="check" size={16} /></button>
               <button type="button" className="btn-danger btn-small btn-icon" disabled={busy} onClick={() => actions.openVoid(warning)} title="Void" aria-label="Void"><Icon name="ban" size={16} /></button>
-            </>
+            </span>
           )}
           {error && <span className="row-error" role="alert">{error}</span>}
         </div>
