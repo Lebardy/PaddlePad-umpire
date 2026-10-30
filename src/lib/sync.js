@@ -6,6 +6,9 @@ import {
   getSession,
   applyCourtNotice,
   getMatch,
+  getQueuedRulings,
+  dropQueuedRuling,
+  saveMatch,
   setScoringDevice,
   replaceServerState,
   clearTombstone,
@@ -171,6 +174,8 @@ function payloadFor(entry) {
   if (entry.kind === 'match' || entry.kind === 'log' || entry.kind === 'matchVoid') {
     return getMatch(entry.entityId)
   }
+  if (entry.kind === 'scorekeeper') return getMatch(entry.entityId)
+  if (entry.kind === 'ruling') return getQueuedRulings().find((r) => r.id === entry.entityId) ?? null
   // Deletes have no local record left to read -- the tombstone IS the
   // payload. Without this they would look like a vanished entity and be
   // dropped from the queue, leaving the row alive on the server.
@@ -196,6 +201,26 @@ async function push(entry, payload) {
   }
   if (entry.kind === 'match') {
     await api.pushMatch(payload)
+    return
+  }
+  if (entry.kind === 'scorekeeper') {
+    const scorekeeper = await api.setScorekeeper(payload.id, {
+      umpireId: payload.scorekeeperAsk?.umpireId ?? null,
+      deviceId: outbox.getDeviceId(),
+    })
+    const match = getMatch(payload.id)
+    if (match) saveMatch({ ...match, scorekeeper, scorekeeperAsk: undefined })
+    return
+  }
+  if (entry.kind === 'ruling') {
+    try {
+      await api.sendRuling(payload.matchId, payload)
+    } catch (error) {
+      // Refused (too late, or the split ended): the server kept it as
+      // refused and the next read of the match shows why. Not a failure.
+      if (error.status !== 409) throw error
+    }
+    dropQueuedRuling(payload.id)
     return
   }
   if (entry.kind === 'log') {

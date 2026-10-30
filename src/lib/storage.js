@@ -47,6 +47,7 @@ import {
 const SESSIONS_KEY = 'paddlepad.sessions'
 const PLAYERS_KEY = 'paddlepad.players'
 const MATCHES_KEY = 'paddlepad.matches'
+const RULINGS_KEY = 'paddlepad.rulingsOut'
 
 // Both delegate to localstore, which parses on write and hands back a
 // reference-stable value. That stability is what lets the React hooks
@@ -188,7 +189,7 @@ export function getMatch(matchId) {
 // so React concludes nothing changed and skips the re-render -- taps
 // land in storage but never appear until something else forces a
 // render. Every mutator below therefore spreads into a new object.
-function saveMatch(match) {
+export function saveMatch(match) {
   const updated = getMatches().map((m) => (m.id === match.id ? match : m))
   writeJSON(MATCHES_KEY, updated)
   return match
@@ -388,10 +389,53 @@ export function tapThirdShot(matchId, tap) {
 export function undoLastEvent(matchId) {
   const match = getMatch(matchId)
   if (!match || match.events.length === 0) return match
+  // A ruling is the match umpire's call, not a tap to take back.
+  if (match.events.at(-1)?.type === 'ruling') return match
   return finalizeAfterEventChange({
     ...match,
     events: match.events.slice(0, -1),
   })
+}
+
+/**
+ * Names (or withdraws) the umpire who will tap this match. Queued like
+ * any change, AFTER the match's own taps, so the scorekeeper always
+ * starts from every rally this phone recorded.
+ */
+export function askScorekeeper(matchId, umpire) {
+  const match = getMatch(matchId)
+  if (!match) return match
+  const next = {
+    ...match,
+    scorekeeperAsk: { umpireId: umpire?.id ?? null },
+    scorekeeper: umpire ? { id: umpire.id, name: umpire.name, state: 'asked', seenAt: null } : null,
+  }
+  markDirty('scorekeeper', matchId)
+  return saveMatch(next)
+}
+
+/** Rulings this phone made that the server has not taken yet ("Waiting to send"). */
+export function getQueuedRulings() {
+  return readJSON(RULINGS_KEY, [])
+}
+
+/** Queues a ruling on a rally; the id is made here so a resend is the same ruling. */
+export function queueRuling(matchId, targetEventId, kind) {
+  const id = crypto.randomUUID()
+  writeJSON(RULINGS_KEY, [...getQueuedRulings(), { id, matchId, targetEventId, kind }])
+  markDirty('ruling', id)
+  return id
+}
+
+export function dropQueuedRuling(id) {
+  writeJSON(RULINGS_KEY, getQueuedRulings().filter((r) => r.id !== id))
+}
+
+/** The scorekeeper's log after applying a ruling (see scorekeeper-rules.js). */
+export function setMatchEvents(matchId, events) {
+  const match = getMatch(matchId)
+  if (!match || match.status === 'completed') return match
+  return finalizeAfterEventChange({ ...match, events })
 }
 
 /**
@@ -538,7 +582,7 @@ export function replaceServerState({
     const dirty = force
       ? new Set()
       : new Set(
-          pendingEntities('match').concat(pendingEntities('log'), pendingEntities('matchVoid'), [...keep]),
+          pendingEntities('match').concat(pendingEntities('log'), pendingEntities('matchVoid'), pendingEntities('scorekeeper'), [...keep]),
         )
     const local = getMatches()
     const fromServer = matches
@@ -691,6 +735,7 @@ export function clearLocalData() {
     localStorage.removeItem('paddlepad.todayCourts')
   } catch { /* private mode */ }
   writeJSON(COURT_NOTICES_KEY, {})
+  write(RULINGS_KEY, [])
 }
 
 // ============================================================

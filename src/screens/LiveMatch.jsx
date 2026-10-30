@@ -156,6 +156,8 @@ function rallyLabel(event) {
   return rallyEnding(event.detail)?.label ?? legacyRallyLabel(event.outcome, event.zone)
 }
 
+const RULING_WORDS = { stands: 'call stands', overturned: 'overturned', replay: 'replay', wrongWinner: 'winner corrected' }
+
 // Turns one logged event into the plain-English line shown in the
 // history panel, so an umpire can glance back and confirm what was
 // actually recorded without needing to remember button labels.
@@ -165,6 +167,9 @@ function describeEvent(event, name) {
   }
   if (event.type === 'serverCorrection') {
     return `Serve corrected — ${name(event.playerId)}`
+  }
+  if (event.type === 'ruling') {
+    return `Umpire: ${RULING_WORDS[event.kind] ?? 'ruling'}`
   }
   const shotLabel =
     event.shotType === 'drop' ? (event.success ? 'Drop ✓' : 'Drop ✗') : 'Drive'
@@ -434,7 +439,7 @@ function LiveMatch({ matchId, onBack }) {
                     <button
                       className="undo"
                       onClick={handleUndo}
-                      disabled={!pending && match.events.length === 0}
+                      disabled={!pending && (match.events.length === 0 || match.events.at(-1)?.type === 'ruling')}
                     >
                       <Icon name="undo" size={18} />
                       {pending ? 'Back' : 'Undo'}

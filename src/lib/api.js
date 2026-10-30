@@ -438,6 +438,37 @@ export function claimMatch(matchId, { deviceId, force = false }) {
   }).then((d) => d.match)
 }
 
+/** Active umpires at this umpire's place, for picking a scorekeeper. */
+export function fetchScorekeepers() {
+  return apiFetch('/scorekeeping/umpires').then((d) => d.umpires)
+}
+
+/** Matches this umpire was asked to score, or is scoring. */
+export function fetchScorekeeping({ signal } = {}) {
+  return apiFetch('/scorekeeping/waiting', { signal }).then((d) => d.matches)
+}
+
+export function setScorekeeper(matchId, { umpireId, deviceId }) {
+  return apiFetch(`/scorekeeping/${matchId}`, { method: 'PUT', body: { umpireId, deviceId } }).then((d) => d.scorekeeper)
+}
+
+export function answerScorekeeping(matchId, { deviceId, start }) {
+  return apiFetch(`/scorekeeping/${matchId}/answer`, { method: 'POST', body: { deviceId, start } })
+}
+
+/** A 409 carries the refusal sentence ("Too late: …") as the error message. */
+export function sendRuling(matchId, { id, targetEventId, kind }) {
+  return apiFetch(`/scorekeeping/${matchId}/rulings`, { method: 'POST', body: { id, targetEventId, kind } }).then((d) => d.ruling)
+}
+
+export function fetchWaitingRulings(matchId, { signal } = {}) {
+  return apiFetch(`/scorekeeping/${matchId}/rulings`, { signal }).then((d) => d.rulings)
+}
+
+export function refuseRuling(matchId, rulingId) {
+  return apiFetch(`/scorekeeping/${matchId}/rulings/${rulingId}/refuse`, { method: 'POST' })
+}
+
 /** Cancels an unfinished match. Idempotent server-side. */
 export function deleteMatchOnServer(matchId, { deviceId }) {
   return apiFetch(`/matches/${matchId}`, { method: 'DELETE', body: { deviceId } })
