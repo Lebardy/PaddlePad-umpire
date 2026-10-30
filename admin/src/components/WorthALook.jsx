@@ -53,7 +53,10 @@ function WarningRow({ warning, showFacility, now, actions }) {
           </Link>
         </span>
         <span className="cell-sub">
-          {warning.sessionName} · {warning.status === 'in_progress' ? 'still in progress' : `finished ${warning.score.A}–${warning.score.B}`}
+          {warning.sessionName}
+          {warning.status === 'in_progress'
+            ? ' · still in progress'
+            : !warning.reasons.some((r) => r.reason === 'shutout') && <> · <span className="nowrap">finished {warning.score.A}–{warning.score.B}</span></>}
         </span>
       </td>
       <td>
@@ -75,8 +78,8 @@ function WarningRow({ warning, showFacility, now, actions }) {
             </>
           ) : (
             <>
-              <button type="button" className="btn-quiet btn-small" disabled={busy} onClick={handleLooksFine}>Looks fine</button>
-              <button type="button" className="btn-danger btn-small" disabled={busy} onClick={() => actions.openVoid(warning)}>Void</button>
+              <button type="button" className="btn-quiet btn-small btn-icon" disabled={busy} onClick={handleLooksFine} title="Looks fine" aria-label="Looks fine"><Icon name="check" size={16} /></button>
+              <button type="button" className="btn-danger btn-small btn-icon" disabled={busy} onClick={() => actions.openVoid(warning)} title="Void" aria-label="Void"><Icon name="ban" size={16} /></button>
             </>
           )}
           {error && <span className="row-error" role="alert">{error}</span>}

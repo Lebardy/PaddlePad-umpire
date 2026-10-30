@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import CloseSessionDialog from '../components/CloseSessionDialog'
+import Icon from '../components/Icon'
 import FacilityPicker from '../components/FacilityPicker'
 import BoardStrip from '../components/BoardStrip'
 import MergeDialog from '../components/MergeDialog'
@@ -157,15 +158,11 @@ export default function Overview({ me, facilityLabel }) {
         <div className="overview-head">
           <div>
             <h1>Overview</h1>
-            <p>
-              {isOwner && !facilityId
-                ? <><strong>Every facility</strong>, right now.</>
-                : <><strong>{data?.facilityName ?? facilityLabel ?? 'Your facility'}</strong>, right now.</>}
-            </p>
+            {!(isOwner && !facilityId) && <p><strong>{data?.facilityName ?? facilityLabel ?? 'Your facility'}</strong>, right now.</p>}
           </div>
           <div className="board-head-group">
             <FacilityPicker me={me} value={facilityId} onChange={setFacilityId} includeAll variant="board" />
-            <div className="as-of">{data ? <>Up to date as of <b>{clockText(data.asOf)}</b> · refreshes every 30 s</> : <Ghost variant="label" style={{ width: '14rem' }} />}</div>
+            <div className="as-of">{data ? <>Up to date as of <b>{clockText(data.asOf)}</b></> : <Ghost variant="label" style={{ width: '14rem' }} />}</div>
           </div>
         </div>
         <BoardStrip loading={loading && !error} cellCount={7} cells={loading ? [] : ownerCells(data)} />
@@ -186,7 +183,7 @@ export default function Overview({ me, facilityLabel }) {
         <div id="overview-panel" role="tabpanel" aria-labelledby={tab ? `overview-tab-${tab}` : undefined} aria-busy={loading || undefined}>
           {loading ? (error ? null : <RowsSkeleton rows={6} />) : tab === 'now' ? (
             data.sessions.length === 0
-              ? <p className="empty">Nothing live right now.</p>
+              ? <p className="empty"><Icon name="live" size={20} /> Nothing live right now.</p>
               : data.sessions.map((s) => <SessionCard key={s.id} session={s} showFacility={showFacility} now={now} />)
           ) : (
             <WorthALook

@@ -151,7 +151,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
 
           {!settling && current === 'now' && (!data ? (error ? null : <RowsSkeleton rows={4} />) : (
             data.sessions.length === 0
-              ? <p className="empty">Nothing live right now.</p>
+              ? <p className="empty"><Icon name="live" size={20} /> Nothing live right now.</p>
               : data.sessions.map((session) => <SessionCard key={session.id} session={session} now={now} />)
           ))}
 
@@ -226,7 +226,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
           {current === 'place' && (
             <div className="home-place">
               <div>
-                <h2 className="section-title"><Icon name="pin" /><span className="sr-only">Place</span></h2>
+                <h2 className="section-title" title="Place"><Icon name="pin" /><span className="sr-only">Place</span></h2>
                 {facilityError && <p className="form-error" role="alert">{facilityError}</p>}
                 {!facility && !facilityError && <RowsSkeleton rows={4} />}
                 {facility && (
@@ -243,7 +243,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
               </div>
 
               <div>
-                <h2 className="section-title"><Icon name="clipboard" /><span className="sr-only">Umpires</span></h2>
+                <h2 className="section-title" title="Umpires"><Icon name="clipboard" /><span className="sr-only">Umpires</span></h2>
                 {!data && <RowsSkeleton rows={4} />}
                 {data && (
                   <>
