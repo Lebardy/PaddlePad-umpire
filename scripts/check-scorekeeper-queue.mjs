@@ -42,13 +42,18 @@ const UMP = '99999999-9999-4999-8999-999999999999'
 let rulingAnswer = 201
 let scorekeeperBodies = []
 let rulingCalls = 0
+let scorekeeperDelay = 0
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const UMP2 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 
 globalThis.fetch = async (url, init) => {
   const path = new URL(String(url), 'http://x').pathname.replace(/^\/api/, '')
   const method = init?.method ?? 'GET'
   if (method === 'PUT' && path === `/scorekeeping/${MID}`) {
-    scorekeeperBodies.push(JSON.parse(init.body))
-    return new Response(JSON.stringify({ scorekeeper: { id: UMP, name: 'Ana', state: 'asked', seenAt: null } }), { status: 200 })
+    const body = JSON.parse(init.body)
+    scorekeeperBodies.push(body)
+    await sleep(scorekeeperDelay)
+    return new Response(JSON.stringify({ scorekeeper: { id: body.umpireId, name: 'Ana', state: 'asked', seenAt: null } }), { status: 200 })
   }
   if (method === 'POST' && path === `/scorekeeping/${MID}/rulings`) {
     rulingCalls += 1
@@ -86,6 +91,25 @@ storage.queueRuling(MID, 'e1', 'replay')
 rulingAnswer = 409
 await sync.drain()
 check('a refused ruling is sent once and dropped', [rulingCalls, storage.getQueuedRulings().length], [2, 0])
+
+// A second ask made while the first is in flight must not be wiped.
+scorekeeperBodies = []
+scorekeeperDelay = 50
+storage.askScorekeeper(MID, { id: UMP, name: 'Ana' })
+const first = sync.drain()
+await sleep(10)
+storage.askScorekeeper(MID, { id: UMP2, name: 'Bea' })
+await first
+check('the newer ask is still queued after the first reply', storage.getMatch(MID).scorekeeperAsk, { umpireId: UMP2 })
+await sync.drain()
+check('the next push sends the newer ask', scorekeeperBodies.map((b) => b.umpireId), [UMP, UMP2])
+scorekeeperDelay = 0
+
+// A ruling refused for good (match gone) must not stay as "Waiting to send".
+rulingAnswer = 404
+storage.queueRuling(MID, 'e1', 'stands')
+await sync.drain()
+check('a ruling refused with 404 leaves the queue', storage.getQueuedRulings(), [])
 
 // A pull keeps whose match it is and who taps; a list pull keeps local rulings.
 const fromServer = { ...base, startedAt: new Date(1).toISOString(), recordedBy: 'u1', recordedByName: 'Joy', scorekeeper: { id: UMP, name: 'Ana', state: 'scoring', seenAt: null } }

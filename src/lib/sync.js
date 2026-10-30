@@ -208,8 +208,12 @@ async function push(entry, payload) {
       umpireId: payload.scorekeeperAsk?.umpireId ?? null,
       deviceId: outbox.getDeviceId(),
     })
+    // Only if the umpire has not picked someone else meanwhile: that
+    // newer ask is still queued and the next push sends it.
     const match = getMatch(payload.id)
-    if (match) saveMatch({ ...match, scorekeeper, scorekeeperAsk: undefined })
+    if ((match?.scorekeeperAsk?.umpireId ?? null) === (payload.scorekeeperAsk?.umpireId ?? null)) {
+      saveMatch({ ...match, scorekeeper, scorekeeperAsk: undefined })
+    }
     return
   }
   if (entry.kind === 'ruling') {
@@ -218,7 +222,13 @@ async function push(entry, payload) {
     } catch (error) {
       // Refused (too late, or the split ended): the server kept it as
       // refused and the next read of the match shows why. Not a failure.
+      // Any other refusal for good (match gone) is retired by the drain,
+      // so the ruling must not stay behind as "Waiting to send".
+      const retry = !(error.status >= 400 && error.status < 500) || error.status === 401 || error.status === 429
+      if (retry) throw error
+      dropQueuedRuling(payload.id)
       if (error.status !== 409) throw error
+      return
     }
     dropQueuedRuling(payload.id)
     return
