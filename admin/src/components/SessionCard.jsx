@@ -31,7 +31,7 @@ export default function SessionCard({ session, showFacility, now }) {
               {match.teamB.map((player) => <span key={player.id}>{player.name}</span>)}
             </div>
             <div className="court-side">
-              {match.umpireName !== session.openedBy && <span className="who"><Icon name="clipboard" size={14} /> {match.umpireName}</span>}
+              {match.umpireName && match.umpireName !== session.openedBy && <span className="who"><Icon name="clipboard" size={14} /> {match.umpireName}</span>}
               <span><Icon name="clock" size={14} /> {agoText(match.startedAt, now)}</span>
             </div>
           </div>

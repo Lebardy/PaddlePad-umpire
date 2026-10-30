@@ -51,7 +51,7 @@ const newLine = (n) => `+${n} this week`
 /** The owner's number strip: what is live, then the totals. */
 export function ownerCells({ live, totals }) {
   return [
-    { key: 'live', label: 'Live now', figure: live.sessions, sub: live.sessions ? `${live.onCourt} on court` : 'Nothing live', lit: live.sessions > 0 },
+    { key: 'live', label: 'Live now', figure: live.sessions, sub: live.sessions ? `${live.matches} ${live.matches === 1 ? 'match' : 'matches'} on court` : 'Nothing live', lit: live.sessions > 0 },
     { key: 'players', label: 'Players', figure: totals.players.count.toLocaleString(), sub: newLine(totals.players.newThisWeek) },
     { key: 'matches', label: 'Matches', figure: totals.matches.count.toLocaleString(), sub: newLine(totals.matches.newThisWeek) },
     { key: 'sessions', label: 'Sessions', figure: totals.sessions.count.toLocaleString(), sub: newLine(totals.sessions.newThisWeek) },

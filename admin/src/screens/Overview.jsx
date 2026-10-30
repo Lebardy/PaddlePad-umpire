@@ -158,7 +158,7 @@ export default function Overview({ me, facilityLabel }) {
         <div className="overview-head">
           <div>
             <h1>Overview</h1>
-            {!(isOwner && !facilityId) && <p><strong>{data?.facilityName ?? facilityLabel ?? 'Your facility'}</strong>, right now.</p>}
+            {!isOwner && <p><strong>{data?.facilityName ?? facilityLabel ?? 'Your facility'}</strong>, right now.</p>}
           </div>
           <div className="board-head-group">
             <FacilityPicker me={me} value={facilityId} onChange={setFacilityId} includeAll variant="board" />
