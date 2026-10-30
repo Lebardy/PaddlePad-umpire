@@ -3775,6 +3775,137 @@ async function main() {
     const meAfterEnd = await asPlayer('/player/me', { bearer: one.token })
     check('once the session ends: inSession false',
       opEnded.status === 200 && meAfterEnd.body.inSession === false, `${opEnded.status} ${meAfterEnd.body.inSession}`)
+
+    section('open play courts — start by tapping, named by the server')
+    // Live now: starts at the next whole Manila hour (always inside the
+    // 1-hour lead). Posting only allows 6 am to 11 pm, so skip outside it.
+    let courtPlayId = null
+    const nextHour = new Date(Math.ceil(Date.now() / 3_600_000) * 3_600_000)
+    const manilaHourNow = (new Date().getUTCHours() + 8) % 24
+    if (manilaHourNow < 5 || manilaHourNow >= 22) {
+      console.log('  ...  open play courts skipped: an open play can only be posted from 6 am to 11 pm Manila')
+    } else {
+      const courtPlay = await addOpenPlay({
+        startsAt: nextHour.toISOString(), endsAt: new Date(nextHour.getTime() + 3_600_000).toISOString(),
+        courts: 2, spots: 8, fee: '', umpire: true, note: '',
+      })
+      courtPlayId = courtPlay.body.openPlay?.id
+      check('an open play starting within the hour, 2 courts -> 201', courtPlay.status === 201, JSON.stringify(courtPlay.body).slice(0, 120))
+      const today = await request('/open-plays/today', { bearer: opUmpireToken })
+      const listed = today.body.openPlays?.find((p) => p.id === courtPlayId)
+      check("the umpire's lookup lists it with 2 open courts",
+        listed?.courts.length === 2 && listed.courts.every((c) => c.assignedTo === null && !c.started), JSON.stringify(today.body).slice(0, 160))
+
+      const courtSessionId = uuid()
+      const started = await request('/sessions', {
+        method: 'POST', bearer: opUmpireToken,
+        body: { id: courtSessionId, startsAt: new Date().toISOString(), openPlayId: courtPlayId, court: 1 },
+      })
+      check('starting Court 1 -> 201, named "Open Play · Court 1 · …", no notice',
+        started.status === 201 && /^Open Play · Court 1 · /.test(started.body.session?.name) && !started.body.courtNotice,
+        JSON.stringify(started.body).slice(0, 160))
+      const again = await request('/sessions', {
+        method: 'POST', bearer: opUmpireToken,
+        body: { id: uuid(), startsAt: new Date().toISOString(), openPlayId: courtPlayId, court: 1 },
+      })
+      check('a second start of Court 1 -> 201 as a plain session with the notice',
+        again.status === 201 && /^Session · /.test(again.body.session?.name) && /already started by .*Saved as a plain session\.$/.test(again.body.courtNotice ?? ''),
+        JSON.stringify(again.body).slice(0, 200))
+      const resend = await request('/sessions', {
+        method: 'POST', bearer: opUmpireToken,
+        body: { id: courtSessionId, startsAt: new Date().toISOString(), openPlayId: courtPlayId, court: 1 },
+      })
+      check('resending the same session changes nothing, no notice',
+        resend.status === 201 && !resend.body.courtNotice && resend.body.session?.court === 1, JSON.stringify(resend.body).slice(0, 160))
+      // Void the court's session, start the court again, then restore the first: 200, and it gives the court up.
+      const voidCourt = (id, voided) => request(`/sessions/${id}/void`, { method: 'POST', bearer: opUmpireToken, body: { voided } })
+      const voidedFirst = await voidCourt(courtSessionId, true)
+      const restart = await request('/sessions', {
+        method: 'POST', bearer: opUmpireToken,
+        body: { id: uuid(), startsAt: new Date().toISOString(), openPlayId: courtPlayId, court: 1 },
+      })
+      const restored = await voidCourt(courtSessionId, false)
+      const heldNow = await request('/open-plays/today', { bearer: opUmpireToken })
+      check('restoring a voided court session whose court was started again -> 200, it gives the court up, the new one keeps it',
+        voidedFirst.status === 200 && restart.body.session?.court === 1 && restored.status === 200
+          && !restored.body.session?.court && !restored.body.session?.openPlayId
+          && heldNow.body.openPlays?.find((p) => p.id === courtPlayId)?.courts[0]?.started === true,
+        `${voidedFirst.status} ${restored.status} ${JSON.stringify(restored.body).slice(0, 120)}`)
+      const plain = await request('/sessions', { method: 'POST', bearer: opUmpireToken, body: { id: uuid(), startsAt: new Date().toISOString() } })
+      check('a plain one-tap session -> "Session · …"',
+        plain.status === 201 && /^Session · \w{3} \w{3} \d{1,2}, \d{1,2}(:\d{2})? [AP]M$/.test(plain.body.session?.name ?? ''), JSON.stringify(plain.body).slice(0, 160))
+      const typed = await request('/sessions', { method: 'POST', bearer: opUmpireToken, body: { id: uuid(), name: 'Saturday Morning Doubles' } })
+      check('an old app with a typed name still works',
+        typed.status === 201 && typed.body.session?.name === 'Saturday Morning Doubles', JSON.stringify(typed.body).slice(0, 160))
+      const after = await request('/open-plays/today', { bearer: opUmpireToken })
+      check('the lookup now shows Court 1 started',
+        after.body.openPlays?.find((p) => p.id === courtPlayId)?.courts[0]?.started === true, JSON.stringify(after.body).slice(0, 160))
+
+      // A bad open play id never refuses the session either.
+      const junk = await request('/sessions', {
+        method: 'POST', bearer: opUmpireToken,
+        body: { id: uuid(), startsAt: new Date().toISOString(), openPlayId: 'not-a-uuid', court: 1 },
+      })
+      check('starting a court of a junk open play id -> 201 plain with the notice',
+        junk.status === 201 && /^Session · /.test(junk.body.session?.name ?? '') && /Saved as a plain session\.$/.test(junk.body.courtNotice ?? ''),
+        JSON.stringify(junk.body).slice(0, 200))
+
+      // The manager's roster: a second umpire at the same place (registered
+      // like the first, so the run's tidy removes it with the others).
+      const ramilInvite = await request('/admin/invites', {
+        method: 'POST', bearer: opOwnerToken, body: { note: 'smoke open play', facilityId: placeId },
+      })
+      const ramil = await request('/auth/register', {
+        method: 'POST',
+        body: {
+          email: `smoke.openplay.umpire2.${opStamp}@example.com`, name: 'Ramil Ocampo',
+          password: `smk-${uuid()}`, invite: ramilInvite.body.invite?.code,
+        },
+      })
+      check('a second umpire joins that place -> 201', ramil.status === 201, String(ramil.status))
+      const guestsRoster = await request(`/admin/facilities/${placeId}/guests`, { bearer: opOwnerToken })
+      const roster = guestsRoster.body.openPlays?.find((p) => p.id === courtPlayId)?.courtRoster
+      check('the guests page lists a roster of 2 courts, Court 1 started, and both umpires',
+        roster?.length === 2 && !!roster[0].session?.startedBy && roster[1].session === null &&
+          [opUmpire.body.umpire?.id, ramil.body.umpire?.id].every((id) => guestsRoster.body.umpires?.some((u) => u.id === id)),
+        JSON.stringify(guestsRoster.body).slice(0, 200))
+      const courtUrl = (n) => `/admin/facilities/${placeId}/open-plays/${courtPlayId}/courts/${n}`
+      const assign2 = await request(courtUrl(2), { method: 'PUT', bearer: opOwnerToken, body: { umpireId: ramil.body.umpire?.id } })
+      check('putting the second umpire on Court 2 -> 200', assign2.status === 200 && assign2.body.court?.court === 2 && assign2.body.court?.umpire?.id === ramil.body.umpire?.id,
+        JSON.stringify(assign2.body).slice(0, 160))
+      const twice = await request(courtUrl(1), { method: 'PUT', bearer: opOwnerToken, body: { umpireId: ramil.body.umpire?.id } })
+      check('the same umpire on Court 1 too -> 409 "… is on Court 2"',
+        twice.status === 409 && /is on Court 2$/.test(twice.body.error ?? ''), `${twice.status} ${twice.body.error}`)
+      const firstSees = await request('/open-plays/today', { bearer: opUmpireToken })
+      const secondSees = await request('/open-plays/today', { bearer: ramil.body.token })
+      const courtTwo = (res) => res.body.openPlays?.find((p) => p.id === courtPlayId)?.courts[1]
+      check('Court 2 reads "other" to the first umpire and "me" to the second',
+        courtTwo(firstSees)?.assignedTo === 'other' && courtTwo(secondSees)?.assignedTo === 'me',
+        `${courtTwo(firstSees)?.assignedTo} ${courtTwo(secondSees)?.assignedTo}`)
+      const notMine = await request('/sessions', {
+        method: 'POST', bearer: opUmpireToken,
+        body: { id: uuid(), startsAt: new Date().toISOString(), openPlayId: courtPlayId, court: 2 },
+      })
+      check("the first umpire starting Court 2 -> 201 plain, \"Court 2 is Ramil's tonight\"",
+        notMine.status === 201 && /^Session · /.test(notMine.body.session?.name ?? '') &&
+          /^Court 2 is \w+'s tonight\. Saved as a plain session\.$/.test(notMine.body.courtNotice ?? ''),
+        JSON.stringify(notMine.body).slice(0, 200))
+      const freed = await request(courtUrl(2), { method: 'PUT', bearer: opOwnerToken, body: { umpireId: null } })
+      check('leaving Court 2 open to anyone -> 200, umpire null', freed.status === 200 && freed.body.court?.umpire === null, JSON.stringify(freed.body).slice(0, 160))
+      const cancelStarted = await request(`/admin/facilities/${placeId}/open-plays/${courtPlayId}`, { method: 'DELETE', bearer: opOwnerToken })
+      check('cancelling once a court has started -> 409 "Courts already started"',
+        cancelStarted.status === 409 && cancelStarted.body.error === 'Courts already started', `${cancelStarted.status} ${cancelStarted.body.error}`)
+      const noUmpirePlay = await addOpenPlay({
+        startsAt: new Date(nextHour.getTime() + 24 * 3_600_000).toISOString(),
+        endsAt: new Date(nextHour.getTime() + 25 * 3_600_000).toISOString(),
+        courts: 2, spots: 8, fee: '', umpire: false, note: '',
+      })
+      const noUmpireAssign = await request(
+        `/admin/facilities/${placeId}/open-plays/${noUmpirePlay.body.openPlay?.id}/courts/1`,
+        { method: 'PUT', bearer: opOwnerToken, body: { umpireId: ramil.body.umpire?.id } },
+      )
+      check('assigning on an open play with no umpire -> 409', noUmpireAssign.status === 409, `${noUmpirePlay.status} ${noUmpireAssign.status}`)
+    }
   }
 
   section('admin site — overview')
@@ -4256,11 +4387,24 @@ async function main() {
   process.exit(fail ? 1 : 0)
 }
 
-main().catch(async (error) => {
-  console.error('\nsmoke test crashed:', error)
-  // A crash used to skip the tidy and leave "Smoke ..." players on staging.
-  // Tidy first: it removes the sessions too, and closing them can hang after a dropped connection.
+// Tidy first: it removes the sessions too, and closing them can hang after a dropped connection.
+async function tidyAndExit() {
   await tidyStaging()?.catch(() => {})
   await closeOpenSessions().catch(() => {})
   process.exit(1)
+}
+
+main().catch(async (error) => {
+  console.error('\nsmoke test crashed:', error)
+  // A crash used to skip the tidy and leave "Smoke ..." players on staging.
+  await tidyAndExit()
 })
+
+// A stop from outside (a timeout running out, Ctrl+C) skipped the tidy too.
+// `once`, so a second Ctrl+C still quits straight away.
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  process.once(signal, async () => {
+    console.error(`\nsmoke test stopped (${signal}), tidying staging first`)
+    await tidyAndExit()
+  })
+}

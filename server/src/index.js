@@ -8,6 +8,7 @@ import playerAuthRoutes from './routes/player-auth.js'
 // Umpire-facing: search, create and manage the player registry.
 import playerAdminRoutes from './routes/players.js'
 import sessionRoutes from './routes/sessions.js'
+import umpireOpenPlayRoutes from './routes/umpire-open-plays.js'
 import matchRoutes from './routes/matches.js'
 // Player-facing: a claimed player reading their OWN history.
 import playerSelfRoutes from './routes/player.js'
@@ -207,6 +208,7 @@ app.use('/auth', authRoutes)
 app.use('/auth', playerAuthRoutes)
 app.use('/players', playerAdminRoutes)
 app.use('/sessions', sessionRoutes)
+app.use('/open-plays', umpireOpenPlayRoutes)
 app.use('/matches', matchRoutes)
 app.use('/video', videoRoutes)
 app.use('/player', playerVideoRoutes)

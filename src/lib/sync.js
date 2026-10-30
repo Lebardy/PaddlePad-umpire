@@ -4,6 +4,7 @@ import * as outbox from './outbox'
 import { subscribe } from './localstore'
 import {
   getSession,
+  applyCourtNotice,
   getMatch,
   setScoringDevice,
   replaceServerState,
@@ -151,7 +152,14 @@ export async function pullMatch(matchId, { signal } = {}) {
 function payloadFor(entry) {
   if (entry.kind === 'session') {
     const session = getSession(entry.entityId)
-    return session ? { id: session.id, name: session.name } : null
+    return session ? {
+      id: session.id,
+      name: session.name,
+      // Undefined for a session made before this update, so it goes up the old way.
+      startsAt: session.startsAt ? new Date(session.startsAt).toISOString() : undefined,
+      openPlayId: session.openPlayId ?? undefined,
+      court: session.court ?? undefined,
+    } : null
   }
   if (entry.kind === 'sessionVoid' || entry.kind === 'sessionEnd') {
     return getSession(entry.entityId)
@@ -177,7 +185,9 @@ function payloadFor(entry) {
 
 async function push(entry, payload) {
   if (entry.kind === 'session') {
-    await api.pushSession(payload)
+    const { session, courtNotice } = await api.pushSession(payload)
+    // The court was taken or not this umpire's: the server kept it as a plain session.
+    if (courtNotice) applyCourtNotice(payload.id, { name: session.name, notice: courtNotice })
     return
   }
   if (entry.kind === 'roster') {

@@ -6,7 +6,7 @@
 // ============================================================
 
 import {
-  comingWords, dayOptions, endHours, feeWords, levelWords, scoreWords, spotsFor, startHours, toIso, whenWords,
+  comingWords, courtCount, dayOptions, endHours, feeWords, levelWords, scoreWords, spotsFor, startHours, toIso, whenWords,
 } from '../src/lib/guests.js'
 
 let pass = 0
@@ -59,6 +59,10 @@ check('no fee', feeWords(null), 'Free')
 
 check('when, same half of the day', whenWords('2026-10-16T22:00:00Z', '2026-10-17T01:00:00Z'), 'Sat, Oct 17 · 6–9 AM')
 check('when, across noon', whenWords('2026-10-17T02:00:00Z', '2026-10-17T06:00:00Z'), 'Sat, Oct 17 · 10 AM–2 PM')
+
+check('two of three courts have an umpire', courtCount([{ umpire: { id: 'a' } }, { umpire: null }, { umpire: { id: 'b' } }]), '2 / 3')
+check('an assignee who can no longer start it does not count', courtCount([{ umpire: { id: 'a', active: false } }, { umpire: null }]), '0 / 2')
+check('none yet', courtCount([{ umpire: null }]), '0 / 1')
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

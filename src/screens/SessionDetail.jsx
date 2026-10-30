@@ -17,6 +17,7 @@ import {
   useSession,
   usePlayers,
   useMatchesForSession,
+  useCourtNotices,
 } from '../lib/useLocalStore'
 import NotFound from './NotFound'
 
@@ -28,6 +29,7 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
   const session = useSession(sessionId)
   const knownPlayers = usePlayers()
   const matches = useMatchesForSession(sessionId)
+  const notice = useCourtNotices()[sessionId]
   const [sharing, setSharing] = useState(null)
 
   // Pull this session's roster and matches so an umpire sees what
@@ -92,6 +94,12 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
         &larr; Sessions
       </button>
       <h2>{session.name}</h2>
+      {notice && (
+        <div className="court-notice" role="status">
+          <Icon name="alert" size={18} />
+          <span>{notice}</span>
+        </div>
+      )}
 
       {/* Deliberately NOT in the danger zone below. Ending a night is
           the ordinary way a session finishes, not a destructive act --

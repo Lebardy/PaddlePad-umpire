@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useId, useRef, useState } from 'react'
 import FacilityPicker from '../components/FacilityPicker'
 import Icon from '../components/Icon'
 import PageBoard from '../components/PageBoard'
 import RowConfirm from '../components/RowConfirm'
 import StatusTag from '../components/StatusTag'
-import { addOpenPlay, cancelOpenPlay, fetchGuests, listFacilities } from '../lib/api'
+import { addOpenPlay, cancelOpenPlay, fetchGuests, listFacilities, setCourtUmpire } from '../lib/api'
 import { countWord } from '../lib/format'
 import {
-  comingWords, dayOptions, endHours, feeWords, scoreWords, spotsFor, startHours, toIso, whenWords,
+  comingWords, courtCount, dayOptions, endHours, feeWords, scoreWords, spotsFor, startHours, toIso, whenWords,
 } from '../lib/guests'
 
 const FACES = [1, 2, 3, 4, 5]
@@ -22,6 +22,7 @@ export default function Guests({ me, facilityLabel }) {
   const [error, setError] = useState(null)
   const [confirming, setConfirming] = useState(null)
   const [newest, setNewest] = useState(null)
+  const [openCourts, setOpenCourts] = useState(null)
   const playsHeading = useRef(null)
 
   // The owner starts on the first place by name; a manager is always on their own.
@@ -57,6 +58,7 @@ export default function Guests({ me, facilityLabel }) {
     setData(null)
     setConfirming(null)
     setNewest(null)
+    setOpenCourts(null)
     setPicked(id)
   }
 
@@ -115,14 +117,29 @@ export default function Guests({ me, facilityLabel }) {
                     </thead>
                     <tbody>
                       {data.openPlays.map((play) => {
-                        const sub = [play.note, play.umpire && 'Umpire on duty'].filter(Boolean).join(' · ')
+                        const sub = play.note
                         return (
-                          <tr key={play.id} className={newest === play.id ? 'is-new' : undefined}>
+                          <Fragment key={play.id}>
+                          <tr className={newest === play.id ? 'is-new' : undefined}>
                             <td>
                               <span className="cell-main"><b>{whenWords(play.startsAt, play.endsAt)}</b></span>
                               {sub && <span className="cell-sub">{sub}</span>}
                             </td>
-                            <td className="cell-figure">{play.courts}</td>
+                            <td>
+                              {play.courtRoster ? (
+                                <button
+                                  type="button"
+                                  className="court-count"
+                                  aria-expanded={openCourts === play.id}
+                                  aria-controls={`courts-${play.id}`}
+                                  onClick={() => setOpenCourts(openCourts === play.id ? null : play.id)}
+                                >
+                                  <Icon name="court" />{courtCount(play.courtRoster)}
+                                </button>
+                              ) : (
+                                <span className="cell-sub">No umpire</span>
+                              )}
+                            </td>
                             <td className="cell-figure">{feeWords(play.feeCentavos)}</td>
                             <td>
                               <span className="cell-figure">{play.count} / {play.spots}</span>
@@ -150,6 +167,18 @@ export default function Guests({ me, facilityLabel }) {
                               </div>
                             </td>
                           </tr>
+                          {openCourts === play.id && play.courtRoster && (
+                            <tr className="court-strip" id={`courts-${play.id}`}>
+                              <td colSpan={7}>
+                                <div className="court-grid">
+                                  {play.courtRoster.map((slot) => (
+                                    <CourtCard key={slot.court} facilityId={facilityId} play={play} slot={slot} umpires={data.umpires} onSaved={load} />
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          </Fragment>
                         )
                       })}
                     </tbody>
@@ -163,6 +192,53 @@ export default function Guests({ me, facilityLabel }) {
         )}
       </div>
     </section>
+  )
+}
+
+/** One court: the manager picks who umpires it; the rest is read-only. */
+function CourtCard({ facilityId, play, slot, umpires, onSaved }) {
+  const [state, setState] = useState(null) // null | 'saving' | 'saved' | error text
+  // The pick shows straight away; otherwise the select snaps back to the old umpire until the list reloads.
+  const [picked, setPicked] = useState(null)
+  const takenElsewhere = new Set(play.courtRoster.filter((c) => c.court !== slot.court && c.umpire).map((c) => c.umpire.id))
+  async function change(event) {
+    if (state === 'saving') return // aria-disabled keeps focus but does not block changes
+    const value = event.target.value
+    setPicked(value)
+    setState('saving')
+    try {
+      await setCourtUmpire(facilityId, play.id, slot.court, value || null)
+      await onSaved().catch(() => {}) // the save stood; a failed reload only leaves the old list showing
+      setState('saved')
+    } catch (err) {
+      setState(err.message)
+    }
+    setPicked(null)
+  }
+  const id = `court-${play.id}-${slot.court}`
+  return (
+    <div className="court-card">
+      <div className="court-card-head">
+        <label htmlFor={id}><Icon name="court" />Court {slot.court}</label>
+        {/* always in the page, so a screen reader hears the words when they appear */}
+        <span className="court-saved" role="status">{state === 'saved' && <><Icon name="check" />Saved</>}</span>
+      </div>
+      <select id={id} value={picked ?? slot.umpire?.id ?? ''} onChange={change} aria-disabled={state === 'saving'}>
+        <option value="">Anyone</option>
+        {slot.umpire && slot.umpire.active === false && <option value={slot.umpire.id}>{slot.umpire.name} (can’t start)</option>}
+        {umpires.map((u) => (
+          <option key={u.id} value={u.id} disabled={takenElsewhere.has(u.id)}>
+            {u.name}{takenElsewhere.has(u.id) ? ' · on another court' : ''}
+          </option>
+        ))}
+      </select>
+      <span className="court-state">
+        {slot.session
+          ? <>{!slot.session.ended && <i className="live-lamp" aria-hidden="true" />}{slot.session.ended ? 'Ended' : `Started by ${slot.session.startedBy}`}</>
+          : 'Not started'}
+      </span>
+      {state && !['saving', 'saved'].includes(state) && <p className="form-error" role="alert">{state}</p>}
+    </div>
   )
 }
 
