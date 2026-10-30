@@ -4,7 +4,7 @@ import { requireActiveUmpire, requireAuth } from '../auth.js'
 import { umpireScope } from '../facility-rules.js'
 import { isUuid } from '../validate.js'
 import { heldByAnotherDevice } from '../scoring-lease.js'
-import { RULING_KINDS, TOO_LATE, rulingProblem } from '../scorekeeper-rules.js'
+import { MATCH_OVER, RULING_KINDS, TOO_LATE, rulingProblem } from '../scorekeeper-rules.js'
 
 // ============================================================
 // A second umpire taps the score while the match's own umpire watches
@@ -123,19 +123,28 @@ router.post('/:matchId/rulings', async (req, res) => {
   if (!isUuid(id) || !isUuid(targetEventId) || !RULING_KINDS.includes(kind)) return res.status(400).json({ error: 'Not a valid ruling' })
 
   const shape = (r) => ({ id: r.id, targetEventId: r.target_event_id, kind: r.kind, refused: r.refused })
+  const answer = (r) => res.status(r.refused ? 409 : 200).json({ error: r.refused ?? undefined, ruling: shape(r) })
   const { rows: [already] } = await query(`SELECT * FROM match_rulings WHERE id = $1 AND match_id = $2`, [id, match.id])
-  if (already) return res.status(already.refused ? 409 : 200).json({ error: already.refused ?? undefined, ruling: shape(already) })
+  if (already) return answer(already)
+  if (!playing(match)) return res.status(409).json({ error: MATCH_OVER })
   if (match.scorekeeper_state !== 'scoring') return res.status(409).json({ error: 'Nobody is scoring this match for you' })
 
   // Judged on the log the server has; the scorekeeper's phone judges again
   // on its own (newer) log when it applies the ruling.
   const { rows: events } = await query(`SELECT id, type FROM match_events WHERE match_id = $1 ORDER BY seq`, [match.id])
   const refused = rulingProblem(events, targetEventId)
+  // ON CONFLICT: two sends of the same ruling racing (an outbox retry) must
+  // not hit the primary key; the loser reads back what the winner stored.
   const { rows: [ruling] } = await query(
     `INSERT INTO match_rulings (id, match_id, target_event_id, kind, ruled_by, refused)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+     VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING RETURNING *`,
     [id, match.id, targetEventId, kind, req.umpire.id, refused],
   )
+  if (!ruling) {
+    const { rows: [stored] } = await query(`SELECT * FROM match_rulings WHERE id = $1 AND match_id = $2`, [id, match.id])
+    if (!stored) return res.status(400).json({ error: 'Not a valid ruling' })
+    return answer(stored)
+  }
   if (refused) return res.status(409).json({ error: refused, ruling: shape(ruling) })
   res.status(201).json({ ruling: shape(ruling) })
 })
