@@ -81,7 +81,7 @@ export default function App() {
     // Read once: a match's id is both its screen's key and its prop.
     const match = matchPath('/matches/:id', path)
     let screen
-    if (path === '/') screen = <Overview me={admin} facilityLabel={facilityLabel(admin, facilities ?? [])} />
+    if (path === '/') screen = <Overview me={admin} />
     else if (path === '/open-play') screen = <Guests me={admin} facilityLabel={facilityLabel(admin, facilities ?? [])} />
     else if (path === '/managers' && admin.role === 'owner') screen = <Admins me={admin} />
     else if (path === '/activity') screen = <Activity me={admin} />

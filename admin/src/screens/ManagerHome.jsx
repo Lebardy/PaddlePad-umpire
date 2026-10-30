@@ -132,7 +132,7 @@ export default function ManagerHome({ me, data, error, now, actions }) {
             { id: 'place', label: 'Place & umpires', icon: 'pin' },
           ]}
         />
-        <div id="home-panel" role="tabpanel" aria-labelledby={tab ? `home-tab-${tab}` : undefined} aria-busy={!data || undefined}>
+        <div id="home-panel" role="tabpanel" aria-labelledby={tab ? `home-tab-${tab}` : undefined} aria-busy={!data || (current === 'sessions' && !past && !pastError) || undefined}>
           {settling && <RowsSkeleton rows={4} />}
 
           {!settling && current === 'needs' && (!data ? (error ? null : <RowsSkeleton rows={4} />) : (

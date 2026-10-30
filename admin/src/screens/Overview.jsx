@@ -18,7 +18,7 @@ import ManagerHome from './ManagerHome'
 const REFRESH_MS = 30_000
 
 /** The landing page: a number strip, then what's going on right now and anything worth a look in two tabs. */
-export default function Overview({ me, facilityLabel }) {
+export default function Overview({ me }) {
   const isOwner = me.role === 'owner'
   const [facilityId, setFacilityId] = useState('')
   const [data, setData] = useState(null)
@@ -158,7 +158,6 @@ export default function Overview({ me, facilityLabel }) {
         <div className="overview-head">
           <div>
             <h1>Overview</h1>
-            {!isOwner && <p><strong>{data?.facilityName ?? facilityLabel ?? 'Your facility'}</strong>, right now.</p>}
           </div>
           <div className="board-head-group">
             <FacilityPicker me={me} value={facilityId} onChange={setFacilityId} includeAll variant="board" />

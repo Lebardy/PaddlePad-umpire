@@ -37,7 +37,8 @@ export function filterWorth({ warnings, leftOpen, duplicates }, { chip, umpire, 
     warnings: chip === 'all' || reasons
       ? warnings.filter((w) => (chip === 'all' || hasReason(w, reasons)) && byUmpire(w.umpireName) && recent(w.startedAt))
       : [],
-    leftOpen: chip === 'all' || chip === 'left_open' ? leftOpen.filter((s) => byUmpire(s.openedBy) && recent(s.openedAt)) : [],
+    // Still open now, whenever it was opened, so the When filter never hides it.
+    leftOpen: chip === 'all' || chip === 'left_open' ? leftOpen.filter((s) => byUmpire(s.openedBy)) : [],
     // A pair of players has no umpire or date to filter by.
     duplicates: duplicates && (chip === 'all' || chip === 'duplicates') ? duplicates : [],
   }

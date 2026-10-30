@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon'
 import VideoMark from './VideoMark'
 import { Link } from '../lib/router'
@@ -167,6 +167,13 @@ export default function WorthALook({ warnings, leftOpen, duplicates, showFacilit
   const [days, setDays] = useState(30)
   const [showAll, setShowAll] = useState(false)
   const data = { warnings, leftOpen, duplicates }
+  const root = useRef(null)
+  const rowsBefore = useRef(0)
+
+  // The button that was pressed goes away, so hand focus to the first row that appeared.
+  useEffect(() => {
+    if (showAll) root.current?.querySelectorAll('tbody tr')[rowsBefore.current]?.querySelector('a')?.focus()
+  }, [showAll])
 
   function pick(set, value) { set(value); setShowAll(false) }
 
@@ -182,7 +189,7 @@ export default function WorthALook({ warnings, leftOpen, duplicates, showFacilit
   const text = CHIP_TEXT[chip]
 
   return (
-    <div>
+    <div ref={root}>
       <div className="worth-bar">
       <div className="worth-chips" role="group" aria-label="Why it’s worth a look">
         {worthChips(data).map((c) => (
@@ -223,7 +230,7 @@ export default function WorthALook({ warnings, leftOpen, duplicates, showFacilit
           {shownDuplicates.length > 0 && <DuplicatePlayers pairs={shownDuplicates} actions={duplicateActions} />}
           <div className="table-foot">
             <span>Showing {shown} of {total}{text?.note && ` · ${text.note}`}</span>
-            {shown < total && <button type="button" className="btn-quiet btn-small" onClick={() => setShowAll(true)}>Show {total - shown} more</button>}
+            {shown < total && <button type="button" className="btn-quiet btn-small" onClick={() => { rowsBefore.current = root.current.querySelectorAll('tbody tr').length; setShowAll(true) }}>Show {total - shown} more</button>}
           </div>
         </>
       )}

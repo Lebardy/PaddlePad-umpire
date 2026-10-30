@@ -23,16 +23,22 @@ const DAY = 86_400_000
 const w = (id, reason, umpireName, ago, extra = {}) => ({ matchId: id, reasons: [{ reason }], umpireName, startedAt: new Date(NOW - ago * DAY).toISOString(), ...extra })
 const data = {
   warnings: [w('a', 'shutout', 'Tessa Ramos', 2), w('b', 'shutout', 'Paolo Sy', 20), w('c', 'stuck', 'Paolo Sy', 1), w('d', 'short', 'Noel Garcia', 3, { voided: { byMe: true } })],
-  leftOpen: [{ sessionId: 's1', openedBy: 'Tessa Ramos', openedAt: new Date(NOW - 10 * DAY).toISOString() }],
+  leftOpen: [
+    { sessionId: 's1', openedBy: 'Tessa Ramos', openedAt: new Date(NOW - 10 * DAY).toISOString() },
+    { sessionId: 's2', openedBy: 'Noel Garcia', openedAt: new Date(NOW - 45 * DAY).toISOString() },
+  ],
   duplicates: [{ a: { id: 1 }, b: { id: 2 } }],
 }
 check('chips and counts (voided not counted)', worthChips(data).map((c) => [c.id, c.count]),
-  [['all', 5], ['stuck', 1], ['ended_early', 0], ['shutout', 2], ['length', 0], ['left_open', 1], ['duplicates', 1]])
+  [['all', 6], ['stuck', 1], ['ended_early', 0], ['shutout', 2], ['length', 0], ['left_open', 2], ['duplicates', 1]])
 check('no duplicates chip for a manager-shaped page', worthChips({ ...data, duplicates: undefined }).some((c) => c.id === 'duplicates'), false)
 check('all, any umpire, 30 days', filterWorth(data, { chip: 'all', umpire: '', days: 30 }, NOW).warnings.map((x) => x.matchId), ['a', 'b', 'c', 'd'])
 check('shutouts only', filterWorth(data, { chip: 'shutout', umpire: '', days: 30 }, NOW).warnings.map((x) => x.matchId), ['a', 'b'])
 check('last 7 days drops older', filterWorth(data, { chip: 'all', umpire: '', days: 7 }, NOW).warnings.map((x) => x.matchId), ['a', 'c', 'd'])
 check('by umpire, left open follows', filterWorth(data, { chip: 'all', umpire: 'Tessa Ramos', days: 30 }, NOW).leftOpen.length, 1)
+check('left open ignores When (7 days)', filterWorth(data, { chip: 'all', umpire: '', days: 7 }, NOW).leftOpen.length, 2)
+check('left open ignores When (30 days)', filterWorth(data, { chip: 'all', umpire: '', days: 30 }, NOW).leftOpen.length, 2)
+check('left open chip lists the old one', filterWorth(data, { chip: 'left_open', umpire: '', days: 7 }, NOW).leftOpen.map((s) => s.sessionId), ['s1', 's2'])
 check('by umpire narrows matches', filterWorth(data, { chip: 'all', umpire: 'Paolo Sy', days: 30 }, NOW).warnings.map((x) => x.matchId), ['b', 'c'])
 check('duplicates ignore filters', filterWorth(data, { chip: 'all', umpire: 'Paolo Sy', days: 7 }, NOW).duplicates.length, 1)
 check('umpire choices', umpireChoices(data), ['Noel Garcia', 'Paolo Sy', 'Tessa Ramos'])

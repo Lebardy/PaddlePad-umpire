@@ -394,6 +394,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   order: 1; flex: 1 0 100%; white-space: normal; text-align: right;
   font-size: 0.88rem; font-weight: 500; line-height: 1.3; color: var(--status-critical);
 }
+/* A failed Looks fine says its piece in a readable line, not a sliver. */
+.icon-pair ~ .row-error { min-width: 12rem; }
+.icon-pair .btn-small { min-height: 2.75rem; min-width: 2.75rem; }
 button[aria-disabled='true'] { opacity: 0.6; cursor: progress; }
 .code { font-family: var(--label); font-weight: 700; font-size: 1.15rem; letter-spacing: 0.08em; white-space: nowrap; }
 tr.is-faded .code { text-decoration: none; }
@@ -698,6 +701,7 @@ a.btn-quiet { color: var(--text); }
 .dlg-choice label:has(input:checked) { border-color: var(--text); background: var(--surface-sunken); }
 .dlg-choice small { display: block; color: var(--text-muted); }
 .table td.col-actions { min-width: 5.5rem; }
+.guests-table td.col-actions { min-width: 13rem; }
 .fine-done { color: var(--text-muted); font-size: 0.9rem; font-weight: 500; white-space: nowrap; }
 .pair-names { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; font-weight: 600; }
 .pair-names a { color: inherit; }
