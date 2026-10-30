@@ -266,6 +266,8 @@ function LiveMatch({ matchId, onBack }) {
       wasScoring.current = true
       return
     }
+    // Finishing the match ends the split on the server; that is not a take-back.
+    if (match?.status === 'completed') wasScoring.current = false
     if (!wasScoring.current || yielding.current) return
     yielding.current = true
     sync.yieldMatch(matchId).then(
@@ -396,7 +398,8 @@ function LiveMatch({ matchId, onBack }) {
 
   // While a scorekeeper holds or is asked for the taps, no scoring control is
   // reachable here: the ask is sent after this phone's earlier taps, so none may follow it.
-  if (takenBack) {
+  // A new split on this match must not show an old notice.
+  if (takenBack && !(iScore && isScorer)) {
     return (
       <div className="live-match">
         <button className="back-link" onClick={onBack}>&larr; Back</button>

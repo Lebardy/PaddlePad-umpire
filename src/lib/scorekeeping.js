@@ -40,11 +40,16 @@ export function useRulingsPoller(matchId, active, teamWords) {
   useEffect(() => {
     if (!active) return undefined
     let live = true
+    let running = false
     const tick = async () => {
+      if (running) return
+      running = true
       try {
         for (const ruling of await fetchWaitingRulings(matchId)) {
           const match = getMatch(matchId)
           if (!live || !match) return
+          // Applied here already; the server keeps listing it until the log push lands.
+          if (match.events.some((e) => e.type === 'ruling' && e.id === ruling.id)) continue
           const result = applyRuling(match.events, ruling, match.teamA)
           // This phone already scored past that rally: too late, say so to the server.
           if (result.refused) { await refuseRuling(matchId, ruling.id); continue }
@@ -53,6 +58,8 @@ export function useRulingsPoller(matchId, active, teamWords) {
         }
       } catch {
         // Offline or a blip: the rulings wait on the server for the next tick.
+      } finally {
+        running = false
       }
     }
     tick()

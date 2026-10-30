@@ -399,7 +399,7 @@ export async function yieldMatch(matchId) {
   setReachable(true)
   const localEvents = getMatch(matchId)?.events ?? []
   const known = new Set((remote.events ?? []).map((e) => e.id))
-  const unsaved = localEvents.filter((e) => !known.has(e.id)).length
+  const unsaved = localEvents.filter((e) => e.type !== 'ruling' && !known.has(e.id)).length
   replaceServerState({ matches: [remote], force: true })
   outbox.resolve(outbox.outboxKey('log', matchId))
   outbox.discardDead(outbox.outboxKey('log', matchId))
