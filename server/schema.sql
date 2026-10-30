@@ -382,6 +382,14 @@ ALTER TABLE matches ADD COLUMN IF NOT EXISTS void_reason TEXT;
 -- pocketed or crashed phone would lock that court forever.
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS scoring_device TEXT;
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS scoring_claimed_at TIMESTAMPTZ;
+-- A second umpire who taps the score while the match's own umpire
+-- watches and rules (see routes/scorekeeping.js). scorekeeper_id stays
+-- after the split ends, as "who scored"; scorekeeper_state is NULL
+-- whenever no split is running.
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS scorekeeper_id UUID REFERENCES umpires (id) ON DELETE SET NULL;
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS scorekeeper_state TEXT
+    CHECK (scorekeeper_state IN ('asked', 'scoring', 'declined'));
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS scorekeeper_seen_at TIMESTAMPTZ;
 
 -- Back the `player_id = ANY(team_a)` lookups behind the player search,
 -- which reports each player's match count and last-played date so an
@@ -398,7 +406,7 @@ CREATE TABLE IF NOT EXISTS match_events (
     id         UUID PRIMARY KEY,
     match_id   UUID NOT NULL REFERENCES matches (id) ON DELETE CASCADE,
     seq        INTEGER NOT NULL,
-    type       TEXT NOT NULL CHECK (type IN ('rally', 'thirdShot', 'serverCorrection')),
+    type       TEXT NOT NULL CHECK (type IN ('rally', 'thirdShot', 'serverCorrection', 'ruling')),
     payload    JSONB NOT NULL,
     at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -432,7 +440,23 @@ BEGIN
 END $$;
 
 ALTER TABLE match_events ADD CONSTRAINT match_events_type_allowed
-    CHECK (type IN ('rally', 'thirdShot', 'serverCorrection'));
+    CHECK (type IN ('rally', 'thirdShot', 'serverCorrection', 'ruling'));
+
+-- A main umpire's ruling on the last rally, waiting for the
+-- scorekeeper's phone to apply it to the log (the only writer). The id
+-- is made on the main umpire's phone, so a resend is the same ruling.
+CREATE TABLE IF NOT EXISTS match_rulings (
+    id               UUID PRIMARY KEY,
+    match_id         UUID NOT NULL REFERENCES matches (id) ON DELETE CASCADE,
+    target_event_id  UUID NOT NULL,
+    kind             TEXT NOT NULL CHECK (kind IN ('stands', 'overturned', 'replay', 'wrongWinner')),
+    ruled_by         UUID REFERENCES umpires (id) ON DELETE SET NULL,
+    ruled_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    applied_at       TIMESTAMPTZ,
+    refused          TEXT
+);
+CREATE INDEX IF NOT EXISTS match_rulings_waiting_idx
+    ON match_rulings (match_id) WHERE applied_at IS NULL AND refused IS NULL;
 
 -- ============================================================
 -- ML pipeline results

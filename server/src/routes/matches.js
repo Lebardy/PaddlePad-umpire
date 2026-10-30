@@ -12,6 +12,7 @@ import { rallyEndingProblem } from '../rally-endings.js'
 import { invalidateRallyRatings } from '../rally-rating-store.js'
 import { umpireScope } from '../facility-rules.js'
 import { LEASE_MINUTES, heldByAnotherDevice } from '../scoring-lease.js'
+import { RULING_KINDS, MATCH_OVER, TAKEN_BACK } from '../scorekeeper-rules.js'
 import { bucketConfig, deleteFile } from '../bucket.js'
 import { clockOffsetMs } from '../video-times.js'
 
@@ -45,10 +46,13 @@ const MATCH_SELECT = `
          m.voided_at, m.void_reason,
          m.started_at, m.ended_at,
          m.scoring_device, m.scoring_claimed_at,
+         m.recorded_by, m.scorekeeper_id, m.scorekeeper_state, m.scorekeeper_seen_at,
+         sk.name AS scorekeeper_name,
          u.name AS recorded_by_name,
          (SELECT count(*)::int FROM match_events e WHERE e.match_id = m.id) AS event_count
     FROM matches m
     LEFT JOIN umpires u ON u.id = m.recorded_by
+    LEFT JOIN umpires sk ON sk.id = m.scorekeeper_id
     -- A match belongs to the facility its session belongs to. An inner
     -- join, not a left one: a match whose session is somehow gone is
     -- out of everyone's reach rather than in everyone's.
@@ -56,7 +60,7 @@ const MATCH_SELECT = `
 `
 
 /** Reshapes a database row into the shape the app already speaks. */
-function toClientMatch(row, events = undefined) {
+function toClientMatch(row, events = undefined, rulings = undefined) {
   return {
     id: row.id,
     sessionId: row.session_id,
@@ -76,11 +80,34 @@ function toClientMatch(row, events = undefined) {
     startedAt: row.started_at,
     endedAt: row.ended_at,
     recordedByName: row.recorded_by_name,
+    recordedBy: row.recorded_by,
+    // Who taps for this match's umpire. state is null once the split has
+    // ended; the id stays as "scored by".
+    scorekeeper: row.scorekeeper_id
+      ? { id: row.scorekeeper_id, name: row.scorekeeper_name, state: row.scorekeeper_state, seenAt: row.scorekeeper_seen_at }
+      : null,
     scoringDevice: row.scoring_device,
     scoringClaimedAt: row.scoring_claimed_at,
     eventCount: row.event_count,
     ...(events === undefined ? {} : { events }),
+    ...(rulings === undefined ? {} : { rulings }),
   }
+}
+
+/** The latest rulings on a match, newest first: enough for the umpire's overview. */
+async function loadRulings(matchId) {
+  const { rows } = await query(
+    `SELECT id, target_event_id, kind, applied_at, refused
+       FROM match_rulings WHERE match_id = $1 ORDER BY ruled_at DESC LIMIT 5`,
+    [matchId],
+  )
+  return rows.map((r) => ({
+    id: r.id,
+    targetEventId: r.target_event_id,
+    kind: r.kind,
+    state: r.refused ? 'refused' : r.applied_at ? 'applied' : 'waiting',
+    refused: r.refused,
+  }))
 }
 
 /** Events in replay order, shaped as the scoring engine expects. */
@@ -114,7 +141,7 @@ router.get('/:id', async (req, res) => {
   const scope = umpireScope(req.umpire.facilityId, params, 'sess.facility_id')
   const { rows } = await query(`${MATCH_SELECT} WHERE m.id = $1 AND ${scope}`, params)
   if (!rows[0]) return res.status(404).json({ error: 'No such match' })
-  res.json({ match: toClientMatch(rows[0], await loadEvents(req.params.id)) })
+  res.json({ match: toClientMatch(rows[0], await loadEvents(req.params.id), await loadRulings(req.params.id)) })
 })
 
 /**
@@ -303,6 +330,20 @@ router.post('/:id/claim', async (req, res) => {
     })
   }
 
+  // The match's own umpire claiming it back ends a split: the scorekeeper
+  // stays recorded, and rulings still waiting can no longer be applied.
+  const ended = await query(
+    `UPDATE matches SET scorekeeper_state = NULL
+      WHERE id = $1 AND recorded_by = $2 AND scorekeeper_state IS NOT NULL RETURNING id`,
+    [req.params.id, req.umpire.id],
+  )
+  if (ended.rowCount) {
+    await query(
+      `UPDATE match_rulings SET refused = $2 WHERE match_id = $1 AND applied_at IS NULL AND refused IS NULL`,
+      [req.params.id, TAKEN_BACK],
+    )
+  }
+
   const matchParams = [req.params.id]
   const matchScope = umpireScope(req.umpire.facilityId, matchParams, 'sess.facility_id')
   const match = await query(`${MATCH_SELECT} WHERE m.id = $1 AND ${matchScope}`, matchParams)
@@ -367,7 +408,8 @@ router.put('/:id/log', async (req, res) => {
     if (
       event.type !== 'rally' &&
       event.type !== 'thirdShot' &&
-      event.type !== 'serverCorrection'
+      event.type !== 'serverCorrection' &&
+      event.type !== 'ruling'
     ) {
       return res.status(400).json({ error: `Event ${index} has unknown type ${event.type}` })
     }
@@ -391,6 +433,17 @@ router.put('/:id/log', async (req, res) => {
       if (problem) {
         return res.status(400).json({ error: `Event ${index} has a ${problem}` })
       }
+    }
+    // A ruling note (see scorekeeper-rules.js) names a rally, not a
+    // player; what the rally was, when kept, must still be this match's.
+    if (event.type === 'ruling') {
+      if (!isUuid(event.targetEventId) || !RULING_KINDS.includes(event.kind)) {
+        return res.status(400).json({ error: `Event ${index} is not a valid ruling` })
+      }
+      if (event.was !== undefined && !players.has(event.was?.actingPlayerId)) {
+        return res.status(400).json({ error: `Event ${index} references a player not in this match` })
+      }
+      continue
     }
     // Both non-rally types name their player the same way, so the check
     // below covers a correction naming someone outside the match too.
@@ -441,6 +494,7 @@ router.put('/:id/log', async (req, res) => {
               ended_at = CASE WHEN $2 = 'completed' THEN COALESCE($5::timestamptz, now()) END,
               scoring_device = $6,
               scoring_claimed_at = now(),
+              scorekeeper_state = CASE WHEN $2 = 'completed' THEN NULL ELSE scorekeeper_state END,
               -- How far this tablet's clock is from ours, for lining a
               -- video up with these taps. The smallest seen, since a slow
               -- request only makes it look bigger; kept when a save sends none.
@@ -456,6 +510,22 @@ router.put('/:id/log', async (req, res) => {
         clockOffsetMs(Date.now(), Number(req.body?.sentAt ?? NaN)),
       ],
     )
+
+    // A ruling counts as applied once the scorekeeper's log carries its note.
+    const ruled = events.filter((e) => e.type === 'ruling').map((e) => e.id)
+    if (ruled.length) {
+      await client.query(
+        `UPDATE match_rulings SET applied_at = now()
+          WHERE match_id = $1 AND id = ANY($2::uuid[]) AND applied_at IS NULL AND refused IS NULL`,
+        [req.params.id, ruled],
+      )
+    }
+    if (completed) {
+      await client.query(
+        `UPDATE match_rulings SET refused = $2 WHERE match_id = $1 AND applied_at IS NULL AND refused IS NULL`,
+        [req.params.id, MATCH_OVER],
+      )
+    }
   })
 
   // Only finished matches are rated. The ratings need working out again
@@ -466,7 +536,7 @@ router.put('/:id/log', async (req, res) => {
   const updatedParams = [req.params.id]
   const updatedScope = umpireScope(req.umpire.facilityId, updatedParams, 'sess.facility_id')
   const updated = await query(`${MATCH_SELECT} WHERE m.id = $1 AND ${updatedScope}`, updatedParams)
-  res.json({ match: toClientMatch(updated.rows[0], await loadEvents(req.params.id)) })
+  res.json({ match: toClientMatch(updated.rows[0], await loadEvents(req.params.id), await loadRulings(req.params.id)) })
 })
 
 /**
