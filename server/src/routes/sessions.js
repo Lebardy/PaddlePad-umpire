@@ -5,6 +5,9 @@ import { isUuid } from '../validate.js'
 import { invalidateRallyRatings } from '../rally-rating-store.js'
 import { umpireScope } from '../facility-rules.js'
 import { heldByAnotherDevice } from '../scoring-lease.js'
+import { sessionName } from '../session-name.js'
+import { clampStartsAt, courtStartProblem, courtNoticeText } from '../court-rules.js'
+import { loadCourtState } from '../open-play-store.js'
 
 const router = Router()
 router.use(requireAuth, requireActiveUmpire(query))
@@ -16,6 +19,9 @@ const SESSION_SELECT = `
          s.voided_at,
          s.void_reason,
          s.ended_at,
+         s.starts_at,
+         s.open_play_id,
+         s.court,
          -- Both the id and the name: the app groups by id, because two
          -- umpires can share a display name, and shows the name.
          s.created_by,
@@ -49,27 +55,74 @@ router.get('/', async (req, res) => {
  * `ON CONFLICT DO NOTHING` deliberately keeps the stored name on a
  * replay: this endpoint creates, it does not rename, and there is no
  * rename UI whose intent it could be mistaking.
+ *
+ * A body with startsAt is named here by the shared rule; see
+ * court-rules.js for courts.
  */
 router.post('/', async (req, res) => {
   const id = String(req.body?.id ?? '')
-  const name = String(req.body?.name ?? '').trim()
-
   if (!isUuid(id)) return res.status(400).json({ error: 'A valid session id is required' })
-  if (!name) return res.status(400).json({ error: 'A session name is required' })
-  if (name.length > 120) return res.status(400).json({ error: 'That name is too long' })
 
-  await query(
-    `INSERT INTO sessions (id, name, created_by, facility_id)
-     VALUES ($1, $2, $3, (SELECT facility_id FROM umpires WHERE id = $3))
-     ON CONFLICT (id) DO NOTHING`,
-    [id, name, req.umpire.id],
-  )
+  // Old installed apps send only a typed name; they keep working as before.
+  const named = req.body?.startsAt !== undefined
+  let name = String(req.body?.name ?? '').trim()
+  if (!named) {
+    if (!name) return res.status(400).json({ error: 'A session name is required' })
+    if (name.length > 120) return res.status(400).json({ error: 'That name is too long' })
+  }
+
+  let courtNotice = null
+  await withTransaction(async (client) => {
+    const q = client.query.bind(client)
+    // A resend of a session already stored changes nothing.
+    const { rows: [existing] } = await q('SELECT 1 FROM sessions WHERE id = $1', [id])
+    if (existing) return
+    if (!named) {
+      await q(
+        `INSERT INTO sessions (id, name, created_by, facility_id)
+         VALUES ($1, $2, $3, (SELECT facility_id FROM umpires WHERE id = $3))
+         ON CONFLICT (id) DO NOTHING`,
+        [id, name, req.umpire.id],
+      )
+      return
+    }
+    const startsAt = clampStartsAt(req.body.startsAt, new Date())
+    let openPlayId = null
+    let court = null
+    let namedAt = startsAt
+    const asked = req.body.openPlayId != null || req.body.court != null
+    if (asked) {
+      const wanted = { id: String(req.body.openPlayId ?? ''), court: Number(req.body.court) }
+      // Locked so two phones starting the same court take turns here.
+      const { rows: [play] } = isUuid(wanted.id)
+        ? await q('SELECT id, facility_id, umpire, courts, starts_at, ends_at FROM open_plays WHERE id = $1 FOR UPDATE', [wanted.id])
+        : { rows: [] }
+      const slot = play ? (await loadCourtState(q, [play.id])).get(play.id).get(wanted.court) : null
+      const problem = courtStartProblem({
+        openPlay: play && { facilityId: play.facility_id, umpire: play.umpire, courts: play.courts, startsAt: play.starts_at, endsAt: play.ends_at },
+        umpire: { id: req.umpire.id, facilityId: req.umpire.facilityId },
+        court: wanted.court,
+        startsAt,
+        assignee: slot?.assignee ?? null,
+        heldBy: slot?.session?.startedBy ?? null,
+      })
+      if (problem) courtNotice = courtNoticeText(wanted.court, problem)
+      else { openPlayId = play.id; court = wanted.court; namedAt = play.starts_at }
+    }
+    name = sessionName({ startsAt: namedAt, court })
+    await q(
+      `INSERT INTO sessions (id, name, created_by, facility_id, starts_at, open_play_id, court)
+       VALUES ($1, $2, $3, (SELECT facility_id FROM umpires WHERE id = $3), $4, $5, $6)
+       ON CONFLICT (id) DO NOTHING`,
+      [id, name, req.umpire.id, court ? namedAt : startsAt, openPlayId, court],
+    )
+  })
 
   const params = [id]
   const scope = umpireScope(req.umpire.facilityId, params, 's.facility_id')
   const { rows } = await query(`${SESSION_SELECT} WHERE s.id = $1 AND ${scope}`, params)
   if (!rows[0]) return res.status(404).json({ error: 'No such session' })
-  res.status(201).json({ session: rows[0] })
+  res.status(201).json({ session: rows[0], ...(courtNotice && { courtNotice }) })
 })
 
 /** One session plus its roster, with each player's stats for display. */

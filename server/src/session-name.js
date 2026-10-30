@@ -14,7 +14,7 @@ const PARTS = new Intl.DateTimeFormat('en-US', {
   hour: 'numeric', minute: '2-digit', hour12: true,
 })
 
-/** "Open Play · Court 2 · Thu Oct 30, 6 PM", or "Session · Thu Oct 30, 6:10 PM" without a court. */
+/** "Open Play · Court 2 · Fri Oct 30, 6 PM", or "Session · Fri Oct 30, 6:10 PM" without a court. */
 export function sessionName({ startsAt, court = null }) {
   const part = Object.fromEntries(PARTS.formatToParts(new Date(startsAt)).map((p) => [p.type, p.value]))
   const time = `${part.hour}${part.minute === '00' ? '' : `:${part.minute}`} ${part.dayPeriod}`

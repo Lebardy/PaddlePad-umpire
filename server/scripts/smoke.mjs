@@ -3775,6 +3775,58 @@ async function main() {
     const meAfterEnd = await asPlayer('/player/me', { bearer: one.token })
     check('once the session ends: inSession false',
       opEnded.status === 200 && meAfterEnd.body.inSession === false, `${opEnded.status} ${meAfterEnd.body.inSession}`)
+
+    section('open play courts — start by tapping, named by the server')
+    // Live now: starts at the next whole Manila hour (always inside the
+    // 1-hour lead). Posting only allows 6 am to 11 pm, so skip outside it.
+    let courtPlayId = null
+    const nextHour = new Date(Math.ceil(Date.now() / 3_600_000) * 3_600_000)
+    const manilaHourNow = (new Date().getUTCHours() + 8) % 24
+    if (manilaHourNow < 5 || manilaHourNow >= 22) {
+      console.log('  ...  open play courts skipped: an open play can only be posted from 6 am to 11 pm Manila')
+    } else {
+      const courtPlay = await addOpenPlay({
+        startsAt: nextHour.toISOString(), endsAt: new Date(nextHour.getTime() + 3_600_000).toISOString(),
+        courts: 2, spots: 8, fee: '', umpire: true, note: '',
+      })
+      courtPlayId = courtPlay.body.openPlay?.id
+      check('an open play starting within the hour, 2 courts -> 201', courtPlay.status === 201, JSON.stringify(courtPlay.body).slice(0, 120))
+      const today = await request('/open-plays/today', { bearer: opUmpireToken })
+      const listed = today.body.openPlays?.find((p) => p.id === courtPlayId)
+      check("the umpire's lookup lists it with 2 open courts",
+        listed?.courts.length === 2 && listed.courts.every((c) => c.assignedTo === null && !c.started), JSON.stringify(today.body).slice(0, 160))
+
+      const courtSessionId = uuid()
+      const started = await request('/sessions', {
+        method: 'POST', bearer: opUmpireToken,
+        body: { id: courtSessionId, startsAt: new Date().toISOString(), openPlayId: courtPlayId, court: 1 },
+      })
+      check('starting Court 1 -> 201, named "Open Play · Court 1 · …", no notice',
+        started.status === 201 && /^Open Play · Court 1 · /.test(started.body.session?.name) && !started.body.courtNotice,
+        JSON.stringify(started.body).slice(0, 160))
+      const again = await request('/sessions', {
+        method: 'POST', bearer: opUmpireToken,
+        body: { id: uuid(), startsAt: new Date().toISOString(), openPlayId: courtPlayId, court: 1 },
+      })
+      check('a second start of Court 1 -> 201 as a plain session with the notice',
+        again.status === 201 && /^Session · /.test(again.body.session?.name) && /already started by .*Saved as a plain session\.$/.test(again.body.courtNotice ?? ''),
+        JSON.stringify(again.body).slice(0, 200))
+      const resend = await request('/sessions', {
+        method: 'POST', bearer: opUmpireToken,
+        body: { id: courtSessionId, startsAt: new Date().toISOString(), openPlayId: courtPlayId, court: 1 },
+      })
+      check('resending the same session changes nothing, no notice',
+        resend.status === 201 && !resend.body.courtNotice && resend.body.session?.court === 1, JSON.stringify(resend.body).slice(0, 160))
+      const plain = await request('/sessions', { method: 'POST', bearer: opUmpireToken, body: { id: uuid(), startsAt: new Date().toISOString() } })
+      check('a plain one-tap session -> "Session · …"',
+        plain.status === 201 && /^Session · \w{3} \w{3} \d{1,2}, \d{1,2}(:\d{2})? [AP]M$/.test(plain.body.session?.name ?? ''), JSON.stringify(plain.body).slice(0, 160))
+      const typed = await request('/sessions', { method: 'POST', bearer: opUmpireToken, body: { id: uuid(), name: 'Saturday Morning Doubles' } })
+      check('an old app with a typed name still works',
+        typed.status === 201 && typed.body.session?.name === 'Saturday Morning Doubles', JSON.stringify(typed.body).slice(0, 160))
+      const after = await request('/open-plays/today', { bearer: opUmpireToken })
+      check('the lookup now shows Court 1 started',
+        after.body.openPlays?.find((p) => p.id === courtPlayId)?.courts[0]?.started === true, JSON.stringify(after.body).slice(0, 160))
+    }
   }
 
   section('admin site — overview')
