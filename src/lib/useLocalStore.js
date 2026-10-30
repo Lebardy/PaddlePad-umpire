@@ -3,6 +3,7 @@ import { subscribe } from './localstore'
 import {
   getSessions,
   getSession,
+  getCourtNotices,
   getKnownPlayers,
   getMatch,
   getMatches,
@@ -48,6 +49,11 @@ const matchesBySession = new Map()
 /** Every session, newest first. */
 export function useSessions() {
   return useSyncExternalStore(subscribe, getSessions)
+}
+
+/** Court notices by session id; re-renders when one is added or dismissed. */
+export function useCourtNotices() {
+  return useSyncExternalStore(subscribe, getCourtNotices)
 }
 
 /** One session, or null while it isn't in the local cache. */

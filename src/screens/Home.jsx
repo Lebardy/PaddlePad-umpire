@@ -63,8 +63,9 @@ function Home({ onOpenSession, onOpenGuide, onOpenPlayers, onOpenCamera, umpire 
 
   function handleCreate(e) {
     e.preventDefault()
+    // Temporary until the court cards replace this form: the typed name is no longer used.
     if (!name.trim()) return
-    const session = createSession(name)
+    const session = createSession()
     setName('')
     onOpenSession(session.id)
   }

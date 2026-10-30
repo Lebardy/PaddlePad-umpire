@@ -367,8 +367,13 @@ export function fetchSession(sessionId, { signal } = {}) {
   return apiFetch(`/sessions/${sessionId}`, { signal })
 }
 
-export function pushSession({ id, name }) {
-  return apiFetch('/sessions', { method: 'POST', body: { id, name } }).then((d) => d.session)
+export function pushSession({ id, name, startsAt, openPlayId, court }) {
+  return apiFetch('/sessions', { method: 'POST', body: { id, name, startsAt, openPlayId, court } })
+}
+
+/** Today's open play courts at this umpire's place. */
+export function fetchTodayCourts() {
+  return apiFetch('/open-plays/today').then((d) => d.openPlays)
 }
 
 /** Replaces a session's whole roster; see the route for why it's a replace. */
