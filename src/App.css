@@ -1934,6 +1934,8 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
   box-shadow: var(--shadow-md);
 }
 .last-rally strong { font-family: var(--display); font-size: 1.9rem; line-height: 1.05; overflow-wrap: anywhere; }
+.last-rally.is-removed > strong,
+.last-rally.is-removed > span:not(.ruling-state) { text-decoration: line-through; color: var(--text-muted); }
 .last-rally > span { color: var(--text-muted); overflow-wrap: anywhere; }
 .ruling-state { font-size: 0.9rem; font-weight: 600; color: var(--text-muted); }
 .ruling-state.is-refused { color: var(--danger); background: var(--danger-soft); border-radius: var(--radius-sm); padding: 0.4rem 0.6rem; }

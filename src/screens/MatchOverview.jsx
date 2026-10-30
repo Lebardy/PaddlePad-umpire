@@ -52,10 +52,10 @@ function MatchOverview({ match, name, onTakeBack }) {
         {seenAgo !== null && seenAgo > SEEN_LATE_MS && <span className="seen-late"> · seen {Math.round(seenAgo / 1000)} s ago</span>}
       </p>
 
-      {reenter && <p className="overview-wait"><Icon name="timer" size={18} />Replay: point to {teamWords(reenter)}</p>}
+      {reenter && <p className="overview-wait"><Icon name="timer" size={18} />Waiting: point to {teamWords(reenter)}</p>}
 
       {subject && (
-        <section className="last-rally" aria-label="Last rally">
+        <section className={`last-rally${appliedNote?.was ? ' is-removed' : ''}`} aria-label="Last rally">
           <strong>{teamWords(rallyWinnerTeam(match.teamA, subject))} won the point</strong>
           <span>{rallyEnding(subject.detail)?.label ?? legacyRallyLabel(subject.outcome, subject.zone)} — {name(subject.actingPlayerId)}</span>
           {appliedNote && (
