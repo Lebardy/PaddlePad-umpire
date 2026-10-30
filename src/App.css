@@ -354,7 +354,6 @@ section {
 
 .login input,
 .account-form input,
-.new-session-form input,
 .add-player form input,
 .player-picker input,
 .player-search {
@@ -372,7 +371,6 @@ section {
 }
 
 .login input::placeholder,
-.new-session-form input::placeholder,
 .add-player form input::placeholder,
 .player-picker input::placeholder,
 .player-search::placeholder {
@@ -381,7 +379,6 @@ section {
 
 .login input:focus,
 .account-form input:focus,
-.new-session-form input:focus,
 .add-player form input:focus,
 .player-picker input:focus,
 .player-search:focus {
@@ -405,7 +402,8 @@ section {
 .start-match,
 .new-match-btn,
 .account-form button[type='submit'],
-.new-session-form button,
+.new-session button,
+.court-card button,
 .add-player form button,
 .guide-nudge-open,
 .dupe-yes {
@@ -422,7 +420,8 @@ section {
 
 .start-match:hover:not(:disabled),
 .new-match-btn:hover:not(:disabled),
-.new-session-form button:hover,
+.new-session button:hover,
+.court-card button:hover,
 .add-player form button:hover { background: var(--primary-hover); }
 
 .start-match,
@@ -566,32 +565,69 @@ section {
 
 /* ============ Home ============ */
 
-/* Starting tonight's session is what the screen is for, so it leads. */
-.new-session-form {
+/* Open play courts lead (the umpire's own one has the heavier border); a plain session is one tap below. */
+.court-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  gap: 0.75rem;
+}
+.court-card,
+.new-session {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 1rem;
   box-shadow: var(--shadow-sm);
 }
-.new-session-form label {
-  display: block;
-  font-family: var(--display);
-  font-size: 1.7rem;
-  font-weight: 800;
-  line-height: 1;
-  margin-bottom: 0.7rem;
+.court-card { display: grid; gap: 0.6rem; }
+.court-card.is-mine { border: 2px solid var(--primary); padding: calc(1rem - 1px); }
+.court-card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.court-card-top strong { display: flex; align-items: center; gap: 0.4rem; font-size: 1.1rem; }
+.court-chip { font-size: 0.8rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 999px; }
+.court-chip.is-mine { background: var(--primary-soft); color: var(--primary); }
+.court-chip.is-open { background: var(--accent-soft); color: var(--accent); }
+.court-card-hours { font-size: 0.88rem; color: var(--text-muted); }
+.court-card button,
+.new-session button { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; }
+.court-card button { width: 100%; min-height: 2.75rem; border: 2px solid var(--primary); }
+/* An open court is a choice, not the umpire's own: Start is outlined so "yours" stays the loud one. */
+.court-card:not(.is-mine) button { background: transparent; color: var(--primary); border: 2px solid var(--primary); }
+.court-card:not(.is-mine) button:hover { background: var(--primary-soft); }
+
+.new-session {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-top: 0.75rem;
 }
-.new-session-row,
+.new-session h2 { margin: 0; }
+.new-session-name { flex: 1; margin: 0; font-weight: 600; color: var(--text); }
+@media (max-width: 600px) {
+  .new-session { flex-wrap: wrap; }
+  .new-session-name { flex-basis: 100%; order: 3; }
+  .new-session h2 { flex: 1; }
+}
+
 .add-player form { display: flex; gap: 0.5rem; }
-.new-session-row input,
 .add-player form input { flex: 1; }
-.new-session-form button,
 .add-player form button { flex-shrink: 0; }
 
-@media (max-width: 420px) {
-  .new-session-row { flex-direction: column; }
+.court-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
 }
+.court-notice span { flex: 1; }
+.court-notice button { background: none; border: none; color: var(--text-muted); padding: 0.3rem; cursor: pointer; min-width: 44px; min-height: 44px; }
 
 /* Shown until waved away; the ? in the header opens the same guide. */
 .guide-nudge {

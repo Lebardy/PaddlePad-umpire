@@ -902,6 +902,27 @@ CREATE TABLE IF NOT EXISTS open_play_joins (
     PRIMARY KEY (open_play_id, player_id)
 );
 
+-- Open play courts: which umpire runs each court, and which session
+-- took it. No row means the court is open to any umpire at the place.
+CREATE TABLE IF NOT EXISTS open_play_courts (
+    open_play_id UUID NOT NULL REFERENCES open_plays (id) ON DELETE CASCADE,
+    court        INTEGER NOT NULL CHECK (court BETWEEN 1 AND 20),
+    umpire_id    UUID NOT NULL REFERENCES umpires (id) ON DELETE CASCADE,
+    assigned_by  UUID REFERENCES admins (id) ON DELETE SET NULL,
+    assigned_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (open_play_id, court),
+    -- One court per umpire per open play.
+    UNIQUE (open_play_id, umpire_id)
+);
+-- What a session was named from. All empty for sessions from before
+-- this, and for old installed apps that still send a typed name.
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS starts_at    TIMESTAMPTZ;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS open_play_id UUID REFERENCES open_plays (id) ON DELETE SET NULL;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS court        INTEGER CHECK (court BETWEEN 1 AND 20);
+-- One live claim per court; voiding the session frees the court.
+CREATE UNIQUE INDEX IF NOT EXISTS sessions_open_play_court_idx
+    ON sessions (open_play_id, court) WHERE open_play_id IS NOT NULL AND court IS NOT NULL AND voided_at IS NULL;
+
 -- How a visit went: one face (1-5) and chips per player per session they
 -- played in. The place sees them summed, never who gave them.
 CREATE TABLE IF NOT EXISTS visit_ratings (

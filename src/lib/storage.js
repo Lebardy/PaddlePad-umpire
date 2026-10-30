@@ -1,6 +1,7 @@
 import { DEFAULT_POINT_TARGET, deriveMatchState } from './pickleball'
 import { waitingThirdShot, withThirdShotTap } from './thirdShot'
 import { read, write } from './localstore'
+import { sessionName } from './sessionName'
 import {
   clearOutbox,
   deadLetter,
@@ -69,17 +70,38 @@ export function getSession(sessionId) {
   return getSessions().find((s) => s.id === sessionId) ?? null
 }
 
-/** Creates a session with an empty roster and stores it. */
-export function createSession(name) {
+/** Creates a session with an empty roster and stores it, named by the shared rule. A court start passes its open play and court. */
+export function createSession({ startsAt = Date.now(), openPlayId = null, court = null } = {}) {
   const session = {
     id: crypto.randomUUID(),
-    name: name.trim(),
+    name: sessionName({ startsAt, court }),
     createdAt: Date.now(),
+    startsAt,
+    openPlayId,
+    court,
     playerIds: [],
   }
   writeJSON(SESSIONS_KEY, [session, ...getSessions()])
   markDirty('session', session.id)
   return session
+}
+
+const COURT_NOTICES_KEY = 'paddlepad.courtNotices'
+
+/** Sessions whose court start became a plain session, with the server's one sentence why. */
+export function getCourtNotices() {
+  return readJSON(COURT_NOTICES_KEY, {})
+}
+
+export function dismissCourtNotice(sessionId) {
+  const { [sessionId]: _gone, ...rest } = getCourtNotices()
+  writeJSON(COURT_NOTICES_KEY, rest)
+}
+
+/** Takes the server's plain name for a session whose court was not given, and keeps the reason to show. */
+export function applyCourtNotice(sessionId, { name, notice }) {
+  writeJSON(SESSIONS_KEY, getSessions().map((s) => (s.id === sessionId ? { ...s, name, openPlayId: null, court: null } : s)))
+  writeJSON(COURT_NOTICES_KEY, { ...getCourtNotices(), [sessionId]: notice })
 }
 
 /** Every player ever tracked, shared across all sessions. */
@@ -461,6 +483,11 @@ export function replaceServerState({
         voidedAt: s.voided_at ? new Date(s.voided_at).getTime() : null,
         voidReason: s.void_reason ?? null,
         endedAt: s.ended_at ? new Date(s.ended_at).getTime() : null,
+        // Kept so a court session that came back from the server still
+        // hides its court's card on Home.
+        startsAt: s.starts_at ? new Date(s.starts_at).getTime() : null,
+        openPlayId: s.open_play_id ?? null,
+        court: s.court ?? null,
         // Kept so the home screen can group "yours" from "everyone
         // else's" and say whose a session is. The server has always sent
         // these; the local mirror used to drop them, which is why the
@@ -659,6 +686,11 @@ export function clearLocalData() {
   write(MATCHES_KEY, [])
   write(TOMBSTONES_KEY, { matches: [], sessions: [] })
   clearOutbox()
+  // The next umpire on a shared phone must not see this one's courts as "yours".
+  try {
+    localStorage.removeItem('paddlepad.todayCourts')
+  } catch { /* private mode */ }
+  writeJSON(COURT_NOTICES_KEY, {})
 }
 
 // ============================================================

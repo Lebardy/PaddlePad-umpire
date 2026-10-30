@@ -132,3 +132,47 @@ export async function recentRatings(query, facilityId) {
   )
   return rows
 }
+
+/**
+ * Each open play's courts: who is assigned (and whether they can still
+ * start it: not paused, not closed, still at that place) and which
+ * session took it. Courts nobody touched are simply absent.
+ */
+export async function loadCourtState(query, openPlayIds) {
+  const state = new Map(openPlayIds.map((id) => [id, new Map()]))
+  if (openPlayIds.length === 0) return state
+  const at = (id, court) => {
+    const courts = state.get(id)
+    if (!courts.has(court)) courts.set(court, { assignee: null, session: null })
+    return courts.get(court)
+  }
+  const { rows: assigned } = await query(
+    `SELECT c.open_play_id, c.court, u.id, u.name,
+            (u.paused_at IS NULL AND u.closed_at IS NULL AND u.facility_id = o.facility_id) AS active
+       FROM open_play_courts c
+       JOIN umpires u ON u.id = c.umpire_id
+       JOIN open_plays o ON o.id = c.open_play_id
+      WHERE c.open_play_id = ANY($1::uuid[])`,
+    [openPlayIds],
+  )
+  for (const row of assigned) at(row.open_play_id, row.court).assignee = { id: row.id, name: row.name, active: row.active }
+  const { rows: taken } = await query(
+    `SELECT s.open_play_id, s.court, u.name AS started_by, s.ended_at IS NOT NULL AS ended
+       FROM sessions s LEFT JOIN umpires u ON u.id = s.created_by
+      WHERE s.open_play_id = ANY($1::uuid[]) AND s.court IS NOT NULL AND s.voided_at IS NULL`,
+    [openPlayIds],
+  )
+  for (const row of taken) at(row.open_play_id, row.court).session = { startedBy: row.started_by ?? 'another umpire', ended: row.ended }
+  return state
+}
+
+/** The umpires a manager can put on a court: at this place, not paused, not closed. */
+export async function loadFacilityUmpires(query, facilityId) {
+  const { rows } = await query(
+    `SELECT id, name FROM umpires
+      WHERE facility_id = $1 AND paused_at IS NULL AND closed_at IS NULL
+      ORDER BY name`,
+    [facilityId],
+  )
+  return rows
+}

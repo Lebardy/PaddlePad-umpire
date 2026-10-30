@@ -103,6 +103,7 @@ const ACTION_LABELS = {
   'session.closed': 'Closed a session',
   'open_play.added': 'Added open play',
   'open_play.cancelled': 'Cancelled open play',
+  'open_play.court_assigned': 'Set an open play court’s umpire',
 }
 
 export function actionLabel(action) {

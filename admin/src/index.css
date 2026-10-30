@@ -971,5 +971,25 @@ tr.is-voided .reason { opacity: 0.6; }
   border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); font-weight: 600;
 }
 .visits-none { color: var(--text-muted); }
+/* Courts: a count that opens a strip of one card per court. */
+.court-count {
+  display: inline-flex; align-items: center; gap: 0.45rem; min-height: 2.75rem; padding: 0.25rem 0.8rem;
+  background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius-sm); cursor: pointer;
+  font-family: var(--label); font-weight: 700; font-size: 1.1rem; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.court-count[aria-expanded='true'] { border-color: var(--primary); background: var(--primary-soft); }
+.court-count:focus-visible, .court-card select:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.court-strip td { background: var(--surface-sunken); }
+.court-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; }
+.court-card { display: grid; gap: 0.5rem; padding: 0.8rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); min-width: 0; }
+.court-card-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; min-height: 1.5rem; }
+.court-card label { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 700; }
+.court-card select { width: 100%; min-height: 2.75rem; padding: 0.4rem 0.6rem; background: var(--bg); border: 1.5px solid var(--border); border-radius: var(--radius-sm); }
+.court-saved { display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 600; }
+.court-saved svg { color: var(--status-good); }
+.court-state { display: flex; align-items: center; gap: 0.45rem; color: var(--text-muted); font-size: 0.9rem; }
+.live-lamp { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--win-lamp); box-shadow: 0 0 6px var(--win-lamp); flex: none; }
 /* A row's Cancel and its Confirm / Not now are a finger's size on a tablet. */
 .guests-table .btn-small { min-height: 2.75rem; }
+/* The refusal ("Courts already started") reads on one line under Cancel, not in a three-line sliver. */
+.guests-table .row-actions > .row-error { white-space: nowrap; }

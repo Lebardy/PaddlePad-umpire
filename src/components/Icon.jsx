@@ -14,6 +14,7 @@ const PATHS = {
   camera: 'M3 7h12v10H3zM15 10l6-3v10l-6-3',
   cameraOff: 'M3 7h12v10H3zM15 10l6-3v10l-6-3M3 3l18 18',
   chevron: 'M9 6l6 6-6 6',
+  court: 'M3 5h18v14H3zM12 5v14M3 12h18',
   flag: 'M5 21V4M5 4h11l-2 4 2 4H5',
   key: 'M8 19a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM11 12l9-9M16 7l3 3',
   list: 'M9 6h11M9 12h11M9 18h11M4 6v.01M4 12v.01M4 18v.01',

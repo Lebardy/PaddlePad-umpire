@@ -203,6 +203,8 @@ export function logoSrc(logoUrl, { small = false } = {}) {
 export const fetchGuests = (facilityId) => apiFetch(`/admin/facilities/${facilityId}/guests`)
 export const addOpenPlay = (facilityId, body) => post(`/admin/facilities/${facilityId}/open-plays`, body).then((d) => d.openPlay)
 export const cancelOpenPlay = (facilityId, id) => apiFetch(`/admin/facilities/${facilityId}/open-plays/${id}`, { method: 'DELETE' })
+export const setCourtUmpire = (facilityId, openPlayId, court, umpireId) =>
+  apiFetch(`/admin/facilities/${facilityId}/open-plays/${openPlayId}/courts/${court}`, { method: 'PUT', body: { umpireId } }).then((d) => d.court)
 
 // Activity
 
