@@ -239,9 +239,10 @@ function LiveMatch({ matchId, onBack }) {
   const me = getStoredUmpire()?.id
   const split = match?.scorekeeper?.state ? match.scorekeeper : null
   const iRunIt = Boolean(split) && (match.recordedBy ?? me) === me
-  // The other umpire's match, which this phone only taps for.
-  const isKeeper = split?.id === me && Boolean(match?.recordedBy) && match.recordedBy !== me
-  const iScore = isKeeper && split.state === 'scoring'
+  // The other umpire's match, which this phone only taps for. Still so once
+  // scoring is taken back: the name stays on the match and only the state clears.
+  const isKeeper = match?.scorekeeper?.id === me && Boolean(match?.recordedBy) && match.recordedBy !== me
+  const iScore = isKeeper && split?.state === 'scoring'
   const polling = watching || iRunIt
   const pollMs = iRunIt ? SPLIT_POLL_MS : WATCH_POLL_MS
 
