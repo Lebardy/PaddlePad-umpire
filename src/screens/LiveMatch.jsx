@@ -466,7 +466,7 @@ function LiveMatch({ matchId, onBack }) {
 
   const derived = deriveMatchState(match)
   // Won but still open: held for the main umpire, or just taken back by them.
-  const won = match.status === 'in_progress' && derived.completed && !match.voidedAt
+  const won = match.status === 'in_progress' && derived.completed
   const iConclude = (match.recordedBy ?? me) === me
   const players = [...match.teamA, ...match.teamB]
   const serverId =
@@ -714,7 +714,7 @@ function LiveMatch({ matchId, onBack }) {
                 <p>Waiting for {match.recordedByName?.split(' ')[0]} to conclude</p>
               ) : match.concludeAsk ? (
                 <p>Conclude · Waiting to send</p>
-              ) : blockedLog ? null : (
+              ) : blockedLog || match.voidedAt ? null : (
                 <button onClick={() => { askConclude(matchId, match.events.at(-1).id); sync.flush() }}>
                   <Icon name="check" size={20} />Conclude match
                 </button>
