@@ -130,5 +130,11 @@ check('I4: a screen that was scoring and lost it yields', must({ wasScoring: tru
 check('I4: still scoring, nothing blocked, no yield', must({}), false)
 check('I4: a finished match never counts as taken back', must({ blockedLog: true, completed: true }), false)
 
+// --- Match point: a won match waits for the umpire only while a scorekeeper is scoring ---
+check('hold: won + scoring waits', rules.waitsForUmpire?.({ completed: true }, 'scoring'), true)
+check('hold: won, no split finishes', rules.waitsForUmpire?.({ completed: true }, null), false)
+check('hold: won, split only asked finishes', rules.waitsForUmpire?.({ completed: true }, 'asked'), false)
+check('hold: not won, nothing to wait for', rules.waitsForUmpire?.({ completed: false }, 'scoring'), false)
+
 console.log(`\n${pass} ok / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)

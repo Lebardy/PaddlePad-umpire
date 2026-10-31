@@ -14,6 +14,7 @@ export const RULING_KINDS = ['stands', 'overturned', 'replay', 'wrongWinner']
 export const TOO_LATE = 'Too late: the next rally was scored.'
 export const TAKEN_BACK = 'Scoring was taken back.'
 export const MATCH_OVER = 'The match has finished.'
+export const CONCLUDE_MOVED = 'The score changed: check the last rally.'
 
 /** The team a rally gave the point to: a winning shot scores for its own side, a mistake for the other. */
 export function rallyWinnerTeam(teamA, rally) {
@@ -81,4 +82,12 @@ export function newestRuling(queued, rulings) {
  */
 export function keeperMustYield({ isKeeper, wasScoring, blockedLog, completed }) {
   return !completed && (wasScoring || (isKeeper && blockedLog))
+}
+
+/**
+ * Whether a won match stays open for the main umpire: while a scorekeeper
+ * taps, the winning rally can still be appealed, so it cannot end the match.
+ */
+export function waitsForUmpire(derived, scorekeeperState) {
+  return derived.completed && scorekeeperState === 'scoring'
 }

@@ -4000,6 +4000,106 @@ async function main() {
     const junk = await asMain('/scorekeeping/not-a-uuid/rulings', { method: 'POST', body: {} })
     check('a junk match id -> 404, never 500', junk.status === 404, String(junk.status))
     await asMain(`/matches/${skMatch}`, { method: 'DELETE', body: { deviceId: mainDevice } })
+
+    // --- Match point: the winning rally waits for the main umpire ---
+    const startSplit = async () => {
+      const id = uuid()
+      await asMain('/matches', { method: 'POST', body: { id, sessionId: skSession, teamA: [players[0].id], teamB: [players[1].id], firstServer: { team: 'A', playerId: players[0].id } } })
+      await asMain(`/scorekeeping/${id}`, { method: 'PUT', body: { umpireId: skId, deviceId: mainDevice } })
+      await asSk(`/scorekeeping/${id}/answer`, { method: 'POST', body: { deviceId: skDevice, start: true } })
+      return id
+    }
+    const skLog = (id, events) => asSk(`/matches/${id}/log`, { method: 'PUT', body: { deviceId: skDevice, events: events.map((e, seq) => ({ ...e, seq })) } })
+    // match_events.id is a global primary key, so every match needs its own rallies.
+    const freshWins = () => Array.from({ length: 10 }, (_, i) => rally(i, players[0].id))
+    const tenWins = freshWins()
+    const conclude = (id, targetEventId) => asMain(`/matches/${id}/conclude`, { method: 'POST', body: { deviceId: mainDevice, targetEventId } })
+
+    const mp = await startSplit()
+    const winAt = Date.now() - 60_000
+    const winner = { ...rally(10, players[0].id), at: winAt }
+    const heldLog = await skLog(mp, [...tenWins, winner])
+    check('the winning rally holds the match open',
+      heldLog.status === 200 && heldLog.body.match?.status === 'in_progress' && heldLog.body.match.winner === null && heldLog.body.match.scorekeeper?.state === 'scoring',
+      JSON.stringify({ status: heldLog.status, m: heldLog.body.match?.status, w: heldLog.body.match?.winner }))
+    const skConcludes = await asSk(`/matches/${mp}/conclude`, { method: 'POST', body: { deviceId: skDevice, targetEventId: winner.id } })
+    check('only the main umpire concludes -> 403', skConcludes.status === 403, String(skConcludes.status))
+    const staleTarget = await conclude(mp, tenWins[9].id)
+    check('conclude on an older event -> 409', staleTarget.status === 409, String(staleTarget.status))
+
+    const undone = await skLog(mp, tenWins)
+    const afterUndo = await conclude(mp, winner.id)
+    check('after the scorekeeper undoes the winning rally, conclude -> 409 and play goes on',
+      undone.body.match?.status === 'in_progress' && afterUndo.status === 409, String(afterUndo.status))
+
+    await skLog(mp, [...tenWins, winner])
+    const replayMp = uuid()
+    const replayAsk = await asMain(`/scorekeeping/${mp}/rulings`, { method: 'POST', body: { id: replayMp, targetEventId: winner.id, kind: 'replay' } })
+    const replayNoteMp = { id: replayMp, type: 'ruling', at: Date.now(), targetEventId: winner.id, kind: 'replay', ruledBy: null, was: { actingPlayerId: players[0].id, outcome: 'winner', zone: 'open' } }
+    const replayedMp = await skLog(mp, [...tenWins, replayNoteMp])
+    check('Replay on the winning rally removes it and play goes on',
+      replayAsk.status === 201 && replayedMp.body.match?.status === 'in_progress', JSON.stringify(replayAsk.body))
+
+    await skLog(mp, [...tenWins, replayNoteMp, winner])
+    const overMp = uuid()
+    const overAsk = await asMain(`/scorekeeping/${mp}/rulings`, { method: 'POST', body: { id: overMp, targetEventId: winner.id, kind: 'overturned' } })
+    const overNote = { id: overMp, type: 'ruling', at: Date.now(), targetEventId: winner.id, kind: 'overturned', ruledBy: null, was: { actingPlayerId: players[0].id, outcome: 'winner', zone: 'open' } }
+    const overturnedMp = await skLog(mp, [...tenWins, replayNoteMp, overNote])
+    check('Overturned on the winning rally removes it and play goes on',
+      overAsk.status === 201 && overturnedMp.body.match?.status === 'in_progress', JSON.stringify(overAsk.body))
+
+    await skLog(mp, [...tenWins, replayNoteMp, overNote, winner])
+    const standsMp = uuid()
+    await asMain(`/scorekeeping/${mp}/rulings`, { method: 'POST', body: { id: standsMp, targetEventId: winner.id, kind: 'stands' } })
+    const standsNote = { id: standsMp, type: 'ruling', at: Date.now(), targetEventId: winner.id, kind: 'stands', ruledBy: null }
+    const stoodMp = await skLog(mp, [...tenWins, replayNoteMp, overNote, winner, standsNote])
+    check('Stands keeps the match open for the umpire to conclude', stoodMp.body.match?.status === 'in_progress', String(stoodMp.body.match?.status))
+
+    const done = await conclude(mp, standsNote.id)
+    const doneMatch = done.body.match
+    check('conclude finishes it: winner, end time of the winning rally, split over, scorekeeper still named',
+      done.status === 200 && doneMatch?.status === 'completed' && doneMatch.winner === 'A'
+        && new Date(doneMatch.endedAt).getTime() === winAt && doneMatch.scorekeeper?.state === null && doneMatch.scorekeeper?.id === skId,
+      JSON.stringify({ s: done.status, st: doneMatch?.status, w: doneMatch?.winner, e: doneMatch?.endedAt, sk: doneMatch?.scorekeeper }))
+    const repeat = await conclude(mp, standsNote.id)
+    check('a repeated conclude -> 200', repeat.status === 200 && repeat.body.match?.status === 'completed', String(repeat.status))
+    const lateUpload = await skLog(mp, tenWins)
+    check("the scorekeeper's late upload -> 409, the result stands", lateUpload.status === 409, String(lateUpload.status))
+    const lateRulings = await asSk(`/scorekeeping/${mp}/rulings`)
+    check('and he can no longer read rulings -> 403', lateRulings.status === 403, String(lateRulings.status))
+    const lateRuling = await asMain(`/scorekeeping/${mp}/rulings`, { method: 'POST', body: { id: uuid(), targetEventId: standsNote.id, kind: 'replay' } })
+    check('a ruling after concluding -> 409', lateRuling.status === 409, String(lateRuling.status))
+
+    // A ruling still waiting when the match ends can no longer apply.
+    const mr = await startSplit()
+    const mrWinner = rally(10, players[0].id)
+    await skLog(mr, [...freshWins(), mrWinner])
+    const waitingId = uuid()
+    const waitingAsk = await asMain(`/scorekeeping/${mr}/rulings`, { method: 'POST', body: { id: waitingId, targetEventId: mrWinner.id, kind: 'stands' } })
+    const mrDone = await conclude(mr, mrWinner.id)
+    check('a ruling still waiting is refused as match over',
+      waitingAsk.status === 201 && mrDone.body.match?.rulings?.find((r) => r.id === waitingId)?.refused === 'The match has finished.',
+      JSON.stringify(mrDone.body.match?.rulings))
+
+    // Taken back while won: nothing finishes by itself.
+    const tb = await startSplit()
+    const tbWinner = rally(10, players[0].id)
+    await skLog(tb, [...freshWins(), tbWinner])
+    await asMain(`/matches/${tb}/claim`, { method: 'POST', body: { deviceId: mainDevice, force: true } })
+    const afterTb = await asMain(`/matches/${tb}`)
+    check('taking scoring back on a won match leaves it open', afterTb.body.match?.status === 'in_progress' && afterTb.body.match.scorekeeper?.state === null, JSON.stringify(afterTb.body.match?.status))
+    const tbDone = await conclude(tb, tbWinner.id)
+    check('then the umpire concludes it', tbDone.status === 200 && tbDone.body.match?.status === 'completed' && tbDone.body.match.winner === 'A', String(tbDone.status))
+
+    const tb2 = await startSplit()
+    const tb2Winner = rally(10, players[0].id)
+    const tb2Wins = freshWins()
+    await skLog(tb2, [...tb2Wins, tb2Winner])
+    await asMain(`/matches/${tb2}/claim`, { method: 'POST', body: { deviceId: mainDevice, force: true } })
+    const mainUndo = await asMain(`/matches/${tb2}/log`, { method: 'PUT', body: { deviceId: mainDevice, events: tb2Wins } })
+    check('or undoes the winning rally and plays on', mainUndo.status === 200 && mainUndo.body.match?.status === 'in_progress', String(mainUndo.status))
+    const mainWins = await asMain(`/matches/${tb2}/log`, { method: 'PUT', body: { deviceId: mainDevice, events: [...tb2Wins, tb2Winner] } })
+    check('with no split left, the winning tap finishes as usual', mainWins.body.match?.status === 'completed', String(mainWins.body.match?.status))
   }
 
   section('admin site — overview')

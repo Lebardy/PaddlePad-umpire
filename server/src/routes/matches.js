@@ -12,7 +12,7 @@ import { rallyEndingProblem } from '../rally-endings.js'
 import { invalidateRallyRatings } from '../rally-rating-store.js'
 import { umpireScope } from '../facility-rules.js'
 import { LEASE_MINUTES, heldByAnotherDevice } from '../scoring-lease.js'
-import { RULING_KINDS, MATCH_OVER, TAKEN_BACK } from '../scorekeeper-rules.js'
+import { RULING_KINDS, MATCH_OVER, TAKEN_BACK, CONCLUDE_MOVED, waitsForUmpire } from '../scorekeeper-rules.js'
 import { bucketConfig, deleteFile } from '../bucket.js'
 import { clockOffsetMs } from '../video-times.js'
 
@@ -351,6 +351,76 @@ router.post('/:id/claim', async (req, res) => {
 })
 
 /**
+ * The main umpire ends a won match. Changes only the match's status, never
+ * its log, so the scorekeeper's phone stays the only writer and a dead
+ * scorekeeper phone cannot keep a match open. Moving the device means a
+ * late upload from that phone is refused rather than reopening the match.
+ */
+router.post('/:id/conclude', async (req, res) => {
+  const { targetEventId } = req.body ?? {}
+  const deviceId = String(req.body?.deviceId ?? '')
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such match' })
+  if (!deviceId || !isUuid(targetEventId)) return res.status(400).json({ error: 'A deviceId and targetEventId are required' })
+
+  const params = [req.params.id]
+  const scope = umpireScope(req.umpire.facilityId, params, 'sess.facility_id')
+  const read = () => query(`${MATCH_SELECT} WHERE m.id = $1 AND ${scope}`, params)
+  const { rows: [row] } = await read()
+  if (!row) return res.status(404).json({ error: 'No such match' })
+  if (row.recorded_by !== req.umpire.id) return res.status(403).json({ error: 'Only the umpire running this match can conclude it' })
+
+  // A resend after a lost answer: already done.
+  if (row.status !== 'completed') {
+    if (row.voided_at) return res.status(409).json({ error: MATCH_OVER })
+    const events = await loadEvents(req.params.id)
+    const derived = deriveRow(row, events)
+    if (!derived.completed || events.at(-1)?.id !== targetEventId) return res.status(409).json({ error: CONCLUDE_MOVED })
+    const done = await withTransaction(async (client) => {
+      // Guarded on the last event: the scorekeeper's undo may have landed since the read.
+      const updated = await client.query(
+        `UPDATE matches
+            SET status = 'completed',
+                winner = $2,
+                ended_early = false,
+                -- When play stopped, so duration and the export do not count the wait.
+                ended_at = (SELECT at FROM match_events WHERE match_id = $1 AND type = 'rally' ORDER BY seq DESC LIMIT 1),
+                scorekeeper_state = NULL,
+                scoring_device = $3,
+                scoring_claimed_at = now()
+          WHERE id = $1 AND status = 'in_progress'
+            AND (SELECT id FROM match_events WHERE match_id = $1 ORDER BY seq DESC LIMIT 1) = $4`,
+        [req.params.id, derived.winner, deviceId, targetEventId],
+      )
+      if (!updated.rowCount) return false
+      await client.query(
+        `UPDATE match_rulings SET refused = $2 WHERE match_id = $1 AND applied_at IS NULL AND refused IS NULL`,
+        [req.params.id, MATCH_OVER],
+      )
+      return true
+    })
+    if (!done) return res.status(409).json({ error: CONCLUDE_MOVED })
+    invalidateRallyRatings()
+  }
+
+  const { rows: [fresh] } = await read()
+  res.json({ match: toClientMatch(fresh, await loadEvents(req.params.id), await loadRulings(req.params.id)) })
+})
+
+/** The engine's view of a match row and its log. */
+function deriveRow(row, events) {
+  return deriveMatchState({
+    teamA: row.team_a,
+    teamB: row.team_b,
+    firstServer: { team: row.first_server_team, playerId: row.first_server_player },
+    rightStart: { A: row.right_start_a, B: row.right_start_b },
+    // Without this the server would score a game played to 15 as though
+    // it were to 11 and declare a winner partway through.
+    pointTarget: row.point_target,
+    events,
+  })
+}
+
+/**
  * Replaces a match's entire event log: "this match's log is exactly
  * these events."
  *
@@ -453,22 +523,15 @@ router.put('/:id/log', async (req, res) => {
     }
   }
 
-  const derived = deriveMatchState({
-    teamA: row.team_a,
-    teamB: row.team_b,
-    firstServer: { team: row.first_server_team, playerId: row.first_server_player },
-    rightStart: { A: row.right_start_a, B: row.right_start_b },
-    // Without this the server would score a game played to 15 as though
-    // it were to 11 and declare a winner partway through.
-    pointTarget: row.point_target,
-    events,
-  })
+  const derived = deriveRow(row, events)
+  // Held for the main umpire, who may still rule on the winning rally.
+  const held = waitsForUmpire(derived, row.scorekeeper_state)
 
   // A match ends either by being won on court (derivable) or by being
   // stopped early (NOT derivable -- ending early appends no event). The
   // second case is why ended_early is stored: without it, every
   // manually-ended match would reopen as in-progress on the next sync.
-  const completed = derived.completed || endedEarly
+  const completed = (derived.completed && !held) || endedEarly
   const endedAtSource = derived.completed
     ? events[events.length - 1]?.at
     : (endedEarlyAt ?? Date.now())
@@ -503,7 +566,7 @@ router.put('/:id/log', async (req, res) => {
       [
         req.params.id,
         completed ? 'completed' : 'in_progress',
-        derived.winner,
+        held ? null : derived.winner,
         endedEarly && !derived.completed,
         completed && endedAtSource ? new Date(endedAtSource).toISOString() : null,
         deviceId,
