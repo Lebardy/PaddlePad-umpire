@@ -180,6 +180,20 @@ await sync.drain()
 concludeStatus = 200
 check('refused: shows what the server has, nothing dead', [storage.getMatch(MID).status, storage.getMatch(MID).events.length, storage.getMatch(MID).concludeAsk, outbox.deadLetter().length], ['in_progress', 10, undefined, 0])
 
+// Refused, then the re-read: the match was cancelled (404), or there is no connection.
+const concludeRealFetch = globalThis.fetch
+for (const [name, reread, queued] of [['404', () => new Response(JSON.stringify({ error: 'Not found' }), { status: 404 }), false], ['no connection', () => { throw new TypeError('Failed to fetch') }, true]]) {
+  outbox.clearOutbox()
+  setLocal({ ...base, events: wonEvents, scorekeeper: scoring })
+  storage.askConclude(MID, 'e11')
+  concludeStatus = 409
+  globalThis.fetch = async (url, init = {}) => ((init.method ?? 'GET') === 'GET' ? reread() : concludeRealFetch(url, init))
+  await sync.drain()
+  globalThis.fetch = concludeRealFetch
+  concludeStatus = 200
+  check(`refused, re-read ${name}: ${queued ? 'still queued' : 'nothing queued'}, nothing dead`, [outbox.pending().length, outbox.deadLetter().length, storage.getMatch(MID).concludeAsk?.targetEventId], [queued ? 1 : 0, 0, queued ? 'e11' : undefined])
+}
+
 outbox.clearOutbox()
 setLocal({ ...base, events: wonEvents, scorekeeper: scoring })
 server = { ...serverCopy(wonEvents, null), status: 'completed', winner: 'A' }

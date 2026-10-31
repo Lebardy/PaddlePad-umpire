@@ -237,7 +237,15 @@ async function push(entry, payload) {
       const refused = error.status >= 400 && error.status < 500 && error.status !== 401 && error.status !== 429
       if (!refused) throw error
       // The score moved first (the scorekeeper undid it). Show what is true.
-      remote = await api.fetchMatch(payload.id)
+      try {
+        remote = await api.fetchMatch(payload.id)
+      } catch (gone) {
+        if (gone.status !== 404) throw gone
+        // Cancelled on the server: nothing is left to conclude.
+        const match = getMatch(payload.id)
+        if (match) saveMatch({ ...match, concludeAsk: undefined })
+        return
+      }
     }
     replaceServerState({ matches: [remote], force: true })
     return
