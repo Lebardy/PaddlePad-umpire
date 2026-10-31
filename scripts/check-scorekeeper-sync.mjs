@@ -132,7 +132,8 @@ const must = (o) => rules.keeperMustYield?.({ isKeeper: true, wasScoring: false,
 check('I4: a blocked upload on a freshly opened screen yields', must({ blockedLog: true }), true)
 check('I4: a screen that was scoring and lost it yields', must({ wasScoring: true }), true)
 check('I4: still scoring, nothing blocked, no yield', must({}), false)
-check('I4: a finished match never counts as taken back', must({ blockedLog: true, completed: true }), false)
+check('I4: a blocked upload yields even on a locally finished copy', must({ blockedLog: true, completed: true }), true)
+check('I4: a finished copy that was scoring is not a take-back by itself', must({ wasScoring: true, completed: true }), false)
 
 // --- Match point: a won match waits for the umpire only while a scorekeeper is scoring ---
 check('hold: won + scoring waits', rules.waitsForUmpire?.({ completed: true }, 'scoring'), true)
@@ -201,6 +202,21 @@ check('a concluded match is not a take-back', (await sync.yieldMatch(MID)).finis
 setLocal({ ...base, events: wonEvents, scorekeeper: scoring })
 server = serverCopy(wonEvents, null)
 check('a real take-back still is', (await sync.yieldMatch(MID)).finished, false)
+
+// A conclude still queued when scoring is taken back: the Undo made after must stay.
+outbox.clearOutbox(); logPuts.length = 0
+setLocal({ ...base, events: wonEvents, scoringDevice: 'paolo-phone', scorekeeper: scoring })
+storage.askConclude(MID, 'e11')
+offline = true; await sync.drain(); offline = false
+server = serverCopy(wonEvents, null)
+await sync.takeOverMatch(MID, { adopt: true })
+storage.undoLastEvent(MID)
+concludeStatus = 400 // the entry now names no target
+outbox.release(outbox.outboxKey('conclude', MID))
+await sync.drain()
+concludeStatus = 200
+check('take back with a conclude queued: the Undo stays', storage.getMatch(MID).events.length, 10)
+check('and what goes up is the shorter log', logPuts.at(-1)?.events.length, 10)
 
 console.log(`\n${pass} ok / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)

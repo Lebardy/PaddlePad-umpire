@@ -466,7 +466,7 @@ function LiveMatch({ matchId, onBack }) {
 
   const derived = deriveMatchState(match)
   // Won but still open: held for the main umpire, or just taken back by them.
-  const won = match.status === 'in_progress' && derived.completed
+  const won = match.status === 'in_progress' && derived.completed && !match.voidedAt
   const iConclude = (match.recordedBy ?? me) === me
   const players = [...match.teamA, ...match.teamB]
   const serverId =
@@ -520,12 +520,12 @@ function LiveMatch({ matchId, onBack }) {
         <div className="scoring-status">
           <div className="scoreboard" aria-label="Score">
             {teams.map(({ key, ids }) => {
-              const serving = match.status === 'in_progress' && derived.servingTeam === key
+              const serving = match.status === 'in_progress' && !won && derived.servingTeam === key
               return (
                 <div key={key} className={`score-side ${serving ? 'serving' : ''}`}>
                   <span className="score-names">
                     {ids.map((id) => (
-                      <span key={id} className={id === serverId ? 'is-server' : undefined}>
+                      <span key={id} className={id === serverId && !won ? 'is-server' : undefined}>
                         {name(id)}
                       </span>
                     ))}
@@ -579,7 +579,7 @@ function LiveMatch({ matchId, onBack }) {
                     <button
                       className="undo"
                       onClick={handleUndo}
-                      disabled={!pending && (match.events.length === 0 || match.events.at(-1)?.type === 'ruling' || Boolean(match.concludeAsk))}
+                      disabled={!pending && (match.events.length === 0 || match.events.at(-1)?.type === 'ruling' || Boolean(match.concludeAsk) || (won && !iConclude && !iScore))}
                     >
                       <Icon name="undo" size={18} />
                       {pending ? 'Back' : 'Undo'}
@@ -772,9 +772,11 @@ function LiveMatch({ matchId, onBack }) {
               <button onClick={() => unvoidMatch(matchId)}>Restore this match</button>
             </>
           ) : (
-            <button className="void-btn" onClick={handleVoid}>
-              Void this match (wrong pairing?)
-            </button>
+            !isKeeper && (
+              <button className="void-btn" onClick={handleVoid}>
+                Void this match (wrong pairing?)
+              </button>
+            )
           )}
         </div>
       )}

@@ -11,7 +11,7 @@ import { isUuid, stackingFromColumns, stackingToColumns } from '../validate.js'
 import { rallyEndingProblem } from '../rally-endings.js'
 import { invalidateRallyRatings } from '../rally-rating-store.js'
 import { umpireScope } from '../facility-rules.js'
-import { LEASE_MINUTES, heldByAnotherDevice } from '../scoring-lease.js'
+import { LEASE_MINUTES, heldByAnotherDevice, scorekeeperRevoked } from '../scoring-lease.js'
 import { RULING_KINDS, MATCH_OVER, TAKEN_BACK, CONCLUDE_MOVED, waitsForUmpire } from '../scorekeeper-rules.js'
 import { bucketConfig, deleteFile } from '../bucket.js'
 import { clockOffsetMs } from '../video-times.js'
@@ -375,6 +375,13 @@ router.post('/:id/conclude', async (req, res) => {
     const events = await loadEvents(req.params.id)
     const derived = deriveRow(row, events)
     if (!derived.completed || events.at(-1)?.id !== targetEventId) return res.status(409).json({ error: CONCLUDE_MOVED })
+    // Never over a ruling still waiting on the winning rally: it may remove it.
+    const waiting = await query(
+      `SELECT 1 FROM match_rulings WHERE match_id = $1 AND target_event_id = $2
+          AND kind <> 'stands' AND applied_at IS NULL AND refused IS NULL`,
+      [req.params.id, events.findLast((e) => e.type === 'rally')?.id],
+    )
+    if (waiting.rowCount) return res.status(409).json({ error: CONCLUDE_MOVED })
     const done = await withTransaction(async (client) => {
       // Guarded on the last event: the scorekeeper's undo may have landed since the read.
       const updated = await client.query(
@@ -456,7 +463,7 @@ router.put('/:id/log', async (req, res) => {
   if (!existing.rows[0]) return res.status(404).json({ error: 'No such match' })
   const row = existing.rows[0]
 
-  if (heldByAnotherDevice(row, deviceId)) {
+  if (scorekeeperRevoked(row, req.umpire.id, deviceId) || heldByAnotherDevice(row, deviceId)) {
     return res.status(409).json({
       error: 'Another device is scoring this match',
       heldBy: { umpireName: row.recorded_by_name, since: row.scoring_claimed_at },
@@ -533,7 +540,7 @@ router.put('/:id/log', async (req, res) => {
   // manually-ended match would reopen as in-progress on the next sync.
   const completed = (derived.completed && !held) || endedEarly
   const endedAtSource = derived.completed
-    ? events[events.length - 1]?.at
+    ? events.findLast((e) => e.type === 'rally')?.at
     : (endedEarlyAt ?? Date.now())
 
   await withTransaction(async (client) => {

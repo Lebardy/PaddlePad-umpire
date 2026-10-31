@@ -230,6 +230,8 @@ async function push(entry, payload) {
     return
   }
   if (entry.kind === 'conclude') {
+    // Replaced since it was queued (scoring taken back): the ask went with it.
+    if (!payload.concludeAsk) return
     let remote
     try {
       remote = await api.concludeMatch(payload.id, { targetEventId: payload.concludeAsk?.targetEventId, deviceId: outbox.getDeviceId() })
@@ -246,6 +248,12 @@ async function push(entry, payload) {
         if (match) saveMatch({ ...match, concludeAsk: undefined })
         return
       }
+    }
+    // Never over work this phone still owes: the log goes up next and the server decides.
+    if (outbox.pending().some((e) => e.kind === 'log' && e.entityId === payload.id)) {
+      const match = getMatch(payload.id)
+      if (match) saveMatch({ ...match, concludeAsk: undefined })
+      return
     }
     replaceServerState({ matches: [remote], force: true })
     return
@@ -265,6 +273,13 @@ async function push(entry, payload) {
       return
     }
     dropQueuedRuling(payload.id)
+    // Show it waiting at once, so Conclude and the rule buttons do not flash back until the next read.
+    const match = getMatch(payload.matchId)
+    if (match) {
+      const sent = { id: payload.id, targetEventId: payload.targetEventId, kind: payload.kind, state: 'waiting', refused: null }
+      saveMatch({ ...match, rulings: [sent, ...(match.rulings ?? [])] })
+      lastPushed.set(payload.matchId, ++pushes)
+    }
     return
   }
   if (entry.kind === 'log') {

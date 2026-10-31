@@ -4091,6 +4091,18 @@ async function main() {
     const tbDone = await conclude(tb, tbWinner.id)
     check('then the umpire concludes it', tbDone.status === 200 && tbDone.body.match?.status === 'completed' && tbDone.body.match.winner === 'A', String(tbDone.status))
 
+    // A ruling still waiting on the winning rally holds Conclude back: it may remove that rally.
+    const wo = await startSplit()
+    const woWinner = rally(10, players[0].id)
+    await skLog(wo, [...freshWins(), woWinner])
+    const woRuling = uuid()
+    await asMain(`/scorekeeping/${wo}/rulings`, { method: 'POST', body: { id: woRuling, targetEventId: woWinner.id, kind: 'overturned' } })
+    const woBlocked = await conclude(wo, woWinner.id)
+    check('conclude while an Overturned waits -> 409', woBlocked.status === 409, String(woBlocked.status))
+    await asMain(`/matches/${wo}/claim`, { method: 'POST', body: { deviceId: mainDevice, force: true } })
+    const woAfter = await conclude(wo, woWinner.id)
+    check('after taking back refuses that ruling, conclude -> 200', woAfter.status === 200 && woAfter.body.match?.status === 'completed', String(woAfter.status))
+
     const tb2 = await startSplit()
     const tb2Winner = rally(10, players[0].id)
     const tb2Wins = freshWins()

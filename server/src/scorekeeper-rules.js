@@ -78,10 +78,11 @@ export function newestRuling(queued, rulings) {
 /**
  * Whether the scorekeeper's phone must give the tapping up: it was scoring
  * and no longer is, or its upload was refused (only a moved lease does that).
- * Never for a finished match: finishing ends the split, nothing was taken back.
+ * A match finished locally still yields on a refused upload; yieldMatch
+ * tells a finish from a take-back, so no false notice shows.
  */
 export function keeperMustYield({ isKeeper, wasScoring, blockedLog, completed }) {
-  return !completed && (wasScoring || (isKeeper && blockedLog))
+  return (!completed && wasScoring) || (isKeeper && blockedLog)
 }
 
 /**

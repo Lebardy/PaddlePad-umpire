@@ -41,7 +41,7 @@ function MatchOverview({ match, name, onTakeBack }) {
   const canRule = lastRally && !ruling && mineAll.length === 0 && rulingProblem(match.events, lastRally.id) === null && !match.concludeAsk
   const won = derived.completed
   // Never over a ruling still on its way: that ruling may remove the winning rally.
-  const canConclude = won && mineAll.length === 0 && !match.concludeAsk && ruling?.state !== 'waiting'
+  const canConclude = won && !match.voidedAt && mineAll.length === 0 && !match.concludeAsk && ruling?.state !== 'waiting'
 
   function rule(kind) {
     queueRuling(match.id, lastRally.id, kind)

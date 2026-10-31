@@ -256,7 +256,9 @@ export function createMatch({
 
 // Recomputes derived score/completion after mutating a match's event
 // log, and freezes endedAt/status/winner the moment the game is won so
-// exported match_duration_mins stays fixed once play stops.
+// exported match_duration_mins stays fixed once play stops. While a
+// scorekeeper splits the match the win only holds it open; the main
+// umpire's Conclude does the freezing.
 function finalizeAfterEventChange(match) {
   const derived = deriveMatchState(match)
 
