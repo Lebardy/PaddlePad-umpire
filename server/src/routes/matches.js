@@ -525,7 +525,7 @@ router.put('/:id/log', async (req, res) => {
 
   const derived = deriveRow(row, events)
   // Held for the main umpire, who may still rule on the winning rally.
-  const held = waitsForUmpire(derived, row.scorekeeper_state)
+  const held = waitsForUmpire(derived, row.scorekeeper_state) && !endedEarly
 
   // A match ends either by being won on court (derivable) or by being
   // stopped early (NOT derivable -- ending early appends no event). The

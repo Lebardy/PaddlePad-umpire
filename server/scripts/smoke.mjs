@@ -4100,6 +4100,15 @@ async function main() {
     check('or undoes the winning rally and plays on', mainUndo.status === 200 && mainUndo.body.match?.status === 'in_progress', String(mainUndo.status))
     const mainWins = await asMain(`/matches/${tb2}/log`, { method: 'PUT', body: { deviceId: mainDevice, events: [...tb2Wins, tb2Winner] } })
     check('with no split left, the winning tap finishes as usual', mainWins.body.match?.status === 'completed', String(mainWins.body.match?.status))
+
+    // Ending early is unchanged: on a won log it still finishes with the winner.
+    const ee = await startSplit()
+    const eeEvents = [...freshWins(), rally(10, players[0].id)].map((e, seq) => ({ ...e, seq }))
+    await skLog(ee, eeEvents)
+    const eeEnded = await asSk(`/matches/${ee}/log`, { method: 'PUT', body: { deviceId: skDevice, endedEarly: true, events: eeEvents } })
+    check('ending a won match early still finishes it with the winner',
+      eeEnded.status === 200 && eeEnded.body.match?.status === 'completed' && eeEnded.body.match.winner === 'A',
+      JSON.stringify({ s: eeEnded.status, st: eeEnded.body.match?.status, w: eeEnded.body.match?.winner }))
   }
 
   section('admin site — overview')
