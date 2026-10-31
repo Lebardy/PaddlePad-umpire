@@ -46,6 +46,8 @@ export function describeRefused(entry, find) {
       return 'Scorekeeper request'
     case 'ruling':
       return 'Ruling'
+    case 'conclude':
+      return 'Concluding a match'
     case 'matchDelete':
       return 'Deleting a match'
     default:

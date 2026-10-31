@@ -47,6 +47,7 @@ const [r1, r2, r3] = [ev(1), ev(2), ev(3)]
 let server = null // what GET /matches/:id answers
 let offline = false
 let askStatus = 200
+let concludeStatus = 200
 const logPuts = []
 globalThis.fetch = async (url, init = {}) => {
   const path = new URL(String(url), 'http://x').pathname.replace(/^\/api/, '')
@@ -60,6 +61,9 @@ globalThis.fetch = async (url, init = {}) => {
     return askStatus === 200
       ? json({ scorekeeper: { id: PAOLO, name: 'Paolo Reyes', state: 'asked' } })
       : json({ error: 'Take scoring back first' }, askStatus)
+  }
+  if (method === 'POST' && path === `/matches/${MID}/conclude`) {
+    return concludeStatus === 200 ? json({ match: server }) : json({ error: 'The score changed: check the last rally.' }, concludeStatus)
   }
   return json({})
 }
@@ -135,6 +139,54 @@ check('hold: won + scoring waits', rules.waitsForUmpire?.({ completed: true }, '
 check('hold: won, no split finishes', rules.waitsForUmpire?.({ completed: true }, null), false)
 check('hold: won, split only asked finishes', rules.waitsForUmpire?.({ completed: true }, 'asked'), false)
 check('hold: not won, nothing to wait for', rules.waitsForUmpire?.({ completed: false }, 'scoring'), false)
+
+// --- Match point on the phones ---
+const tenWins = Array.from({ length: 10 }, (_, i) => ev(i + 1))
+const tap = { actingPlayerId: 'a1', outcome: 'winner', zone: 'open' }
+const scoring = { id: PAOLO, name: 'Paolo Reyes', state: 'scoring' }
+
+outbox.clearOutbox()
+setLocal({ ...base, events: tenWins, scorekeeper: scoring })
+storage.addRallyEvent(MID, tap)
+check('the scorekeeper\'s winning tap holds', [storage.getMatch(MID).status, storage.getMatch(MID).winner, storage.getMatch(MID).events.length], ['in_progress', null, 11])
+storage.undoLastEvent(MID)
+check('Undo reopens play', [storage.getMatch(MID).status, storage.getMatch(MID).events.length], ['in_progress', 10])
+
+outbox.clearOutbox()
+setLocal({ ...base, events: tenWins })
+storage.addRallyEvent(MID, tap)
+check('with no split the winning tap finishes, as today', [storage.getMatch(MID).status, storage.getMatch(MID).winner], ['completed', 'A'])
+
+const wonEvents = [...tenWins, ev(11)]
+outbox.clearOutbox()
+setLocal({ ...base, events: wonEvents, scorekeeper: scoring })
+storage.askConclude(MID, 'e11')
+check('asking to conclude is queued on the match', storage.getMatch(MID).concludeAsk, { targetEventId: 'e11' })
+offline = true
+await sync.drain()
+offline = false
+check('offline it stays queued', [outbox.pending().length, outbox.deadLetter().length, storage.getMatch(MID).concludeAsk?.targetEventId], [1, 0, 'e11'])
+server = { ...serverCopy(wonEvents, null), status: 'completed', winner: 'A' }
+outbox.release(outbox.outboxKey('conclude', MID)) // clears the offline back-off
+await sync.drain()
+check('sent: the match is finished here too, nothing queued', [storage.getMatch(MID).status, storage.getMatch(MID).concludeAsk, outbox.pending().length, outbox.deadLetter().length], ['completed', undefined, 0, 0])
+
+outbox.clearOutbox()
+setLocal({ ...base, events: wonEvents, scorekeeper: scoring })
+storage.askConclude(MID, 'e11')
+concludeStatus = 409
+server = serverCopy(tenWins, 'scoring')
+await sync.drain()
+concludeStatus = 200
+check('refused: shows what the server has, nothing dead', [storage.getMatch(MID).status, storage.getMatch(MID).events.length, storage.getMatch(MID).concludeAsk, outbox.deadLetter().length], ['in_progress', 10, undefined, 0])
+
+outbox.clearOutbox()
+setLocal({ ...base, events: wonEvents, scorekeeper: scoring })
+server = { ...serverCopy(wonEvents, null), status: 'completed', winner: 'A' }
+check('a concluded match is not a take-back', (await sync.yieldMatch(MID)).finished, true)
+setLocal({ ...base, events: wonEvents, scorekeeper: scoring })
+server = serverCopy(wonEvents, null)
+check('a real take-back still is', (await sync.yieldMatch(MID)).finished, false)
 
 console.log(`\n${pass} ok / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)

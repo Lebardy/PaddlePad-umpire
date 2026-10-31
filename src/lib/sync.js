@@ -174,7 +174,7 @@ function payloadFor(entry) {
   if (entry.kind === 'match' || entry.kind === 'log' || entry.kind === 'matchVoid') {
     return getMatch(entry.entityId)
   }
-  if (entry.kind === 'scorekeeper') return getMatch(entry.entityId)
+  if (entry.kind === 'scorekeeper' || entry.kind === 'conclude') return getMatch(entry.entityId)
   if (entry.kind === 'ruling') return getQueuedRulings().find((r) => r.id === entry.entityId) ?? null
   // Deletes have no local record left to read -- the tombstone IS the
   // payload. Without this they would look like a vanished entity and be
@@ -227,6 +227,19 @@ async function push(entry, payload) {
     if (match && (match.scorekeeperAsk?.umpireId ?? null) === askedId) {
       saveMatch({ ...match, scorekeeper, scorekeeperAsk: undefined })
     }
+    return
+  }
+  if (entry.kind === 'conclude') {
+    let remote
+    try {
+      remote = await api.concludeMatch(payload.id, { targetEventId: payload.concludeAsk?.targetEventId, deviceId: outbox.getDeviceId() })
+    } catch (error) {
+      const refused = error.status >= 400 && error.status < 500 && error.status !== 401 && error.status !== 429
+      if (!refused) throw error
+      // The score moved first (the scorekeeper undid it). Show what is true.
+      remote = await api.fetchMatch(payload.id)
+    }
+    replaceServerState({ matches: [remote], force: true })
     return
   }
   if (entry.kind === 'ruling') {
@@ -405,7 +418,8 @@ export function compareLogs(local, remote) {
 /**
  * The match's own umpire took scoring back from this scorekeeper's phone.
  * Adopts the server's log and reports how many of this phone's taps never
- * reached it (they are not kept: the umpire is the one responsible now).
+ * reached it (they are not kept: the umpire is the one responsible now),
+ * and whether the umpire in fact concluded the match, which is no take-back.
  */
 export async function yieldMatch(matchId) {
   const remote = await api.fetchMatch(matchId)
@@ -417,7 +431,7 @@ export async function yieldMatch(matchId) {
   outbox.resolve(outbox.outboxKey('log', matchId))
   outbox.discardDead(outbox.outboxKey('log', matchId))
   notify()
-  return { unsaved }
+  return { unsaved, finished: remote.status === 'completed' }
 }
 
 /**

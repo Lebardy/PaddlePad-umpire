@@ -2,6 +2,7 @@ import { DEFAULT_POINT_TARGET, deriveMatchState } from './pickleball'
 import { waitingThirdShot, withThirdShotTap } from './thirdShot'
 import { read, write } from './localstore'
 import { sessionName } from './sessionName'
+import { waitsForUmpire } from '../../server/src/scorekeeper-rules.js'
 import {
   clearOutbox,
   deadLetter,
@@ -260,7 +261,7 @@ function finalizeAfterEventChange(match) {
   const derived = deriveMatchState(match)
 
   let next = match
-  if (derived.completed && match.status !== 'completed') {
+  if (derived.completed && match.status !== 'completed' && !waitsForUmpire(derived, match.scorekeeper?.state)) {
     next = {
       ...match,
       status: 'completed',
@@ -412,6 +413,14 @@ export function askScorekeeper(matchId, umpire) {
   }
   markDirty('scorekeeper', matchId)
   return saveMatch(next)
+}
+
+/** Queues the main umpire's word that a won match is over; it names the last event it saw. */
+export function askConclude(matchId, targetEventId) {
+  const match = getMatch(matchId)
+  if (!match) return match
+  markDirty('conclude', matchId)
+  return saveMatch({ ...match, concludeAsk: { targetEventId } })
 }
 
 /** Rulings this phone made that the server has not taken yet ("Waiting to send"). */
@@ -582,7 +591,7 @@ export function replaceServerState({
     const dirty = force
       ? new Set()
       : new Set(
-          pendingEntities('match').concat(pendingEntities('log'), pendingEntities('matchVoid'), pendingEntities('scorekeeper'), [...keep]),
+          pendingEntities('match').concat(pendingEntities('log'), pendingEntities('matchVoid'), pendingEntities('scorekeeper'), pendingEntities('conclude'), [...keep]),
         )
     const local = getMatches()
     const fromServer = matches

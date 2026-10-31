@@ -469,6 +469,11 @@ export function refuseRuling(matchId, rulingId) {
   return apiFetch(`/scorekeeping/${matchId}/rulings/${rulingId}/refuse`, { method: 'POST' })
 }
 
+/** A 409 carries the refusal sentence as the error message. */
+export function concludeMatch(matchId, { targetEventId, deviceId }) {
+  return apiFetch(`/matches/${matchId}/conclude`, { method: 'POST', body: { targetEventId, deviceId } }).then((d) => d.match)
+}
+
 /** Cancels an unfinished match. Idempotent server-side. */
 export function deleteMatchOnServer(matchId, { deviceId }) {
   return apiFetch(`/matches/${matchId}`, { method: 'DELETE', body: { deviceId } })
