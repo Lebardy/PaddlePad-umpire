@@ -6,6 +6,9 @@ import {
   getSession,
   applyCourtNotice,
   getMatch,
+  getQueuedRulings,
+  dropQueuedRuling,
+  saveMatch,
   setScoringDevice,
   replaceServerState,
   clearTombstone,
@@ -171,6 +174,8 @@ function payloadFor(entry) {
   if (entry.kind === 'match' || entry.kind === 'log' || entry.kind === 'matchVoid') {
     return getMatch(entry.entityId)
   }
+  if (entry.kind === 'scorekeeper' || entry.kind === 'conclude') return getMatch(entry.entityId)
+  if (entry.kind === 'ruling') return getQueuedRulings().find((r) => r.id === entry.entityId) ?? null
   // Deletes have no local record left to read -- the tombstone IS the
   // payload. Without this they would look like a vanished entity and be
   // dropped from the queue, leaving the row alive on the server.
@@ -196,6 +201,85 @@ async function push(entry, payload) {
   }
   if (entry.kind === 'match') {
     await api.pushMatch(payload)
+    return
+  }
+  if (entry.kind === 'scorekeeper') {
+    const askedId = payload.scorekeeperAsk?.umpireId ?? null
+    let scorekeeper
+    try {
+      scorekeeper = await api.setScorekeeper(payload.id, { umpireId: askedId, deviceId: outbox.getDeviceId() })
+    } catch (error) {
+      const refused = error.status >= 400 && error.status < 500 && error.status !== 401 && error.status !== 429
+      if (!refused) throw error
+      // The server's copy moved first (the scorekeeper started, the match
+      // ended). Show what is true instead of dead-lettering, which would
+      // freeze every pull of this match. A failed re-read retries the push.
+      const remote = await api.fetchMatch(payload.id)
+      const match = getMatch(payload.id)
+      if (match && (match.scorekeeperAsk?.umpireId ?? null) === askedId) {
+        replaceServerState({ matches: [remote], force: true })
+      }
+      return
+    }
+    // Only if the umpire has not picked someone else meanwhile: that
+    // newer ask is still queued and the next push sends it.
+    const match = getMatch(payload.id)
+    if (match && (match.scorekeeperAsk?.umpireId ?? null) === askedId) {
+      saveMatch({ ...match, scorekeeper, scorekeeperAsk: undefined })
+    }
+    return
+  }
+  if (entry.kind === 'conclude') {
+    // Replaced since it was queued (scoring taken back): the ask went with it.
+    if (!payload.concludeAsk) return
+    let remote
+    try {
+      remote = await api.concludeMatch(payload.id, { targetEventId: payload.concludeAsk?.targetEventId, deviceId: outbox.getDeviceId() })
+    } catch (error) {
+      const refused = error.status >= 400 && error.status < 500 && error.status !== 401 && error.status !== 429
+      if (!refused) throw error
+      // The score moved first (the scorekeeper undid it). Show what is true.
+      try {
+        remote = await api.fetchMatch(payload.id)
+      } catch (gone) {
+        if (gone.status !== 404) throw gone
+        // Cancelled on the server: nothing is left to conclude.
+        const match = getMatch(payload.id)
+        if (match) saveMatch({ ...match, concludeAsk: undefined })
+        return
+      }
+    }
+    // Never over work this phone still owes: the log goes up next and the server decides.
+    if (outbox.pending().some((e) => e.kind === 'log' && e.entityId === payload.id)) {
+      const match = getMatch(payload.id)
+      if (match) saveMatch({ ...match, concludeAsk: undefined })
+      return
+    }
+    replaceServerState({ matches: [remote], force: true })
+    return
+  }
+  if (entry.kind === 'ruling') {
+    try {
+      await api.sendRuling(payload.matchId, payload)
+    } catch (error) {
+      // Refused (too late, or the split ended): the server kept it as
+      // refused and the next read of the match shows why. Not a failure.
+      // Any other refusal for good (match gone) is retired by the drain,
+      // so the ruling must not stay behind as "Waiting to send".
+      const retry = !(error.status >= 400 && error.status < 500) || error.status === 401 || error.status === 429
+      if (retry) throw error
+      dropQueuedRuling(payload.id)
+      if (error.status !== 409) throw error
+      return
+    }
+    dropQueuedRuling(payload.id)
+    // Show it waiting at once, so Conclude and the rule buttons do not flash back until the next read.
+    const match = getMatch(payload.matchId)
+    if (match) {
+      const sent = { id: payload.id, targetEventId: payload.targetEventId, kind: payload.kind, state: 'waiting', refused: null }
+      saveMatch({ ...match, rulings: [sent, ...(match.rulings ?? [])] })
+      lastPushed.set(payload.matchId, ++pushes)
+    }
     return
   }
   if (entry.kind === 'log') {
@@ -355,6 +439,25 @@ export function compareLogs(local, remote) {
 }
 
 /**
+ * The match's own umpire took scoring back from this scorekeeper's phone.
+ * Adopts the server's log and reports how many of this phone's taps never
+ * reached it (they are not kept: the umpire is the one responsible now),
+ * and whether the umpire in fact concluded the match, which is no take-back.
+ */
+export async function yieldMatch(matchId) {
+  const remote = await api.fetchMatch(matchId)
+  setReachable(true)
+  const localEvents = getMatch(matchId)?.events ?? []
+  const known = new Set((remote.events ?? []).map((e) => e.id))
+  const unsaved = localEvents.filter((e) => e.type !== 'ruling' && !known.has(e.id)).length
+  replaceServerState({ matches: [remote], force: true })
+  outbox.resolve(outbox.outboxKey('log', matchId))
+  outbox.discardDead(outbox.outboxKey('log', matchId))
+  notify()
+  return { unsaved, finished: remote.status === 'completed' }
+}
+
+/**
  * Takes over scoring a match.
  *
  * The first version of this simply forced the local log up, on the
@@ -397,8 +500,9 @@ export function compareLogs(local, remote) {
  * @param {object} [options]
  * @param {'server'|'mine'} [options.resolution] choice for a diverged log
  * @param {string|null} [options.remoteLast] last server event id the choice was made against
+ * @param {boolean} [options.adopt] always carry on from the server's log (taking scoring back from a scorekeeper)
  */
-export async function takeOverMatch(matchId, { resolution, remoteLast } = {}) {
+export async function takeOverMatch(matchId, { resolution, remoteLast, adopt } = {}) {
   const deviceId = outbox.getDeviceId()
 
   const before = getMatch(matchId)
@@ -445,6 +549,10 @@ export async function takeOverMatch(matchId, { resolution, remoteLast } = {}) {
     return { status: 'pushed', events: localEvents.length }
   }
 
+  // The scorekeeper's phone is the only writer during a split, so a copy
+  // here that looks ahead is only stale (they undid a rally since the last poll).
+  if (adopt) return adoptServer()
+
   if (relation === 'diverged') {
     if (choice === 'server') return adoptServer()
     if (choice === 'mine') return pushMine()
@@ -473,6 +581,9 @@ export function discardDead(key) {
   if (kind === 'matchDelete') {
     clearTombstone('matches', id)
     pullMatch(id).catch(() => {})
+  } else if (kind === 'sessionVoid') {
+    // No longer owed, so the pull puts back the server's un-voided session.
+    pullCore().catch(() => {})
   } else if (kind === 'sessionDelete') {
     const buried = getTombstones().sessionMatches?.[id] ?? []
     clearTombstone('sessions', id)

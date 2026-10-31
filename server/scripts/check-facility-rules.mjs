@@ -255,15 +255,15 @@ section('every umpire route stays scoped to its facility')
 
   check('sessions.js has the routes this count expects', handlerCount(sessionsRoute), 7)
   check('sessions.js calls umpireScope at least once per route (writes plus read-backs)',
-    scopeCallCount(sessionsRoute), 9)
+    scopeCallCount(sessionsRoute), 10)
   check('sessions.js actually uses every umpireScope result it computes',
-    scopeUseCount(sessionsRoute), 9)
+    scopeUseCount(sessionsRoute), 10)
 
-  check('matches.js has the routes this count expects', handlerCount(matchesRoute), 7)
+  check('matches.js has the routes this count expects', handlerCount(matchesRoute), 8)
   check('matches.js calls umpireScope at least once per route (writes plus read-backs)',
-    scopeCallCount(matchesRoute), 12)
+    scopeCallCount(matchesRoute), 13)
   check('matches.js actually uses every umpireScope result it computes',
-    scopeUseCount(matchesRoute), 12)
+    scopeUseCount(matchesRoute), 13)
 }
 
 section('logo addresses')

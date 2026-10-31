@@ -6,6 +6,7 @@ import {
   addPlayerToSession,
   removePlayerFromSession,
   deleteSession,
+  waitsForConclude,
   voidSession,
   unvoidSession,
   setSessionEnded,
@@ -52,8 +53,8 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
   }
 
   // Cancels a session created by mistake. Unfinished matches inside go
-  // with it; a finished one blocks the delete, because that is real
-  // recorded play and should be voided individually instead.
+  // with it; a finished or won-and-held one blocks the delete, because that
+  // is real recorded play and should be voided individually instead.
   function handleDeleteSession() {
     if (!confirm(`Cancel "${session.name}"? Any unfinished matches go with it.`)) return
     if (deleteSession(sessionId)) onBack()
@@ -225,6 +226,8 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
               Restore this session
             </button>
           </>
+        ) : matches.some(waitsForConclude) ? (
+          <p className="placeholder-note"><Icon name="flag" size={18} />A won match is waiting to be concluded.</p>
         ) : finishedCount > 0 ? (
           <>
             <p className="placeholder-note">

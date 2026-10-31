@@ -42,6 +42,12 @@ export function describeRefused(entry, find) {
       return `The rallies of ${match()}`
     case 'matchVoid':
       return `${find.match(entry.entityId)?.voidedAt ? 'Voiding' : 'Restoring'} ${match()}`
+    case 'scorekeeper':
+      return 'Scorekeeper request'
+    case 'ruling':
+      return 'Ruling'
+    case 'conclude':
+      return 'Concluding a match'
     case 'matchDelete':
       return 'Deleting a match'
     default:

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Icon from '../components/Icon'
 import {
   addRallyEvent,
@@ -15,7 +15,14 @@ import NotFound from './NotFound'
 import TakeoverNotice from '../components/TakeoverNotice'
 import MatchVideo from '../components/MatchVideo'
 import * as sync from '../lib/sync'
-import { getDeviceId } from '../lib/outbox'
+import { getDeviceId, pending as queued } from '../lib/outbox'
+import { useSyncStatus } from '../lib/useSyncStatus'
+import { useRulingsPoller } from '../lib/scorekeeping'
+import { keeperMustYield, reentryMismatch, waitingReentry } from '../../server/src/scorekeeper-rules.js'
+import { getStoredUmpire } from '../lib/api'
+import { askConclude, askScorekeeper, getMatch } from '../lib/storage'
+import MatchOverview from './MatchOverview'
+import ScorekeeperPicker from '../components/ScorekeeperPicker'
 import { LEASE_MINUTES } from '../../server/src/scoring-lease.js'
 import { deriveMatchState, currentServerPlayerId, courtSides } from '../lib/pickleball'
 import { isSameThirdShot, waitingThirdShot } from '../lib/thirdShot'
@@ -32,6 +39,8 @@ import {
 // enough to be negligible, fast enough that a watcher isn't looking at
 // a score several rallies out of date.
 const WATCH_POLL_MS = 8_000
+// The match umpire follows a scorekeeper closely: the overview is their only view.
+const SPLIT_POLL_MS = 2_000
 
 // Remembered so the explanation is open for someone's first night and
 // out of the way by their tenth -- the same bargain as the guide nudge
@@ -156,6 +165,8 @@ function rallyLabel(event) {
   return rallyEnding(event.detail)?.label ?? legacyRallyLabel(event.outcome, event.zone)
 }
 
+const RULING_WORDS = { stands: 'call stands', overturned: 'overturned', replay: 'replay', wrongWinner: 'winner corrected' }
+
 // Turns one logged event into the plain-English line shown in the
 // history panel, so an umpire can glance back and confirm what was
 // actually recorded without needing to remember button labels.
@@ -165,6 +176,9 @@ function describeEvent(event, name) {
   }
   if (event.type === 'serverCorrection') {
     return `Serve corrected — ${name(event.playerId)}`
+  }
+  if (event.type === 'ruling') {
+    return `Umpire: ${RULING_WORDS[event.kind] ?? 'ruling'}`
   }
   const shotLabel =
     event.shotType === 'drop' ? (event.success ? 'Drop ✓' : 'Drop ✗') : 'Drive'
@@ -187,6 +201,7 @@ function describeEvent(event, name) {
 function LiveMatch({ matchId, onBack }) {
   const match = useMatch(matchId)
   const [showHistory, setShowHistory] = useState(false)
+  const [picking, setPicking] = useState(false)
   // The ending picked by the first tap, waiting for the player.
   const [pending, setPending] = useState(null)
   // A half-finished pick must not survive into a different match, or
@@ -220,41 +235,98 @@ function LiveMatch({ matchId, onBack }) {
   const isScorer = !scoringDevice || scoringDevice === getDeviceId()
   // A finished or voided match no longer changes, so watching it is pointless.
   const watching = !isScorer && match?.status === 'in_progress' && !match.voidedAt
+  // A match made on this phone has no recordedBy until the server's copy is adopted.
+  const me = getStoredUmpire()?.id
+  const split = match?.scorekeeper?.state ? match.scorekeeper : null
+  const iRunIt = Boolean(split) && (match.recordedBy ?? me) === me
+  // The other umpire's match, which this phone only taps for. Still so once
+  // scoring is taken back: the name stays on the match and only the state clears.
+  const isKeeper = match?.scorekeeper?.id === me && Boolean(match?.recordedBy) && match.recordedBy !== me
+  const iScore = isKeeper && split?.state === 'scoring'
+  const polling = watching || iRunIt
+  const pollMs = iRunIt ? SPLIT_POLL_MS : WATCH_POLL_MS
+
+  const sideA = match?.teamA
+  const sideB = match?.teamB
+  const teamWords = useCallback(
+    (team) => (team === 'A' ? sideA : sideB)?.map((id) => knownPlayers.find((p) => p.id === id)?.name ?? '?').join(' / '),
+    [sideA, sideB, knownPlayers],
+  )
+  const [takenBack, setTakenBack] = useState(null)
+  const [gone, setGone] = useState(false)
+
+  // Scoring is taken back when the lease moves, the split ends, or this
+  // phone's next upload is refused. Only a phone that WAS scoring as the
+  // scorekeeper reacts, and only once; a refused upload says the same
+  // even on a screen opened afterwards.
+  useSyncStatus()
+  const blockedLog = queued().some((e) => e.kind === 'log' && e.entityId === matchId && e.state === 'blocked')
+  const wasScoring = useRef(false)
+  const yielding = useRef(false)
+  const yieldNow = useCallback(() => {
+    if (yielding.current) return
+    yielding.current = true
+    sync.yieldMatch(matchId).then(
+      (result) => {
+        wasScoring.current = false
+        // The umpire concluding it ends the split too; that is no take-back.
+        if (!result.finished) setTakenBack(result)
+      },
+      () => {}, // Offline: the next render tries again.
+    ).finally(() => { yielding.current = false })
+  }, [matchId])
+  const [banner, clearBanner] = useRulingsPoller(matchId, iScore && isScorer && match?.status !== 'completed', teamWords, yieldNow, setGone)
+  useEffect(() => {
+    if (iScore && isScorer && !blockedLog) {
+      wasScoring.current = true
+      return
+    }
+    // Finishing the match ends the split on the server; that is not a take-back.
+    if (match?.status === 'completed') wasScoring.current = false
+    if (keeperMustYield({ isKeeper, wasScoring: wasScoring.current, blockedLog, completed: match?.status === 'completed' })) yieldNow()
+  })
 
   useEffect(() => {
     const controller = new AbortController()
     let timer = null
 
     const refresh = () => {
-      sync.pullMatch(matchId, { signal: controller.signal }).catch(() => {})
+      // A 404 is the main umpire cancelling the match under the overview.
+      sync.pullMatch(matchId, { signal: controller.signal }).catch((error) => error.status === 404 && setGone(true))
     }
     refresh()
 
-    if (watching) {
+    if (polling) {
       const tick = () => {
         if (document.visibilityState === 'visible') refresh()
-        timer = setTimeout(tick, WATCH_POLL_MS)
+        timer = setTimeout(tick, pollMs)
       }
-      timer = setTimeout(tick, WATCH_POLL_MS)
+      timer = setTimeout(tick, pollMs)
     }
 
     return () => {
       controller.abort()
       if (timer) clearTimeout(timer)
     }
-  }, [matchId, watching])
+  }, [matchId, polling, pollMs])
 
   function name(id) {
     return knownPlayers.find((p) => p.id === id)?.name ?? '?'
   }
 
   function logRally(actingPlayerId, ending) {
+    const ruledFor = iScore ? waitingReentry(match.events, match.teamA) : null
     addRallyEvent(matchId, {
       actingPlayerId,
       outcome: ending.outcome,
       zone: ending.zone,
       detail: ending.key,
     })
+    // The umpire ruled for one team; a tap that gives the point to the other is a mis-tap.
+    if (reentryMismatch(ruledFor, match.teamA, getMatch(matchId).events.at(-1))) {
+      undoLastEvent(matchId)
+      alert(`That gives the point to ${teamWords(ruledFor === 'A' ? 'B' : 'A')}. The umpire ruled ${teamWords(ruledFor)}.`)
+    }
     setPending(null)
   }
 
@@ -332,7 +404,70 @@ function LiveMatch({ matchId, onBack }) {
   // match.teamA / match.events were dereferenced unguarded below.
   if (!match) return <NotFound what="match" onBack={onBack} />
 
+  // While a scorekeeper holds or is asked for the taps, no scoring control is
+  // reachable here: the ask is sent after this phone's earlier taps, so none may follow it.
+  // A new split on this match must not show an old notice.
+  if (takenBack && !(iScore && isScorer)) {
+    return (
+      <div className="live-match">
+        <button className="back-link" onClick={onBack}>&larr; Back</button>
+        <div className="scorekeeper-wait" role="status">
+          <div className="wait-card">
+            <Icon name="undo" size={32} />
+            <strong>{match.recordedByName?.split(' ')[0]} took scoring back</strong>
+            {takenBack.unsaved > 0 && <p>{takenBack.unsaved} {takenBack.unsaved === 1 ? 'tap' : 'taps'} not saved</p>}
+            <button onClick={onBack}><Icon name="check" size={20} />Done</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  if ((iRunIt || isKeeper) && gone) {
+    return (
+      <div className="live-match">
+        <div className="scorekeeper-wait" role="status">
+          <div className="wait-card">
+            <Icon name="x" size={32} />
+            <strong>Match cancelled</strong>
+            <button onClick={() => { deleteMatch(matchId, { gone: true }); onBack() }}><Icon name="check" size={20} />Done</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  if (iRunIt && split.state === 'scoring') {
+    return (
+      <div className="live-match">
+        <button className="back-link" onClick={onBack}>&larr; Back</button>
+        <MatchOverview match={match} name={name} onTakeBack={() => sync.takeOverMatch(matchId, { adopt: true }).catch((error) => alert(error.status ? error.message : 'Needs a connection'))} />
+      </div>
+    )
+  }
+  if (iRunIt) {
+    const score = deriveMatchState(match).score
+    return (
+      <div className="live-match">
+        <button className="back-link" onClick={onBack}>&larr; Back</button>
+        <div className="scorekeeper-wait" role="status">
+          <span className="big-score">{score.A}–{score.B}</span>
+          <div className="wait-card">
+            <Icon name={split.state === 'declined' ? 'x' : 'timer'} size={32} />
+            <strong>{split.state === 'declined' ? `${split.name} said not now` : match.scorekeeperAsk ? `Sending to ${split.name}` : `Waiting for ${split.name}`}</strong>
+            <div className="overview-actions">
+              {split.state === 'declined' && <button onClick={() => setPicking(true)}><Icon name="people" size={20} />Someone else</button>}
+              <button className="btn-quiet" onClick={() => { askScorekeeper(matchId, null); sync.flush() }}><Icon name="play" size={20} />Keep scoring</button>
+            </div>
+          </div>
+        </div>
+        {picking && <ScorekeeperPicker matchId={matchId} onClose={() => setPicking(false)} />}
+      </div>
+    )
+  }
+
   const derived = deriveMatchState(match)
+  // Won but still open: held for the main umpire, or just taken back by them.
+  const won = match.status === 'in_progress' && derived.completed
+  const iConclude = (match.recordedBy ?? me) === me
   const players = [...match.teamA, ...match.teamB]
   const serverId =
     match.status === 'in_progress' ? currentServerPlayerId(derived, match) : null
@@ -363,7 +498,17 @@ function LiveMatch({ matchId, onBack }) {
         &larr; Back
       </button>
 
-      <TakeoverNotice matchId={matchId} />
+      {!isKeeper && <TakeoverNotice matchId={matchId} />}
+      {iScore && (
+        <p className="scoring-for"><Icon name="people" size={16} />Scoring for {match.recordedByName?.split(' ')[0]}</p>
+      )}
+      {banner && (
+        <div className="ruling-banner" role="alert">
+          <Icon name="flag" size={20} />
+          <span><strong>{banner.who?.split(' ')[0]}:</strong> {banner.text}</span>
+          <button className="icon-solo" onClick={clearBanner} aria-label="Dismiss"><Icon name="x" size={18} /></button>
+        </div>
+      )}
 
       {/* Everything tapped during a rally, in one block: the score and
           undo, the 3rd shot and the ending buttons (or the "who" step in
@@ -375,12 +520,12 @@ function LiveMatch({ matchId, onBack }) {
         <div className="scoring-status">
           <div className="scoreboard" aria-label="Score">
             {teams.map(({ key, ids }) => {
-              const serving = match.status === 'in_progress' && derived.servingTeam === key
+              const serving = match.status === 'in_progress' && !won && derived.servingTeam === key
               return (
                 <div key={key} className={`score-side ${serving ? 'serving' : ''}`}>
                   <span className="score-names">
                     {ids.map((id) => (
-                      <span key={id} className={id === serverId ? 'is-server' : undefined}>
+                      <span key={id} className={id === serverId && !won ? 'is-server' : undefined}>
                         {name(id)}
                       </span>
                     ))}
@@ -392,7 +537,7 @@ function LiveMatch({ matchId, onBack }) {
             })}
           </div>
 
-          {match.status === 'in_progress' && (
+          {match.status === 'in_progress' && !won && (
             <p className="serve-note">
               <span>
                 <strong>{name(serverId)}</strong> serves
@@ -434,7 +579,7 @@ function LiveMatch({ matchId, onBack }) {
                     <button
                       className="undo"
                       onClick={handleUndo}
-                      disabled={!pending && match.events.length === 0}
+                      disabled={!pending && (match.events.length === 0 || match.events.at(-1)?.type === 'ruling' || Boolean(match.concludeAsk) || (won && !iConclude && !iScore))}
                     >
                       <Icon name="undo" size={18} />
                       {pending ? 'Back' : 'Undo'}
@@ -444,7 +589,7 @@ function LiveMatch({ matchId, onBack }) {
           )}
         </div>
 
-        {match.status === 'in_progress' && (
+        {match.status === 'in_progress' && !won && (
           <div className="scoring-rally">
             {pendingEnding ? (
               <section
@@ -559,29 +704,61 @@ function LiveMatch({ matchId, onBack }) {
             )}
           </div>
         )}
+        {won && (
+          <div className="scoring-rally">
+            <div className="wait-card" role="status">
+              <Icon name="flag" size={32} />
+              <strong>{teamWords(derived.winner)} won the match</strong>
+              {/* While the takeover notice is up, no Conclude: the notice decides whose taps count first, and a conclude now would replace them. */}
+              {!iConclude ? (
+                <p>Waiting for {match.recordedByName?.split(' ')[0]} to conclude</p>
+              ) : match.concludeAsk ? (
+                <p>Conclude · Waiting to send</p>
+              ) : blockedLog || match.voidedAt ? null : (
+                <button onClick={() => { askConclude(matchId, match.events.at(-1).id); sync.flush() }}>
+                  <Icon name="check" size={20} />Conclude match
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {match.status === 'in_progress' && (
+      {picking && <ScorekeeperPicker matchId={matchId} onClose={() => setPicking(false)} />}
+
+      {match.status === 'in_progress' && !won && (
         <>
           <RallyLegend />
 
           {/* Kept well below the scoring buttons, where no rally tap can
               land on them by accident. */}
           <section className="match-controls" aria-label="Match">
-            <button className="end-early" onClick={handleEndEarly}>
-              <Icon name="flag" size={18} />
-              End match early
-            </button>
-            <button className="cancel-match" onClick={handleCancel}>
-              <Icon name="x" size={18} />
-              Cancel match
-            </button>
+            {isScorer && (match.recordedBy ?? me) === me && (
+              <button onClick={() => setPicking(true)}>
+                <Icon name="people" size={18} />
+                Scorekeeper
+              </button>
+            )}
+            {/* The match stays the main umpire's to end or cancel. */}
+            {!isKeeper && (
+              <>
+                <button className="end-early" onClick={handleEndEarly}>
+                  <Icon name="flag" size={18} />
+                  End match early
+                </button>
+                <button className="cancel-match" onClick={handleCancel}>
+                  <Icon name="x" size={18} />
+                  Cancel match
+                </button>
+              </>
+            )}
           </section>
         </>
       )}
 
-      {/* Nothing shows when the match has no video, or video is off here. */}
-      {match.status === 'completed' && (
+      {/* Nothing shows when the match has no video, or video is off here.
+          Only the main umpire can read a match's video. */}
+      {match.status === 'completed' && iConclude && (
         <MatchVideo matchId={matchId} events={match.events} describe={(event) => describeEvent(event, name)} />
       )}
 
@@ -596,9 +773,11 @@ function LiveMatch({ matchId, onBack }) {
               <button onClick={() => unvoidMatch(matchId)}>Restore this match</button>
             </>
           ) : (
-            <button className="void-btn" onClick={handleVoid}>
-              Void this match (wrong pairing?)
-            </button>
+            !isKeeper && (
+              <button className="void-btn" onClick={handleVoid}>
+                Void this match (wrong pairing?)
+              </button>
+            )
           )}
         </div>
       )}

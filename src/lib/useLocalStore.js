@@ -4,6 +4,7 @@ import {
   getSessions,
   getSession,
   getCourtNotices,
+  getQueuedRulings,
   getKnownPlayers,
   getMatch,
   getMatches,
@@ -54,6 +55,11 @@ export function useSessions() {
 /** Court notices by session id; re-renders when one is added or dismissed. */
 export function useCourtNotices() {
   return useSyncExternalStore(subscribe, getCourtNotices)
+}
+
+/** Rulings made on this phone that the server has not taken yet. */
+export function useQueuedRulings() {
+  return useSyncExternalStore(subscribe, getQueuedRulings)
 }
 
 /** One session, or null while it isn't in the local cache. */

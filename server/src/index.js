@@ -10,6 +10,7 @@ import playerAdminRoutes from './routes/players.js'
 import sessionRoutes from './routes/sessions.js'
 import umpireOpenPlayRoutes from './routes/umpire-open-plays.js'
 import matchRoutes from './routes/matches.js'
+import scorekeepingRoutes from './routes/scorekeeping.js'
 // Player-facing: a claimed player reading their OWN history.
 import playerSelfRoutes from './routes/player.js'
 import playerVideoRoutes from './routes/player-video.js'
@@ -210,6 +211,7 @@ app.use('/players', playerAdminRoutes)
 app.use('/sessions', sessionRoutes)
 app.use('/open-plays', umpireOpenPlayRoutes)
 app.use('/matches', matchRoutes)
+app.use('/scorekeeping', scorekeepingRoutes)
 app.use('/video', videoRoutes)
 app.use('/player', playerVideoRoutes)
 app.use('/player', playerSelfRoutes)

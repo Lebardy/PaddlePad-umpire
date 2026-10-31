@@ -2,6 +2,7 @@ import { DEFAULT_POINT_TARGET, deriveMatchState } from './pickleball'
 import { waitingThirdShot, withThirdShotTap } from './thirdShot'
 import { read, write } from './localstore'
 import { sessionName } from './sessionName'
+import { waitsForUmpire } from '../../server/src/scorekeeper-rules.js'
 import {
   clearOutbox,
   deadLetter,
@@ -47,6 +48,7 @@ import {
 const SESSIONS_KEY = 'paddlepad.sessions'
 const PLAYERS_KEY = 'paddlepad.players'
 const MATCHES_KEY = 'paddlepad.matches'
+const RULINGS_KEY = 'paddlepad.rulingsOut'
 
 // Both delegate to localstore, which parses on write and hands back a
 // reference-stable value. That stability is what lets the React hooks
@@ -188,7 +190,7 @@ export function getMatch(matchId) {
 // so React concludes nothing changed and skips the re-render -- taps
 // land in storage but never appear until something else forces a
 // render. Every mutator below therefore spreads into a new object.
-function saveMatch(match) {
+export function saveMatch(match) {
   const updated = getMatches().map((m) => (m.id === match.id ? match : m))
   writeJSON(MATCHES_KEY, updated)
   return match
@@ -254,12 +256,14 @@ export function createMatch({
 
 // Recomputes derived score/completion after mutating a match's event
 // log, and freezes endedAt/status/winner the moment the game is won so
-// exported match_duration_mins stays fixed once play stops.
+// exported match_duration_mins stays fixed once play stops. While a
+// scorekeeper splits the match the win only holds it open; the main
+// umpire's Conclude does the freezing.
 function finalizeAfterEventChange(match) {
   const derived = deriveMatchState(match)
 
   let next = match
-  if (derived.completed && match.status !== 'completed') {
+  if (derived.completed && match.status !== 'completed' && !waitsForUmpire(derived, match.scorekeeper?.state)) {
     next = {
       ...match,
       status: 'completed',
@@ -388,10 +392,61 @@ export function tapThirdShot(matchId, tap) {
 export function undoLastEvent(matchId) {
   const match = getMatch(matchId)
   if (!match || match.events.length === 0) return match
+  // A ruling is the match umpire's call, not a tap to take back.
+  if (match.events.at(-1)?.type === 'ruling') return match
   return finalizeAfterEventChange({
     ...match,
     events: match.events.slice(0, -1),
   })
+}
+
+/**
+ * Names (or withdraws) the umpire who will tap this match. Queued like
+ * any change, AFTER the match's own taps, so the scorekeeper always
+ * starts from every rally this phone recorded.
+ */
+export function askScorekeeper(matchId, umpire) {
+  const match = getMatch(matchId)
+  if (!match) return match
+  const next = {
+    ...match,
+    scorekeeperAsk: { umpireId: umpire?.id ?? null },
+    scorekeeper: umpire ? { id: umpire.id, name: umpire.name, state: 'asked', seenAt: null } : null,
+  }
+  markDirty('scorekeeper', matchId)
+  return saveMatch(next)
+}
+
+/** Queues the main umpire's word that a won match is over; it names the last event it saw. */
+export function askConclude(matchId, targetEventId) {
+  const match = getMatch(matchId)
+  if (!match) return match
+  markDirty('conclude', matchId)
+  return saveMatch({ ...match, concludeAsk: { targetEventId } })
+}
+
+/** Rulings this phone made that the server has not taken yet ("Waiting to send"). */
+export function getQueuedRulings() {
+  return readJSON(RULINGS_KEY, [])
+}
+
+/** Queues a ruling on a rally; the id is made here so a resend is the same ruling. */
+export function queueRuling(matchId, targetEventId, kind) {
+  const id = crypto.randomUUID()
+  writeJSON(RULINGS_KEY, [...getQueuedRulings(), { id, matchId, targetEventId, kind }])
+  markDirty('ruling', id)
+  return id
+}
+
+export function dropQueuedRuling(id) {
+  writeJSON(RULINGS_KEY, getQueuedRulings().filter((r) => r.id !== id))
+}
+
+/** The scorekeeper's log after applying a ruling (see scorekeeper-rules.js). */
+export function setMatchEvents(matchId, events) {
+  const match = getMatch(matchId)
+  if (!match || match.status === 'completed') return match
+  return finalizeAfterEventChange({ ...match, events })
 }
 
 /**
@@ -538,7 +593,7 @@ export function replaceServerState({
     const dirty = force
       ? new Set()
       : new Set(
-          pendingEntities('match').concat(pendingEntities('log'), pendingEntities('matchVoid'), [...keep]),
+          pendingEntities('match').concat(pendingEntities('log'), pendingEntities('matchVoid'), pendingEntities('scorekeeper'), pendingEntities('conclude'), [...keep]),
         )
     const local = getMatches()
     const fromServer = matches
@@ -574,6 +629,13 @@ export function replaceServerState({
         // is the scorer, so a watching device never refreshes its screen.
         scoringDevice: m.scoringDevice ?? null,
         scoringClaimedAt: m.scoringClaimedAt ?? null,
+        // Whose match it is, and who taps it: the overview and both
+        // phones of a scorekeeper split pick their screen from these.
+        recordedBy: m.recordedBy ?? null,
+        recordedByName: m.recordedByName ?? null,
+        scorekeeper: m.scorekeeper ?? null,
+        // Like events, only the single-match fetch carries rulings.
+        rulings: m.rulings ? m.rulings.map((r) => ({ ...r })) : (local.find((l) => l.id === m.id)?.rulings ?? []),
         // A match list carries no events -- only the single-match fetch
         // does. Defaulting to [] here would wipe the local log of an
         // already-synced match every time the session screen refreshed.
@@ -691,6 +753,7 @@ export function clearLocalData() {
     localStorage.removeItem('paddlepad.todayCourts')
   } catch { /* private mode */ }
   writeJSON(COURT_NOTICES_KEY, {})
+  write(RULINGS_KEY, [])
 }
 
 // ============================================================
@@ -736,10 +799,12 @@ export function isTombstoned(kind, id) {
 /**
  * Cancels an unfinished match -- wrong pairing, wrong court, started by
  * mistake. Removed outright, because nothing in it counted yet.
+ * `gone` is this phone clearing a match the server no longer has: a won
+ * local copy must still go, or its session stays blocked for good.
  */
-export function deleteMatch(matchId) {
+export function deleteMatch(matchId, { gone = false } = {}) {
   const match = getMatch(matchId)
-  if (!match || match.status === 'completed') return false
+  if (!match || match.status === 'completed' || (!gone && waitsForConclude(match))) return false
 
   writeJSON(MATCHES_KEY, getMatches().filter((m) => m.id !== matchId))
   addTombstone('matches', matchId)
@@ -777,17 +842,22 @@ export function unvoidMatch(matchId) {
   return true
 }
 
+/** Won and held open for the umpire's Conclude: it can't be cancelled or voided until concluded. */
+export function waitsForConclude(m) {
+  return m.status === 'in_progress' && !m.voidedAt && deriveMatchState(m).completed
+}
+
 /**
  * Cancels a session and any unfinished matches in it.
  *
- * Refused when a match inside has finished: that is real recorded play,
- * and the server refuses too. Those should be voided individually if
- * they were wrong, which keeps the decision explicit per match rather
- * than sweeping several away at once.
+ * Refused when a match inside has finished or is won and waiting to be
+ * concluded: that is real recorded play, and the server refuses too.
+ * Those should be voided individually if they were wrong, which keeps the
+ * decision explicit per match rather than sweeping several away at once.
  */
 export function deleteSession(sessionId) {
   const matches = getMatches().filter((m) => m.sessionId === sessionId)
-  if (matches.some((m) => m.status === 'completed')) return false
+  if (matches.some((m) => m.status === 'completed' || waitsForConclude(m))) return false
 
   writeJSON(MATCHES_KEY, getMatches().filter((m) => m.sessionId !== sessionId))
   writeJSON(SESSIONS_KEY, getSessions().filter((s) => s.id !== sessionId))
@@ -821,7 +891,7 @@ export function deleteSession(sessionId) {
  */
 export function voidSession(sessionId, reason = '') {
   const session = getSession(sessionId)
-  if (!session) return false
+  if (!session || getMatches().some((m) => m.sessionId === sessionId && waitsForConclude(m))) return false
   const updated = getSessions().map((s) =>
     s.id === sessionId ? { ...s, voidedAt: Date.now(), voidReason: reason || null } : s,
   )

@@ -349,6 +349,8 @@ section {
 .field-hint { margin: -0.5rem 0 0.9rem; }
 .setup-note { margin: 0 0 0.6rem; }
 .placeholder-note { margin: 0 0 0.75rem; }
+.placeholder-note:has(> svg) { display: flex; align-items: center; gap: 0.5rem; }
+.placeholder-note > svg { flex: none; }
 
 /* ============ Fields and the primary button ============ */
 
@@ -1893,3 +1895,154 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
 .video-star-count { display: inline-flex; align-items: center; gap: 0.25rem; margin-left: 0.5rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-size: 0.85rem; font-variant-numeric: tabular-nums; vertical-align: middle; }
 .video-this { margin: 0.4rem 0.6rem 0.4rem 0; border-color: var(--primary); background: var(--primary); color: var(--primary-contrast); }
 .video-coming { display: flex; align-items: center; gap: 0.45rem; margin: 0 0 1.25rem; color: var(--text-muted); }
+
+/* Scorekeeper split: the match umpire's overview, wait screen and picker. */
+.match-overview,
+.scorekeeper-wait {
+  display: grid;
+  gap: 1rem;
+  max-width: 44rem;
+  margin: 0 auto;
+}
+.scorekeeper-wait { justify-items: center; text-align: center; padding-top: 2rem; }
+.wait-card {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 24rem;
+  padding: calc(1.5rem - 1.5px) 1.25rem;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+.wait-card > svg { color: var(--primary); }
+.wait-card > strong { font-family: var(--display); font-size: 1.6rem; line-height: 1.1; text-wrap: balance; overflow-wrap: anywhere; }
+.wait-card > p { margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--text-muted); }
+.wait-card > button { width: 100%; }
+.wait-card .overview-actions { justify-content: center; width: 100%; }
+.wait-card .overview-actions button { flex: 1 1 auto; }
+.big-score {
+  font-family: var(--display);
+  font-size: clamp(3.6rem, 16vw, 5.5rem);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 0.9;
+}
+.overview-score { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.overview-score .serving,
+.overview-scorer,
+.overview-wait,
+.scorekeeper-wait p {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.seen-late { color: var(--accent); }
+.overview-wait { color: var(--accent); background: var(--accent-soft); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem; }
+.last-rally {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1.1rem 1.25rem;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+.last-rally strong { font-family: var(--display); font-size: 1.9rem; line-height: 1.05; overflow-wrap: anywhere; }
+.last-rally.is-removed > strong,
+.last-rally.is-removed > span:not(.ruling-state) { text-decoration: line-through; color: var(--text-muted); }
+.last-rally > span { color: var(--text-muted); overflow-wrap: anywhere; }
+.ruling-state { font-size: 0.9rem; font-weight: 600; color: var(--text-muted); }
+.ruling-state.is-refused { color: var(--danger); background: var(--danger-soft); border-radius: var(--radius-sm); padding: 0.4rem 0.6rem; }
+.ruling-state.is-applied { display: inline-flex; align-items: center; gap: 0.35rem; }
+.overview-stray { display: flex; align-items: center; gap: 0.35rem; }
+.ruling-state.is-applied svg { color: var(--primary); }
+.overview-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.overview-actions button,
+.take-back,
+.wait-card > button,
+.scorekeeper-picker li button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--primary);
+  background: var(--primary);
+  color: var(--primary-contrast);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.overview-actions .btn-quiet,
+.take-back.btn-quiet {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+.overview-actions .icon-solo { min-width: 2.75rem; padding: 0; background: var(--bg-elevated); border-color: var(--border); color: var(--text-muted); }
+.overview-rallies {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.overview-rallies li { overflow-wrap: anywhere; }
+.take-back { justify-self: start; }
+.scorekeeper-picker {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 20;
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 1rem;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  box-shadow: var(--shadow-md);
+}
+.picker-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+.picker-head strong { display: flex; align-items: center; gap: 0.4rem; }
+.picker-head .icon-solo { min-width: 2.75rem; min-height: 2.75rem; background: none; border: none; color: var(--text-muted); cursor: pointer; }
+.scorekeeper-picker ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.scorekeeper-picker li button { width: 100%; justify-content: flex-start; background: var(--bg-elevated); border-color: var(--border); color: var(--text); }
+
+/* Scorekeeper split: the card on Home, and the scoring screen's strip and ruling banner. */
+.scorekeeper-card {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  padding: calc(1rem - 1px);
+  background: var(--bg-elevated);
+  border: 2px solid var(--primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+.scorekeeper-card > strong { display: flex; align-items: center; gap: 0.4rem; font-size: 1.15rem; }
+.scoring-for { display: flex; align-items: center; gap: 0.35rem; margin: 0 0 0.5rem; color: var(--text-muted); font-size: 0.9rem; font-weight: 600; }
+.ruling-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.75rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: var(--radius-sm);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.ruling-banner span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ruling-banner .icon-solo { flex: none; min-width: 2.75rem; min-height: 2.75rem; background: none; border: none; color: inherit; cursor: pointer; }

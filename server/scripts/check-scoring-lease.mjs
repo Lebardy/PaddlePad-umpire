@@ -19,7 +19,7 @@
 // Pure, so no database and no network.
 // ============================================================
 
-import { heldByAnotherDevice } from '../src/scoring-lease.js'
+import { heldByAnotherDevice, scorekeeperRevoked } from '../src/scoring-lease.js'
 
 let pass = 0
 let fail = 0
@@ -59,6 +59,17 @@ check('another device is turned away however long ago it ended',
   heldByAnotherDevice(finishedAnHourAgo, 'tablet-b', NOW), true)
 check('the device that finished it may still correct it',
   heldByAnotherDevice(finishedAnHourAgo, 'tablet-a', NOW), false)
+
+console.log('\nafter scoring was taken back from the scorekeeper')
+const revoked = (changes = {}, who = 'keeper', device = 'tablet-b') =>
+  scorekeeperRevoked(match({ scorekeeper_id: 'keeper', recorded_by: 'main', scorekeeper_state: null, ...changes }), who, device)
+check('the ex-scorekeeper is turned away, even after the lease lapsed',
+  revoked({ scoring_claimed_at: minutesAgo(60) }), true)
+check('not while he is scoring', revoked({ scorekeeper_state: 'scoring' }), false)
+check('not on the device that holds the match', revoked({ scoring_device: 'tablet-b' }), false)
+check('not the main umpire', revoked({}, 'main'), false)
+check('not an umpire who was never the scorekeeper', revoked({}, 'other'), false)
+check('a match with no scorekeeper', revoked({ scorekeeper_id: null }), false)
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

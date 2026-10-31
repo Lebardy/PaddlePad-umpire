@@ -11,7 +11,8 @@ import { isUuid, stackingFromColumns, stackingToColumns } from '../validate.js'
 import { rallyEndingProblem } from '../rally-endings.js'
 import { invalidateRallyRatings } from '../rally-rating-store.js'
 import { umpireScope } from '../facility-rules.js'
-import { LEASE_MINUTES, heldByAnotherDevice } from '../scoring-lease.js'
+import { LEASE_MINUTES, heldByAnotherDevice, scorekeeperRevoked } from '../scoring-lease.js'
+import { RULING_KINDS, MATCH_OVER, TAKEN_BACK, CONCLUDE_MOVED, CONCLUDE_FIRST, waitsForUmpire } from '../scorekeeper-rules.js'
 import { bucketConfig, deleteFile } from '../bucket.js'
 import { clockOffsetMs } from '../video-times.js'
 
@@ -45,10 +46,13 @@ const MATCH_SELECT = `
          m.voided_at, m.void_reason,
          m.started_at, m.ended_at,
          m.scoring_device, m.scoring_claimed_at,
+         m.recorded_by, m.scorekeeper_id, m.scorekeeper_state, m.scorekeeper_seen_at,
+         sk.name AS scorekeeper_name,
          u.name AS recorded_by_name,
          (SELECT count(*)::int FROM match_events e WHERE e.match_id = m.id) AS event_count
     FROM matches m
     LEFT JOIN umpires u ON u.id = m.recorded_by
+    LEFT JOIN umpires sk ON sk.id = m.scorekeeper_id
     -- A match belongs to the facility its session belongs to. An inner
     -- join, not a left one: a match whose session is somehow gone is
     -- out of everyone's reach rather than in everyone's.
@@ -56,7 +60,7 @@ const MATCH_SELECT = `
 `
 
 /** Reshapes a database row into the shape the app already speaks. */
-function toClientMatch(row, events = undefined) {
+function toClientMatch(row, events = undefined, rulings = undefined) {
   return {
     id: row.id,
     sessionId: row.session_id,
@@ -76,15 +80,38 @@ function toClientMatch(row, events = undefined) {
     startedAt: row.started_at,
     endedAt: row.ended_at,
     recordedByName: row.recorded_by_name,
+    recordedBy: row.recorded_by,
+    // Who taps for this match's umpire. state is null once the split has
+    // ended; the id stays as "scored by".
+    scorekeeper: row.scorekeeper_id
+      ? { id: row.scorekeeper_id, name: row.scorekeeper_name, state: row.scorekeeper_state, seenAt: row.scorekeeper_seen_at }
+      : null,
     scoringDevice: row.scoring_device,
     scoringClaimedAt: row.scoring_claimed_at,
     eventCount: row.event_count,
     ...(events === undefined ? {} : { events }),
+    ...(rulings === undefined ? {} : { rulings }),
   }
 }
 
+/** The latest rulings on a match, newest first: enough for the umpire's overview. */
+async function loadRulings(matchId) {
+  const { rows } = await query(
+    `SELECT id, target_event_id, kind, applied_at, refused
+       FROM match_rulings WHERE match_id = $1 ORDER BY ruled_at DESC LIMIT 5`,
+    [matchId],
+  )
+  return rows.map((r) => ({
+    id: r.id,
+    targetEventId: r.target_event_id,
+    kind: r.kind,
+    state: r.refused ? 'refused' : r.applied_at ? 'applied' : 'waiting',
+    refused: r.refused,
+  }))
+}
+
 /** Events in replay order, shaped as the scoring engine expects. */
-async function loadEvents(matchId, client = { query }) {
+export async function loadEvents(matchId, client = { query }) {
   const { rows } = await client.query(
     `SELECT id, seq, type, payload, at
        FROM match_events WHERE match_id = $1 ORDER BY seq`,
@@ -114,7 +141,7 @@ router.get('/:id', async (req, res) => {
   const scope = umpireScope(req.umpire.facilityId, params, 'sess.facility_id')
   const { rows } = await query(`${MATCH_SELECT} WHERE m.id = $1 AND ${scope}`, params)
   if (!rows[0]) return res.status(404).json({ error: 'No such match' })
-  res.json({ match: toClientMatch(rows[0], await loadEvents(req.params.id)) })
+  res.json({ match: toClientMatch(rows[0], await loadEvents(req.params.id), await loadRulings(req.params.id)) })
 })
 
 /**
@@ -303,11 +330,102 @@ router.post('/:id/claim', async (req, res) => {
     })
   }
 
+  // The match's own umpire claiming it back ends a split: the scorekeeper
+  // stays recorded, and rulings still waiting can no longer be applied.
+  const ended = await query(
+    `UPDATE matches SET scorekeeper_state = NULL
+      WHERE id = $1 AND recorded_by = $2 AND scorekeeper_state IS NOT NULL RETURNING id`,
+    [req.params.id, req.umpire.id],
+  )
+  if (ended.rowCount) {
+    await query(
+      `UPDATE match_rulings SET refused = $2 WHERE match_id = $1 AND applied_at IS NULL AND refused IS NULL`,
+      [req.params.id, TAKEN_BACK],
+    )
+  }
+
   const matchParams = [req.params.id]
   const matchScope = umpireScope(req.umpire.facilityId, matchParams, 'sess.facility_id')
   const match = await query(`${MATCH_SELECT} WHERE m.id = $1 AND ${matchScope}`, matchParams)
   res.json({ match: toClientMatch(match.rows[0]) })
 })
+
+/**
+ * The main umpire ends a won match. Changes only the match's status, never
+ * its log, so the scorekeeper's phone stays the only writer and a dead
+ * scorekeeper phone cannot keep a match open. Moving the device means a
+ * late upload from that phone is refused rather than reopening the match.
+ */
+router.post('/:id/conclude', async (req, res) => {
+  const { targetEventId } = req.body ?? {}
+  const deviceId = String(req.body?.deviceId ?? '')
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such match' })
+  if (!deviceId || !isUuid(targetEventId)) return res.status(400).json({ error: 'A deviceId and targetEventId are required' })
+
+  const params = [req.params.id]
+  const scope = umpireScope(req.umpire.facilityId, params, 'sess.facility_id')
+  const read = () => query(`${MATCH_SELECT} WHERE m.id = $1 AND ${scope}`, params)
+  const { rows: [row] } = await read()
+  if (!row) return res.status(404).json({ error: 'No such match' })
+  if (row.recorded_by !== req.umpire.id) return res.status(403).json({ error: 'Only the umpire running this match can conclude it' })
+
+  // A resend after a lost answer: already done.
+  if (row.status !== 'completed') {
+    if (row.voided_at) return res.status(409).json({ error: MATCH_OVER })
+    const events = await loadEvents(req.params.id)
+    const derived = deriveRow(row, events)
+    if (!derived.completed || events.at(-1)?.id !== targetEventId) return res.status(409).json({ error: CONCLUDE_MOVED })
+    // Never over a ruling still waiting on the winning rally: it may remove it.
+    const waiting = await query(
+      `SELECT 1 FROM match_rulings WHERE match_id = $1 AND target_event_id = $2
+          AND kind <> 'stands' AND applied_at IS NULL AND refused IS NULL`,
+      [req.params.id, events.findLast((e) => e.type === 'rally')?.id],
+    )
+    if (waiting.rowCount) return res.status(409).json({ error: CONCLUDE_MOVED })
+    const done = await withTransaction(async (client) => {
+      // Guarded on the last event: the scorekeeper's undo may have landed since the read.
+      const updated = await client.query(
+        `UPDATE matches
+            SET status = 'completed',
+                winner = $2,
+                ended_early = false,
+                -- When play stopped, so duration and the export do not count the wait.
+                ended_at = (SELECT at FROM match_events WHERE match_id = $1 AND type = 'rally' ORDER BY seq DESC LIMIT 1),
+                scorekeeper_state = NULL,
+                scoring_device = $3,
+                scoring_claimed_at = now()
+          WHERE id = $1 AND status = 'in_progress'
+            AND (SELECT id FROM match_events WHERE match_id = $1 ORDER BY seq DESC LIMIT 1) = $4`,
+        [req.params.id, derived.winner, deviceId, targetEventId],
+      )
+      if (!updated.rowCount) return false
+      await client.query(
+        `UPDATE match_rulings SET refused = $2 WHERE match_id = $1 AND applied_at IS NULL AND refused IS NULL`,
+        [req.params.id, MATCH_OVER],
+      )
+      return true
+    })
+    if (!done) return res.status(409).json({ error: CONCLUDE_MOVED })
+    invalidateRallyRatings()
+  }
+
+  const { rows: [fresh] } = await read()
+  res.json({ match: toClientMatch(fresh, await loadEvents(req.params.id), await loadRulings(req.params.id)) })
+})
+
+/** The engine's view of a match row and its log. */
+export function deriveRow(row, events) {
+  return deriveMatchState({
+    teamA: row.team_a,
+    teamB: row.team_b,
+    firstServer: { team: row.first_server_team, playerId: row.first_server_player },
+    rightStart: { A: row.right_start_a, B: row.right_start_b },
+    // Without this the server would score a game played to 15 as though
+    // it were to 11 and declare a winner partway through.
+    pointTarget: row.point_target,
+    events,
+  })
+}
 
 /**
  * Replaces a match's entire event log: "this match's log is exactly
@@ -345,7 +463,7 @@ router.put('/:id/log', async (req, res) => {
   if (!existing.rows[0]) return res.status(404).json({ error: 'No such match' })
   const row = existing.rows[0]
 
-  if (heldByAnotherDevice(row, deviceId)) {
+  if (scorekeeperRevoked(row, req.umpire.id, deviceId) || heldByAnotherDevice(row, deviceId)) {
     return res.status(409).json({
       error: 'Another device is scoring this match',
       heldBy: { umpireName: row.recorded_by_name, since: row.scoring_claimed_at },
@@ -367,7 +485,8 @@ router.put('/:id/log', async (req, res) => {
     if (
       event.type !== 'rally' &&
       event.type !== 'thirdShot' &&
-      event.type !== 'serverCorrection'
+      event.type !== 'serverCorrection' &&
+      event.type !== 'ruling'
     ) {
       return res.status(400).json({ error: `Event ${index} has unknown type ${event.type}` })
     }
@@ -392,6 +511,17 @@ router.put('/:id/log', async (req, res) => {
         return res.status(400).json({ error: `Event ${index} has a ${problem}` })
       }
     }
+    // A ruling note (see scorekeeper-rules.js) names a rally, not a
+    // player; what the rally was, when kept, must still be this match's.
+    if (event.type === 'ruling') {
+      if (!isUuid(event.targetEventId) || !RULING_KINDS.includes(event.kind)) {
+        return res.status(400).json({ error: `Event ${index} is not a valid ruling` })
+      }
+      if (event.was !== undefined && !players.has(event.was?.actingPlayerId)) {
+        return res.status(400).json({ error: `Event ${index} references a player not in this match` })
+      }
+      continue
+    }
     // Both non-rally types name their player the same way, so the check
     // below covers a correction naming someone outside the match too.
     const actor = event.type === 'rally' ? event.actingPlayerId : event.playerId
@@ -400,24 +530,17 @@ router.put('/:id/log', async (req, res) => {
     }
   }
 
-  const derived = deriveMatchState({
-    teamA: row.team_a,
-    teamB: row.team_b,
-    firstServer: { team: row.first_server_team, playerId: row.first_server_player },
-    rightStart: { A: row.right_start_a, B: row.right_start_b },
-    // Without this the server would score a game played to 15 as though
-    // it were to 11 and declare a winner partway through.
-    pointTarget: row.point_target,
-    events,
-  })
+  const derived = deriveRow(row, events)
+  // Held for the main umpire, who may still rule on the winning rally.
+  const held = waitsForUmpire(derived, row.scorekeeper_state) && !endedEarly
 
   // A match ends either by being won on court (derivable) or by being
   // stopped early (NOT derivable -- ending early appends no event). The
   // second case is why ended_early is stored: without it, every
   // manually-ended match would reopen as in-progress on the next sync.
-  const completed = derived.completed || endedEarly
+  const completed = (derived.completed && !held) || endedEarly
   const endedAtSource = derived.completed
-    ? events[events.length - 1]?.at
+    ? events.findLast((e) => e.type === 'rally')?.at
     : (endedEarlyAt ?? Date.now())
 
   await withTransaction(async (client) => {
@@ -441,6 +564,7 @@ router.put('/:id/log', async (req, res) => {
               ended_at = CASE WHEN $2 = 'completed' THEN COALESCE($5::timestamptz, now()) END,
               scoring_device = $6,
               scoring_claimed_at = now(),
+              scorekeeper_state = CASE WHEN $2 = 'completed' THEN NULL ELSE scorekeeper_state END,
               -- How far this tablet's clock is from ours, for lining a
               -- video up with these taps. The smallest seen, since a slow
               -- request only makes it look bigger; kept when a save sends none.
@@ -449,13 +573,29 @@ router.put('/:id/log', async (req, res) => {
       [
         req.params.id,
         completed ? 'completed' : 'in_progress',
-        derived.winner,
+        held ? null : derived.winner,
         endedEarly && !derived.completed,
         completed && endedAtSource ? new Date(endedAtSource).toISOString() : null,
         deviceId,
         clockOffsetMs(Date.now(), Number(req.body?.sentAt ?? NaN)),
       ],
     )
+
+    // A ruling counts as applied once the scorekeeper's log carries its note.
+    const ruled = events.filter((e) => e.type === 'ruling').map((e) => e.id)
+    if (ruled.length) {
+      await client.query(
+        `UPDATE match_rulings SET applied_at = now()
+          WHERE match_id = $1 AND id = ANY($2::uuid[]) AND applied_at IS NULL AND refused IS NULL`,
+        [req.params.id, ruled],
+      )
+    }
+    if (completed) {
+      await client.query(
+        `UPDATE match_rulings SET refused = $2 WHERE match_id = $1 AND applied_at IS NULL AND refused IS NULL`,
+        [req.params.id, MATCH_OVER],
+      )
+    }
   })
 
   // Only finished matches are rated. The ratings need working out again
@@ -466,7 +606,7 @@ router.put('/:id/log', async (req, res) => {
   const updatedParams = [req.params.id]
   const updatedScope = umpireScope(req.umpire.facilityId, updatedParams, 'sess.facility_id')
   const updated = await query(`${MATCH_SELECT} WHERE m.id = $1 AND ${updatedScope}`, updatedParams)
-  res.json({ match: toClientMatch(updated.rows[0], await loadEvents(req.params.id)) })
+  res.json({ match: toClientMatch(updated.rows[0], await loadEvents(req.params.id), await loadRulings(req.params.id)) })
 })
 
 /**
@@ -483,7 +623,7 @@ router.delete('/:id', async (req, res) => {
   const params = [req.params.id]
   const scope = umpireScope(req.umpire.facilityId, params, 'sess.facility_id')
   const { rows } = await query(
-    `SELECT m.status, m.scoring_device, m.scoring_claimed_at, u.name AS recorded_by_name
+    `SELECT m.*, u.name AS recorded_by_name
        FROM matches m JOIN sessions sess ON sess.id = m.session_id
        LEFT JOIN umpires u ON u.id = m.recorded_by
       WHERE m.id = $1 AND ${scope}`,
@@ -502,6 +642,11 @@ router.delete('/:id', async (req, res) => {
     return res.status(409).json({
       error: 'That match is already finished — void it instead of deleting it',
     })
+  }
+
+  // Won and held for Conclude: concluded first, then voided if it was wrong.
+  if (!rows[0].voided_at && deriveRow(rows[0], await loadEvents(req.params.id)).completed) {
+    return res.status(409).json({ error: CONCLUDE_FIRST })
   }
 
   // Another device scoring this match keeps it. A request with no deviceId

@@ -30,3 +30,13 @@ export function heldByAnotherDevice(match, deviceId, now = Date.now()) {
   if (match.status === 'completed') return true
   return now - new Date(match.scoring_claimed_at).getTime() < LEASE_MINUTES * 60_000
 }
+
+/**
+ * Whether this umpire is the match's scorekeeper whose scoring was taken
+ * back, on a device that does not hold the match. Waiting out the lease
+ * does not give the pen back: only the umpire's own hand-over does.
+ */
+export function scorekeeperRevoked(match, umpireId, deviceId) {
+  return match.scorekeeper_id === umpireId && match.recorded_by !== umpireId
+    && match.scorekeeper_state !== 'scoring' && match.scoring_device !== deviceId
+}
