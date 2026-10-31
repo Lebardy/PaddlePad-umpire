@@ -24,7 +24,7 @@ function check(label, actual, expected) {
 }
 
 const fresh = new Date().toISOString()
-const held = { status: 'in_progress', scoring_device: 'A', scoring_claimed_at: fresh, recorded_by_name: 'Sam' }
+const held = { team_a: ['p1'], team_b: ['p2'], first_server_team: 'A', first_server_player: 'p1', right_start_a: 'p1', right_start_b: 'p2', point_target: 11, status: 'in_progress', scoring_device: 'A', scoring_claimed_at: fresh, recorded_by_name: 'Sam' }
 let rows = []
 let deleted = []
 pool.query = async (text) => {

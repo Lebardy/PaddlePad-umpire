@@ -9,6 +9,20 @@ import { sessionName } from '../session-name.js'
 import { clampStartsAt, courtStartProblem, courtNoticeText } from '../court-rules.js'
 import { loadCourtState } from '../open-play-store.js'
 import { deriveRow, loadEvents } from './matches.js'
+import { CONCLUDE_FIRST } from '../scorekeeper-rules.js'
+
+// A match won but held open for Conclude: the umpire concludes first, then voids if it was wrong.
+async function hasWonOpenMatch(sessionId, facilityId) {
+  const params = [sessionId]
+  const scope = umpireScope(facilityId, params, 's.facility_id')
+  const { rows } = await query(
+    `SELECT m.* FROM matches m JOIN sessions s ON s.id = m.session_id
+      WHERE m.session_id = $1 AND m.status = 'in_progress' AND m.voided_at IS NULL AND ${scope}`,
+    params,
+  )
+  for (const m of rows) if (deriveRow(m, await loadEvents(m.id)).completed) return true
+  return false
+}
 
 const router = Router()
 router.use(requireAuth, requireActiveUmpire(query))
@@ -241,15 +255,15 @@ router.delete('/:id', async (req, res) => {
     return res.status(204).end()
   }
 
-  // A match won but held open for Conclude is real play too.
-  const { rows: matches } = await query(
-    "SELECT * FROM matches WHERE session_id = $1 AND status IN ('completed', 'in_progress')",
-    [req.params.id],
-  )
-  let finished = 0
-  for (const m of matches) {
-    if (m.status === 'completed' || (!m.voided_at && deriveRow(m, await loadEvents(m.id)).completed)) finished++
+  if (await hasWonOpenMatch(req.params.id, req.umpire.facilityId)) {
+    return res.status(409).json({ error: CONCLUDE_FIRST })
   }
+  const finished = (
+    await query(
+      "SELECT count(*)::int AS n FROM matches WHERE session_id = $1 AND status = 'completed'",
+      [req.params.id],
+    )
+  ).rows[0].n
   if (finished > 0) {
     return res.status(409).json({
       error: `That session has ${finished} finished match${
@@ -299,6 +313,9 @@ router.delete('/:id', async (req, res) => {
  */
 router.post('/:id/void', async (req, res) => {
   const voided = req.body?.voided !== false
+  if (voided && (await hasWonOpenMatch(req.params.id, req.umpire.facilityId))) {
+    return res.status(409).json({ error: CONCLUDE_FIRST })
+  }
   const reason = String(req.body?.reason ?? '').trim() || null
 
   const params = [req.params.id, voided, req.umpire.id, reason]

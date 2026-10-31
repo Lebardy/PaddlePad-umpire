@@ -35,7 +35,7 @@ const BANNER = {
 
 /**
  * Applies the match umpire's rulings as they arrive, every 2 s; returns the latest banner.
- * A 403 means scoring was taken from this phone: onRevoked hears it at once.
+ * A 403, or a 200 saying scoring is over, means scoring was taken from this phone: onRevoked hears it at once.
  */
 export function useRulingsPoller(matchId, active, teamWords, onRevoked) {
   const [banner, setBanner] = useState(null)
@@ -47,7 +47,10 @@ export function useRulingsPoller(matchId, active, teamWords, onRevoked) {
       if (running) return
       running = true
       try {
-        for (const ruling of await fetchWaitingRulings(matchId)) {
+        const { rulings, scoring } = await fetchWaitingRulings(matchId)
+        // The match ended or scoring was taken back: the server answers its former scorekeeper 200 so no error is logged.
+        if (scoring === false) { onRevoked(); return }
+        for (const ruling of rulings) {
           const match = getMatch(matchId)
           if (!live || !match) return
           // Ended meanwhile: setMatchEvents would refuse, and no banner is true.

@@ -152,7 +152,11 @@ router.post('/:matchId/rulings', async (req, res) => {
 router.get('/:matchId/rulings', async (req, res) => {
   const match = await matchHere(req)
   if (!match) return res.status(404).json(NO_MATCH)
-  if (match.scorekeeper_id !== req.umpire.id || match.scorekeeper_state !== 'scoring') {
+  // The former scorekeeper's phone learns the split is over from this answer; a 403 would print as an error.
+  if (match.scorekeeper_id === req.umpire.id && match.scorekeeper_state !== 'scoring') {
+    return res.json({ rulings: [], scoring: false })
+  }
+  if (match.scorekeeper_id !== req.umpire.id) {
     return res.status(403).json({ error: 'You are not scoring this match' })
   }
   // Feeds "Scorer last seen" on the main umpire's overview.

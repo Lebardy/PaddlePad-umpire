@@ -12,7 +12,7 @@ import { rallyEndingProblem } from '../rally-endings.js'
 import { invalidateRallyRatings } from '../rally-rating-store.js'
 import { umpireScope } from '../facility-rules.js'
 import { LEASE_MINUTES, heldByAnotherDevice, scorekeeperRevoked } from '../scoring-lease.js'
-import { RULING_KINDS, MATCH_OVER, TAKEN_BACK, CONCLUDE_MOVED, waitsForUmpire } from '../scorekeeper-rules.js'
+import { RULING_KINDS, MATCH_OVER, TAKEN_BACK, CONCLUDE_MOVED, CONCLUDE_FIRST, waitsForUmpire } from '../scorekeeper-rules.js'
 import { bucketConfig, deleteFile } from '../bucket.js'
 import { clockOffsetMs } from '../video-times.js'
 
@@ -623,7 +623,7 @@ router.delete('/:id', async (req, res) => {
   const params = [req.params.id]
   const scope = umpireScope(req.umpire.facilityId, params, 'sess.facility_id')
   const { rows } = await query(
-    `SELECT m.status, m.scoring_device, m.scoring_claimed_at, u.name AS recorded_by_name
+    `SELECT m.*, u.name AS recorded_by_name
        FROM matches m JOIN sessions sess ON sess.id = m.session_id
        LEFT JOIN umpires u ON u.id = m.recorded_by
       WHERE m.id = $1 AND ${scope}`,
@@ -642,6 +642,11 @@ router.delete('/:id', async (req, res) => {
     return res.status(409).json({
       error: 'That match is already finished — void it instead of deleting it',
     })
+  }
+
+  // Won and held for Conclude: concluded first, then voided if it was wrong.
+  if (!rows[0].voided_at && deriveRow(rows[0], await loadEvents(req.params.id)).completed) {
+    return res.status(409).json({ error: CONCLUDE_FIRST })
   }
 
   // Another device scoring this match keeps it. A request with no deviceId

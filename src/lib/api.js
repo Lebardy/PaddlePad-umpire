@@ -462,7 +462,7 @@ export function sendRuling(matchId, { id, targetEventId, kind }) {
 }
 
 export function fetchWaitingRulings(matchId, { signal } = {}) {
-  return apiFetch(`/scorekeeping/${matchId}/rulings`, { signal }).then((d) => d.rulings)
+  return apiFetch(`/scorekeeping/${matchId}/rulings`, { signal })
 }
 
 export function refuseRuling(matchId, rulingId) {

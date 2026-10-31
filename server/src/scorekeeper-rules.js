@@ -14,6 +14,7 @@ export const RULING_KINDS = ['stands', 'overturned', 'replay', 'wrongWinner']
 export const TOO_LATE = 'Too late: the next rally was scored.'
 export const TAKEN_BACK = 'Scoring was taken back.'
 export const MATCH_OVER = 'The match has finished.'
+export const CONCLUDE_FIRST = 'A won match is waiting to be concluded.'
 export const CONCLUDE_MOVED = 'The score changed: check the last rally.'
 
 /** The team a rally gave the point to: a winning shot scores for its own side, a mistake for the other. */

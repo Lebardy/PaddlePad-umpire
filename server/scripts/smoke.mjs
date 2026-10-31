@@ -28,6 +28,7 @@
 // ============================================================
 
 import { randomBytes } from 'node:crypto'
+import { CONCLUDE_FIRST } from '../src/scorekeeper-rules.js'
 import { RALLY_ENDINGS, rallyEndingColumn } from '../src/rally-endings.js'
 import { NOT_LEFT_OPEN_MESSAGE, SESSION_REASON_MESSAGE } from '../src/overview-rules.js'
 import { manilaDayStart, openPlayWhen } from '../src/visit-rules.js'
@@ -3993,7 +3994,9 @@ async function main() {
     const skLate = await asSk(`/matches/${skMatch}/log`, { method: 'PUT', body: { deviceId: skDevice, events: [r0, r1, note, replayNote, r4, rally(5, players[1].id)] } })
     check("Paolo's next upload -> 409", skLate.status === 409, String(skLate.status))
     const skNoMore = await asSk(`/scorekeeping/${skMatch}/rulings`)
-    check('and he can no longer read rulings -> 403', skNoMore.status === 403, String(skNoMore.status))
+    check('and he is told scoring is over -> 200 scoring false', skNoMore.status === 200 && skNoMore.body.scoring === false && skNoMore.body.rulings?.length === 0, JSON.stringify(skNoMore.body))
+    const notKeeper = await asMain(`/scorekeeping/${skMatch}/rulings`)
+    check('an umpire who was never the scorekeeper still gets 403', notKeeper.status === 403, String(notKeeper.status))
 
     const elsewhere = await call(`/scorekeeping/${skMatch}/rulings`, { method: 'POST', body: { id: uuid(), targetEventId: r4.id, kind: 'stands' } })
     check("another place's umpire -> 404", elsewhere.status === 404, String(elsewhere.status))
@@ -4066,7 +4069,7 @@ async function main() {
     const lateUpload = await skLog(mp, tenWins)
     check("the scorekeeper's late upload -> 409, the result stands", lateUpload.status === 409, String(lateUpload.status))
     const lateRulings = await asSk(`/scorekeeping/${mp}/rulings`)
-    check('and he can no longer read rulings -> 403', lateRulings.status === 403, String(lateRulings.status))
+    check('and he is told scoring is over -> 200 scoring false', lateRulings.status === 200 && lateRulings.body.scoring === false, JSON.stringify(lateRulings.body))
     const lateRuling = await asMain(`/scorekeeping/${mp}/rulings`, { method: 'POST', body: { id: uuid(), targetEventId: standsNote.id, kind: 'replay' } })
     check('a ruling after concluding -> 409', lateRuling.status === 409, String(lateRuling.status))
 
@@ -4122,7 +4125,7 @@ async function main() {
       eeEnded.status === 200 && eeEnded.body.match?.status === 'completed' && eeEnded.body.match.winner === 'A',
       JSON.stringify({ s: eeEnded.status, st: eeEnded.body.match?.status, w: eeEnded.body.match?.winner }))
 
-    // A won match held open for Conclude counts as played: its session cannot be cancelled.
+    // A won match held open for Conclude cannot be cancelled or voided: the umpire concludes first.
     const cxSession = uuid()
     await asMain('/sessions', { method: 'POST', body: { id: cxSession, startsAt: new Date().toISOString() } })
     await asMain(`/sessions/${cxSession}/players`, { method: 'PUT', body: { playerIds: [players[0].id, players[1].id] } })
@@ -4135,13 +4138,22 @@ async function main() {
     check('a won match is held open', cxHeld.body.match?.status === 'in_progress', String(cxHeld.status))
     const cxMain = await asMain(`/sessions/${cxSession}`, { method: 'DELETE', body: { deviceId: mainDevice } })
     // The wording matters: without this rule the main umpire still gets a 409, from the scorekeeper's lease.
-    check('cancelling its session as the main umpire -> 409 finished match', cxMain.status === 409 && /finished match/.test(cxMain.body.error), JSON.stringify(cxMain.body))
+    check('cancelling its session as the main umpire -> 409 conclude first', cxMain.status === 409 && cxMain.body.error === CONCLUDE_FIRST, JSON.stringify(cxMain.body))
     const cxSk = await asSk(`/sessions/${cxSession}`, { method: 'DELETE', body: { deviceId: skDevice } })
-    check('and as the scorekeeper -> 409 finished match', cxSk.status === 409 && /finished match/.test(cxSk.body.error), JSON.stringify(cxSk.body))
+    check('and as the scorekeeper -> 409 conclude first', cxSk.status === 409 && cxSk.body.error === CONCLUDE_FIRST, JSON.stringify(cxSk.body))
+    const cxVoid = await asMain(`/sessions/${cxSession}/void`, { method: 'POST', body: {} })
+    check('voiding its session -> 409 conclude first', cxVoid.status === 409 && cxVoid.body.error === CONCLUDE_FIRST, JSON.stringify(cxVoid.body))
+    const cxDelMatch = await asMain(`/matches/${cxId}`, { method: 'DELETE', body: { deviceId: mainDevice } })
+    check('deleting the match -> 409 conclude first', cxDelMatch.status === 409 && cxDelMatch.body.error === CONCLUDE_FIRST, JSON.stringify(cxDelMatch.body))
     const cxKept = await asMain(`/matches/${cxId}`)
     check('the match is still there', cxKept.status === 200, String(cxKept.status))
     await asMain(`/matches/${cxId}/claim`, { method: 'POST', body: { deviceId: mainDevice, force: true } })
     await asMain(`/matches/${cxId}/log`, { method: 'PUT', body: { deviceId: mainDevice, events: cxWins } })
+    const cxVoided = await asMain(`/sessions/${cxSession}/void`, { method: 'POST', body: {} })
+    const cxRestored = await asMain(`/sessions/${cxSession}/void`, { method: 'POST', body: { voided: false } })
+    check('once the winning rally is undone, voiding and restoring work -> 200', cxVoided.status === 200 && cxRestored.status === 200, `${cxVoided.status} ${cxRestored.status}`)
+    const cxMatchGone = await asMain(`/matches/${cxId}`, { method: 'DELETE', body: { deviceId: mainDevice } })
+    check('and deleting the match works -> 204', cxMatchGone.status === 204, String(cxMatchGone.status))
     const cxGone = await asMain(`/sessions/${cxSession}`, { method: 'DELETE', body: { deviceId: mainDevice } })
     check('once the winning rally is undone, cancelling works -> 204', cxGone.status === 204, String(cxGone.status))
   }
