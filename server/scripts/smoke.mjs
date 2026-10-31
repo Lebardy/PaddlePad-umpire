@@ -4134,9 +4134,10 @@ async function main() {
     const cxHeld = await skLog(cxId, [...cxWins, rally(10, players[0].id)])
     check('a won match is held open', cxHeld.body.match?.status === 'in_progress', String(cxHeld.status))
     const cxMain = await asMain(`/sessions/${cxSession}`, { method: 'DELETE', body: { deviceId: mainDevice } })
-    check('cancelling its session as the main umpire -> 409', cxMain.status === 409, String(cxMain.status))
+    // The wording matters: without this rule the main umpire still gets a 409, from the scorekeeper's lease.
+    check('cancelling its session as the main umpire -> 409 finished match', cxMain.status === 409 && /finished match/.test(cxMain.body.error), JSON.stringify(cxMain.body))
     const cxSk = await asSk(`/sessions/${cxSession}`, { method: 'DELETE', body: { deviceId: skDevice } })
-    check("and as the scorekeeper -> 409", cxSk.status === 409, String(cxSk.status))
+    check('and as the scorekeeper -> 409 finished match', cxSk.status === 409 && /finished match/.test(cxSk.body.error), JSON.stringify(cxSk.body))
     const cxKept = await asMain(`/matches/${cxId}`)
     check('the match is still there', cxKept.status === 200, String(cxKept.status))
     await asMain(`/matches/${cxId}/claim`, { method: 'POST', body: { deviceId: mainDevice, force: true } })

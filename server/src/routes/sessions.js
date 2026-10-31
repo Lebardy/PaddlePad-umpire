@@ -218,10 +218,10 @@ router.put('/:id/players', async (req, res) => {
  * Cancels a session -- created by mistake, wrong night, wrong name.
  *
  * Unfinished matches inside it go too (nothing in them counted yet),
- * but a session holding a COMPLETED (or won and held) match is refused: that is real
- * recorded play, and cascading a delete through it would destroy data
- * the ML pipeline has already been given. Void those matches first if
- * they were genuinely wrong.
+ * but a session holding a COMPLETED (or won and held) match is refused:
+ * that is real recorded play, and cascading a delete through it would
+ * destroy data the ML pipeline has already been given. Void those matches
+ * first if they were genuinely wrong.
  *
  * Idempotent, so a delete queued offline and retried after someone else
  * removed the same session still settles as success rather than

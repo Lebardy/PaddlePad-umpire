@@ -53,8 +53,8 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
   }
 
   // Cancels a session created by mistake. Unfinished matches inside go
-  // with it; a finished or won-and-held one blocks the delete, because that is real
-  // recorded play and should be voided individually instead.
+  // with it; a finished or won-and-held one blocks the delete, because that
+  // is real recorded play and should be voided individually instead.
   function handleDeleteSession() {
     if (!confirm(`Cancel "${session.name}"? Any unfinished matches go with it.`)) return
     if (deleteSession(sessionId)) onBack()

@@ -849,9 +849,9 @@ export function countsAsPlayed(m) {
  * Cancels a session and any unfinished matches in it.
  *
  * Refused when a match inside has finished or is won and waiting to be
- * concluded: that is real recorded play, and the server refuses too. Those should be voided individually if
- * they were wrong, which keeps the decision explicit per match rather
- * than sweeping several away at once.
+ * concluded: that is real recorded play, and the server refuses too.
+ * Those should be voided individually if they were wrong, which keeps the
+ * decision explicit per match rather than sweeping several away at once.
  */
 export function deleteSession(sessionId) {
   const matches = getMatches().filter((m) => m.sessionId === sessionId)
