@@ -275,7 +275,7 @@ function LiveMatch({ matchId, onBack }) {
       () => {}, // Offline: the next render tries again.
     ).finally(() => { yielding.current = false })
   }, [matchId])
-  const [banner, clearBanner] = useRulingsPoller(matchId, iScore && isScorer && match?.status !== 'completed', teamWords, yieldNow)
+  const [banner, clearBanner] = useRulingsPoller(matchId, iScore && isScorer && match?.status !== 'completed', teamWords, yieldNow, setGone)
   useEffect(() => {
     if (iScore && isScorer && !blockedLog) {
       wasScoring.current = true
@@ -422,14 +422,14 @@ function LiveMatch({ matchId, onBack }) {
       </div>
     )
   }
-  if (iRunIt && gone) {
+  if ((iRunIt || isKeeper) && gone) {
     return (
       <div className="live-match">
         <div className="scorekeeper-wait" role="status">
           <div className="wait-card">
             <Icon name="x" size={32} />
             <strong>Match cancelled</strong>
-            <button onClick={() => { deleteMatch(matchId); onBack() }}><Icon name="check" size={20} />Done</button>
+            <button onClick={() => { deleteMatch(matchId, { gone: true }); onBack() }}><Icon name="check" size={20} />Done</button>
           </div>
         </div>
       </div>
@@ -756,7 +756,8 @@ function LiveMatch({ matchId, onBack }) {
         </>
       )}
 
-      {/* Nothing shows when the match has no video, or video is off here. Only the main umpire can read a match's video. */}
+      {/* Nothing shows when the match has no video, or video is off here.
+          Only the main umpire can read a match's video. */}
       {match.status === 'completed' && iConclude && (
         <MatchVideo matchId={matchId} events={match.events} describe={(event) => describeEvent(event, name)} />
       )}

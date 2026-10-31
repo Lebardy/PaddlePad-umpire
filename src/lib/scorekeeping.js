@@ -36,8 +36,9 @@ const BANNER = {
 /**
  * Applies the match umpire's rulings as they arrive, every 2 s; returns the latest banner.
  * A 403, or a 200 saying scoring is over, means scoring was taken from this phone: onRevoked hears it at once.
+ * A 404 means the match was cancelled: onGone hears it, or the phone would ask every 2 s for good.
  */
-export function useRulingsPoller(matchId, active, teamWords, onRevoked) {
+export function useRulingsPoller(matchId, active, teamWords, onRevoked, onGone) {
   const [banner, setBanner] = useState(null)
   useEffect(() => {
     if (!active) return undefined
@@ -48,7 +49,8 @@ export function useRulingsPoller(matchId, active, teamWords, onRevoked) {
       running = true
       try {
         const { rulings, scoring } = await fetchWaitingRulings(matchId)
-        // The match ended or scoring was taken back: the server answers its former scorekeeper 200 so no error is logged.
+        // The match ended or scoring was taken back: the server answers its
+        // former scorekeeper 200 so no error is logged.
         if (scoring === false) { onRevoked(); return }
         for (const ruling of rulings) {
           const match = getMatch(matchId)
@@ -66,6 +68,7 @@ export function useRulingsPoller(matchId, active, teamWords, onRevoked) {
       } catch (error) {
         // Offline or a blip: the rulings wait on the server for the next tick.
         if (error.status === 403) onRevoked()
+        if (error.status === 404) onGone(true)
       } finally {
         running = false
       }
@@ -73,6 +76,6 @@ export function useRulingsPoller(matchId, active, teamWords, onRevoked) {
     tick()
     const timer = setInterval(tick, RULINGS_POLL_MS)
     return () => { live = false; clearInterval(timer) }
-  }, [matchId, active, teamWords, onRevoked])
+  }, [matchId, active, teamWords, onRevoked, onGone])
   return [banner, () => setBanner(null)]
 }

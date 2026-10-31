@@ -799,10 +799,12 @@ export function isTombstoned(kind, id) {
 /**
  * Cancels an unfinished match -- wrong pairing, wrong court, started by
  * mistake. Removed outright, because nothing in it counted yet.
+ * `gone` is this phone clearing a match the server no longer has: a won
+ * local copy must still go, or its session stays blocked for good.
  */
-export function deleteMatch(matchId) {
+export function deleteMatch(matchId, { gone = false } = {}) {
   const match = getMatch(matchId)
-  if (!match || match.status === 'completed' || waitsForConclude(match)) return false
+  if (!match || match.status === 'completed' || (!gone && waitsForConclude(match))) return false
 
   writeJSON(MATCHES_KEY, getMatches().filter((m) => m.id !== matchId))
   addTombstone('matches', matchId)
