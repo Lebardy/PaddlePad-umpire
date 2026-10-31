@@ -414,7 +414,7 @@ function LiveMatch({ matchId, onBack }) {
           <div className="wait-card">
             <Icon name="undo" size={32} />
             <strong>{match.recordedByName?.split(' ')[0]} took scoring back</strong>
-            {takenBack.unsaved > 0 && <p>{takenBack.unsaved} taps not saved</p>}
+            {takenBack.unsaved > 0 && <p>{takenBack.unsaved} {takenBack.unsaved === 1 ? 'tap' : 'taps'} not saved</p>}
             <button onClick={onBack}><Icon name="check" size={20} />Done</button>
           </div>
         </div>
