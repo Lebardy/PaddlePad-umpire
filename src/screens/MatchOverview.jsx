@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Icon from '../components/Icon'
 import { deriveMatchState, currentServerPlayerId } from '../lib/pickleball'
-import { queueRuling } from '../lib/storage'
+import { askConclude, queueRuling } from '../lib/storage'
 import { flush } from '../lib/sync'
 import { useQueuedRulings } from '../lib/useLocalStore'
 import { newestRuling, rallyWinnerTeam, rulingProblem, waitingReentry } from '../../server/src/scorekeeper-rules.js'
@@ -38,7 +38,10 @@ function MatchOverview({ match, name, onTakeBack }) {
   const newest = newestRuling(mineAll, match.rulings ?? [])
   const stray = newest && newest.targetEventId !== subject?.id && (newest.state === 'queued' || newest.state === 'refused') ? newest : null
   const seenAgo = match.scorekeeper?.seenAt ? Date.now() - new Date(match.scorekeeper.seenAt).getTime() : null
-  const canRule = lastRally && !ruling && mineAll.length === 0 && rulingProblem(match.events, lastRally.id) === null
+  const canRule = lastRally && !ruling && mineAll.length === 0 && rulingProblem(match.events, lastRally.id) === null && !match.concludeAsk
+  const won = derived.completed
+  // Never over a ruling still on its way: that ruling may remove the winning rally.
+  const canConclude = won && mineAll.length === 0 && !match.concludeAsk && ruling?.state !== 'waiting'
 
   function rule(kind) {
     queueRuling(match.id, lastRally.id, kind)
@@ -46,11 +49,16 @@ function MatchOverview({ match, name, onTakeBack }) {
     setChoosing(false)
   }
 
+  function conclude() {
+    askConclude(match.id, last.id)
+    flush()
+  }
+
   return (
     <div className="match-overview">
       <div className="overview-score" aria-live="polite">
         <span className="big-score">{derived.score.A}–{derived.score.B}</span>
-        <span className="serving"><Icon name="target" size={18} />{name(serverId)} serves</span>
+        {!won && <span className="serving"><Icon name="target" size={18} />{name(serverId)} serves</span>}
       </div>
       <p className="overview-scorer">
         <Icon name="user" size={18} />{match.scorekeeper?.name} scoring
@@ -68,7 +76,7 @@ function MatchOverview({ match, name, onTakeBack }) {
 
       {subject && (
         <section className={`last-rally${appliedNote?.was ? ' is-removed' : ''}`} aria-label="Last rally">
-          <strong>{teamWords(rallyWinnerTeam(match.teamA, subject))} won the rally</strong>
+          <strong>{teamWords(rallyWinnerTeam(match.teamA, subject))} won the {won ? 'match' : 'rally'}</strong>
           <span>{rallyEnding(subject.detail)?.label ?? legacyRallyLabel(subject.outcome, subject.zone)} — {name(subject.actingPlayerId)}</span>
           {appliedNote && (
             <span className="ruling-state is-applied" role="status">
@@ -80,10 +88,14 @@ function MatchOverview({ match, name, onTakeBack }) {
               {KIND_WORDS[ruling.kind]} · {ruling.state === 'refused' ? ruling.refused : STATE_WORDS[ruling.state]}
             </span>
           )}
-          {canRule && !choosing && (
+          {match.concludeAsk && (
+            <span className="ruling-state is-queued" role="status"><Icon name="timer" size={16} />Conclude · Waiting to send</span>
+          )}
+          {(canRule || canConclude) && !choosing && (
             <div className="overview-actions">
-              <button onClick={() => setChoosing(true)}><Icon name="flag" size={18} />Appeal</button>
-              <button className="btn-quiet" onClick={() => rule('wrongWinner')}><Icon name="retry" size={18} />Wrong winner</button>
+              {canConclude && <button onClick={conclude}><Icon name="check" size={18} />Conclude match</button>}
+              {canRule && <button className={won ? 'btn-quiet' : undefined} onClick={() => setChoosing(true)}><Icon name="flag" size={18} />Appeal</button>}
+              {canRule && <button className="btn-quiet" onClick={() => rule('wrongWinner')}><Icon name="retry" size={18} />Wrong winner</button>}
             </div>
           )}
           {choosing && (

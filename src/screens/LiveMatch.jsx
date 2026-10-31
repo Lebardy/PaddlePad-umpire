@@ -20,7 +20,7 @@ import { useSyncStatus } from '../lib/useSyncStatus'
 import { useRulingsPoller } from '../lib/scorekeeping'
 import { keeperMustYield, reentryMismatch, waitingReentry } from '../../server/src/scorekeeper-rules.js'
 import { getStoredUmpire } from '../lib/api'
-import { askScorekeeper, getMatch } from '../lib/storage'
+import { askConclude, askScorekeeper, getMatch } from '../lib/storage'
 import MatchOverview from './MatchOverview'
 import ScorekeeperPicker from '../components/ScorekeeperPicker'
 import { LEASE_MINUTES } from '../../server/src/scoring-lease.js'
@@ -269,7 +269,8 @@ function LiveMatch({ matchId, onBack }) {
     sync.yieldMatch(matchId).then(
       (result) => {
         wasScoring.current = false
-        setTakenBack(result)
+        // The umpire concluding it ends the split too; that is no take-back.
+        if (!result.finished) setTakenBack(result)
       },
       () => {}, // Offline: the next render tries again.
     ).finally(() => { yielding.current = false })
@@ -464,6 +465,9 @@ function LiveMatch({ matchId, onBack }) {
   }
 
   const derived = deriveMatchState(match)
+  // Won but still open: held for the main umpire, or just taken back by them.
+  const won = match.status === 'in_progress' && derived.completed
+  const iConclude = (match.recordedBy ?? me) === me
   const players = [...match.teamA, ...match.teamB]
   const serverId =
     match.status === 'in_progress' ? currentServerPlayerId(derived, match) : null
@@ -533,7 +537,7 @@ function LiveMatch({ matchId, onBack }) {
             })}
           </div>
 
-          {match.status === 'in_progress' && (
+          {match.status === 'in_progress' && !won && (
             <p className="serve-note">
               <span>
                 <strong>{name(serverId)}</strong> serves
@@ -575,7 +579,7 @@ function LiveMatch({ matchId, onBack }) {
                     <button
                       className="undo"
                       onClick={handleUndo}
-                      disabled={!pending && (match.events.length === 0 || match.events.at(-1)?.type === 'ruling')}
+                      disabled={!pending && (match.events.length === 0 || match.events.at(-1)?.type === 'ruling' || Boolean(match.concludeAsk))}
                     >
                       <Icon name="undo" size={18} />
                       {pending ? 'Back' : 'Undo'}
@@ -585,7 +589,7 @@ function LiveMatch({ matchId, onBack }) {
           )}
         </div>
 
-        {match.status === 'in_progress' && (
+        {match.status === 'in_progress' && !won && (
           <div className="scoring-rally">
             {pendingEnding ? (
               <section
@@ -700,11 +704,29 @@ function LiveMatch({ matchId, onBack }) {
             )}
           </div>
         )}
+        {won && (
+          <div className="scoring-rally">
+            <div className="wait-card" role="status">
+              <Icon name="flag" size={32} />
+              <strong>{teamWords(derived.winner)} won the match</strong>
+              {/* While the takeover notice is up, no Conclude: the notice decides whose taps count first, and a conclude now would replace them. */}
+              {!iConclude ? (
+                <p>Waiting for {match.recordedByName?.split(' ')[0]} to conclude</p>
+              ) : match.concludeAsk ? (
+                <p>Conclude · Waiting to send</p>
+              ) : blockedLog ? null : (
+                <button onClick={() => { askConclude(matchId, match.events.at(-1).id); sync.flush() }}>
+                  <Icon name="check" size={20} />Conclude match
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {picking && <ScorekeeperPicker matchId={matchId} onClose={() => setPicking(false)} />}
 
-      {match.status === 'in_progress' && (
+      {match.status === 'in_progress' && !won && (
         <>
           <RallyLegend />
 
