@@ -8,6 +8,7 @@ import { heldByAnotherDevice } from '../scoring-lease.js'
 import { sessionName } from '../session-name.js'
 import { clampStartsAt, courtStartProblem, courtNoticeText } from '../court-rules.js'
 import { loadCourtState } from '../open-play-store.js'
+import { deriveRow, loadEvents } from './matches.js'
 
 const router = Router()
 router.use(requireAuth, requireActiveUmpire(query))
@@ -217,7 +218,7 @@ router.put('/:id/players', async (req, res) => {
  * Cancels a session -- created by mistake, wrong night, wrong name.
  *
  * Unfinished matches inside it go too (nothing in them counted yet),
- * but a session holding a COMPLETED match is refused: that is real
+ * but a session holding a COMPLETED (or won and held) match is refused: that is real
  * recorded play, and cascading a delete through it would destroy data
  * the ML pipeline has already been given. Void those matches first if
  * they were genuinely wrong.
@@ -240,14 +241,19 @@ router.delete('/:id', async (req, res) => {
     return res.status(204).end()
   }
 
-  const finished = await query(
-    "SELECT count(*)::int AS n FROM matches WHERE session_id = $1 AND status = 'completed'",
+  // A match won but held open for Conclude is real play too.
+  const { rows: matches } = await query(
+    "SELECT * FROM matches WHERE session_id = $1 AND status IN ('completed', 'in_progress')",
     [req.params.id],
   )
-  if (finished.rows[0].n > 0) {
+  let finished = 0
+  for (const m of matches) {
+    if (m.status === 'completed' || (!m.voided_at && deriveRow(m, await loadEvents(m.id)).completed)) finished++
+  }
+  if (finished > 0) {
     return res.status(409).json({
-      error: `That session has ${finished.rows[0].n} finished match${
-        finished.rows[0].n === 1 ? '' : 'es'
+      error: `That session has ${finished} finished match${
+        finished === 1 ? '' : 'es'
       } and can't be deleted. Void the session instead — that keeps the record but leaves it out of the exported data.`,
     })
   }

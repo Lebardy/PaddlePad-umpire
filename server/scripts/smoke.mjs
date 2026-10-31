@@ -4121,6 +4121,28 @@ async function main() {
     check('ending a won match early still finishes it with the winner',
       eeEnded.status === 200 && eeEnded.body.match?.status === 'completed' && eeEnded.body.match.winner === 'A',
       JSON.stringify({ s: eeEnded.status, st: eeEnded.body.match?.status, w: eeEnded.body.match?.winner }))
+
+    // A won match held open for Conclude counts as played: its session cannot be cancelled.
+    const cxSession = uuid()
+    await asMain('/sessions', { method: 'POST', body: { id: cxSession, startsAt: new Date().toISOString() } })
+    await asMain(`/sessions/${cxSession}/players`, { method: 'PUT', body: { playerIds: [players[0].id, players[1].id] } })
+    const cxId = uuid()
+    await asMain('/matches', { method: 'POST', body: { id: cxId, sessionId: cxSession, teamA: [players[0].id], teamB: [players[1].id], firstServer: { team: 'A', playerId: players[0].id } } })
+    await asMain(`/scorekeeping/${cxId}`, { method: 'PUT', body: { umpireId: skId, deviceId: mainDevice } })
+    await asSk(`/scorekeeping/${cxId}/answer`, { method: 'POST', body: { deviceId: skDevice, start: true } })
+    const cxWins = freshWins()
+    const cxHeld = await skLog(cxId, [...cxWins, rally(10, players[0].id)])
+    check('a won match is held open', cxHeld.body.match?.status === 'in_progress', String(cxHeld.status))
+    const cxMain = await asMain(`/sessions/${cxSession}`, { method: 'DELETE', body: { deviceId: mainDevice } })
+    check('cancelling its session as the main umpire -> 409', cxMain.status === 409, String(cxMain.status))
+    const cxSk = await asSk(`/sessions/${cxSession}`, { method: 'DELETE', body: { deviceId: skDevice } })
+    check("and as the scorekeeper -> 409", cxSk.status === 409, String(cxSk.status))
+    const cxKept = await asMain(`/matches/${cxId}`)
+    check('the match is still there', cxKept.status === 200, String(cxKept.status))
+    await asMain(`/matches/${cxId}/claim`, { method: 'POST', body: { deviceId: mainDevice, force: true } })
+    await asMain(`/matches/${cxId}/log`, { method: 'PUT', body: { deviceId: mainDevice, events: cxWins } })
+    const cxGone = await asMain(`/sessions/${cxSession}`, { method: 'DELETE', body: { deviceId: mainDevice } })
+    check('once the winning rally is undone, cancelling works -> 204', cxGone.status === 204, String(cxGone.status))
   }
 
   section('admin site — overview')

@@ -6,6 +6,7 @@ import {
   addPlayerToSession,
   removePlayerFromSession,
   deleteSession,
+  countsAsPlayed,
   voidSession,
   unvoidSession,
   setSessionEnded,
@@ -52,7 +53,7 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
   }
 
   // Cancels a session created by mistake. Unfinished matches inside go
-  // with it; a finished one blocks the delete, because that is real
+  // with it; a finished or won-and-held one blocks the delete, because that is real
   // recorded play and should be voided individually instead.
   function handleDeleteSession() {
     if (!confirm(`Cancel "${session.name}"? Any unfinished matches go with it.`)) return
@@ -80,7 +81,7 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
   // but not yet on this device.
   if (!session) return <NotFound what="session" onBack={onBack} />
 
-  const finishedCount = matches.filter((m) => m.status === 'completed').length
+  const finishedCount = matches.filter(countsAsPlayed).length
   const inProgressCount = matches.filter((m) => m.status === 'in_progress').length
 
   const roster = session.playerIds

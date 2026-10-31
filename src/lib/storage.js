@@ -840,17 +840,22 @@ export function unvoidMatch(matchId) {
   return true
 }
 
+/** Finished, or won and held open for the umpire's Conclude: either way real play. */
+export function countsAsPlayed(m) {
+  return m.status === 'completed' || (m.status === 'in_progress' && !m.voidedAt && deriveMatchState(m).completed)
+}
+
 /**
  * Cancels a session and any unfinished matches in it.
  *
- * Refused when a match inside has finished: that is real recorded play,
- * and the server refuses too. Those should be voided individually if
+ * Refused when a match inside has finished or is won and waiting to be
+ * concluded: that is real recorded play, and the server refuses too. Those should be voided individually if
  * they were wrong, which keeps the decision explicit per match rather
  * than sweeping several away at once.
  */
 export function deleteSession(sessionId) {
   const matches = getMatches().filter((m) => m.sessionId === sessionId)
-  if (matches.some((m) => m.status === 'completed')) return false
+  if (matches.some(countsAsPlayed)) return false
 
   writeJSON(MATCHES_KEY, getMatches().filter((m) => m.sessionId !== sessionId))
   writeJSON(SESSIONS_KEY, getSessions().filter((s) => s.id !== sessionId))

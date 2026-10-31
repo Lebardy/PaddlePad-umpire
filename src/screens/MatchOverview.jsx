@@ -100,7 +100,7 @@ function MatchOverview({ match, name, onTakeBack }) {
           )}
           {choosing && (
             <div className="overview-actions" role="group" aria-label="Appeal ruling">
-              <button onClick={() => rule('stands')}><Icon name="check" size={18} />Stands</button>
+              <button onClick={() => (!won || confirm("Stands? The win can't be appealed after this.")) && rule('stands')}><Icon name="check" size={18} />Stands</button>
               <button onClick={() => rule('overturned')}><Icon name="retry" size={18} />Overturned</button>
               <button onClick={() => rule('replay')}><Icon name="undo" size={18} />Replay</button>
               <button className="icon-solo" onClick={() => setChoosing(false)} aria-label="Not now"><Icon name="x" size={18} /></button>

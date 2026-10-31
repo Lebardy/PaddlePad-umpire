@@ -111,7 +111,7 @@ async function loadRulings(matchId) {
 }
 
 /** Events in replay order, shaped as the scoring engine expects. */
-async function loadEvents(matchId, client = { query }) {
+export async function loadEvents(matchId, client = { query }) {
   const { rows } = await client.query(
     `SELECT id, seq, type, payload, at
        FROM match_events WHERE match_id = $1 ORDER BY seq`,
@@ -414,7 +414,7 @@ router.post('/:id/conclude', async (req, res) => {
 })
 
 /** The engine's view of a match row and its log. */
-function deriveRow(row, events) {
+export function deriveRow(row, events) {
   return deriveMatchState({
     teamA: row.team_a,
     teamB: row.team_b,

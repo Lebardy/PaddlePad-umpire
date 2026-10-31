@@ -218,5 +218,12 @@ concludeStatus = 200
 check('take back with a conclude queued: the Undo stays', storage.getMatch(MID).events.length, 10)
 check('and what goes up is the shorter log', logPuts.at(-1)?.events.length, 10)
 
+// --- Cancelling a session: a won but open match is real play ---
+outbox.clearOutbox()
+setLocal({ ...base, events: wonEvents, scorekeeper: scoring })
+check('a session with a won, held match is not deleted', [storage.deleteSession('s'), storage.getMatch(MID)?.id], [false, MID])
+setLocal({ ...base, events: tenWins, scorekeeper: scoring })
+check('one rally short, the session can be cancelled', [storage.deleteSession('s'), storage.getMatch(MID)], [true, undefined])
+
 console.log(`\n${pass} ok / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)
