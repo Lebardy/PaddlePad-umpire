@@ -6,7 +6,7 @@ import {
   addPlayerToSession,
   removePlayerFromSession,
   deleteSession,
-  countsAsPlayed,
+  waitsForConclude,
   voidSession,
   unvoidSession,
   setSessionEnded,
@@ -81,7 +81,7 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
   // but not yet on this device.
   if (!session) return <NotFound what="session" onBack={onBack} />
 
-  const finishedCount = matches.filter(countsAsPlayed).length
+  const finishedCount = matches.filter((m) => m.status === 'completed').length
   const inProgressCount = matches.filter((m) => m.status === 'in_progress').length
 
   const roster = session.playerIds
@@ -226,6 +226,8 @@ function SessionDetail({ sessionId, onBack, onNewMatch, onOpenMatch }) {
               Restore this session
             </button>
           </>
+        ) : matches.some(waitsForConclude) ? (
+          <p className="placeholder-note"><Icon name="flag" size={18} />A won match is waiting to be concluded.</p>
         ) : finishedCount > 0 ? (
           <>
             <p className="placeholder-note">

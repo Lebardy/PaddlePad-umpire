@@ -349,6 +349,8 @@ section {
 .field-hint { margin: -0.5rem 0 0.9rem; }
 .setup-note { margin: 0 0 0.6rem; }
 .placeholder-note { margin: 0 0 0.75rem; }
+.placeholder-note:has(> svg) { display: flex; align-items: center; gap: 0.5rem; }
+.placeholder-note > svg { flex: none; }
 
 /* ============ Fields and the primary button ============ */
 

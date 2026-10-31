@@ -220,9 +220,15 @@ check('and what goes up is the shorter log', logPuts.at(-1)?.events.length, 10)
 
 // --- Cancelling a session: a won but open match is real play ---
 outbox.clearOutbox()
+localstore.write('paddlepad.sessions', [{ id: 's', name: 'S', playerIds: [], voidedAt: null }])
 setLocal({ ...base, events: wonEvents, scorekeeper: scoring })
 check('a session with a won, held match is not deleted', [storage.deleteSession('s'), storage.getMatch(MID)?.id], [false, MID])
+check('nor voided', [storage.voidSession('s'), storage.getSession('s')?.voidedAt ?? null], [false, null])
+check('nor is the match deleted', [storage.deleteMatch(MID), storage.getMatch(MID)?.id], [false, MID])
 setLocal({ ...base, events: tenWins, scorekeeper: scoring })
+check('one rally short, the match can be deleted', storage.deleteMatch(MID), true)
+setLocal({ ...base, events: tenWins, scorekeeper: scoring })
+check('one rally short, the session can be voided', storage.voidSession('s'), true)
 check('one rally short, the session can be cancelled', [storage.deleteSession('s'), storage.getMatch(MID)], [true, undefined])
 
 console.log(`\n${pass} ok / ${fail} FAIL`)

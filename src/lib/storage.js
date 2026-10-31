@@ -802,7 +802,7 @@ export function isTombstoned(kind, id) {
  */
 export function deleteMatch(matchId) {
   const match = getMatch(matchId)
-  if (!match || match.status === 'completed') return false
+  if (!match || match.status === 'completed' || waitsForConclude(match)) return false
 
   writeJSON(MATCHES_KEY, getMatches().filter((m) => m.id !== matchId))
   addTombstone('matches', matchId)
@@ -840,9 +840,9 @@ export function unvoidMatch(matchId) {
   return true
 }
 
-/** Finished, or won and held open for the umpire's Conclude: either way real play. */
-export function countsAsPlayed(m) {
-  return m.status === 'completed' || (m.status === 'in_progress' && !m.voidedAt && deriveMatchState(m).completed)
+/** Won and held open for the umpire's Conclude: it can't be cancelled or voided until concluded. */
+export function waitsForConclude(m) {
+  return m.status === 'in_progress' && !m.voidedAt && deriveMatchState(m).completed
 }
 
 /**
@@ -855,7 +855,7 @@ export function countsAsPlayed(m) {
  */
 export function deleteSession(sessionId) {
   const matches = getMatches().filter((m) => m.sessionId === sessionId)
-  if (matches.some(countsAsPlayed)) return false
+  if (matches.some((m) => m.status === 'completed' || waitsForConclude(m))) return false
 
   writeJSON(MATCHES_KEY, getMatches().filter((m) => m.sessionId !== sessionId))
   writeJSON(SESSIONS_KEY, getSessions().filter((s) => s.id !== sessionId))
@@ -889,7 +889,7 @@ export function deleteSession(sessionId) {
  */
 export function voidSession(sessionId, reason = '') {
   const session = getSession(sessionId)
-  if (!session) return false
+  if (!session || getMatches().some((m) => m.sessionId === sessionId && waitsForConclude(m))) return false
   const updated = getSessions().map((s) =>
     s.id === sessionId ? { ...s, voidedAt: Date.now(), voidReason: reason || null } : s,
   )

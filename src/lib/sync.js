@@ -581,6 +581,9 @@ export function discardDead(key) {
   if (kind === 'matchDelete') {
     clearTombstone('matches', id)
     pullMatch(id).catch(() => {})
+  } else if (kind === 'sessionVoid') {
+    // No longer owed, so the pull puts back the server's un-voided session.
+    pullCore().catch(() => {})
   } else if (kind === 'sessionDelete') {
     const buried = getTombstones().sessionMatches?.[id] ?? []
     clearTombstone('sessions', id)
