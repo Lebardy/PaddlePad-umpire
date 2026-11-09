@@ -6,6 +6,7 @@ import { fetchMatch, removeMatchVideo } from '../lib/api'
 import { formatWhen } from '../lib/format'
 import { followScroll, playingIndex, pointLine, pointMark, pointSaid } from '../lib/matches'
 import { Link } from '../lib/router'
+import { SheetSkeleton } from '../components/Skeleton'
 
 const namesOf = (team) => team.map((player) => player.name).join(' & ')
 // One name to a line under a score, so a long doubles pair never pushes the two scores apart.
@@ -67,7 +68,7 @@ export default function MatchDetail({ id }) {
     }
   }
 
-  if (loading) return <section className="sheet"><p className="empty">Loading…</p></section>
+  if (loading) return <SheetSkeleton />
 
   if (result.notFound) {
     return (
@@ -137,7 +138,7 @@ export default function MatchDetail({ id }) {
  * is asked of the video's storage until play is pressed, so until then
  * the video is a black screen: a lit play button stands on it.
  *
- * Mounted afresh for each match (the page reads "Loading…" in between),
+ * Mounted afresh for each match (the page shows its loading shape in between),
  * so the point lit never carries over from another match.
  */
 function PointByPoint({ match, videoFailed, onVideoError, onTryAgain, onRemoveVideo }) {

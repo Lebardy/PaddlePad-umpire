@@ -10,6 +10,7 @@ import { fetchOpenPlays } from '../lib/api'
 import { useLevelRank } from '../lib/useLevelRank'
 import { dayHeading } from '../lib/openPlay'
 import { navigate } from '../lib/router'
+import { PageSkeleton } from '../components/Skeleton'
 
 function OpenPlay() {
   const [rows, setRows] = useState(null)
@@ -45,7 +46,7 @@ function OpenPlay() {
       </button>
       <h1>Open play</h1>
       {rows === null ? (
-        <p className="muted">{error ?? 'Loading…'}</p>
+        error ? <p className="muted">{error}</p> : <PageSkeleton />
       ) : rows.length === 0 ? (
         <p className="muted">No open play this week.</p>
       ) : (

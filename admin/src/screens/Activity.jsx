@@ -3,6 +3,7 @@ import FacilityPicker from '../components/FacilityPicker'
 import PageBoard from '../components/PageBoard'
 import { activityFilters, listActivity } from '../lib/api'
 import { actionLabel, dayHeading, timeOfDay } from '../lib/format'
+import { RowsSkeleton } from '../components/Skeleton'
 
 // The heading (dayHeading) can read the same for two different days a
 // year apart when neither is this year, so the grouping key is its own
@@ -110,7 +111,7 @@ export default function Activity({ me }) {
 
       <div className="sheet">
         {error && <p className="form-error" role="alert">{error}</p>}
-        {entries === null && !error && <p className="empty">Loading…</p>}
+        {entries === null && !error && <RowsSkeleton />}
         {entries?.length === 0 && <p className="empty">{q ? `No entries match “${q}”.` : 'Nothing recorded for this choice.'}</p>}
 
         {entries?.length > 0 && (

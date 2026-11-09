@@ -11,8 +11,13 @@ export function StripSkeleton({ cells }) {
 
 export function RowsSkeleton({ rows = 5 }) {
   return (
-    <div className="rows-skeleton" aria-hidden="true">
+    <div className="rows-skeleton" role="status" aria-label="Loading">
       {Array.from({ length: rows }, (_, i) => <Ghost key={i} variant="row" />)}
     </div>
   )
+}
+
+/** A detail page still loading: its heading, then its rows. */
+export function SheetSkeleton() {
+  return <section className="sheet"><Ghost variant="title" /><RowsSkeleton rows={6} /></section>
 }

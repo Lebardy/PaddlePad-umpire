@@ -18,7 +18,9 @@ function ScorekeeperPicker({ matchId, onClose }) {
         <button className="icon-solo" onClick={onClose} aria-label="Close"><Icon name="x" size={18} /></button>
       </div>
       {error && <p className="form-error" role="alert">{error}</p>}
-      {!error && !umpires && <p className="muted">Loading…</p>}
+      {!error && !umpires && (
+        <ul role="status" aria-label="Loading">{[0, 1].map((i) => <li key={i}><span className="ghost-button" /></li>)}</ul>
+      )}
       {umpires?.length === 0 && <p className="muted">No other umpires here</p>}
       <ul>
         {umpires?.map((u) => (

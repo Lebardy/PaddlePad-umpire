@@ -2018,6 +2018,10 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
 .picker-head .icon-solo { min-width: 2.75rem; min-height: 2.75rem; background: none; border: none; color: var(--text-muted); cursor: pointer; }
 .scorekeeper-picker ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
 .scorekeeper-picker li button { width: 100%; justify-content: flex-start; background: var(--bg-elevated); border-color: var(--border); color: var(--text); }
+/* Loading: the shape of two umpire buttons, never words. */
+.ghost-button { display: block; height: 2.75rem; border-radius: var(--radius-sm); background: var(--border); animation: ghost 1.2s ease-in-out infinite alternate; }
+@keyframes ghost { to { opacity: 0.5; } }
+@media (prefers-reduced-motion: reduce) { .ghost-button { animation: none; } }
 
 /* Scorekeeper split: the card on Home, and the scoring screen's strip and ruling banner. */
 .scorekeeper-card {

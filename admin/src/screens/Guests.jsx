@@ -6,6 +6,7 @@ import RowConfirm from '../components/RowConfirm'
 import StatusTag from '../components/StatusTag'
 import { addOpenPlay, cancelOpenPlay, fetchGuests, listFacilities, setCourtUmpire } from '../lib/api'
 import { countWord } from '../lib/format'
+import { RowsSkeleton } from '../components/Skeleton'
 import {
   comingWords, courtCount, dayOptions, endHours, feeWords, scoreWords, spotsFor, startHours, toIso, whenWords,
 } from '../lib/guests'
@@ -82,7 +83,7 @@ export default function Guests({ me, facilityLabel }) {
 
       <div className="sheet">
         {error && <p className="form-error" role="alert">{error}</p>}
-        {!data && !error && <p className="empty">Loading…</p>}
+        {!data && !error && <RowsSkeleton />}
         {data && (
           <>
             <GuestTotals totals={data.totals} visits={data.visits} />

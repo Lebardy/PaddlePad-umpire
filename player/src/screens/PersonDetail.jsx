@@ -12,6 +12,7 @@ import { usePlayerData } from '../lib/PlayerData'
 import Avatar from '../components/Avatar'
 import Icon from '../components/Icon'
 import MatchList from '../components/MatchList'
+import { PageSkeleton } from '../components/Skeleton'
 
 function record(matches) {
   return {
@@ -34,9 +35,7 @@ function PersonDetail({ name }) {
     return (
       <div className="person-detail">
         <BackLink />
-        <p className="muted">
-          {loading ? 'Loading…' : `You haven’t played with or against ${name}.`}
-        </p>
+        {loading ? <PageSkeleton board /> : <p className="muted">You haven’t played with or against {name}.</p>}
       </div>
     )
   }

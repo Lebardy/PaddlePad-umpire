@@ -7,6 +7,7 @@ import { listPlayers, listUmpires } from '../lib/api'
 import { formatWhen, lastSignedInText, signInMethodsText } from '../lib/format'
 import { navigate } from '../lib/navigation'
 import { Link } from '../lib/router'
+import { RowsSkeleton } from '../components/Skeleton'
 
 const STATUSES = [
   { key: 'all', label: 'All' },
@@ -132,7 +133,7 @@ export default function People({ kind, me }) {
         </div>
 
         {error && <p className="form-error" role="alert">{error}</p>}
-        {rows === null && !error && <p className="empty">Loading…</p>}
+        {rows === null && !error && <RowsSkeleton />}
         {emptyMessage && <p className="empty">{emptyMessage}</p>}
 
         {rows && rows.length > 0 && (

@@ -10,6 +10,7 @@ import Icon from '../components/Icon'
 import OpenPlaySection from '../components/OpenPlaySection'
 import { fetchFacility } from '../lib/api'
 import { navigate } from '../lib/router'
+import { PageSkeleton } from '../components/Skeleton'
 
 function BackLink() {
   return (
@@ -43,7 +44,7 @@ function FacilityPage({ id }) {
     return (
       <div className="place-page">
         <BackLink />
-        <p className="muted">{current ? 'This place isn’t on PaddlePad any more.' : 'Loading…'}</p>
+        {current ? <p className="muted">This place isn’t on PaddlePad any more.</p> : <PageSkeleton board rows={2} />}
       </div>
     )
   }
