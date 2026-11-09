@@ -10,6 +10,7 @@ import { formatWhen, lastSignedInText, signInMethodsText } from '../lib/format'
 import { Link } from '../lib/router'
 import { mayOpenMatch } from '../lib/matches'
 import VideoMark from '../components/VideoMark'
+import { SheetSkeleton } from '../components/Skeleton'
 
 const inviteText = (invite) => (invite ? `${invite.code}${invite.note ? ` (${invite.note})` : ''}` : 'Unknown')
 const matchStatusText = (status) => (status === 'completed' ? 'Finished' : 'In progress')
@@ -48,7 +49,7 @@ export default function UmpireDetail({ id, me }) {
     setMoveFacilityId('')
   }
 
-  if (loading) return <section className="sheet"><p className="empty">Loading…</p></section>
+  if (loading) return <SheetSkeleton />
 
   if (result.notFound) {
     return (

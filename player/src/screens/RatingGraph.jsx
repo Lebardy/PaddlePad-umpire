@@ -16,6 +16,7 @@ import { formatDate } from '../lib/format'
 import Icon from '../components/Icon'
 import { changeClass, changeIcon, changeWords, graphView } from '../lib/ratingGraph'
 import { navigate } from '../lib/router'
+import { PageSkeleton } from '../components/Skeleton'
 
 const FILTERS = [
   { key: 'week', label: 'Week', span: 'Over the last 7 days', none: 'No matches in the last 7 days.' },
@@ -56,17 +57,14 @@ function RatingGraph() {
   }, [])
 
   if (history === undefined || history?.failed || !history?.matches?.length) {
-    const message =
-      history === undefined
-        ? 'Loading…'
-        : history?.failed
-          ? 'Your graph couldn’t load. Check your connection and try again.'
-          : 'Your graph appears once you’ve played 5 matches.'
+    const message = history?.failed
+      ? 'Your graph couldn’t load. Check your connection and try again.'
+      : 'Your graph appears once you’ve played 5 matches.'
     return (
       <div className="graph-page">
         <BackLink />
         <h1>Your PaddlePad Rating</h1>
-        <p className="muted">{message}</p>
+        {history === undefined ? <PageSkeleton board rows={0} /> : <p className="muted">{message}</p>}
       </div>
     )
   }

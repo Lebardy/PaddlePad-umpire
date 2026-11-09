@@ -6,6 +6,7 @@ import UmpireTabs from '../components/UmpireTabs'
 import RowConfirm from '../components/RowConfirm'
 import { cancelInvite, createInvite, listInvites } from '../lib/api'
 import { EXPIRY_CHOICES, formatWhen, inviteStatusText, madeByText } from '../lib/format'
+import { RowsSkeleton } from '../components/Skeleton'
 
 const SHOWING = [
   { key: 'all', label: 'All codes', empty: 'No invite codes yet. Make the first one above.' },
@@ -170,7 +171,7 @@ export default function Invites({ me }) {
         )}
 
         {error && <p className="form-error" role="alert">{error}</p>}
-        {invites === null && !error && <p className="empty">Loading…</p>}
+        {invites === null && !error && <RowsSkeleton />}
         {cancelled && (
           <p className="form-ok" role="status" tabIndex={-1} ref={cancelledNote}>
             Cancelled {cancelled.code}. It no longer works.

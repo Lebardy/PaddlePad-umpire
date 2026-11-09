@@ -10,6 +10,7 @@ import { formatWhen, lastSignedInText, playstyleText, pprText, signInMethodsText
 import { Link } from '../lib/router'
 import { mayOpenMatch } from '../lib/matches'
 import VideoMark from '../components/VideoMark'
+import { SheetSkeleton } from '../components/Skeleton'
 
 /** One player's page: their details, their recent matches, and what an admin can do about their account. */
 export default function PlayerDetail({ id, me }) {
@@ -55,7 +56,7 @@ export default function PlayerDetail({ id, me }) {
     setResult({ id, player: fresh })
   }
 
-  if (loading) return <section className="sheet"><p className="empty">Loading…</p></section>
+  if (loading) return <SheetSkeleton />
 
   if (result.notFound) {
     return (

@@ -5,6 +5,7 @@ import PageBoard, { TallyCell } from '../components/PageBoard'
 import { createFacility, listFacilities } from '../lib/api'
 import { navigate } from '../lib/navigation'
 import { Link } from '../lib/router'
+import { SheetSkeleton, RowsSkeleton } from '../components/Skeleton'
 
 /** Facilities: where umpires work and matches are scored. The owner sees and manages every one; a facility admin is sent straight to their own. */
 export default function Facilities({ me }) {
@@ -61,7 +62,7 @@ export default function Facilities({ me }) {
     if (facilities && facilities.length === 0) {
       return <section className="sheet"><p className="empty missing">You’re not linked to a facility yet. Ask the owner.</p></section>
     }
-    return <section className="sheet"><p className="empty">Loading…</p></section>
+    return <SheetSkeleton />
   }
 
   return (
@@ -111,7 +112,7 @@ export default function Facilities({ me }) {
 
         {formError && <p className="form-error" role="alert">{formError}</p>}
         {error && <p className="form-error" role="alert">{error}</p>}
-        {facilities === null && !error && <p className="empty">Loading…</p>}
+        {facilities === null && !error && <RowsSkeleton />}
         {facilities?.length === 0 && <p className="empty">No facilities yet. Make the first one above.</p>}
 
         {facilities && facilities.length > 0 && (

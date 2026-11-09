@@ -52,3 +52,13 @@ export function OverviewSkeleton() {
     </div>
   )
 }
+
+/** Any other page still loading: its board when it has one, then rows. */
+export function PageSkeleton({ board = false, rows = 4 }) {
+  return (
+    <div className="skeleton" role="status" aria-label="Loading">
+      {board && <Ghost variant="board" />}
+      <MatchListSkeleton rows={rows} />
+    </div>
+  )
+}

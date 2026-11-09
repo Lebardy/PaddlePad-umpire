@@ -39,6 +39,7 @@ import Icon from '../components/Icon'
 import Fingerprint from '../components/Fingerprint'
 import StyleEmblem from '../components/StyleEmblem'
 import LevelPlate from '../components/LevelPlate'
+import { PageSkeleton } from '../components/Skeleton'
 
 function showValue(value, as) {
   if (value === null || value === undefined) return '—'
@@ -388,7 +389,7 @@ function Rating() {
       <h1>Your rating</h1>
 
       {error && <p className="error">{error}</p>}
-      {!standing && !error && <p className="muted-inline">Loading…</p>}
+      {!standing && !error && <PageSkeleton rows={3} />}
 
       {/* Step 1 is always here, even before five matches, so steps 2
           and 3 -- which the nightly run can fill in on its own count --

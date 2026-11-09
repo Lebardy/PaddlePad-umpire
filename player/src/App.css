@@ -1968,6 +1968,7 @@ a.person-row:active { background: var(--surface-sunken); }
 .ghost { display: block; border-radius: 2px; }
 .ghost-score { width: 2.25rem; height: 2.6rem; }
 .ghost-tile { width: 100%; height: 4.6rem; }
+.ghost-board { width: 100%; height: 12rem; margin: 0.5rem 0 1rem; border-radius: var(--radius); }
 
 /* The shimmer says "working"; motion is removed for anyone who asked. */
 .ghost {

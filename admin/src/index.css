@@ -992,6 +992,7 @@ tr.is-voided .reason { opacity: 0.6; }
 .as-of { min-height: 1.3rem; }
 .as-of .ghost { margin: 0.3rem 0 0 auto; background: var(--board-raised); }
 .ghost-figure { width: 3rem; height: 1.6rem; }
+.ghost-title { width: 14rem; max-width: 60%; height: 1.6rem; margin-bottom: 1rem; }
 .ghost-count { display: inline-block; width: 1.6rem; height: 1.1rem; }
 .ghost-row { height: 2.9rem; border-radius: 0; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--border) 45%, transparent); }
 .ghost-row:last-child { border-bottom: 0; }

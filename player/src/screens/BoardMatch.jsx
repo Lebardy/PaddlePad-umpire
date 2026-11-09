@@ -31,6 +31,7 @@ import MomentumRibbon from '../components/MomentumRibbon'
 import More from '../components/More'
 import Highlights from '../components/Highlights'
 import { usePointVideo } from '../lib/usePointVideo'
+import { PageSkeleton } from '../components/Skeleton'
 
 function BackLink() {
   return (
@@ -310,7 +311,7 @@ function BoardMatch({ id }) {
   return (
     <div className="board-match">
       <BackLink />
-      {match ? <Story match={match} onExpired={() => { if (times < 1) setTimes(times + 1) }} /> : <p className="muted-inline">{error ?? 'Loading…'}</p>}
+      {match ? <Story match={match} onExpired={() => { if (times < 1) setTimes(times + 1) }} /> : error ? <p className="muted-inline">{error}</p> : <PageSkeleton board />}
     </div>
   )
 }

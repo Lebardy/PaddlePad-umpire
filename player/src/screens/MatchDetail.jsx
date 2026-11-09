@@ -28,6 +28,7 @@ import StackedBar from '../components/StackedBar'
 import Meter from '../components/Meter'
 import RallyEndings from '../components/RallyEndings'
 import VisitSection from '../components/VisitSection'
+import { PageSkeleton } from '../components/Skeleton'
 
 // Both timestamps come from a device clock, and startedAt is when the
 // umpire CREATED the match rather than when play began -- a match set up
@@ -132,7 +133,7 @@ function MatchDetail({ id }) {
     return (
       <div className="detail">
         <BackLink />
-        <p className="muted">{loading ? 'Loading…' : 'That match isn’t in your history.'}</p>
+        {loading ? <PageSkeleton board /> : <p className="muted">That match isn’t in your history.</p>}
       </div>
     )
   }

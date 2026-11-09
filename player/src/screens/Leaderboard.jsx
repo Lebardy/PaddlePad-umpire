@@ -10,6 +10,7 @@ import { usePlayerData } from '../lib/PlayerData'
 import RankPanel from '../components/RankPanel'
 import MonthLists from '../components/MonthLists'
 import ErrorState from '../components/ErrorState'
+import { PageSkeleton } from '../components/Skeleton'
 
 function Leaderboard() {
   const { refresh } = usePlayerData()
@@ -50,7 +51,7 @@ function Leaderboard() {
           }}
         />
       )}
-      {!error && !board && <p className="muted">Loading…</p>}
+      {!error && !board && <PageSkeleton rows={6} />}
       {board && (
         <>
           <RankPanel ranking={board.ranking} you={board.you} />

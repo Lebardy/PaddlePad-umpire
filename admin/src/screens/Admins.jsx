@@ -6,6 +6,7 @@ import RowConfirm from '../components/RowConfirm'
 import StatusTag from '../components/StatusTag'
 import { addAdmin, listAdmins, listFacilities, moveAdmin, newSetupLink, switchAdmin } from '../lib/api'
 import { formatWhen, signInMethods } from '../lib/format'
+import { RowsSkeleton } from '../components/Skeleton'
 
 const notSetUp = (admin) => !admin.hasPassword && !admin.googleEmail
 
@@ -194,7 +195,7 @@ export default function Admins({ me }) {
         )}
 
         {error && <p className="form-error" role="alert">{error}</p>}
-        {admins === null && !error && <p className="empty">Loading…</p>}
+        {admins === null && !error && <RowsSkeleton />}
         {admins?.length === 0 && <p className="empty">No managers yet.</p>}
 
         {list.length > 0 && (

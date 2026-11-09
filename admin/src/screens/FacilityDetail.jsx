@@ -7,6 +7,7 @@ import StatusTag from '../components/StatusTag'
 import { fetchFacility, updateFacility } from '../lib/api'
 import { navigate } from '../lib/navigation'
 import { Link } from '../lib/router'
+import { SheetSkeleton } from '../components/Skeleton'
 
 /** One facility's page: its details (with an edit form for any of its admins), then who works there, in tabs. */
 export default function FacilityDetail({ id, me }) {
@@ -79,7 +80,7 @@ export default function FacilityDetail({ id, me }) {
     }
   }
 
-  if (loading) return <section className="sheet"><p className="empty">Loading…</p></section>
+  if (loading) return <SheetSkeleton />
 
   if (result.notFound) {
     return (
