@@ -8,6 +8,10 @@ import { isUuid, normalizePlayerName, playerNameError } from '../validate.js'
 const router = Router()
 router.use(requireAuth, requireActiveUmpire(query))
 
+const signsInAnotherWay = (row) => Boolean(row.password_hash || row.google_sub)
+const SIGNS_IN_ANOTHER_WAY =
+  'This player signs in with a password or Google, so they need no code. If they are locked out, the owner can make them one.'
+
 const SEARCH_LIMIT = 50
 
 // Every player response is built from this shape. `match_count` and
@@ -138,7 +142,7 @@ router.get('/:id/claim-code', async (req, res) => {
   if (!isUuid(req.params.id)) return res.status(404).json({ error: 'No such player' })
 
   const { rows: existing } = await query(
-    'SELECT closed_by_admin_at FROM players WHERE id = $1',
+    'SELECT closed_by_admin_at, password_hash, google_sub FROM players WHERE id = $1',
     [req.params.id],
   )
   if (!existing[0]) return res.status(404).json({ error: 'No such player' })
@@ -147,6 +151,9 @@ router.get('/:id/claim-code', async (req, res) => {
       error: "This player's account was closed by the owner. Only the owner can reopen it.",
     })
   }
+  // A code signs in with no password, and players belong to no facility:
+  // for someone who already signs in another way, only the owner makes one.
+  if (signsInAnotherWay(existing[0])) return res.status(403).json({ error: SIGNS_IN_ANOTHER_WAY })
 
   // The WHERE guards the same thing the SELECT above just checked: an
   // owner close landing between the two statements must not mint a
@@ -158,12 +165,13 @@ router.get('/:id/claim-code', async (req, res) => {
         SET claim_code = COALESCE(claim_code, $2)
       WHERE id = $1
         AND closed_by_admin_at IS NULL
+        AND password_hash IS NULL AND google_sub IS NULL
       RETURNING claim_code`,
     [req.params.id, generateInviteCode()],
   )
   if (!rows[0]) {
     const { rows: recheck } = await query(
-      'SELECT closed_by_admin_at FROM players WHERE id = $1',
+      'SELECT closed_by_admin_at, password_hash, google_sub FROM players WHERE id = $1',
       [req.params.id],
     )
     if (recheck[0] && !mayMintClaimCode(recheck[0])) {
@@ -171,6 +179,7 @@ router.get('/:id/claim-code', async (req, res) => {
         error: "This player's account was closed by the owner. Only the owner can reopen it.",
       })
     }
+    if (recheck[0] && signsInAnotherWay(recheck[0])) return res.status(403).json({ error: SIGNS_IN_ANOTHER_WAY })
     return res.status(404).json({ error: 'No such player' })
   }
   res.json({ claimCode: rows[0].claim_code })

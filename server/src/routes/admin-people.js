@@ -192,6 +192,11 @@ adminPlayersRoutes.post('/:id/claim-code', async (req, res) => {
       if (!mayMintClaimCode(row, { isOwner: mayClose(req.admin) })) {
         throw refusal(403, 'Only the owner can reopen a closed account')
       }
+      // A code signs in with no password, and players belong to no facility:
+      // for someone who already signs in another way, only the owner makes one.
+      if ((row.password_hash || row.google_sub) && !mayClose(req.admin)) {
+        throw refusal(403, 'Only the owner can make a code for a player who signs in with a password or Google')
+      }
       if (row.paused_at && !row.deactivated_at) throw refusal(409, 'Switch this player back on before making a new code')
       const code = generateInviteCode()
       await client.query('UPDATE players SET claim_code = $2 WHERE id = $1', [row.id, code])

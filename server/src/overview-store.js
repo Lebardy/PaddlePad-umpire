@@ -424,6 +424,14 @@ export async function mergePlayers(client, keepId, removeId) {
       [keepId, removeId, key, movedIds],
     )
   }
+  // A ruling keeps the rally it overturned, player and all; the server checks that player is in the match.
+  await client.query(
+    `UPDATE match_events SET payload = jsonb_set(payload, '{was,actingPlayerId}', to_jsonb($1::text))
+      WHERE match_id = ANY($3::uuid[]) AND type = 'ruling' AND payload->'was'->>'actingPlayerId' = $2::text`,
+    [keepId, removeId, movedIds],
+  )
+  // Otherwise the delete below clears it, and nobody may remove the video they filmed.
+  await client.query('UPDATE match_videos SET player_id = $1 WHERE player_id = $2', [keepId, removeId])
   // session_players, player_ratings and dismissed pairs go with the row (ON DELETE CASCADE).
   await client.query('DELETE FROM players WHERE id = $1', [removeId])
   return { movedMatches: movedIds.length }
