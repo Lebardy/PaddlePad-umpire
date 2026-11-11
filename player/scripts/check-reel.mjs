@@ -19,6 +19,8 @@ check('past the end too (a late time update)', reelStep(clips, 0, 40), { index: 
 check('after the last clip it stops', reelStep(clips, 1, 77), { done: true })
 check('no clip there, it stops', reelStep(clips, 5, 0), { done: true })
 check('no clips at all, it stops', reelStep([], 0, 0), { done: true })
+check('one highlight on its own stops at its end', reelStep(clips, 0, 32, true), { done: true })
+check('one highlight on its own keeps playing inside it', reelStep(clips, 0, 20, true), { index: 0 })
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

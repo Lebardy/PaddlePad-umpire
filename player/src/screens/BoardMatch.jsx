@@ -140,7 +140,7 @@ function Story({ match, onExpired }) {
   const clean = useCountUp(Number.isFinite(match.clean) ? Math.round(match.clean * 100) : NaN)
   // The point picked in the boxes, lit up on the chart above them.
   const [selected, setSelected] = useState(null)
-  const { ref: filmRef, pick, playReel, onTimeUpdate, onSeeking, reel, starred } = usePointVideo(match.video, game.moments.length, selected, setSelected)
+  const { ref: filmRef, pick, playReel, onTimeUpdate, onSeeking, playing } = usePointVideo(match.video, game.moments.length, selected, setSelected)
 
   const markers = []
   if (game.lowPoint && game.lowPoint.losers - game.lowPoint.winners >= 2) {
@@ -236,7 +236,7 @@ function Story({ match, onExpired }) {
                 onSeeking={onSeeking}
                 onError={onExpired}
               />
-              <Highlights count={match.video.highlights?.length ?? 0} reel={reel} onPlay={playReel} />
+              <Highlights count={match.video.highlights?.length ?? 0} playing={playing} onPlay={playReel} />
             </>
           )}
           <MomentumRibbon
@@ -249,7 +249,6 @@ function Story({ match, onExpired }) {
             lowIndex={game.lowPoint ? game.lowPoint.index : null}
             selected={selected}
             onSelect={match.video ? pick : setSelected}
-            starred={match.video ? starred : null}
             hint={match.video ? 'Tap a point to watch it' : undefined}
             watching={Boolean(match.video)}
           />

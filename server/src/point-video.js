@@ -8,7 +8,7 @@ import { pointRallyOrder } from './player-stats.js'
  * video is not set up here: a link good for two hours, and for each
  * POINT the second its rally starts at -- null for a point the video
  * does not show -- and the umpire's highlights as clips (start and end
- * seconds, and the point each one scored or null). `row` is the match, `events` its rows in play order
+ * seconds). `row` is the match, `events` its rows in play order
  * (with `at`), `log` the same events as the scoring engine reads them,
  * and whether this player may remove it: only the one who filmed it.
  */
@@ -30,7 +30,7 @@ export async function pointVideo(row, events, log, playerId) {
   }
   const timed = events.filter((e) => e.type === 'rally').map((e) => ({ id: e.id, atMs: new Date(e.at).getTime() }))
   const everyRally = rallySeconds({ ...timing, rallies: timed })
-  // For each point, which rally scored it; a highlight that scored no point has no box to star.
+  // For each point, which rally scored it.
   const order = pointRallyOrder(row, log)
   return {
     url: signedReadUrl(config, video.file_key),
@@ -40,6 +40,6 @@ export async function pointVideo(row, events, log, playerId) {
     mayRemove: video.source === 'player' && video.player_id === playerId,
     seconds: order.map((rally) => everyRally[rally] ?? null),
     highlights: highlightClips({ ...timing, rallies: timed, picked: video.highlights ?? [] })
-      .map(({ index, start, end }) => ({ start, end, point: order.includes(index) ? order.indexOf(index) : null })),
+      .map(({ start, end }) => ({ start, end })),
   }
 }
