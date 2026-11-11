@@ -15,7 +15,8 @@ import UpdateNotice from './components/UpdateNotice'
 import CameraIcon from './components/CameraIcon'
 import * as sync from './lib/sync'
 import { clearLocalData, migrateLegacyData } from './lib/storage'
-import { pendingCount } from './lib/outbox'
+import { deadLetter, pendingCount } from './lib/outbox'
+import { read, write } from './lib/localstore'
 import './App.css'
 
 /** "Jan Librando" -> "JL", for the account button. */
@@ -28,6 +29,12 @@ function initialsOf(name) {
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
+
+// Whose sessions, matches and unsent changes are on this device.
+const OWNER_KEY = 'paddlepad.dataOwner'
+
+/** Changes the server has not taken: waiting to send, and refused ("Couldn't sync"). Both exist only here. */
+const unsentCount = () => pendingCount() + deadLetter().length
 
 // Central view-router. There is no URL routing in this app (it's a
 // single-page courtside tool) -- `view` is the entire navigation
@@ -83,6 +90,8 @@ function App() {
   // already on the device stays usable.
   useEffect(() => {
     if (!umpire) return
+    // Installs from before the owner was kept: whoever is signed in now owns what is here.
+    if (!read(OWNER_KEY, null)) write(OWNER_KEY, { id: umpire.id, name: umpire.name })
     // Drop anything written before the server existed; those records
     // hold device-minted player ids that no longer resolve.
     migrateLegacyData()
@@ -116,7 +125,7 @@ function App() {
   // Unsynced work is the one thing worth stopping for, because it
   // exists nowhere else yet.
   function handleSignOut() {
-    const unsynced = pendingCount()
+    const unsynced = unsentCount()
     if (
       unsynced > 0 &&
       !confirm(
@@ -136,6 +145,26 @@ function App() {
 
   // The sign-in and account answers come without the facility's filming flag, so ask again straight away.
   function handleSignedIn(fresh) {
+    // Another umpire's data is still here when their session ended on its
+    // own (a pause, an expired sign-in): sending it would credit their
+    // matches to this umpire, so it is discarded -- after asking, if any is unsent.
+    const owner = read(OWNER_KEY, null)
+    if (owner && owner.id !== fresh.id) {
+      const unsent = unsentCount()
+      if (
+        unsent > 0 &&
+        !confirm(
+          `${unsent} change${unsent === 1 ? '' : 's'} from ${owner.name} ` +
+            "haven't reached the server yet. Signing in as someone else discards them. " +
+            `To keep them, cancel and let ${owner.name} sign in.\n\nDiscard and continue?`,
+        )
+      ) {
+        clearSession()
+        return
+      }
+      clearLocalData()
+    }
+    write(OWNER_KEY, { id: fresh.id, name: fresh.name })
     setUmpire(fresh)
     fetchCurrentUmpire().then((current) => { if (current) setUmpire(current) }).catch(() => {})
   }

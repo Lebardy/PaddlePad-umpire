@@ -1193,8 +1193,8 @@ async function main() {
     // --- the claim code as the recovery path ---
     // A code stops working once its player has their own way in, so one
     // that was read out or sent around earlier is not a spare key to
-    // the account. With no email there is no reset link: an umpire
-    // making a NEW code is how a locked-out player gets back in.
+    // the account. An umpire cannot make a new one for a player who signs
+    // in with a password; the owner can (see the admin people section).
     const spentCode = await asPlayer('/auth/player/claim', {
       method: 'POST',
       body: { code: claim.body.claimCode },
@@ -1202,20 +1202,8 @@ async function main() {
     check('the code used to set up the account no longer signs in -> 404',
       spentCode.status === 404, String(spentCode.status))
     const recoveryCode = await call(`/players/${playerA}/claim-code`)
-    check('an umpire asking for that player\'s code now gets a NEW one',
-      recoveryCode.status === 200 && Boolean(recoveryCode.body.claimCode) &&
-        recoveryCode.body.claimCode !== claim.body.claimCode,
-      String(recoveryCode.status))
-    const recovered = await asPlayer('/auth/player/claim', {
-      method: 'POST',
-      body: { code: recoveryCode.body.claimCode },
-    })
-    check('and the new code signs them back in (the recovery path)',
-      recovered.status === 200 && recovered.body.player?.id === playerA,
-      JSON.stringify(recovered.body).slice(0, 100))
-    check('and it reports the username, so no prompt to set up what exists',
-      recovered.body.player?.username === `smk_a_${stamp}`.slice(0, 20),
-      String(recovered.body.player?.username))
+    check('an umpire cannot make a code for a player who signs in with a password -> 403',
+      recoveryCode.status === 403 && !recoveryCode.body.claimCode, JSON.stringify(recoveryCode.body))
 
     // --- upgrading a code-only session into an account ---
     const echo = await call('/players', {
@@ -1567,23 +1555,25 @@ async function main() {
     check('linking a code that matches nobody -> 404',
       (await link({ code: 'PAD-0000-0000' })).status === 404)
 
-    const ownCode = (await call(`/players/${ownId}/claim-code`)).body.claimCode
-    const mine = await link({ code: ownCode })
+    // A code-only player still holds their code, so they can paste it here.
+    const selfOnly = await call('/players', { method: 'POST', body: { name: `Smoke Self ${stamp3}` } })
+    const selfCode = (await call(`/players/${selfOnly.body.player?.id}/claim-code`)).body.claimCode
+    const selfIn = await asPlayer('/auth/player/claim', { method: 'POST', body: { code: selfCode } })
+    const mine = await link({ code: selfCode }, selfIn.body.token)
     check('your own code is not an error, just nothing to do',
       mine.status === 200 && mine.body.alreadyYours === true,
       JSON.stringify(mine.body).slice(0, 120))
 
-    // An umpire can make a code for a player who already has an
-    // account, because that is the forgotten-password path -- so
-    // holding one must NOT be enough to absorb a real account.
+    // Only the owner makes a code for a player who already has an account
+    // (the absorb refusal for such a code is checked in the owner section).
     const rivalUser = `smk_rival_${stamp3}`.slice(0, 20)
     const rival = await register({
       name: `Smoke Rival ${stamp3}`, username: rivalUser, password: PASSWORD,
     })
     if (rival.body.player?.id) selfRegistered.push(rival.body.player.id)
-    const rivalCode = (await call(`/players/${rival.body.player?.id}/claim-code`)).body.claimCode
-    check('a code belonging to a REGISTERED account is refused -> 409',
-      (await link({ code: rivalCode })).status === 409)
+    const rivalCode = await call(`/players/${rival.body.player?.id}/claim-code`)
+    check('an umpire cannot make a code for a REGISTERED account -> 403',
+      rivalCode.status === 403 && !rivalCode.body.claimCode, JSON.stringify(rivalCode.body))
 
     // mates[0] played alongside the account in m2, so the two ids are
     // demonstrably two people and no rewrite of that match is safe.
@@ -2028,6 +2018,15 @@ async function main() {
       claimNewCode.status === 200 && claimNewCode.body.player?.id === playerId,
       JSON.stringify(claimNewCode.body).slice(0, 80))
     playerToken = claimNewCode.body.token
+    // The owner can make a code for a registered player (the forgotten-password
+    // path), so holding one must NOT be enough to absorb that account.
+    const absorber = await request('/auth/player/register', {
+      method: 'POST',
+      body: { name: `Smoke Absorber ${pStamp}`, username: `smk_abs_${pStamp}`.slice(0, 20), password: `smk-${uuid()}` },
+    })
+    if (absorber.body.player?.id) selfRegistered.push(absorber.body.player.id)
+    const absorb = await request('/player/link', { method: 'POST', bearer: absorber.body.token, body: { code: newCode.body.claimCode } })
+    check('a code belonging to a REGISTERED account is refused -> 409', absorb.status === 409, JSON.stringify(absorb.body).slice(0, 80))
 
     // --- 9: activity ---
     const umpirePausedCount = await countByAction('umpire.paused', umpireId, ownerToken)
@@ -2070,6 +2069,9 @@ async function main() {
     check('a non-owner admin cannot close a player -> 403, the owner-only message',
       nonOwnerClose.status === 403 && nonOwnerClose.body.error === 'Only the owner can close accounts',
       JSON.stringify(nonOwnerClose.body))
+    const nonOwnerCode = await request(`/admin/players/${playerId}/claim-code`, { method: 'POST', bearer: peopleAdmin })
+    check('a non-owner admin cannot make a code for a player who signs in with a password -> 403',
+      nonOwnerCode.status === 403, JSON.stringify(nonOwnerCode.body))
 
     const nonOwnerPause = await request(`/admin/umpires/${umpireId}/pause`, {
       method: 'POST', bearer: peopleAdmin, body: { reason: 'any admin can pause' },
@@ -2155,8 +2157,9 @@ async function main() {
       reopenLink.body.player?.id === playerId, `${reopenLink.body.player?.id} vs ${playerId}`)
 
     const claimCodeAfterLink = await request(`/players/${playerId}/claim-code`, { bearer: umpToken })
-    check('the umpire route mints a code for the reopened row -> 200, not the owner-only 403',
-      claimCodeAfterLink.status === 200 && Boolean(claimCodeAfterLink.body.claimCode),
+    // It signs in with a password now, so the umpire is refused -- for that, not for the owner's close.
+    check('the umpire route refuses the reopened row for its password, not the owner-only close -> 403',
+      claimCodeAfterLink.status === 403 && /password or Google/.test(claimCodeAfterLink.body.error ?? ''),
       JSON.stringify(claimCodeAfterLink.body).slice(0, 80))
 
     const peopleAdminOff = await request(`/admin/admins/${peopleAdminId}/switch-off`, { method: 'POST', bearer: ownerToken })
