@@ -41,11 +41,13 @@ function refusal(statusCode, message) {
 // refused connection or similar, and that would otherwise fall through
 // as a generic 500 instead of the 503 an unreachable Google deserves.
 const GOOGLE_UNREACHABLE = 'Google sign-in is unavailable right now. Try again in a moment.'
+// A slow Google fails the sign-in with that message rather than leaving the button spinning.
+const GOOGLE_WAIT_MS = 10_000
 
 async function fetchKeys() {
   let res
   try {
-    res = await fetch(CERTS_URL)
+    res = await fetch(CERTS_URL, { signal: AbortSignal.timeout(GOOGLE_WAIT_MS) })
   } catch {
     throw refusal(503, GOOGLE_UNREACHABLE)
   }
@@ -167,7 +169,7 @@ export async function verifyGoogleAccessToken(accessToken) {
 
   let res
   try {
-    res = await fetch(`${TOKENINFO_URL}?access_token=${encodeURIComponent(accessToken)}`)
+    res = await fetch(`${TOKENINFO_URL}?access_token=${encodeURIComponent(accessToken)}`, { signal: AbortSignal.timeout(GOOGLE_WAIT_MS) })
   } catch {
     throw refusal(503, GOOGLE_UNREACHABLE)
   }
@@ -191,6 +193,7 @@ export async function verifyGoogleAccessToken(accessToken) {
   try {
     const who = await fetch(USERINFO_URL, {
       headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(GOOGLE_WAIT_MS),
     })
     if (who.ok) {
       const profile = await who.json()

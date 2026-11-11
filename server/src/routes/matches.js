@@ -531,19 +531,28 @@ router.put('/:id/log', async (req, res) => {
   }
 
   const derived = deriveRow(row, events)
-  // Held for the main umpire, who may still rule on the winning rally.
-  const held = waitsForUmpire(derived, row.scorekeeper_state) && !endedEarly
-
-  // A match ends either by being won on court (derivable) or by being
-  // stopped early (NOT derivable -- ending early appends no event). The
-  // second case is why ended_early is stored: without it, every
-  // manually-ended match would reopen as in-progress on the next sync.
-  const completed = (derived.completed && !held) || endedEarly
   const endedAtSource = derived.completed
     ? events.findLast((e) => e.type === 'rally')?.at
     : (endedEarlyAt ?? Date.now())
 
-  await withTransaction(async (client) => {
+  const saved = await withTransaction(async (client) => {
+    // Asked again under a lock: a Conclude or a takeover that landed after
+    // the read above must win, or a save already on its way reopens the match.
+    const { rows: [current] } = await client.query(
+      `SELECT status, recorded_by, scorekeeper_id, scorekeeper_state, scoring_device, scoring_claimed_at
+         FROM matches WHERE id = $1 FOR UPDATE`,
+      [req.params.id],
+    )
+    if (!current || scorekeeperRevoked(current, req.umpire.id, deviceId) || heldByAnotherDevice(current, deviceId)) return null
+
+    // Held for the main umpire, who may still rule on the winning rally.
+    const held = waitsForUmpire(derived, current.scorekeeper_state) && !endedEarly
+    // A match ends either by being won on court (derivable) or by being
+    // stopped early (NOT derivable -- ending early appends no event). The
+    // second case is why ended_early is stored: without it, every
+    // manually-ended match would reopen as in-progress on the next sync.
+    const completed = (derived.completed && !held) || endedEarly
+
     await client.query('DELETE FROM match_events WHERE match_id = $1', [req.params.id])
 
     for (const event of events) {
@@ -596,12 +605,19 @@ router.put('/:id/log', async (req, res) => {
         [req.params.id, MATCH_OVER],
       )
     }
+    return { completed, wasCompleted: current.status === 'completed' }
   })
+  if (!saved) {
+    return res.status(409).json({
+      error: 'Another device is scoring this match',
+      heldBy: { umpireName: row.recorded_by_name, since: row.scoring_claimed_at },
+    })
+  }
 
   // Only finished matches are rated. The ratings need working out again
   // when this match was finished before the save or is finished now;
   // a tap in a match still being played changes none of them.
-  if (row.status === 'completed' || completed) invalidateRallyRatings()
+  if (saved.wasCompleted || saved.completed) invalidateRallyRatings()
 
   const updatedParams = [req.params.id]
   const updatedScope = umpireScope(req.umpire.facilityId, updatedParams, 'sess.facility_id')
