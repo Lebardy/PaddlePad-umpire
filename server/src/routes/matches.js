@@ -484,6 +484,7 @@ router.put('/:id/log', async (req, res) => {
     }
     if (
       event.type !== 'rally' &&
+      event.type !== 'timeout' &&
       event.type !== 'thirdShot' &&
       event.type !== 'serverCorrection' &&
       event.type !== 'ruling'
@@ -519,6 +520,13 @@ router.put('/:id/log', async (req, res) => {
       }
       if (event.was !== undefined && !players.has(event.was?.actingPlayerId)) {
         return res.status(400).json({ error: `Event ${index} references a player not in this match` })
+      }
+      continue
+    }
+    // A side's timeout (Rule 21.A): names a side, not a player; changes no score.
+    if (event.type === 'timeout') {
+      if (event.team !== 'A' && event.team !== 'B') {
+        return res.status(400).json({ error: `Event ${index} is not a valid timeout` })
       }
       continue
     }
