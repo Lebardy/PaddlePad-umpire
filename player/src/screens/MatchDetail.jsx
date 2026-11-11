@@ -365,7 +365,7 @@ function PointByPoint({ id, match, selected, onSelect }) {
   const game = loaded?.id === id ? loaded.game : null
   const points = loaded?.id === id ? loaded.points : null
   const video = loaded?.id === id ? loaded.video : null
-  const { ref: filmRef, pick, playReel, onTimeUpdate, onSeeking, reel, starred } = usePointVideo(video, game?.moments.length ?? 0, selected, onSelect)
+  const { ref: filmRef, pick, playReel, onTimeUpdate, onSeeking, playing } = usePointVideo(video, game?.moments.length ?? 0, selected, onSelect)
   if (!game || game.moments.length === 0) return null
 
   async function remove() {
@@ -404,7 +404,7 @@ function PointByPoint({ id, match, selected, onSelect }) {
             onSeeking={onSeeking}
             onError={() => { if (times < 1) setAsked({ id, times: times + 1 }) }}
           />
-          <Highlights count={video.highlights?.length ?? 0} reel={reel} onPlay={playReel} />
+          <Highlights count={video.highlights?.length ?? 0} playing={playing} onPlay={playReel} />
         </>
       )}
       <MomentumRibbon
@@ -419,7 +419,6 @@ function PointByPoint({ id, match, selected, onSelect }) {
         lowIndex={game.lowPoint ? game.lowPoint.index : null}
         selected={selected}
         onSelect={video ? pick : onSelect}
-        starred={video ? starred : null}
         hint={video ? 'Tap a point to watch it' : undefined}
         watching={Boolean(video)}
       />

@@ -4,12 +4,12 @@ import { reelStep } from './reel'
 /**
  * A match video beside its point boxes: tap a box to watch that point,
  * the picked box follows what is playing, and the Highlights reel plays
- * the umpire's picks back to back. Shared by a player's match page and
+ * the umpire's picks back to back, or one of them on its own. Shared by a player's match page and
  * the match of the month so the two cannot drift apart.
  */
 export function usePointVideo(video, count, selected, onSelect) {
   const ref = useRef(null)
-  const [reel, setReel] = useState(null) // { video, index }
+  const [reel, setReel] = useState(null) // { video, index, only }
   // Our own jumps, so only the viewer's own seeking leaves the reel.
   const jumping = useRef(false)
   const clips = video?.highlights ?? []
@@ -35,10 +35,10 @@ export function usePointVideo(video, count, selected, onSelect) {
     seek(second)
   }
 
-  function playReel() {
-    if (clips.length === 0) return
-    setReel({ video, index: 0 })
-    seek(clips[0].start)
+  function playReel(index = null) {
+    if (!clips[index ?? 0]) return
+    setReel({ video, index: index ?? 0, only: index !== null })
+    seek(clips[index ?? 0].start)
   }
 
   function onTimeUpdate(event) {
@@ -46,9 +46,9 @@ export function usePointVideo(video, count, selected, onSelect) {
     if (node.paused) return
     const at = node.currentTime
     if (clip !== null) {
-      const step = reelStep(clips, clip, at)
+      const step = reelStep(clips, clip, at, reel.only)
       if (step.done) { node.pause(); setReel(null) }
-      else if (step.index !== clip) { setReel({ video, index: step.index }); seek(step.seek) }
+      else if (step.index !== clip) { setReel({ video, index: step.index, only: false }); seek(step.seek) }
     }
     // The point being played: the last one whose rally has started.
     let playing = null
@@ -65,7 +65,6 @@ export function usePointVideo(video, count, selected, onSelect) {
 
   return {
     ref, pick, playReel, onTimeUpdate, onSeeking,
-    reel: clip !== null ? { at: clip + 1, of: clips.length } : null,
-    starred: new Set(clips.map((clip) => clip.point).filter((point) => point !== null)),
+    playing: clip,
   }
 }

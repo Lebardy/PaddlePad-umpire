@@ -1105,11 +1105,6 @@
 .ribbon-block.is-selected { outline: 2px solid var(--text); outline-offset: 2px; }
 .ribbon-block:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
-/* The umpire's picked points: a small filled star in the box's top corner,
-   out of the way of the score. */
-.ribbon-block.is-starred { position: relative; }
-.ribbon-star { position: absolute; top: 1px; right: 1px; fill: currentColor; stroke: none; pointer-events: none; }
-
 /* ============ Match of the month ============ */
 
 .board-match-eyebrow {
@@ -2613,8 +2608,9 @@ a.person-row:active { background: var(--surface-sunken); }
 .detail-shape.is-filmed > .video-remove button { scroll-margin: calc(var(--video-h) + 8.5rem) 0 calc(4.5rem + env(safe-area-inset-bottom)); }
 .ribbon.is-watching .ribbon-block.is-selected { outline: 4px solid var(--lamp); outline-offset: 1px; }
 
-/* The Highlights reel under the video: the button and, while it plays, which clip. */
-.highlights { display: flex; align-items: center; gap: 0.8rem; margin-top: 0.7rem; }
+/* The Highlights bar under the video: play them all, then one numbered
+   button each; the one on screen lights up like the play button. */
+.highlights { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.7rem; }
 .highlights-play {
   min-height: 2.75rem; min-width: 2.75rem; padding: 0 1rem; display: inline-flex; align-items: center; gap: 0.4rem;
   border: none; border-radius: 999px; background: var(--button); color: var(--button-ink);
@@ -2622,7 +2618,17 @@ a.person-row:active { background: var(--surface-sunken); }
 }
 .highlights-play svg { fill: currentColor; stroke: none; }
 .highlights-play:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.highlights-at { color: var(--text-muted); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.highlights-play { flex: none; margin-right: 0.3rem; }
+.highlights-one {
+  /* Five fit beside the play button on a 360px phone: they give a little width, never height. */
+  flex: 0 1 2.75rem; min-width: 2.25rem; height: 2.75rem; display: inline-grid; place-items: center;
+  border: 2px solid color-mix(in srgb, var(--text) 22%, transparent); border-radius: 999px; background: transparent; color: var(--text);
+  font: 700 1.15rem var(--label); font-variant-numeric: tabular-nums; cursor: pointer;
+  transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out, transform 80ms ease-out;
+}
+.highlights-one:active, .highlights-play:active { transform: scale(0.94); }
+.highlights-one.is-playing { background: var(--button); border-color: var(--button); color: var(--button-ink); }
+.highlights-one:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .detail-shape.is-filmed > .highlights + .ribbon { margin-top: 0.7rem; }
 
 /* A phone held sideways: the video takes the height of the screen on
