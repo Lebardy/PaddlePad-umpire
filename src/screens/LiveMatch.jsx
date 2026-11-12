@@ -5,6 +5,7 @@ import {
   addServerCorrection,
   tapThirdShot,
   undoLastEvent,
+  addTimeout,
   endMatchManually,
   deleteMatch,
   voidMatch,
@@ -26,6 +27,7 @@ import ScorekeeperPicker from '../components/ScorekeeperPicker'
 import { LEASE_MINUTES } from '../../server/src/scoring-lease.js'
 import { deriveMatchState, currentServerPlayerId, courtSides } from '../lib/pickleball'
 import { isSameThirdShot, waitingThirdShot } from '../lib/thirdShot'
+import { endChangeAt, isGamePoint, runningTimeout, scoreCall, TIMEOUT_MS, timeoutsLeft } from '../lib/scoreHelpers'
 import {
   FAULT_ENDINGS,
   RALLY_RULE,
@@ -65,6 +67,89 @@ function readLegendCollapsed() {
   } catch {
     return false
   }
+}
+
+// A short buzz on Android; nothing where the browser has no vibration.
+const buzz = (pattern) => navigator.vibrate?.(pattern)
+
+// Which matches' switch-ends reminder this phone has already acted on.
+const END_DONE_KEY = 'paddlepad.endChangeDone'
+
+function readEndDone(matchId) {
+  try {
+    return Boolean(JSON.parse(localStorage.getItem(END_DONE_KEY) ?? '{}')[matchId])
+  } catch {
+    return false
+  }
+}
+
+function writeEndDone(matchId) {
+  try {
+    const done = JSON.parse(localStorage.getItem(END_DONE_KEY) ?? '{}')
+    localStorage.setItem(END_DONE_KEY, JSON.stringify({ ...done, [matchId]: true }))
+  } catch {
+    // Storage blocked: the reminder simply comes back after a reload.
+  }
+}
+
+const clockText = (ms) => {
+  const secs = Math.ceil(ms / 1000)
+  return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`
+}
+
+// The one-minute clock for a timeout or the end change, over the whole
+// screen until the umpire presses Resume (it stays at 0:00 if nobody does).
+// A dialog: focus goes to Resume, and the parent returns it on close.
+function ClockOverlay({ tone, title, note, endsAt, onResume }) {
+  const [now, setNow] = useState(Date.now)
+  const resume = useRef(null)
+  const buzzed = useRef({ warn: false, end: false })
+  const left = Math.max(0, endsAt - now)
+
+  useEffect(() => {
+    resume.current?.focus()
+    const timer = setInterval(() => setNow(Date.now()), 250)
+    return () => clearInterval(timer)
+  }, [])
+  useEffect(() => {
+    if (left === 0 && !buzzed.current.end) {
+      buzzed.current.end = buzzed.current.warn = true
+      buzz([200, 100, 200])
+    } else if (left <= 15_000 && !buzzed.current.warn) {
+      buzzed.current.warn = true
+      buzz(200)
+    }
+  }, [left])
+
+  return (
+    <div
+      className={`clock-overlay is-${tone}`}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onKeyDown={(e) => {
+        if (e.key === 'Tab') {
+          e.preventDefault()
+          resume.current?.focus()
+        }
+      }}
+    >
+      <div className="clock-card">
+        <span className="clock-title">
+          <Icon name={tone === 'timeout' ? 'timer' : 'swap'} size={22} />
+          {title}
+        </span>
+        <div className="clock-ring" style={{ '--left': left / TIMEOUT_MS }}>
+          <span className="clock-time">{clockText(left)}</span>
+        </div>
+        <span className="clock-note">{note}</span>
+        <button ref={resume} className="clock-resume" onClick={onResume}>
+          <Icon name="play" size={20} />
+          Resume play
+        </button>
+      </div>
+    </div>
+  )
 }
 
 // Every ending with what it means, in the two groups the buttons use.
@@ -170,12 +255,15 @@ const RULING_WORDS = { stands: 'call stands', overturned: 'overturned', replay: 
 // Turns one logged event into the plain-English line shown in the
 // history panel, so an umpire can glance back and confirm what was
 // actually recorded without needing to remember button labels.
-function describeEvent(event, name) {
+function describeEvent(event, name, teamWords) {
   if (event.type === 'rally') {
     return `${rallyLabel(event)} — ${name(event.actingPlayerId)}`
   }
   if (event.type === 'serverCorrection') {
     return `Serve corrected — ${name(event.playerId)}`
+  }
+  if (event.type === 'timeout') {
+    return `Timeout — ${teamWords(event.team)}`
   }
   if (event.type === 'ruling') {
     return `Umpire: ${RULING_WORDS[event.kind] ?? 'ruling'}`
@@ -310,6 +398,33 @@ function LiveMatch({ matchId, onBack }) {
     }
   }, [matchId, polling, pollMs])
 
+  // The timeout clock and the end-change clock. A timeout is latched when
+  // first seen running so its clock stays up at 0:00 until Resume; the
+  // end change is local to this phone.
+  // Latched by the tap, or at open when one is still running (after a reload).
+  const [seenTimeout, setSeenTimeout] = useState(() => {
+    const events = getMatch(matchId)?.events ?? []
+    const running = runningTimeout(events, Date.now())
+    return running && { id: events.at(-1).id, ...running }
+  })
+  const [resumedId, setResumedId] = useState(null)
+  const [endChange, setEndChange] = useState(null)
+  const [endDone, setEndDone] = useState(() => readEndDone(matchId))
+  const opener = useRef(null)
+  const undoButton = useRef(null)
+  const lastEvent = match?.events.at(-1)
+  const timeoutClock = seenTimeout && seenTimeout.id === lastEvent?.id && seenTimeout.id !== resumedId ? seenTimeout : null
+  const clockOpen = Boolean(timeoutClock || endChange)
+  const wasOpen = useRef(false)
+  useEffect(() => {
+    // Back to the button that opened the clock (Undo after an end change).
+    if (wasOpen.current && !clockOpen) {
+      const back = opener.current?.isConnected && !opener.current.disabled ? opener.current : undoButton.current
+      back?.focus()
+    }
+    wasOpen.current = clockOpen
+  }, [clockOpen])
+
   function name(id) {
     return knownPlayers.find((p) => p.id === id)?.name ?? '?'
   }
@@ -322,6 +437,7 @@ function LiveMatch({ matchId, onBack }) {
       zone: ending.zone,
       detail: ending.key,
     })
+    buzz(30)
     // The umpire ruled for one team; a tap that gives the point to the other is a mis-tap.
     if (reentryMismatch(ruledFor, match.teamA, getMatch(matchId).events.at(-1))) {
       undoLastEvent(matchId)
@@ -363,6 +479,7 @@ function LiveMatch({ matchId, onBack }) {
       return
     }
     undoLastEvent(matchId)
+    buzz([30, 60, 30])
   }
 
   // An unfinished match is removed outright -- wrong pairing, wrong
@@ -491,6 +608,13 @@ function LiveMatch({ matchId, onBack }) {
     { key: 'A', ids: match.teamA },
     { key: 'B', ids: match.teamB },
   ]
+  const live = match.status === 'in_progress' && !won
+  const gamePoint = live && isGamePoint(derived)
+  const switchAt = endChangeAt(derived.pointTarget)
+  const top = Math.max(derived.score.A, derived.score.B)
+  const switchReminder = live && !endDone && top >= switchAt
+  const leader = derived.score.A === derived.score.B ? null : derived.score.A > derived.score.B ? 'A' : 'B'
+  const mostTimeouts = derived.pointTarget === 21 ? 3 : 2
 
   return (
     <div className="live-match">
@@ -520,9 +644,11 @@ function LiveMatch({ matchId, onBack }) {
         <div className="scoring-status">
           <div className="scoreboard" aria-label="Score">
             {teams.map(({ key, ids }) => {
-              const serving = match.status === 'in_progress' && !won && derived.servingTeam === key
+              const serving = live && derived.servingTeam === key
+              const gp = serving && gamePoint
+              const left = timeoutsLeft(match.events, key, derived.pointTarget)
               return (
-                <div key={key} className={`score-side ${serving ? 'serving' : ''}`}>
+                <div key={key} className={`score-side${serving ? ' serving' : ''}${gp ? ' is-game-point' : ''}${live ? ' has-timeout' : ''}`}>
                   <span className="score-names">
                     {ids.map((id) => (
                       <span key={id} className={id === serverId && !won ? 'is-server' : undefined}>
@@ -530,26 +656,81 @@ function LiveMatch({ matchId, onBack }) {
                       </span>
                     ))}
                   </span>
+                  {live && (
+                    <button
+                      className="timeout-btn"
+                      aria-label={`Timeout for ${teamWords(key)}, ${left} left`}
+                      disabled={left === 0}
+                      onClick={(e) => {
+                        opener.current = e.currentTarget
+                        const next = addTimeout(matchId, key)
+                        const running = runningTimeout(next?.events ?? [], Date.now())
+                        if (running) setSeenTimeout({ id: next.events.at(-1).id, ...running })
+                        buzz(30)
+                      }}
+                    >
+                      <Icon name="timer" size={20} />
+                      <span className="timeout-pips" aria-hidden="true">
+                        {Array.from({ length: mostTimeouts }, (_, i) => (
+                          <span key={i} className={i < left ? 'is-left' : undefined} />
+                        ))}
+                      </span>
+                    </button>
+                  )}
                   <span className="score-value">{derived.score[key]}</span>
-                  {serving && <span className="serving-tag">Serving</span>}
+                  {serving && <span className="serving-tag">{gp ? 'Game point' : 'Serving'}</span>}
                 </div>
               )
             })}
           </div>
 
-          {match.status === 'in_progress' && !won && (
-            <p className="serve-note">
-              <span>
-                <strong>{name(serverId)}</strong> serves
-                {derived.isDoubles ? ` · server ${derived.serverNumber}` : ''}
-                {' · '}first to {derived.pointTarget}
-              </span>
+          {live && (
+            <div className="serve-block">
+              <div className={`call-card${gamePoint ? ' is-game-point' : ''}`}>
+                <span className="call-label">Call</span>
+                {gamePoint && (
+                  <span className="call-flag">
+                    <Icon name="flag" size={18} />
+                    Game point
+                  </span>
+                )}
+                <span className="call-value" aria-live="polite">{scoreCall(derived)}</span>
+                <span className="call-line">
+                  <strong>{name(serverId)}</strong> serves
+                  {derived.isDoubles ? ` · server ${derived.serverNumber}` : ''}
+                  {' · '}first to {derived.pointTarget}
+                </span>
+              </div>
               {derived.isDoubles && (
                 <button className="swap-server" onClick={() => swapServer(serverId)}>
                   Not them?
                 </button>
               )}
-            </p>
+            </div>
+          )}
+
+          {switchReminder && (
+            <div className="end-card" role="status">
+              <Icon name="swap" size={28} />
+              <span className="end-text">
+                <strong>Switch ends</strong>
+                <span>
+                  {leader ? teamWords(leader) : 'Both sides'} reached {switchAt}
+                </span>
+              </span>
+              <button
+                className="end-done"
+                onClick={() => {
+                  writeEndDone(matchId)
+                  setEndDone(true)
+                  opener.current = undoButton.current
+                  // shortcut: Done is per phone, not per match; move into the log as an event if two phones showing it confuses umpires.
+                  setEndChange(Date.now() + TIMEOUT_MS)
+                }}
+              >
+                Done
+              </button>
+            </div>
           )}
 
           {match.status === 'completed' && (
@@ -568,8 +749,8 @@ function LiveMatch({ matchId, onBack }) {
                     <span className="last-logged-text">
                       {pendingEnding
                         ? `${pendingEnding.label} — who?`
-                        : history[0]?.type === 'serverCorrection'
-                          ? `Last: ${describeEvent(history[0], name)}`
+                        : history[0]?.type === 'serverCorrection' || history[0]?.type === 'timeout'
+                          ? `Last: ${describeEvent(history[0], name, teamWords)}`
                           : waiting
                             ? `Last: ${describeEvent(waiting, name)}`
                             : lastRally
@@ -577,6 +758,7 @@ function LiveMatch({ matchId, onBack }) {
                               : 'No rallies yet'}
                     </span>
                     <button
+                      ref={undoButton}
                       className="undo"
                       onClick={handleUndo}
                       disabled={!pending && (match.events.length === 0 || match.events.at(-1)?.type === 'ruling' || Boolean(match.concludeAsk) || (won && !iConclude && !iScore))}
@@ -726,6 +908,26 @@ function LiveMatch({ matchId, onBack }) {
 
       {picking && <ScorekeeperPicker matchId={matchId} onClose={() => setPicking(false)} />}
 
+      {live && timeoutClock && (
+        <ClockOverlay
+          key={timeoutClock.id}
+          tone="timeout"
+          title={`Timeout · ${teamWords(timeoutClock.team)}`}
+          note={`${timeoutsLeft(match.events, timeoutClock.team, derived.pointTarget)} ${timeoutsLeft(match.events, timeoutClock.team, derived.pointTarget) === 1 ? 'timeout' : 'timeouts'} left · buzzes at 0:15`}
+          endsAt={timeoutClock.endsAt}
+          onResume={() => setResumedId(timeoutClock.id)}
+        />
+      )}
+      {live && !timeoutClock && endChange && (
+        <ClockOverlay
+          tone="end"
+          title="Switch ends"
+          note={`Same server after: ${name(serverId)} · buzzes at 0:15`}
+          endsAt={endChange}
+          onResume={() => setEndChange(null)}
+        />
+      )}
+
       {match.status === 'in_progress' && !won && (
         <>
           <RallyLegend />
@@ -759,7 +961,7 @@ function LiveMatch({ matchId, onBack }) {
       {/* Nothing shows when the match has no video, or video is off here.
           Only the main umpire can read a match's video. */}
       {match.status === 'completed' && iConclude && (
-        <MatchVideo matchId={matchId} events={match.events} describe={(event) => describeEvent(event, name)} />
+        <MatchVideo matchId={matchId} events={match.events} describe={(event) => describeEvent(event, name, teamWords)} />
       )}
 
       {match.status === 'completed' && (
@@ -862,7 +1064,7 @@ function LiveMatch({ matchId, onBack }) {
         {showHistory && (
           <ul className="history-list">
             {history.map((event) => (
-              <li key={event.id}>{describeEvent(event, name)}</li>
+              <li key={event.id}>{describeEvent(event, name, teamWords)}</li>
             ))}
           </ul>
         )}
