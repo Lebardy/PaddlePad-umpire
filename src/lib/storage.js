@@ -2,6 +2,7 @@ import { DEFAULT_POINT_TARGET, deriveMatchState } from './pickleball'
 import { waitingThirdShot, withThirdShotTap } from './thirdShot'
 import { read, write } from './localstore'
 import { sessionName } from './sessionName'
+import { timeoutsLeft } from './scoreHelpers'
 import { waitsForUmpire } from '../../server/src/scorekeeper-rules.js'
 import {
   clearOutbox,
@@ -364,6 +365,16 @@ export function addServerCorrection(matchId, playerId) {
       ...match.events,
       { type: 'serverCorrection', id: crypto.randomUUID(), at: Date.now(), playerId },
     ],
+  })
+}
+
+/** A side's timeout (Rule 21.A): an event, so it syncs and Undo takes it back. None once the game is over or used up. */
+export function addTimeout(matchId, team) {
+  const match = getMatch(matchId)
+  if (!match || match.status === 'completed' || timeoutsLeft(match.events, team, match.pointTarget) === 0) return match
+  return finalizeAfterEventChange({
+    ...match,
+    events: [...match.events, { type: 'timeout', id: crypto.randomUUID(), at: Date.now(), team }],
   })
 }
 

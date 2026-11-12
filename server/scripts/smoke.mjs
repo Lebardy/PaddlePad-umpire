@@ -597,6 +597,15 @@ async function main() {
     push3.body.match?.events?.length === 3, String(push3.body.match?.events?.length))
   check('match is still in progress', push3.body.match?.status === 'in_progress')
 
+  const withTimeout = [...shorter, { type: 'timeout', id: uuid(), seq: shorter.length, at: Date.now(), team: 'A' }]
+  const toPush = await call(`/matches/${matchId}/log`, { method: 'PUT', body: { deviceId: DEVICE, events: withTimeout } })
+  check('a timeout in the log is accepted, and the score is unchanged -> 200',
+    toPush.status === 200 && toPush.body.match?.events?.at(-1)?.type === 'timeout', JSON.stringify(toPush.body).slice(0, 120))
+  const badTimeout = [...shorter, { type: 'timeout', id: uuid(), seq: shorter.length, at: Date.now(), team: 'C' }]
+  const toBad = await call(`/matches/${matchId}/log`, { method: 'PUT', body: { deviceId: DEVICE, events: badTimeout } })
+  check('a timeout for no side -> 400', toBad.status === 400, String(toBad.status))
+  await call(`/matches/${matchId}/log`, { method: 'PUT', body: { deviceId: DEVICE, events: shorter } })
+
   section('ASSERTION 3 — status and winner are DERIVED, never believed')
   const winning = Array.from({ length: 11 }, (_, i) => rally(i, teamA[0]))
   const won = await call(`/matches/${matchId}/log`, {

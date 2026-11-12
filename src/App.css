@@ -935,9 +935,66 @@ section {
   background: var(--bg-elevated);
 }
 .score-side.serving { background: var(--primary-soft); }
+.score-side.has-timeout .score-names { min-height: 2lh; } /* two names wrapping at a two-digit score never change the height */
+.score-side.has-timeout {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    'names timeout score'
+    'tag   timeout score';
+  column-gap: 0.7rem;
+}
+.score-side.is-game-point {
+  background: var(--amber-soft);
+  box-shadow: inset 0 0 0 3px var(--amber-ring);
+}
+.score-side.is-game-point .serving-tag { color: var(--amber-text); }
+
+/* Amber: the serving side wins the game by winning this rally. Dark ink
+   on it in both themes, so it stays readable. */
+:root {
+  --amber: #ffcf5a;
+  --amber-ink: #14201b;
+  --amber-soft: #fff1cc;
+  --amber-ring: #e8a317;
+  --amber-text: #8a4f00;
+  --on-accent: #ffffff;
+}
+:root[data-theme='dark'] {
+  --amber-soft: rgba(255, 207, 90, 0.16);
+  --amber-text: #ffcf5a;
+  --on-accent: #071320;
+}
+
+/* One timeout: a clock over a dot for each one left (filled = left). */
+.timeout-btn {
+  grid-area: timeout;
+  width: 48px;
+  height: 52px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  cursor: pointer;
+}
+.timeout-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.timeout-pips { display: flex; gap: 4px; }
+.timeout-pips span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid var(--primary);
+}
+.timeout-pips .is-left { background: var(--primary); }
 
 .score-names {
   grid-area: names;
+  align-content: start;
   display: flex;
   flex-wrap: wrap;
   gap: 0 0.7rem;
@@ -977,17 +1034,159 @@ section {
   color: var(--primary);
 }
 
-.serve-note {
+.serve-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+/* The score call, the one thing to read aloud before each serve. */
+.call-card {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 0.2rem 0.75rem;
+  padding: 0.7rem 1rem 0.8rem;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: var(--primary-contrast);
+}
+.call-card.is-game-point { background: var(--amber); color: var(--amber-ink); }
+.call-label,
+.call-flag {
+  min-height: 1.4rem; /* the same first row with or without the flag */
+  line-height: 1.4rem;
+  font-family: var(--label);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.call-label { opacity: 0.85; }
+.call-flag {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.75rem;
-  font-size: 0.95rem;
-  color: var(--text-muted);
-  margin-bottom: 0.75rem;
+  gap: 0.35rem;
+  justify-self: end;
+  align-self: center;
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
 }
-.serve-note strong { color: var(--text); }
+.call-value {
+  grid-column: 1 / -1;
+  font-family: var(--display);
+  font-size: 4rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+}
+.call-line { grid-column: 1 / -1; font-size: 0.95rem; }
+
+/* Switch ends: a reminder worked out from the score. */
+.end-card {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.6rem 0.6rem 0.9rem;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.end-card > svg { flex: none; }
+.end-text { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 0.9rem; }
+.end-text strong { font-family: var(--label); font-size: 1.35rem; line-height: 1.1; }
+.end-done {
+  flex: none;
+  min-height: 44px;
+  padding: 0 1.1rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--on-accent);
+  color: var(--accent);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* The one-minute clock over the whole screen. */
+.clock-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(12, 19, 17, 0.72);
+  --ink: var(--primary);
+  --ink-on: var(--primary-contrast);
+  --track: var(--primary-soft);
+}
+.clock-overlay.is-end { --ink: var(--accent); --ink-on: var(--on-accent); --track: var(--accent-soft); }
+.clock-card {
+  width: min(26rem, 100%);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  text-align: center;
+  border-radius: 18px;
+  background: var(--bg-elevated);
+}
+.clock-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--label);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.clock-ring {
+  width: 13rem;
+  height: 13rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(var(--ink) calc(var(--left) * 360deg), var(--track) 0);
+  position: relative;
+}
+.clock-ring::before {
+  content: '';
+  position: absolute;
+  inset: 17px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+}
+.clock-time {
+  position: relative;
+  font-family: var(--display);
+  font-size: 5rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.clock-note { color: var(--text-muted); }
+.clock-resume {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: none;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--ink-on);
+  font-size: 1.15rem;
+  font-weight: 700;
+  cursor: pointer;
+}
 
 /* Quiet on purpose: asked once or twice a night, not a rally control. */
 .swap-server {
@@ -1578,7 +1777,8 @@ section {
   min-width: 0;
 }
 .scoring .scoreboard,
-.scoring .serve-note,
+.scoring .serve-block,
+.scoring .end-card,
 .scoring .last-logged,
 .scoring .match-complete,
 .scoring .rally-log,
@@ -1590,6 +1790,21 @@ section {
   letter-spacing: 0.04em;
   text-transform: none;
   opacity: 0.85;
+}
+
+/* Portrait (tablet and phone): the switch-ends reminder lies over the
+   header band, so it adds no height and nothing a rally needs moves. */
+@media (orientation: portrait) {
+  .scoring .end-card {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 6;
+    box-sizing: border-box;
+    min-height: 3.4rem;
+    padding: max(0.3rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) 0.3rem max(0.75rem, env(safe-area-inset-left));
+    border-radius: 0;
+  }
+  .end-text { flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: 0 0.6rem; }
 }
 
 /* Tablet, portrait: one column, but tight. The two teams sit side by
@@ -1606,6 +1821,21 @@ section {
   .scoring-status .scoreboard,
   .scoring-status .match-complete { grid-column: 1 / -1; }
   .scoring .scoreboard { grid-template-columns: 1fr 1fr; }
+
+  /* The call on the left, the undo and "Not them?" beside it: the blue
+     reminder, when it shows, takes the row below. */
+  .scoring-status { align-items: start; gap: 0.5rem 0.75rem; }
+  .serve-block { display: contents; }
+  .call-card {
+    grid-column: 1;
+    grid-row: 2 / span 2;
+    padding: 0.45rem 0.9rem 0.55rem;
+    gap: 0.05rem 0.5rem;
+  }
+  .call-value { font-size: 3.3rem; }
+  .call-line { font-size: 0.9rem; }
+  .scoring-status .serve-block ~ .last-logged { grid-column: 2; grid-row: 2; align-self: end; }
+  .scoring-status .swap-server { grid-column: 2; grid-row: 3; align-self: start; justify-self: start; }
 
   .ending-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.45rem; }
   .ending-group + .ending-group { margin-top: 0.6rem; }
