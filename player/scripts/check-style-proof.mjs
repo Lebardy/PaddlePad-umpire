@@ -11,6 +11,7 @@ import {
   metaLine,
   shownNumber,
   styleShareLine,
+  styleTags,
 } from '../src/lib/styleProof.js'
 import { hasStyle } from '../src/lib/fingerprint.js'
 
@@ -25,11 +26,27 @@ function check(label, actual, expected) {
 }
 
 console.log('\nwho shares the style')
-check('a style of three or more', styleShareLine(10, 14), '10 play this way')
+check('a style of three or more', styleShareLine(10, 14), '10 players play this way')
 check('a style of two', styleShareLine(2, 14), 'You and 1 other play this way')
 check('a style of one', styleShareLine(1, 14), 'Nobody else plays this way yet')
 check('no style size', styleShareLine(null, 14), 'Compared with similar players')
 check('no group', styleShareLine(3, 0), null)
+
+console.log('\na line for each word in the name')
+const corner = (word, feature, out, inName = true) => ({ word, feature, out, inName })
+check('words come in name order, unnamed corners left out',
+  styleTags('Reliable Precise Dropper', [
+    corner('Clean', 'error_to_winner_ratio', 'lower', false),
+    corner('Precise', 'drop_efficiency_mean', 'higher'),
+    corner('Dropper', 'drop_preference_rate_mean', 'higher'),
+    corner('Reliable', 'drop_efficiency_std', 'lower'),
+  ]).map((tag) => tag.word), ['Reliable', 'Precise', 'Dropper'])
+check('Unpredictable reads by its measurement',
+  [['aggression_std', 'Finishes points differently from one match to the next'], ['dink_error_rate_std', 'Has good days and bad days in the kitchen']]
+    .map(([feature, says]) => styleTags('Unpredictable Driver', [corner('Unpredictable', feature, 'higher')])[0].says === says), [true, true])
+check('the all-court noun gets a line with no corner of its own',
+  styleTags('Steady All-Court Player', [corner('Steady', 'aggression_std', 'lower')]).map((tag) => tag.word), ['Steady', 'All-Court Player'])
+check('a side with no word gets no row', styleTags('Driver', [corner('Driver', 'drop_efficiency_mean', 'lower')]), [])
 
 console.log('\nthe table agrees with its words')
 const driver = { feature: 'drop_preference_rate_mean', out: 'lower' }
