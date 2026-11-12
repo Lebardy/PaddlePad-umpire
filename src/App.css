@@ -935,6 +935,7 @@ section {
   background: var(--bg-elevated);
 }
 .score-side.serving { background: var(--primary-soft); }
+.score-side.has-timeout .score-names { min-height: 2lh; } /* two names wrapping at a two-digit score never change the height */
 .score-side.has-timeout {
   grid-template-columns: minmax(0, 1fr) auto auto;
   grid-template-areas:
@@ -993,6 +994,7 @@ section {
 
 .score-names {
   grid-area: names;
+  align-content: start;
   display: flex;
   flex-wrap: wrap;
   gap: 0 0.7rem;
@@ -1054,6 +1056,8 @@ section {
 .call-card.is-game-point { background: var(--amber); color: var(--amber-ink); }
 .call-label,
 .call-flag {
+  min-height: 1.4rem; /* the same first row with or without the flag */
+  line-height: 1.4rem;
   font-family: var(--label);
   font-size: 0.82rem;
   font-weight: 700;
@@ -1083,7 +1087,6 @@ section {
 
 /* Switch ends: a reminder worked out from the score. */
 .end-card {
-  order: 1; /* after Last/Undo, so Undo never moves; portrait puts it in its own row */
   display: flex;
   align-items: center;
   gap: 0.65rem;
@@ -1789,6 +1792,21 @@ section {
   opacity: 0.85;
 }
 
+/* Portrait (tablet and phone): the switch-ends reminder lies over the
+   header band, so it adds no height and nothing a rally needs moves. */
+@media (orientation: portrait) {
+  .scoring .end-card {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 6;
+    box-sizing: border-box;
+    min-height: 3.4rem;
+    padding: max(0.3rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) 0.3rem max(0.75rem, env(safe-area-inset-left));
+    border-radius: 0;
+  }
+  .end-text { flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: 0 0.6rem; }
+}
+
 /* Tablet, portrait: one column, but tight. The two teams sit side by
    side, the serve line shares a row with undo, and the ending buttons
    run four across. */
@@ -1816,11 +1834,8 @@ section {
   }
   .call-value { font-size: 3.3rem; }
   .call-line { font-size: 0.9rem; }
-  .end-card { padding-block: 0.4rem; }
-  .end-text { flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: 0 0.6rem; }
-  .scoring-status .last-logged { grid-column: 2; grid-row: 2; align-self: end; }
+  .scoring-status .serve-block ~ .last-logged { grid-column: 2; grid-row: 2; align-self: end; }
   .scoring-status .swap-server { grid-column: 2; grid-row: 3; align-self: start; justify-self: start; }
-  .scoring-status .end-card { grid-column: 1 / -1; grid-row: 4; }
 
   .ending-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.45rem; }
   .ending-group + .ending-group { margin-top: 0.6rem; }

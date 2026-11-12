@@ -38,6 +38,8 @@ check('never below zero', timeoutsLeft([t('A'), t('A'), t('A')], 'A', 11), 0)
 const now = 1_000_000
 check('a timeout as the last event, 20 s ago, is running', runningTimeout([t('B', now - 20_000)], now), { team: 'B', endsAt: now + 40_000 })
 check('over a minute ago it is not', runningTimeout([t('B', now - 61_000)], now), null)
+check('a timeout pulled from the server (ISO string), 20 s old, is running', runningTimeout([t('B', new Date(now - 20_000).toISOString())], now), { team: 'B', endsAt: now + 40_000 })
+check('an ISO timeout 61 s old is not', runningTimeout([t('B', new Date(now - 61_000).toISOString())], now), null)
 check('a rally after it ends it', runningTimeout([t('B', now - 5_000), { type: 'rally', id: 'r', at: now }], now), null)
 
 console.log(`\n${pass} passed, ${fail} failed`)

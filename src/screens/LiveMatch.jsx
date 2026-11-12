@@ -104,7 +104,7 @@ function ClockOverlay({ tone, title, note, endsAt, onResume }) {
   const [now, setNow] = useState(Date.now)
   const resume = useRef(null)
   const buzzed = useRef({ warn: false, end: false })
-  const left = Math.max(0, endsAt - now)
+  const left = Math.min(TIMEOUT_MS, Math.max(0, endsAt - now)) // clamped: a watching device's clock may run behind the tapping one
 
   useEffect(() => {
     resume.current?.focus()
@@ -619,6 +619,7 @@ function LiveMatch({ matchId, onBack }) {
   const gamePoint = live && isGamePoint(derived)
   const switchAt = endChangeAt(derived.pointTarget)
   const top = Math.max(derived.score.A, derived.score.B)
+  const reentry = waitingReentry(match.events, match.teamA)
   const switchReminder = live && !endDone && top >= switchAt
   const leader = derived.score.A === derived.score.B ? null : derived.score.A > derived.score.B ? 'A' : 'B'
   const mostTimeouts = derived.pointTarget === 21 ? 3 : 2
@@ -667,7 +668,7 @@ function LiveMatch({ matchId, onBack }) {
                     <button
                       className="timeout-btn"
                       aria-label={`Timeout for ${teamWords(key)}, ${left} left`}
-                      disabled={left === 0}
+                      disabled={left === 0 || Boolean(reentry)}
                       onClick={(e) => {
                         opener.current = e.currentTarget
                         const next = addTimeout(matchId, key)
@@ -716,29 +717,6 @@ function LiveMatch({ matchId, onBack }) {
             </div>
           )}
 
-          {switchReminder && (
-            <div className="end-card" role="status">
-              <Icon name="swap" size={28} />
-              <span className="end-text">
-                <strong>Switch ends</strong>
-                <span>
-                  {leader ? teamWords(leader) : 'Both sides'} reached {switchAt}
-                </span>
-              </span>
-              <button
-                className="end-done"
-                onClick={() => {
-                  writeEndDone(matchId)
-                  setEndDone(true)
-                  opener.current = undoButton.current
-                  // shortcut: Done is per phone, not per match; move into the log as an event if two phones showing it confuses umpires.
-                  setEndChange(Date.now() + TIMEOUT_MS)
-                }}
-              >
-                Done
-              </button>
-            </div>
-          )}
 
           {match.status === 'completed' && (
             <p className="match-complete">
@@ -775,6 +753,30 @@ function LiveMatch({ matchId, onBack }) {
                     </button>
                   </div>
             </>
+          )}
+
+          {switchReminder && (
+            <div className="end-card" role="status">
+              <Icon name="swap" size={28} />
+              <span className="end-text">
+                <strong>Switch ends</strong>
+                <span>
+                  {leader ? teamWords(leader) : 'Both sides'} reached {switchAt}
+                </span>
+              </span>
+              <button
+                className="end-done"
+                onClick={() => {
+                  writeEndDone(matchId)
+                  setEndDone(true)
+                  opener.current = undoButton.current
+                  // shortcut: Done is per phone, not per match; move into the log as an event if two phones showing it confuses umpires.
+                  setEndChange(Date.now() + TIMEOUT_MS)
+                }}
+              >
+                Done
+              </button>
+            </div>
           )}
         </div>
 

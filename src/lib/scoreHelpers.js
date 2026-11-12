@@ -33,6 +33,8 @@ export function timeoutsLeft(events, team, target) {
 /** The timeout still running: the log's last event, under a minute old. */
 export function runningTimeout(events, now = Date.now()) {
   const last = events.at(-1)
-  if (last?.type !== 'timeout' || now - last.at >= TIMEOUT_MS) return null
-  return { team: last.team, endsAt: last.at + TIMEOUT_MS }
+  if (last?.type !== 'timeout') return null
+  const at = new Date(last.at).getTime() // a number when tapped here, the server's ISO string once pulled
+  if (!(now - at < TIMEOUT_MS)) return null
+  return { team: last.team, endsAt: at + TIMEOUT_MS }
 }

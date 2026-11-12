@@ -28,6 +28,7 @@ const match = (events) => ({ teamA, teamB, firstServer: { team: 'A', playerId: '
 
 check('a winning shot gives the point to its own team', rallyWinnerTeam(teamA, rally('x', 'a1')), 'A')
 check('a mistake gives the point to the other team', rallyWinnerTeam(teamA, rally('x', 'b1', 'error')), 'A')
+check('a timeout after the rally makes a ruling on that rally too late', rulingProblem([...log, { type: 'timeout', id: 'to', at: 1, team: 'A' }], 'r2'), TOO_LATE)
 check('the last rally may be ruled on', rulingProblem(log, 'r2'), null)
 check('an earlier rally is too late', rulingProblem(log, 'r1'), TOO_LATE)
 check('an unknown rally is too late', rulingProblem(log, 'nope'), TOO_LATE)
