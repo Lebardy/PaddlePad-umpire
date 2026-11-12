@@ -406,7 +406,7 @@ CREATE TABLE IF NOT EXISTS match_events (
     id         UUID PRIMARY KEY,
     match_id   UUID NOT NULL REFERENCES matches (id) ON DELETE CASCADE,
     seq        INTEGER NOT NULL,
-    type       TEXT NOT NULL CHECK (type IN ('rally', 'thirdShot', 'serverCorrection', 'ruling')),
+    type       TEXT NOT NULL CHECK (type IN ('rally', 'thirdShot', 'serverCorrection', 'ruling', 'timeout')),
     payload    JSONB NOT NULL,
     at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -440,7 +440,7 @@ BEGIN
 END $$;
 
 ALTER TABLE match_events ADD CONSTRAINT match_events_type_allowed
-    CHECK (type IN ('rally', 'thirdShot', 'serverCorrection', 'ruling'));
+    CHECK (type IN ('rally', 'thirdShot', 'serverCorrection', 'ruling', 'timeout'));
 
 -- A main umpire's ruling on the last rally, waiting for the
 -- scorekeeper's phone to apply it to the log (the only writer). The id
