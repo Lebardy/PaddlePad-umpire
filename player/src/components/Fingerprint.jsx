@@ -5,9 +5,15 @@
 // is more of that word. A corner whose word is in the player's style name
 // is boxed, so the name can be read off the chart. The amber shape is the
 // average of everyone with the same style, the blue line is the player.
+//
+// It switches on the first time it is scrolled to (`draw`; the steps are
+// beside its styles in App.css). Each ring, dot and word carries its
+// place in the order as --i.
 // ============================================================
 
+import { useRef } from 'react'
 import { hasStyle, labelSpot, outline, reach } from '../lib/fingerprint'
+import { useInView } from '../lib/motion'
 
 const BOX = { cx: 195, cy: 190, r: 112 }
 const RINGS = [0.25, 0.75, 1]
@@ -19,6 +25,8 @@ const place = (i) => {
 }
 
 function Fingerprint({ corners, standout }) {
+  const ref = useRef(null)
+  const inView = useInView(ref)
   const youReach = corners.map((c) => reach(c.you, c))
   const youShape = outline(youReach, BOX)
   const styleShape = hasStyle(corners) ? outline(corners.map((c) => reach(c.style, c)), BOX) : null
@@ -27,10 +35,10 @@ function Fingerprint({ corners, standout }) {
   const spokes = flat(1).split(' ')
 
   return (
-    <figure className="print print-chart">
+    <figure className={`print print-chart${inView ? ' draw' : ''}`} ref={ref}>
       <div className="print-plot">
         <svg viewBox="0 36 390 330" role="img" aria-label={label}>
-          {RINGS.map((k) => <polygon key={k} points={flat(k)} className="print-ring" />)}
+          {RINGS.map((k, i) => <polygon key={k} points={flat(k)} className="print-ring" style={{ '--i': i }} />)}
           {spokes.map((p, i) => {
             const [x, y] = p.split(',')
             return <line key={i} x1={BOX.cx} y1={BOX.cy} x2={x} y2={y} className="print-ring" />
@@ -39,14 +47,15 @@ function Fingerprint({ corners, standout }) {
           <polygon points={youShape} className="print-you" />
           {youShape.split(' ').map((p, i) => {
             const [x, y] = p.split(',')
-            return youReach[i] === null ? null : <circle key={i} cx={x} cy={y} r="3.5" className="print-dot" />
+            return youReach[i] === null ? null : <circle key={i} cx={x} cy={y} r="3.5" className="print-dot" style={{ '--i': i }} />
           })}
         </svg>
+        <i className="print-beam" aria-hidden="true" />
         {corners.map((c, i) => (
           <span
             key={c.word}
             className={`print-word${c.inName ? ' is-named' : ''}${c.feature === standout ? ' is-standout' : ''}`}
-            style={place(i)}
+            style={{ ...place(i), '--i': i }}
             title={youReach[i] === null ? 'Nothing recorded yet' : undefined}
           >
             {c.word}

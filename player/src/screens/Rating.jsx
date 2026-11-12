@@ -29,7 +29,7 @@ import { usePlayerData } from '../lib/PlayerData'
 import { navigate } from '../lib/router'
 import { endingPhrase, namedLeaders } from '../lib/endingWords'
 import { styleName } from '../lib/styleName'
-import { MEASURES, lowerIsMore, metaLine, shownNumber, styleShareLine } from '../lib/styleProof'
+import { MEASURES, lowerIsMore, metaLine, shownNumber, styleShareLine, styleTags } from '../lib/styleProof'
 import { faultsToWorkOn } from '../lib/faultTips'
 import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
 import More from '../components/More'
@@ -37,7 +37,7 @@ import Collapsible from '../components/Collapsible'
 import ShotProfile from '../components/ShotProfile'
 import Icon from '../components/Icon'
 import Fingerprint from '../components/Fingerprint'
-import StyleEmblem from '../components/StyleEmblem'
+import StyleEmblem, { WordMark } from '../components/StyleEmblem'
 import LevelPlate from '../components/LevelPlate'
 import { PageSkeleton } from '../components/Skeleton'
 
@@ -331,7 +331,15 @@ function Playstyle({ standing, number }) {
   const meta = metaLine(standing.meta, standing.playstyleArchetype, band?.name)
   return (
     <Step number={number} icon="sparkle" title="Your playstyle" value={name} lead={<StyleEmblem name={name} />} before={<LevelPlate level={standing.level} />}>
-      <p className="style-takeaway">{proof.takeaway}</p>
+      <ul className="tags">
+        {styleTags(name, proof.corners).map((tag) => (
+          <li key={tag.word}>
+            <span className="tag-mark"><WordMark word={tag.word} /></span>
+            <b>{tag.word}</b>
+            <span>{tag.says}</span>
+          </li>
+        ))}
+      </ul>
       {proof.standout && <p className="style-standout"><i aria-hidden="true" />Your own standout: {proof.standout.text}.</p>}
       <Fingerprint corners={proof.corners} standout={proof.standout?.feature} />
       <ComparedWith band={band} styleSize={proof.styleSize} />
