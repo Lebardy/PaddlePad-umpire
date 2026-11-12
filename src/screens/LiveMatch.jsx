@@ -410,6 +410,13 @@ function LiveMatch({ matchId, onBack }) {
   const [resumedId, setResumedId] = useState(null)
   const [endChange, setEndChange] = useState(null)
   const [endDone, setEndDone] = useState(() => readEndDone(matchId))
+  // A timeout that arrives through sync while this screen is open opens the clock too.
+  const events = match?.events
+  useEffect(() => {
+    const running = runningTimeout(events ?? [], Date.now())
+    // oxlint-disable-next-line react/set-state-in-effect -- reacting to the log changing underneath
+    if (running) setSeenTimeout((seen) => (seen?.id === events.at(-1).id ? seen : { id: events.at(-1).id, ...running }))
+  }, [events])
   const opener = useRef(null)
   const undoButton = useRef(null)
   const lastEvent = match?.events.at(-1)

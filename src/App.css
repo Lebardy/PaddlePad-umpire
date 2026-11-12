@@ -1083,6 +1083,7 @@ section {
 
 /* Switch ends: a reminder worked out from the score. */
 .end-card {
+  order: 1; /* after Last/Undo, so Undo never moves; portrait puts it in its own row */
   display: flex;
   align-items: center;
   gap: 0.65rem;
