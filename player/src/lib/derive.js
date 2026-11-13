@@ -8,7 +8,7 @@
 
 /** Results of the most recent matches, newest first. */
 export function recentForm(matches, count = 5) {
-  return matches.slice(0, count).map((m) => ({ id: m.id, won: m.won }))
+  return matches.slice(0, count)
 }
 
 /**
@@ -171,30 +171,6 @@ export function peopleSummary(matches) {
     lostTo: lostTo.size,
     playedMost: people[0] ?? null,
   }
-}
-
-/**
- * Win rate over a sliding window, oldest first, for the form chart.
- *
- * Returns an empty array until there are enough matches to fill one
- * window. A "trend" drawn from two matches is a straight line between
- * two coin flips, and showing it would invite a player to read
- * improvement into noise.
- */
-export function rollingWinRate(matches, window = 5) {
-  if (matches.length < window) return []
-  const oldestFirst = [...matches].reverse()
-  const points = []
-  for (let i = window - 1; i < oldestFirst.length; i += 1) {
-    const slice = oldestFirst.slice(i - window + 1, i + 1)
-    const decided = slice.filter((m) => m.won !== null)
-    if (decided.length === 0) continue
-    points.push({
-      matchNumber: oldestFirst[i].matchNumber,
-      value: decided.filter((m) => m.won === true).length / decided.length,
-    })
-  }
-  return points
 }
 
 /**

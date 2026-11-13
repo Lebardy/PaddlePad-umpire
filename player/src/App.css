@@ -120,7 +120,6 @@
 .stat-value,
 .ds-yours,
 .ds-theirs,
-.trend-now,
 .step-value,
 .best-value,
 .pr-value,
@@ -432,6 +431,14 @@
   font-size: 1rem;
   font-weight: 700;
 }
+/* On the record's board each lamp opens its match, so it is a finger tall
+   and shares the row's width; the press shows as a ring because the
+   entrance animation holds transform and filter. */
+.sb-form .form-pills { flex: 1; flex-wrap: nowrap; min-width: 0; }
+.sb-form .form-pills li { flex: 0 1 2.75rem; }
+.sb-form .pill { width: 100%; height: 2.75rem; font-size: 1.25rem; text-decoration: none; }
+.sb-form .pill:active { box-shadow: inset 0 0 0 3px var(--board-ink); }
+.sb-form .pill:focus-visible { outline-color: var(--lamp); }
 .pill-sm { width: 1.45rem; height: 1.45rem; font-size: 0.82rem; }
 .pill-won { background: var(--win-lamp); color: var(--win-ink); }
 .pill-lost { background: var(--loss-lamp); color: var(--loss-ink); }
@@ -440,7 +447,6 @@
 /* ============ Bands ============ */
 
 .rating,
-.trend,
 .month-band,
 .step,
 .detail-shape,
@@ -468,7 +474,6 @@
 /* The label strip. Whatever a band opens with -- a bare heading or a
    heading with something beside it -- becomes the strip. */
 .rating > h2,
-.trend > h2,
 .step > .step-head,
 .detail-shape > h2,
 .detail-stats > h2,
@@ -484,7 +489,6 @@
 .places > .section-head,
 .open-play > .section-head,
 .visit > .section-head,
-.trend > .trend-head,
 .detail-shape > .board-match-head {
   display: flex;
   align-items: center;
@@ -503,7 +507,6 @@
   line-height: 1.2;
 }
 .section-head h2,
-.trend-head h2,
 .step-head h2,
 .board-match-head h2 { font: inherit; letter-spacing: inherit; }
 
@@ -516,7 +519,6 @@
   border-color: var(--board-rule);
   background: transparent;
 }
-.trend-head .trend-now { font-size: 1.7rem; color: var(--lamp); letter-spacing: 0; }
 
 /* On a wider screen there is room around the column, so bands become
    panels rather than running into the margin. */
@@ -527,7 +529,6 @@
   .you-top,
   .empty-head,
   .rating,
-  .trend,
   .month-band,
   .step,
   .detail-shape,
@@ -673,21 +674,6 @@
   padding-top: 1rem;
   border-top: 1px solid var(--border);
 }
-
-/* ============ Form trend ============ */
-
-.trend-svg { display: block; width: 100%; height: 64px; overflow: visible; }
-.trend-baseline { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 4; opacity: 0.6; }
-.trend-line {
-  fill: none;
-  stroke: var(--series-1);
-  stroke-width: 2.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-}
-.trend-caption { font-size: 0.82rem; color: var(--text-muted); margin-top: 0.6rem; line-height: 1.45; }
-.trend-early > h2 { margin-bottom: 0.9rem; }
 
 /* ============ Skill rating ============ */
 
@@ -1699,12 +1685,10 @@ a.person-row:active { background: var(--surface-sunken); }
 }
 .head-icon,
 .link-code > h2 svg { margin-right: 0.55rem; }
-.section-head h2,
-.trend-head h2 { display: flex; align-items: center; min-width: 0; }
+.section-head h2 { display: flex; align-items: center; min-width: 0; }
 .bests > h2,
 .link-code > h2,
-.film-note > h2,
-.trend-early > h2 { justify-content: flex-start; gap: 0; }
+.film-note > h2 { justify-content: flex-start; gap: 0; }
 .you-section p,
 .you-line { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.55; margin: 0 0 0.7rem; }
 .you-section .filter-row { margin-bottom: 0; }
