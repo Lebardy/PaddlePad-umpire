@@ -5,8 +5,8 @@
 // browser: node player/scripts/check-style-proof.mjs.
 //
 // The card's words and corners come from the server; this says what each
-// word in the name means, how each corner's number is shown and how many
-// share the style.
+// word in the name means, what each corner counted, how its number is
+// shown and how many share the style.
 // ============================================================
 
 import { styleName } from './styleName.js'
@@ -22,19 +22,32 @@ import { styleName } from './styleName.js'
 //                  roughly a game, a length people already think in
 //   share          also a percent, but a low-side word (Driver, Power Player)
 //                  names the other side, so it shows 1 - value
+// `name` is what was counted, in the app's everyday words: the table's row
+// label. `lowName` is the other side's, for a low-side word.
 
 export const MEASURES = {
-  drop_efficiency_mean: { as: 'percent' },
-  error_to_winner_ratio: { as: 'ratio' },
+  drop_efficiency_mean: { as: 'percent', name: 'Drops that landed' },
+  error_to_winner_ratio: { as: 'ratio', name: 'Mistakes for each winning shot' },
   // The share of a player's finishes (winners and mistakes) that were
   // winners: how cleanly they finish, not how often they attack.
-  aggression_std: { as: 'swing-percent' },
-  drop_efficiency_std: { as: 'swing-percent' },
-  winner_rate_std: { as: 'swing-per10' },
-  general_error_rate_std: { as: 'swing-per10' },
-  dink_error_rate_std: { as: 'swing-per10' },
-  drop_preference_rate_mean: { as: 'percent', share: true },
-  net_game_preference_rate_mean: { as: 'percent', share: true },
+  aggression_std: { as: 'swing-percent', name: 'Finishes that were winning shots' },
+  drop_efficiency_std: { as: 'swing-percent', name: 'Drops that landed' },
+  winner_rate_std: { as: 'swing-per10', name: 'Winning shots per 10 minutes' },
+  general_error_rate_std: { as: 'swing-per10', name: 'Mistakes per 10 minutes' },
+  dink_error_rate_std: { as: 'swing-per10', name: 'Mistakes at the net per 10 minutes' },
+  drop_preference_rate_mean: { as: 'percent', share: true, name: 'Third shots played as a drop', lowName: 'Third shots played as a drive' },
+  net_game_preference_rate_mean: { as: 'percent', share: true, name: 'Winning shots hit at the net', lowName: 'Winning shots hit away from the net' },
+}
+
+/**
+ * What a corner counted, as the table names its row: the side its number
+ * shows (see shownNumber), and whether that number is a swing between matches.
+ * A measurement this app does not know keeps the corner's word.
+ */
+export function measureName(corner) {
+  const m = MEASURES[corner.feature]
+  if (!m) return { name: corner.word, swing: false }
+  return { name: (corner.out === 'lower' && m.lowName) || m.name, swing: m.as.startsWith('swing') }
 }
 
 /**
@@ -91,11 +104,6 @@ export function styleTags(name, corners) {
 export function shownNumber(value, corner) {
   if (value === null || value === undefined) return null
   return MEASURES[corner.feature]?.share && corner.out === 'lower' ? 1 - value : value
-}
-
-/** True when a smaller number means more of the word (Clean, the steadiness swings), so the table adds a down arrow. */
-export function lowerIsMore(corner) {
-  return corner.out === 'lower' && !(MEASURES[corner.feature]?.share)
 }
 
 /** The gentle line about the level above: text before, the bold style name, text after. Null when there is none. */

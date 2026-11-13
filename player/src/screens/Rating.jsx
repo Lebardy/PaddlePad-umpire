@@ -29,7 +29,7 @@ import { usePlayerData } from '../lib/PlayerData'
 import { navigate } from '../lib/router'
 import { endingPhrase, namedLeaders } from '../lib/endingWords'
 import { styleName } from '../lib/styleName'
-import { MEASURES, lowerIsMore, metaLine, shownNumber, styleShareLine, styleTags } from '../lib/styleProof'
+import { MEASURES, measureName, metaLine, shownNumber, styleShareLine, styleTags } from '../lib/styleProof'
 import { faultsToWorkOn } from '../lib/faultTips'
 import { RallyPointsHeadline, RallyProgress } from '../components/RallyRating'
 import More from '../components/More'
@@ -355,11 +355,12 @@ function Playstyle({ standing, number }) {
           <li className="numbers-head"><span /><span>You</span><span>Your style</span><span>Everyone</span></li>
           {proof.corners.map((c) => {
             const as = MEASURES[c.feature]?.as ?? 'ratio'
+            const { name, swing } = measureName(c)
             return (
               <li key={c.feature} className={c.inName ? 'is-named' : undefined}>
                 <span>
-                  {c.word}
-                  {lowerIsMore(c) && <Icon name="arrowDown" size={14} label="lower means more of this word" />}
+                  {name}
+                  {swing && <small>swing from match to match</small>}
                 </span>
                 <span>{showValue(shownNumber(c.you, c), as)}</span>
                 <span>{showValue(shownNumber(c.style, c), as)}</span>
