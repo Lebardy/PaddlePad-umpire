@@ -1706,6 +1706,19 @@ async function main() {
     check('the launch check carries it too',
       (await asPlayer('/auth/player/me', { bearer: meToken })).body.player?.nearRatingName === true)
     check('and it goes back off', (await nrn({ on: false })).body.player?.nearRatingName === false)
+
+    // --- the rival and partner alerts switch ---
+    const alertsSwitch = (body) => asPlayer('/player/me/rival-alerts', { method: 'PUT', bearer: meToken, body })
+    check('alerts start on', (await asPlayer('/player/me', { bearer: meToken })).body.player?.rivalAlerts === true)
+    const alertsOff = await alertsSwitch({ on: false })
+    check('turning alerts off -> 200 and says so',
+      alertsOff.status === 200 && alertsOff.body.player?.rivalAlerts === false, JSON.stringify(alertsOff.body).slice(0, 120))
+    check('an alerts switch that is not true or false -> 400', (await alertsSwitch({ on: 'no' })).status === 400)
+    check('the launch check carries it',
+      (await asPlayer('/auth/player/me', { bearer: meToken })).body.player?.rivalAlerts === false)
+    check('their rivals list is unchanged with alerts off',
+      ((await asPlayer('/player/rivals', { bearer: meToken })).body.rivals ?? []).some((r) => r.name === foeName))
+    check('and alerts go back on', (await alertsSwitch({ on: true })).body.player?.rivalAlerts === true)
   }
 
   section('admin site — doors that need no owner')
@@ -3738,6 +3751,25 @@ async function main() {
       // The sender runs every minute: wait for it so the send path runs once for real.
       console.log('  waiting 70 s for the sender to run once (api log: open play alerts {...})')
       await new Promise((resolve) => setTimeout(resolve, 70_000))
+
+      // --- opting out: joins that must queue nothing. Read from the api log, like the join above. ---
+      const alertsFor = (who, on) => asPlayer('/player/me/rival-alerts', { method: 'PUT', bearer: who.token, body: { on } })
+      const quietJoin = async (offPlayer, day) => {
+        await alertsFor(offPlayer, false)
+        const play = await addOpenPlay({ ...opBody, startsAt: manilaAt(day, 18), endsAt: manilaAt(day, 20) })
+        const joined = await asPlayer(`/player/open-plays/${play.body.openPlay?.id}/join`, { method: 'POST', bearer: one.token })
+        // The queueing runs after the answer: let it finish before the switch goes back on.
+        await new Promise((resolve) => setTimeout(resolve, 3000))
+        const back = await alertsFor(offPlayer, true)
+        await request(`/admin/facilities/${placeId}/open-plays/${play.body.openPlay?.id}`, { method: 'DELETE', bearer: opOwnerToken })
+        return { ok: joined.status === 200 && back.body.player?.rivalAlerts === true, id: play.body.openPlay?.id }
+      }
+      const joinerOff = await quietJoin(one, 5)
+      check('the joiner opts out and joins -> 200, and the switch goes back on', joinerOff.ok)
+      const receiverOff = await quietJoin(two, 6)
+      check('the receiver opts out and the joiner joins -> 200, and the switch goes back on', receiverOff.ok)
+      console.log(`  api log: "open play alerts queued 1 for ${alertPlay.body.openPlay?.id}", and no such line for ${joinerOff.id} or ${receiverOff.id}`)
+
       check('removing the subscription -> 204', (await push('DELETE', { endpoint })).status === 204)
       check('removing without an endpoint -> 400', (await push('DELETE', {})).status === 400)
       await request(`/admin/facilities/${placeId}/open-plays/${alertPlay.body.openPlay?.id}`, { method: 'DELETE', bearer: opOwnerToken })

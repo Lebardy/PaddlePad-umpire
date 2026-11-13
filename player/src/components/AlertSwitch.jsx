@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { fetchPushKey, removePush, savePush } from '../lib/api'
+import { fetchPushKey, removePush, savePush, setRivalAlerts } from '../lib/api'
 import Icon from './Icon'
 
 // The key arrives as base64url; the browser wants its bytes.
@@ -12,15 +12,19 @@ const iPhone = /iPhone|iPad|iPod/.test(navigator.userAgent)
 const standalone = window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true
 
 /**
- * "Alert me when a rival or partner joins open play", a section of You. Asks the phone only when tapped.
- * Hidden, heading and all, where alerts are off on the server or the browser cannot push;
- * on an iPhone outside the Home Screen it says how to get there, since
- * Apple allows web push only from there.
+ * The Alerts section of You. The first switch is the player's own choice to take part at all,
+ * saved on the server: off, their joins alert nobody and nothing is sent to them.
+ * Under it, while that is on, "Alert me when a rival or partner joins open play" for this phone,
+ * which asks the phone only when tapped. That row is hidden where alerts are off on the server
+ * or the browser cannot push; on an iPhone outside the Home Screen it says how to get there,
+ * since Apple allows web push only from there.
  */
-function AlertSwitch() {
+function AlertSwitch({ player, onPlayerChange }) {
   const [state, setState] = useState('loading') // loading | hidden | install | blocked | off | on
   const [key, setKey] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const takesPart = player.rivalAlerts !== false
   const note = useRef(null)
   const tapped = useRef(false)
 
@@ -41,6 +45,18 @@ function AlertSwitch() {
     })()
     return () => { live = false }
   }, [])
+
+  async function flip() {
+    if (saving) return
+    setSaving(true)
+    try {
+      onPlayerChange(await setRivalAlerts(!takesPart))
+    } catch {
+      // Unchanged on failure: the switch keeps showing what is saved.
+    } finally {
+      setSaving(false)
+    }
+  }
 
   async function toggle() {
     if (busy || (state !== 'on' && state !== 'off')) return
@@ -78,7 +94,6 @@ function AlertSwitch() {
     if (state === 'blocked' && tapped.current) note.current?.focus()
   }, [state])
 
-  if (state === 'loading' || state === 'hidden') return null
   const words = state === 'install' ? 'Add PaddlePad to your Home Screen first' : 'Notifications are blocked in your phone’s settings'
   return (
     <section className="you-section" aria-label="Alerts">
@@ -86,9 +101,13 @@ function AlertSwitch() {
         <Icon name="bell" size={16} />
         Alerts
       </h2>
-      {state === 'install' || state === 'blocked' ? (
-        <p ref={note} tabIndex={-1}>{words}</p>
-      ) : (
+      <button type="button" className="you-switch" role="switch" aria-checked={takesPart} aria-busy={saving} onClick={flip}>
+        <span>Rival and partner alerts</span>
+        <span className="you-switch-track" aria-hidden="true"><span /></span>
+      </button>
+      {!takesPart && <p className="detail-note">Your joins alert no one, and no alerts reach you.</p>}
+      {takesPart && (state === 'install' || state === 'blocked') && <p ref={note} tabIndex={-1}>{words}</p>}
+      {takesPart && (state === 'on' || state === 'off') && (
         <button type="button" className="you-switch" role="switch" aria-checked={state === 'on'} aria-busy={busy} onClick={toggle}>
           <span>Alert me when a rival or partner joins open play</span>
           <span className="you-switch-track" aria-hidden="true"><span /></span>
