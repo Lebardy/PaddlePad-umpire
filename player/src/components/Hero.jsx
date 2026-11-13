@@ -1,6 +1,7 @@
 import { currentStreak, recentForm } from '../lib/derive'
 import { useCountUp } from '../lib/motion'
 import Icon from './Icon'
+import { Link } from './Link'
 
 /**
  * The scoreboard the page leads with.
@@ -56,20 +57,23 @@ function Hero({ player, summary, matches, children }) {
       {form.length > 0 && (
         <div className="sb-form">
           <span className="sb-label">Recent</span>
-          <ol className="form-pills">
+          <ol className="form-pills" aria-label="Recent results, oldest first">
             {/* Reversed so it reads oldest to newest, left to right --
                 the direction people expect a run of results to run. */}
             {[...form].reverse().map((entry, i) => (
-              <li
-                key={entry.id}
-                style={{ '--i': i }}
-                className={
-                  entry.won === null ? 'pill pill-none' : entry.won ? 'pill pill-won' : 'pill pill-lost'
-                }
-              >
-                {/* The letter, not just the colour. A status colour must
-                    never carry the meaning on its own. */}
-                {entry.won === null ? '–' : entry.won ? 'W' : 'L'}
+              <li key={entry.id}>
+                <Link
+                  to={`/matches/${entry.id}`}
+                  style={{ '--i': i }}
+                  className={
+                    entry.won === null ? 'pill pill-none' : entry.won ? 'pill pill-won' : 'pill pill-lost'
+                  }
+                  aria-label={`${entry.won === null ? 'No result' : entry.won ? 'Won' : 'Lost'} ${entry.yourScore} to ${entry.theirScore} against ${(entry.opponents ?? []).join(' and ')}`}
+                >
+                  {/* The letter, not just the colour. A status colour must
+                      never carry the meaning on its own. */}
+                  {entry.won === null ? '–' : entry.won ? 'W' : 'L'}
+                </Link>
               </li>
             ))}
           </ol>

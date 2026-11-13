@@ -3,7 +3,7 @@
 //
 // The board at the top answers it; below it, only what nothing else
 // shows in the same way -- the rating in one line, the last night you
-// played, your form and your best. Anything another screen explains in
+// played and your best. Anything another screen explains in
 // full is a line here that links to it, rather than a second copy.
 // ============================================================
 
@@ -11,19 +11,16 @@ import { useEffect, useState } from 'react'
 import { Link } from '../components/Link'
 import { usePlayerData } from '../lib/PlayerData'
 import { fetchLeaderboard, fetchOpenPlays } from '../lib/api'
-import { personalBests, rollingWinRate } from '../lib/derive'
+import { personalBests } from '../lib/derive'
 import { groupMatches } from '../lib/nights'
 import Hero from '../components/Hero'
 import StatGrid from '../components/StatGrid'
 import PersonalBests from '../components/PersonalBests'
-import TrendChart from '../components/TrendChart'
 import RallyRating from '../components/RallyRating'
 import LiveNote from '../components/LiveNote'
 import { NightBlock } from '../components/MatchList'
 import { SetupStrip } from '../components/SetupSignIn'
 import Icon from '../components/Icon'
-
-const TREND_WINDOW = 5
 
 /**
  * The reader's Leaderboard place, only while the Leaderboard is open. One
@@ -100,7 +97,6 @@ export function FilmButton() {
 
 function Overview({ player }) {
   const { summary, matches, inProgress, rallyRating, leaderboardOpen } = usePlayerData()
-  const trend = rollingWinRate(matches, TREND_WINDOW)
   const bests = personalBests(matches)
   const place = useLeaderboardPlace(leaderboardOpen)
 
@@ -120,19 +116,6 @@ function Overview({ player }) {
       <OpenPlayStrip />
 
       <LastNight matches={matches} />
-
-      {trend.length >= 2 ? (
-        <TrendChart points={trend} window={TREND_WINDOW} />
-      ) : (
-        // Said plainly rather than drawn from too little data. A line
-        // through three matches is three coin flips.
-        <section className="trend trend-early" aria-label="Recent form">
-          <h2><Icon name="trendUp" size={17} className="head-icon" />Form</h2>
-          <p className="muted-inline">
-            Appears after {TREND_WINDOW + 1} matches.
-          </p>
-        </section>
-      )}
 
       {bests.length > 0 && <PersonalBests bests={bests} />}
     </div>
