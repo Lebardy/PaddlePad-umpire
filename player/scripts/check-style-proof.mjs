@@ -7,7 +7,7 @@
 
 import {
   MEASURES,
-  lowerIsMore,
+  measureName,
   metaLine,
   shownNumber,
   styleShareLine,
@@ -57,8 +57,17 @@ check('a Power Player shows away from the net', shownNumber(0.25, { feature: 'ne
 check('a Dropper shows drops as they are', shownNumber(0.4, dropper), 0.4)
 check('Clean keeps its ratio', shownNumber(0.88, clean), 0.88)
 check('nothing recorded stays nothing', shownNumber(null, driver), null)
-check('lower-is-more cue on Clean and the swings, not on Driver or a high word',
-  [clean, { feature: 'winner_rate_std', out: 'lower' }, driver, dropper].map(lowerIsMore), [true, true, false, false])
+
+console.log('\nthe table names what was counted')
+check('a row is named by its measurement, not its word', measureName({ ...clean, word: 'Clean' }), { name: 'Mistakes for each winning shot', swing: false })
+check('a Driver row names drives, a Dropper row drops',
+  [driver, dropper].map((c) => measureName(c).name), ['Third shots played as a drive', 'Third shots played as a drop'])
+check('a Power Player row names away from the net',
+  measureName({ feature: 'net_game_preference_rate_mean', out: 'lower' }).name, 'Winning shots hit away from the net')
+check('a swing says so, whichever way its word points',
+  ['lower', 'higher'].map((out) => measureName({ feature: 'winner_rate_std', out })), Array(2).fill({ name: 'Winning shots per 10 minutes', swing: true }))
+check('a measurement the app does not know keeps its word', measureName({ feature: 'new_thing', word: 'Bold', out: 'higher' }), { name: 'Bold', swing: false })
+check('every measure has a name', Object.values(MEASURES).every((m) => m.name), true)
 
 console.log('\nthe level-up line')
 check('another style is named', metaLine({ style: 'Reliable Precise Dropper' }, 'Steady Driver', 'Developing / Lower-Performance'),
