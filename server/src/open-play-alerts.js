@@ -39,7 +39,10 @@ export async function removeSubscription(query, playerId, endpoint) {
   await query('DELETE FROM push_subscriptions WHERE endpoint = $1 AND player_id = $2', [endpoint, playerId])
 }
 
-/** Who has `joinerId` in their block, has a phone to tell, and is not going: queued (or re-armed for a quiet update). */
+/**
+ * Who has `joinerId` in their block, has a phone to tell, and is not going: queued (or re-armed for a quiet update).
+ * Nobody when the joiner has switched rival and partner alerts off, and never anyone who has.
+ */
 export async function queueAlerts(query, openPlayId, joinerId, now) {
   if (!pushConfig()) return 0
   const ratings = await getRallyRatings(query)
@@ -47,10 +50,11 @@ export async function queueAlerts(query, openPlayId, joinerId, now) {
   if (candidates.length === 0) return 0
   const { rows: reachable } = await query(
     `SELECT DISTINCT s.player_id FROM push_subscriptions s
-       JOIN players p ON p.id = s.player_id AND p.deactivated_at IS NULL AND p.paused_at IS NULL
+       JOIN players p ON p.id = s.player_id AND p.deactivated_at IS NULL AND p.paused_at IS NULL AND p.rival_alerts
       WHERE s.player_id = ANY($1::uuid[])
+        AND (SELECT rival_alerts FROM players WHERE id = $3)
         AND NOT EXISTS (SELECT 1 FROM open_play_joins j WHERE j.open_play_id = $2 AND j.player_id = s.player_id)`,
-    [candidates, openPlayId],
+    [candidates, openPlayId, joinerId],
   )
   if (reachable.length === 0) return 0
   const blocks = await blocksFor(query, reachable.map((r) => r.player_id))
@@ -79,13 +83,15 @@ export async function sendDueAlerts(query, now) {
   webpush.setVapidDetails(config.subject, config.publicKey, config.privateKey)
   const { rows: due } = await query(
     `SELECT a.player_id, a.open_play_id, a.first_sent_at, o.starts_at, o.ends_at, o.facility_id, f.name AS facility_name,
-            (p.deactivated_at IS NULL AND p.paused_at IS NULL) AS active,
-            COALESCE(array_agg(j.player_id) FILTER (WHERE j.player_id IS NOT NULL), '{}') AS going
+            (p.deactivated_at IS NULL AND p.paused_at IS NULL AND p.rival_alerts) AS active,
+            -- Someone who switched alerts off after joining is neither named nor counted.
+            COALESCE(array_agg(j.player_id) FILTER (WHERE jp.rival_alerts), '{}') AS going
        FROM open_play_alerts a
        JOIN open_plays o ON o.id = a.open_play_id
        JOIN facilities f ON f.id = o.facility_id
        JOIN players p ON p.id = a.player_id
        LEFT JOIN open_play_joins j ON j.open_play_id = o.id
+       LEFT JOIN players jp ON jp.id = j.player_id
       WHERE a.state = 'waiting' AND a.send_after <= $1
       GROUP BY a.player_id, a.open_play_id, a.first_sent_at, o.id, f.name, p.id
       ORDER BY o.starts_at`,

@@ -965,6 +965,11 @@ CREATE INDEX IF NOT EXISTS visit_ratings_facility_idx ON visit_ratings (facility
 -- on; a hidden name (name_visible) stays hidden whatever this says.
 ALTER TABLE players ADD COLUMN IF NOT EXISTS near_rating_name BOOLEAN NOT NULL DEFAULT false;
 
+-- Whether this player takes part in rival and partner alerts. Off means
+-- their joining an open play alerts nobody and no alert is sent to them.
+-- They stay in other players' rival and partner lists either way.
+ALTER TABLE players ADD COLUMN IF NOT EXISTS rival_alerts BOOLEAN NOT NULL DEFAULT true;
+
 -- One row per phone that asked to be told when a rival or partner joins
 -- open play. The endpoint is the phone's address at its push service.
 CREATE TABLE IF NOT EXISTS push_subscriptions (

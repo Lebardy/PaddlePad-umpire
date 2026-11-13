@@ -548,7 +548,7 @@ function You({ player, onSignOut, onSignedOut, onPlayerChange }) {
 
       <NearRatingName player={player} onPlayerChange={onPlayerChange} />
 
-      <AlertSwitch />
+      <AlertSwitch player={player} onPlayerChange={onPlayerChange} />
 
       <LinkCode onPlayerChange={onPlayerChange} />
 

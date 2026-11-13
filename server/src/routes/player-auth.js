@@ -101,7 +101,7 @@ router.post('/player/claim', async (req, res) => {
             closed_by_admin_at = NULL
       WHERE claim_code = $1
         AND paused_at IS NULL
-      RETURNING id, name, claimed_at, username, google_email, near_rating_name`,
+      RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts`,
     [code],
   )
 
@@ -149,6 +149,7 @@ function playerPayload(row) {
     username: row.username,
     googleEmail: row.google_email,
     nearRatingName: row.near_rating_name === true,
+    rivalAlerts: row.rival_alerts !== false,
   }
 }
 
@@ -242,7 +243,7 @@ router.post('/player/register', async (req, res) => {
                               claimed_at, registered_at)
          VALUES ($1, $2, $3, now(), now())
          ON CONFLICT (lower(name)) DO NOTHING
-         RETURNING id, name, claimed_at, username, google_email, near_rating_name`,
+         RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts`,
         [name, username, password_hash],
       )
       if (inserted.rowCount === 1) return inserted.rows[0]
@@ -275,7 +276,7 @@ router.post('/player/register', async (req, res) => {
                 deactivated_at      = NULL,
                 closed_by_admin_at  = NULL
           WHERE id = $1
-          RETURNING id, name, claimed_at, username, google_email, near_rating_name`,
+          RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts`,
         [rows[0].id, username, password_hash],
       )
       return updated.rows[0]
@@ -313,7 +314,7 @@ router.post('/player/login', async (req, res) => {
   const password = String(req.body?.password ?? '')
 
   const { rows } = await query(
-    `SELECT id, name, claimed_at, username, google_email, near_rating_name, password_hash, paused_at
+    `SELECT id, name, claimed_at, username, google_email, near_rating_name, rival_alerts, password_hash, paused_at
        FROM players
       WHERE lower(username) = $1`,
     [username],
@@ -387,7 +388,7 @@ router.post('/player/google', async (req, res) => {
   const linked = await query(
     `UPDATE players SET google_email = $2
       WHERE google_sub = $1
-      RETURNING id, name, claimed_at, username, google_email, near_rating_name, paused_at, deactivated_at`,
+      RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts, paused_at, deactivated_at`,
     [profile.sub, profile.email],
   )
   if (linked.rows[0]) {
@@ -427,7 +428,7 @@ router.post('/player/google', async (req, res) => {
                               claimed_at, registered_at)
          VALUES ($1, $2, $3, now(), now())
          ON CONFLICT (lower(name)) DO NOTHING
-         RETURNING id, name, claimed_at, username, google_email, near_rating_name`,
+         RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts`,
         [name, profile.sub, profile.email],
       )
       if (inserted.rowCount === 1) return inserted.rows[0]
@@ -469,7 +470,7 @@ router.post('/player/google', async (req, res) => {
                 deactivated_at     = NULL,
                 closed_by_admin_at = NULL
           WHERE id = $1
-          RETURNING id, name, claimed_at, username, google_email, near_rating_name`,
+          RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts`,
         [rows[0].id, profile.sub, profile.email],
       )
       return updated.rows[0]
@@ -567,7 +568,7 @@ router.post(
                 claim_code    = NULL,
                 registered_at = COALESCE(registered_at, now())
           WHERE id = $1
-          RETURNING id, name, claimed_at, username, google_email, near_rating_name`,
+          RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts`,
         [found.id, profile.sub, profile.email],
       ))
     } catch (error) {
@@ -632,7 +633,7 @@ router.post(
     const { rows: updated } = await query(
       `UPDATE players SET google_sub = NULL, google_email = NULL
         WHERE id = $1
-        RETURNING id, name, claimed_at, username, google_email, near_rating_name`,
+        RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts`,
       [found.id],
     )
 
@@ -744,7 +745,7 @@ router.post(
 /** Confirms a stored player token is still good, on app launch. */
 router.get('/player/me', requirePlayer, requireActivePlayer(query), async (req, res) => {
   const { rows } = await query(
-    `SELECT id, name, claimed_at, username, google_email, near_rating_name
+    `SELECT id, name, claimed_at, username, google_email, near_rating_name, rival_alerts
        FROM players WHERE id = $1`,
     [req.player.id],
   )
