@@ -399,7 +399,7 @@ function Details({ player, onPlayerChange }) {
           </DetailRow>
 
           <p className="detail-note">
-            Forgot your password? Your code still gets you in.
+            Forgot your password? Your facility can ask PaddlePad for a new code.
           </p>
         </>
       ) : (
