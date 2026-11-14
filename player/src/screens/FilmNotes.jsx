@@ -34,8 +34,8 @@ function FilmNotes() {
         <h2 id="film-connection"><Icon name="upload" size={17} className="head-icon" />Use a strong connection</h2>
         <div className="film-connection">
           <p><Icon name="wifi" size={24} /><span><strong>Wifi</strong>, or strong mobile data</span></p>
-          {/* 5 Mbps video + 96 kbps audio at 1080p (pickBitrate in lib/videoClock.js) is about 570 MB per 15 minutes. */}
-          <p className="film-size"><strong>570 MB</strong><span>for 15 minutes</span></p>
+          {/* Measured on four real staging recordings (2026-11-14): 535 to 673 MB per 15 minutes, 625 on average. */}
+          <p className="film-size"><strong>625 MB</strong><span>for 15 minutes</span></p>
         </div>
       </section>
 
