@@ -93,7 +93,7 @@ function SignInPanel({ onSignedIn }) {
       </button>
 
       <p className="hint">
-        Forgot your password? Ask your umpire for a new code.
+        Forgot your password? Your facility can ask PaddlePad for a new code.
       </p>
     </form>
   )
