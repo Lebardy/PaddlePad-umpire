@@ -9,10 +9,10 @@ import { flush } from './sync'
 import { getMatch, setMatchEvents } from './storage'
 import { applyRuling } from '../../server/src/scorekeeper-rules.js'
 
-const HOME_POLL_MS = 10_000
+const HOME_POLL_MS = 2_000
 const RULINGS_POLL_MS = 2_000
 
-/** Matches this umpire was asked to score, checked every 10 s while Home is open; refresh() checks now. */
+/** Matches this umpire was asked to score, checked every 2 s while Home is open; refresh() checks now. */
 export function useScorekeeping() {
   const [matches, setMatches] = useState([])
   const refresh = useCallback(() => {

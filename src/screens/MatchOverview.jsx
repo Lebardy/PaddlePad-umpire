@@ -48,6 +48,8 @@ function MatchOverview({ match, name, onTakeBack }) {
   const seenAgo = match.scorekeeper?.seenAt ? Date.now() - new Date(match.scorekeeper.seenAt).getTime() : null
   const canRule = lastRally && !ruling && mineAll.length === 0 && rulingProblem(match.events, lastRally.id) === null && !match.concludeAsk
   const won = derived.completed
+  // An ace or a service or foot fault is the server's alone: the side is not in doubt, only the call (Wrong call).
+  const serverOnly = rallyEnding(lastRally?.detail)?.by === 'server'
   // Never over a ruling still on its way: that ruling may remove the winning rally.
   const canConclude = won && !match.voidedAt && mineAll.length === 0 && !match.concludeAsk && ruling?.state !== 'waiting'
 
@@ -123,7 +125,7 @@ function MatchOverview({ match, name, onTakeBack }) {
             <div className="overview-actions">
               {canConclude && <button onClick={conclude}><Icon name="check" size={18} />Conclude match</button>}
               {canRule && <button className={won ? 'btn-quiet' : undefined} onClick={() => setChoosing(true)}><Icon name="flag" size={18} />Appeal</button>}
-              {canRule && <button className="btn-quiet" onClick={() => rule('wrongWinner')}><Icon name="retry" size={18} />Wrong winner</button>}
+              {canRule && !serverOnly && <button className="btn-quiet" onClick={() => rule('wrongWinner')}><Icon name="retry" size={18} />Wrong winner</button>}
               {canRule && <button className="btn-quiet" onClick={() => rule('wrongCall')}><Icon name="undo" size={18} />Wrong call</button>}
             </div>
           )}
