@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react'
 import Icon from '../components/Icon'
 import { deriveMatchState, currentServerPlayerId } from '../lib/pickleball'
 import { isGamePoint, runningTimeout, timeoutsLeft } from '../lib/scoreHelpers'
-import { askConclude, queueRuling } from '../lib/storage'
+import { askConclude, dropQueuedRuling, queueRuling } from '../lib/storage'
 import { flush } from '../lib/sync'
 import { useQueuedRulings } from '../lib/useLocalStore'
-import { newestRuling, rallyWinnerTeam, rulingProblem, waitingReentry } from '../../server/src/scorekeeper-rules.js'
+import { TIMEOUT_CANCELLED, newestRuling, rallyWinnerTeam, rulingProblem, timeoutTeam, waitingReentry } from '../../server/src/scorekeeper-rules.js'
 import { legacyRallyLabel, rallyEnding } from '../lib/outcomes'
 
-const KIND_WORDS = { stands: 'Stands', overturned: 'Overturned', replay: 'Replay', wrongWinner: 'Wrong winner', wrongCall: 'Wrong call', timeoutA: 'Timeout', timeoutB: 'Timeout' }
+const KIND_WORDS = { stands: 'Stands', overturned: 'Overturned', replay: 'Replay', wrongWinner: 'Wrong winner', wrongCall: 'Wrong call', timeoutA: 'Timeout', timeoutB: 'Timeout', cancelTimeout: 'Cancel timeout' }
 const STATE_WORDS = { queued: 'Waiting to send', waiting: 'Sent, not applied yet', applied: 'Applied' }
 const SEEN_LATE_MS = 20_000
 const RALLIES_SHOWN = 12
@@ -53,14 +53,19 @@ function MatchOverview({ match, name, onTakeBack }) {
   // The newest ruling may be on a rally the card has moved past; its outcome still shows.
   const mineAll = queued.filter((r) => r.matchId === match.id)
   const newest = newestRuling(mineAll, match.rulings ?? [])
-  const stray = newest && newest.targetEventId !== subject?.id && (newest.state === 'queued' || newest.state === 'refused') ? newest : null
+  const stray = newest && newest.targetEventId !== subject?.id && (newest.state === 'queued' || newest.state === 'refused') && newest.refused !== TIMEOUT_CANCELLED ? newest : null
   const seenAgo = match.scorekeeper?.seenAt ? Date.now() - new Date(match.scorekeeper.seenAt).getTime() : null
   const canRule = lastRally && !ruling && mineAll.length === 0 && rulingProblem(match.events, lastRally.id) === null && !match.concludeAsk
   const won = derived.completed
   // An ace or a service or foot fault is the server's alone: the side is not in doubt, only the call (Wrong call).
   const serverOnly = rallyEnding(lastRally?.detail)?.by === 'server'
   // Never over a ruling still on its way: that ruling may remove the winning rally.
-  const canTimeout = !won && !reenter && mineAll.length === 0 && !match.concludeAsk && !running
+  // A timeout called and not yet on the scorekeeper's phone: unsent here, or sent and waiting there.
+  const queuedTimeout = mineAll.find((r) => timeoutTeam(r.kind))
+  const sentTimeout = !queuedTimeout && (match.rulings ?? []).find((r) => timeoutTeam(r.kind) && r.state === 'waiting')
+  const calling = queuedTimeout ?? sentTimeout
+  const cancelQueued = mineAll.some((r) => r.kind === 'cancelTimeout')
+  const canTimeout = !won && !reenter && mineAll.length === 0 && !match.concludeAsk && !running && !calling
   const canConclude = won && !match.voidedAt && mineAll.length === 0 && !match.concludeAsk && ruling?.state !== 'waiting'
 
   function rule(kind) {
@@ -72,6 +77,13 @@ function MatchOverview({ match, name, onTakeBack }) {
   // The scorekeeper's phone adds it to the log; queued like a ruling, so it waits out a dropped signal.
   function callTimeout(team) {
     queueRuling(match.id, last?.id ?? crypto.randomUUID(), team === 'A' ? 'timeoutA' : 'timeoutB')
+    flush()
+  }
+
+  // Unsent: dropped here. Sent: the server stops it, or the scorekeeper's phone takes it back out.
+  function cancelTimeout() {
+    if (queuedTimeout) dropQueuedRuling(queuedTimeout.id)
+    else queueRuling(match.id, running ? last.id : sentTimeout.id, 'cancelTimeout')
     flush()
   }
 
@@ -123,10 +135,13 @@ function MatchOverview({ match, name, onTakeBack }) {
         </p>
       )}
 
-      {running && (
-        <p className="overview-wait" role="status">
-          <Icon name="timer" size={18} />Timeout · {teamWords(running.team)} · {Math.max(0, Math.ceil((running.endsAt - now) / 1000))} s
-        </p>
+      {(running || calling) && (
+        <div className="overview-timeout">
+          <p className="overview-wait" role="status">
+            <Icon name="timer" size={18} />Timeout · {teamWords(running ? running.team : timeoutTeam(calling.kind))} · {running ? `${Math.max(0, Math.ceil((running.endsAt - now) / 1000))} s` : queuedTimeout ? 'Waiting to send' : 'Sent'}
+          </p>
+          {!cancelQueued && <button className="ruling-call" onClick={cancelTimeout}><Icon name="x" size={18} />Cancel</button>}
+        </div>
       )}
       {reenter && <p className="overview-wait"><Icon name="timer" size={18} />Waiting: rally to {teamWords(reenter)}</p>}
 

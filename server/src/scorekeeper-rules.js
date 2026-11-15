@@ -10,7 +10,8 @@
 // player stats, the ML export and old installed apps need nothing new.
 // ============================================================
 
-export const RULING_KINDS = ['stands', 'overturned', 'replay', 'wrongWinner', 'wrongCall', 'timeoutA', 'timeoutB']
+export const RULING_KINDS = ['stands', 'overturned', 'replay', 'wrongWinner', 'wrongCall', 'timeoutA', 'timeoutB', 'cancelTimeout']
+export const TIMEOUT_CANCELLED = 'Timeout cancelled.'
 
 /** A timeout the match umpire calls rides the rulings path; the scorekeeper's phone adds it to the log. */
 export const timeoutTeam = (kind) => (kind === 'timeoutA' ? 'A' : kind === 'timeoutB' ? 'B' : null)
@@ -43,6 +44,12 @@ export function rulingProblem(events, targetEventId) {
  * entered again for (Overturned / Wrong winner: the other team), or `{ refused }`.
  */
 export function applyRuling(events, ruling, teamA, at = Date.now()) {
+  // Cancel: the called timeout, still the last thing logged, gives way to a note, so the side has it back.
+  if (ruling.kind === 'cancelTimeout') {
+    const last = events.at(-1)
+    if (last?.type !== 'timeout' || last.id !== ruling.targetEventId) return { refused: TOO_LATE }
+    return { events: [...events.slice(0, -1), { type: 'ruling', id: ruling.id, at, targetEventId: last.id, kind: 'cancelTimeout', ruledBy: ruling.ruledByName ?? null }], reenterFor: null }
+  }
   const team = timeoutTeam(ruling.kind)
   if (team) {
     // Not mid-re-entry: the timeout would hide which team the rally must go to.

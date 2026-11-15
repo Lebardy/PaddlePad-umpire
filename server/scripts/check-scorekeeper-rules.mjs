@@ -58,6 +58,11 @@ check('a called timeout is added after the last event, even past an older rally'
 check('the timeout event keeps the ruling id, so the server can mark it applied', called.events.at(-1).id, 'g7')
 check('the timeout is for the side named', called.events.at(-1).team, 'B')
 check('a timeout waits while a re-entry is owed', applyRuling(over.events, { id: 'g8', targetEventId: 'g3', kind: 'timeoutA' }, teamA).refused, TOO_LATE)
+const cancelled = applyRuling(called.events, { id: 'g9', targetEventId: 'g7', kind: 'cancelTimeout' }, teamA)
+check('Cancel takes the called timeout back out', cancelled.events.filter((e) => e.type === 'timeout').length, 0)
+check('Cancel leaves a note in its place, so the server marks it applied', cancelled.events.at(-1).id, 'g9')
+check('Cancel is too late once something was logged after the timeout',
+  applyRuling([...called.events, rally('r9', 'a1')], { id: 'g10', targetEventId: 'g7', kind: 'cancelTimeout' }, teamA).refused, TOO_LATE)
 check('a re-entered rally ends the wait', waitingReentry([...over.events, rally('r3', 'b1')], teamA), null)
 check('a ruling on a stale rally is refused', applyRuling(log, { id: 'g5', targetEventId: 'r1', kind: 'replay' }, teamA).refused, TOO_LATE)
 check('a note is not a rally, so it cannot be ruled on again', rulingProblem(stands.events, 'g1'), TOO_LATE)

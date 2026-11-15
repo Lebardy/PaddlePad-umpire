@@ -35,6 +35,7 @@ const BANNER = {
   wrongCall: () => 'Wrong call: enter the last rally again',
   timeoutA: (team) => `Timeout: ${team}`,
   timeoutB: (team) => `Timeout: ${team}`,
+  cancelTimeout: () => 'Timeout cancelled',
 }
 
 /**
