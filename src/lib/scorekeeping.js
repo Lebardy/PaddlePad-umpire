@@ -5,6 +5,7 @@
 // ============================================================
 import { useCallback, useEffect, useState } from 'react'
 import { fetchScorekeeping, fetchWaitingRulings, refuseRuling } from './api'
+import { flush } from './sync'
 import { getMatch, setMatchEvents } from './storage'
 import { applyRuling } from '../../server/src/scorekeeper-rules.js'
 
@@ -31,6 +32,7 @@ const BANNER = {
   replay: () => 'Replay: last rally removed',
   overturned: (team) => `Overturned: rally to ${team}. How did it end?`,
   wrongWinner: (team) => `Winner corrected: rally to ${team}. How did it end?`,
+  wrongCall: () => 'Wrong call: enter the last rally again',
 }
 
 /**
@@ -63,6 +65,7 @@ export function useRulingsPoller(matchId, active, teamWords, onRevoked, onGone) 
           // This phone already scored past that rally: too late, say so to the server.
           if (result.refused) { await refuseRuling(matchId, ruling.id); continue }
           setMatchEvents(matchId, result.events)
+          flush() // the umpire's overview shows Applied as soon as the log lands
           setBanner({ id: ruling.id, who: ruling.ruledByName, text: BANNER[ruling.kind](result.reenterFor && teamWords(result.reenterFor)) })
         }
       } catch (error) {

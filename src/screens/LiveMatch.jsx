@@ -42,7 +42,7 @@ import {
 // a score several rallies out of date.
 const WATCH_POLL_MS = 8_000
 // The match umpire follows a scorekeeper closely: the overview is their only view.
-const SPLIT_POLL_MS = 2_000
+const SPLIT_POLL_MS = 1_000
 
 // Remembered so the explanation is open for someone's first night and
 // out of the way by their tenth -- the same bargain as the guide nudge
@@ -250,7 +250,7 @@ function rallyLabel(event) {
   return rallyEnding(event.detail)?.label ?? legacyRallyLabel(event.outcome, event.zone)
 }
 
-const RULING_WORDS = { stands: 'call stands', overturned: 'overturned', replay: 'replay', wrongWinner: 'winner corrected' }
+const RULING_WORDS = { stands: 'call stands', overturned: 'overturned', replay: 'replay', wrongWinner: 'winner corrected', wrongCall: 'wrong call' }
 
 // Turns one logged event into the plain-English line shown in the
 // history panel, so an umpire can glance back and confirm what was
@@ -449,6 +449,9 @@ function LiveMatch({ matchId, onBack }) {
     if (reentryMismatch(ruledFor, match.teamA, getMatch(matchId).events.at(-1))) {
       undoLastEvent(matchId)
       alert(`That gives the point to ${teamWords(ruledFor === 'A' ? 'B' : 'A')}. The umpire ruled ${teamWords(ruledFor)}.`)
+    } else if (iScore) {
+      // The match umpire is waiting on this rally to appeal it: send it now, not after the 2 s debounce.
+      sync.flush()
     }
     setPending(null)
   }

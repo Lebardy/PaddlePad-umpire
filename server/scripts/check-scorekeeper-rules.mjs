@@ -49,6 +49,10 @@ check('Overturned asks for the rally again, won by the other team', over.reenter
 check('the log now waits for that re-entry', waitingReentry(over.events, teamA), 'B')
 check('Wrong winner behaves like Overturned',
   applyRuling(log, { id: 'g4', targetEventId: 'r2', kind: 'wrongWinner' }, teamA).reenterFor, 'B')
+const wrongCall = applyRuling(log, { id: 'g6', targetEventId: 'r2', kind: 'wrongCall' }, teamA)
+check('Wrong call removes the rally (note takes its place)', wrongCall.events.length, 2)
+check('Wrong call binds no team: the rally is entered again as it ended', wrongCall.reenterFor, null)
+check('nothing waits on a team after Wrong call', waitingReentry(wrongCall.events, teamA), null)
 check('a re-entered rally ends the wait', waitingReentry([...over.events, rally('r3', 'b1')], teamA), null)
 check('a ruling on a stale rally is refused', applyRuling(log, { id: 'g5', targetEventId: 'r1', kind: 'replay' }, teamA).refused, TOO_LATE)
 check('a note is not a rally, so it cannot be ruled on again', rulingProblem(stands.events, 'g1'), TOO_LATE)
