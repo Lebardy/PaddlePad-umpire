@@ -475,7 +475,7 @@ BEGIN
 END $$;
 
 ALTER TABLE match_rulings ADD CONSTRAINT match_rulings_kind_allowed
-    CHECK (kind IN ('stands', 'overturned', 'replay', 'wrongWinner', 'wrongCall'));
+    CHECK (kind IN ('stands', 'overturned', 'replay', 'wrongWinner', 'wrongCall', 'timeoutA', 'timeoutB'));
 
 -- ============================================================
 -- ML pipeline results

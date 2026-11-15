@@ -4,7 +4,7 @@ import { requireActiveUmpire, requireAuth } from '../auth.js'
 import { umpireScope } from '../facility-rules.js'
 import { isUuid } from '../validate.js'
 import { heldByAnotherDevice } from '../scoring-lease.js'
-import { MATCH_OVER, RULING_KINDS, TOO_LATE, rulingProblem } from '../scorekeeper-rules.js'
+import { MATCH_OVER, RULING_KINDS, TOO_LATE, rulingProblem, timeoutTeam } from '../scorekeeper-rules.js'
 
 // ============================================================
 // A second umpire taps the score while the match's own umpire watches
@@ -132,7 +132,8 @@ router.post('/:matchId/rulings', async (req, res) => {
   // Judged on the log the server has; the scorekeeper's phone judges again
   // on its own (newer) log when it applies the ruling.
   const { rows: events } = await query(`SELECT id, type FROM match_events WHERE match_id = $1 ORDER BY seq`, [match.id])
-  const refused = rulingProblem(events, targetEventId)
+  // A timeout is not about one rally, so it is never too late here.
+  const refused = timeoutTeam(kind) ? null : rulingProblem(events, targetEventId)
   // ON CONFLICT: two sends of the same ruling racing (an outbox retry) must
   // not hit the primary key; the loser reads back what the winner stored.
   const { rows: [ruling] } = await query(

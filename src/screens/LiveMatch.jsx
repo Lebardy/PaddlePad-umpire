@@ -667,7 +667,16 @@ function LiveMatch({ matchId, onBack }) {
                       </span>
                     ))}
                   </span>
-                  {live && (
+                  {live && iScore && (
+                    // Timeouts are the match umpire's to call during a split: shown here, not tapped.
+                    <span className="overview-timeouts" aria-label={`${left} ${left === 1 ? 'timeout' : 'timeouts'} left`}>
+                      <Icon name="timer" size={18} className="icon-solo" />
+                      <span className="timeout-pips" aria-hidden="true">
+                        {Array.from({ length: mostTimeouts }, (_, i) => <span key={i} className={i < left ? 'is-left' : undefined} />)}
+                      </span>
+                    </span>
+                  )}
+                  {live && !iScore && (
                     <button
                       className="timeout-btn"
                       aria-label={`Timeout for ${teamWords(key)}, ${left} left`}
@@ -680,7 +689,7 @@ function LiveMatch({ matchId, onBack }) {
                         buzz(30)
                       }}
                     >
-                      <Icon name="timer" size={20} />
+                      <Icon name="timer" size={20} className="icon-solo" />
                       <span className="timeout-pips" aria-hidden="true">
                         {Array.from({ length: mostTimeouts }, (_, i) => (
                           <span key={i} className={i < left ? 'is-left' : undefined} />

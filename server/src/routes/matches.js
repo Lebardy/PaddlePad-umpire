@@ -598,8 +598,8 @@ router.put('/:id/log', async (req, res) => {
       ],
     )
 
-    // A ruling counts as applied once the scorekeeper's log carries its note.
-    const ruled = events.filter((e) => e.type === 'ruling').map((e) => e.id)
+    // A ruling counts as applied once the scorekeeper's log carries its note (a called timeout: its event).
+    const ruled = events.filter((e) => e.type === 'ruling' || e.type === 'timeout').map((e) => e.id)
     if (ruled.length) {
       await client.query(
         `UPDATE match_rulings SET applied_at = now()

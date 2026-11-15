@@ -33,6 +33,8 @@ const BANNER = {
   overturned: (team) => `Overturned: rally to ${team}. How did it end?`,
   wrongWinner: (team) => `Winner corrected: rally to ${team}. How did it end?`,
   wrongCall: () => 'Wrong call: enter the last rally again',
+  timeoutA: (team) => `Timeout: ${team}`,
+  timeoutB: (team) => `Timeout: ${team}`,
 }
 
 /**
@@ -66,7 +68,7 @@ export function useRulingsPoller(matchId, active, teamWords, onRevoked, onGone) 
           if (result.refused) { await refuseRuling(matchId, ruling.id); continue }
           setMatchEvents(matchId, result.events)
           flush() // the umpire's overview shows Applied as soon as the log lands
-          setBanner({ id: ruling.id, who: ruling.ruledByName, text: BANNER[ruling.kind](result.reenterFor && teamWords(result.reenterFor)) })
+          setBanner({ id: ruling.id, who: ruling.ruledByName, text: BANNER[ruling.kind]((result.reenterFor ?? result.timeoutFor) && teamWords(result.reenterFor ?? result.timeoutFor)) })
         }
       } catch (error) {
         // Offline or a blip: the rulings wait on the server for the next tick.

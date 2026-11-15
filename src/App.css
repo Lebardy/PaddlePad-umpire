@@ -2237,6 +2237,10 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
   border-color: var(--border);
   color: var(--text-muted);
 }
+/* Each ruling its own tint; Conclude match stays the one solid button. */
+.overview-actions .ruling-appeal { background: var(--amber-soft); border-color: var(--amber-ring); color: var(--amber-text); }
+.overview-actions .ruling-winner { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.overview-actions .ruling-call { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
 .overview-actions .icon-solo { min-width: 2.75rem; padding: 0; background: var(--bg-elevated); border-color: var(--border); color: var(--text-muted); }
 .overview-side {
   display: grid;
