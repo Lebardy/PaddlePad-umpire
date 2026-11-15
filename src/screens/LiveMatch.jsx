@@ -100,7 +100,7 @@ const clockText = (ms) => {
 // The one-minute clock for a timeout or the end change, over the whole
 // screen until the umpire presses Resume (it stays at 0:00 if nobody does).
 // A dialog: focus goes to Resume, and the parent returns it on close.
-function ClockOverlay({ tone, title, note, endsAt, onResume }) {
+function ClockOverlay({ tone, title, note, endsAt, onResume, onCancel }) {
   const [now, setNow] = useState(Date.now)
   const resume = useRef(null)
   const buzzed = useRef({ warn: false, end: false })
@@ -128,7 +128,8 @@ function ClockOverlay({ tone, title, note, endsAt, onResume }) {
       aria-modal="true"
       aria-label={title}
       onKeyDown={(e) => {
-        if (e.key === 'Tab') {
+        // Focus stays inside the clock; with Cancel there, Tab moves between its two buttons.
+        if (e.key === 'Tab' && !onCancel) {
           e.preventDefault()
           resume.current?.focus()
         }
@@ -147,6 +148,12 @@ function ClockOverlay({ tone, title, note, endsAt, onResume }) {
           <Icon name="play" size={20} />
           Resume play
         </button>
+        {onCancel && (
+          <button className="clock-cancel" onClick={onCancel}>
+            <Icon name="x" size={20} />
+            Cancel timeout
+          </button>
+        )}
       </div>
     </div>
   )
@@ -250,7 +257,7 @@ function rallyLabel(event) {
   return rallyEnding(event.detail)?.label ?? legacyRallyLabel(event.outcome, event.zone)
 }
 
-const RULING_WORDS = { stands: 'call stands', overturned: 'overturned', replay: 'replay', wrongWinner: 'winner corrected', wrongCall: 'wrong call' }
+const RULING_WORDS = { stands: 'call stands', overturned: 'overturned', replay: 'replay', wrongWinner: 'winner corrected', wrongCall: 'wrong call', cancelTimeout: 'timeout cancelled' }
 
 // Turns one logged event into the plain-English line shown in the
 // history panel, so an umpire can glance back and confirm what was
@@ -937,6 +944,8 @@ function LiveMatch({ matchId, onBack }) {
           note={`${timeoutsLeft(match.events, timeoutClock.team, derived.pointTarget)} ${timeoutsLeft(match.events, timeoutClock.team, derived.pointTarget) === 1 ? 'timeout' : 'timeouts'} left · buzzes at 0:15`}
           endsAt={timeoutClock.endsAt}
           onResume={() => setResumedId(timeoutClock.id)}
+          // A mis-tap: the timeout comes back out and the side has it again. Only on the scoring device; during a split the match umpire cancels.
+          onCancel={isScorer && !iScore ? () => { undoLastEvent(matchId); setResumedId(timeoutClock.id) } : undefined}
         />
       )}
       {live && !timeoutClock && endChange && (

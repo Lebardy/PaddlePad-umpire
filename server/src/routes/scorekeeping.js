@@ -4,7 +4,7 @@ import { requireActiveUmpire, requireAuth } from '../auth.js'
 import { umpireScope } from '../facility-rules.js'
 import { isUuid } from '../validate.js'
 import { heldByAnotherDevice } from '../scoring-lease.js'
-import { MATCH_OVER, RULING_KINDS, TOO_LATE, rulingProblem, timeoutTeam } from '../scorekeeper-rules.js'
+import { MATCH_OVER, RULING_KINDS, TIMEOUT_CANCELLED, TOO_LATE, rulingProblem, timeoutTeam } from '../scorekeeper-rules.js'
 
 // ============================================================
 // A second umpire taps the score while the match's own umpire watches
@@ -133,7 +133,22 @@ router.post('/:matchId/rulings', async (req, res) => {
   // on its own (newer) log when it applies the ruling.
   const { rows: events } = await query(`SELECT id, type FROM match_events WHERE match_id = $1 ORDER BY seq`, [match.id])
   // A timeout is not about one rally, so it is never too late here.
-  const refused = timeoutTeam(kind) ? null : rulingProblem(events, targetEventId)
+  const refused = timeoutTeam(kind) || kind === 'cancelTimeout' ? null : rulingProblem(events, targetEventId)
+  // A cancel that reaches the timeout before the scorekeeper's phone does stops it here: nothing left for that phone to do.
+  if (kind === 'cancelTimeout') {
+    const stopped = await query(
+      `UPDATE match_rulings SET refused = $3 WHERE id = $1 AND match_id = $2 AND kind IN ('timeoutA', 'timeoutB') AND applied_at IS NULL AND refused IS NULL`,
+      [targetEventId, match.id, TIMEOUT_CANCELLED],
+    )
+    if (stopped.rowCount) {
+      const { rows: [done] } = await query(
+        `INSERT INTO match_rulings (id, match_id, target_event_id, kind, ruled_by, applied_at)
+         VALUES ($1, $2, $3, $4, $5, now()) ON CONFLICT (id) DO NOTHING RETURNING *`,
+        [id, match.id, targetEventId, kind, req.umpire.id],
+      )
+      return res.status(201).json({ ruling: shape(done ?? { id, target_event_id: targetEventId, kind, refused: null }) })
+    }
+  }
   // ON CONFLICT: two sends of the same ruling racing (an outbox retry) must
   // not hit the primary key; the loser reads back what the winner stored.
   const { rows: [ruling] } = await query(

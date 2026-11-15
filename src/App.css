@@ -1172,6 +1172,21 @@ section {
   line-height: 1;
 }
 .clock-note { color: var(--text-muted); }
+.clock-cancel {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1.5px solid var(--danger);
+  border-radius: 12px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
 .clock-resume {
   width: 100%;
   min-height: 56px;
@@ -2240,7 +2255,11 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
 /* Each ruling its own tint; Conclude match stays the one solid button. */
 .overview-actions .ruling-appeal { background: var(--amber-soft); border-color: var(--amber-ring); color: var(--amber-text); }
 .overview-actions .ruling-winner { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-.overview-actions .ruling-call { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+.overview-timeout { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.overview-timeout .overview-wait { flex: 1 1 14rem; }
+.overview-timeout .ruling-call { min-height: 2.75rem; padding: 0 1rem; border: 1.5px solid; border-radius: var(--radius-sm); display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 600; cursor: pointer; }
+.overview-actions .ruling-call,
+.overview-timeout .ruling-call { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
 .overview-actions .icon-solo { min-width: 2.75rem; padding: 0; background: var(--bg-elevated); border-color: var(--border); color: var(--text-muted); }
 .overview-side {
   display: grid;
