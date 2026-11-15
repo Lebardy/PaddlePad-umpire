@@ -10,7 +10,10 @@
 // player stats, the ML export and old installed apps need nothing new.
 // ============================================================
 
-export const RULING_KINDS = ['stands', 'overturned', 'replay', 'wrongWinner']
+export const RULING_KINDS = ['stands', 'overturned', 'replay', 'wrongWinner', 'wrongCall', 'timeoutA', 'timeoutB']
+
+/** A timeout the match umpire calls rides the rulings path; the scorekeeper's phone adds it to the log. */
+export const timeoutTeam = (kind) => (kind === 'timeoutA' ? 'A' : kind === 'timeoutB' ? 'B' : null)
 export const TOO_LATE = 'Too late: the next rally was scored.'
 export const TAKEN_BACK = 'Scoring was taken back.'
 export const MATCH_OVER = 'The match has finished.'
@@ -37,9 +40,15 @@ export function rulingProblem(events, targetEventId) {
 
 /**
  * The scorekeeper's log after a ruling, and which team the rally must be
- * entered again for (Overturned / Wrong winner), or `{ refused }`.
+ * entered again for (Overturned / Wrong winner: the other team), or `{ refused }`.
  */
 export function applyRuling(events, ruling, teamA, at = Date.now()) {
+  const team = timeoutTeam(ruling.kind)
+  if (team) {
+    // Not mid-re-entry: the timeout would hide which team the rally must go to.
+    if (waitingReentry(events, teamA)) return { refused: TOO_LATE }
+    return { events: [...events, { type: 'timeout', id: ruling.id, at, team }], reenterFor: null, timeoutFor: team }
+  }
   const problem = rulingProblem(events, ruling.targetEventId)
   if (problem) return { refused: problem }
   const rally = events.at(-1)
@@ -54,15 +63,19 @@ export function applyRuling(events, ruling, teamA, at = Date.now()) {
   const winner = rallyWinnerTeam(teamA, rally)
   return {
     events: [...events.slice(0, -1), { ...note, was }],
-    reenterFor: ruling.kind === 'replay' ? null : winner === 'A' ? 'B' : 'A',
+    reenterFor: reentryTeam(ruling.kind, winner),
   }
 }
+
+// Replay and Wrong call (an undo: the scorekeeper enters the rally again as it really ended) bind no team.
+const reentryTeam = (kind, winner) =>
+  kind === 'replay' || kind === 'wrongCall' ? null : winner === 'A' ? 'B' : 'A'
 
 /** The team an overturned rally still has to be entered for, or null once it has been. */
 export function waitingReentry(events, teamA) {
   const last = events.at(-1)
-  if (last?.type !== 'ruling' || !last.was || last.kind === 'replay') return null
-  return rallyWinnerTeam(teamA, last.was) === 'A' ? 'B' : 'A'
+  if (last?.type !== 'ruling' || !last.was) return null
+  return reentryTeam(last.kind, rallyWinnerTeam(teamA, last.was))
 }
 
 /** True when a rally entered after an overturned call gives the point to the other team than the one ruled for. */

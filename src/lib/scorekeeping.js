@@ -5,13 +5,14 @@
 // ============================================================
 import { useCallback, useEffect, useState } from 'react'
 import { fetchScorekeeping, fetchWaitingRulings, refuseRuling } from './api'
+import { flush } from './sync'
 import { getMatch, setMatchEvents } from './storage'
 import { applyRuling } from '../../server/src/scorekeeper-rules.js'
 
-const HOME_POLL_MS = 10_000
+const HOME_POLL_MS = 2_000
 const RULINGS_POLL_MS = 2_000
 
-/** Matches this umpire was asked to score, checked every 10 s while Home is open; refresh() checks now. */
+/** Matches this umpire was asked to score, checked every 2 s while Home is open; refresh() checks now. */
 export function useScorekeeping() {
   const [matches, setMatches] = useState([])
   const refresh = useCallback(() => {
@@ -31,6 +32,9 @@ const BANNER = {
   replay: () => 'Replay: last rally removed',
   overturned: (team) => `Overturned: rally to ${team}. How did it end?`,
   wrongWinner: (team) => `Winner corrected: rally to ${team}. How did it end?`,
+  wrongCall: () => 'Wrong call: enter the last rally again',
+  timeoutA: (team) => `Timeout: ${team}`,
+  timeoutB: (team) => `Timeout: ${team}`,
 }
 
 /**
@@ -63,7 +67,8 @@ export function useRulingsPoller(matchId, active, teamWords, onRevoked, onGone) 
           // This phone already scored past that rally: too late, say so to the server.
           if (result.refused) { await refuseRuling(matchId, ruling.id); continue }
           setMatchEvents(matchId, result.events)
-          setBanner({ id: ruling.id, who: ruling.ruledByName, text: BANNER[ruling.kind](result.reenterFor && teamWords(result.reenterFor)) })
+          flush() // the umpire's overview shows Applied as soon as the log lands
+          setBanner({ id: ruling.id, who: ruling.ruledByName, text: BANNER[ruling.kind]((result.reenterFor ?? result.timeoutFor) && teamWords(result.reenterFor ?? result.timeoutFor)) })
         }
       } catch (error) {
         // Offline or a blip: the rulings wait on the server for the next tick.

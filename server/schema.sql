@@ -449,7 +449,7 @@ CREATE TABLE IF NOT EXISTS match_rulings (
     id               UUID PRIMARY KEY,
     match_id         UUID NOT NULL REFERENCES matches (id) ON DELETE CASCADE,
     target_event_id  UUID NOT NULL,
-    kind             TEXT NOT NULL CHECK (kind IN ('stands', 'overturned', 'replay', 'wrongWinner')),
+    kind             TEXT NOT NULL CHECK (kind IN ('stands', 'overturned', 'replay', 'wrongWinner', 'wrongCall')),
     ruled_by         UUID REFERENCES umpires (id) ON DELETE SET NULL,
     ruled_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
     applied_at       TIMESTAMPTZ,
@@ -457,6 +457,25 @@ CREATE TABLE IF NOT EXISTS match_rulings (
 );
 CREATE INDEX IF NOT EXISTS match_rulings_waiting_idx
     ON match_rulings (match_id) WHERE applied_at IS NULL AND refused IS NULL;
+
+-- 'wrongCall' joined the kinds after the table existed, and the inline
+-- CHECK above never updates itself: the kind check is found by its
+-- definition, dropped and put back on every boot, as match_events does.
+DO $$
+DECLARE existing record;
+BEGIN
+    FOR existing IN
+        SELECT conname FROM pg_constraint
+         WHERE conrelid = 'match_rulings'::regclass
+           AND contype = 'c'
+           AND pg_get_constraintdef(oid) ILIKE '%kind%'
+    LOOP
+        EXECUTE format('ALTER TABLE match_rulings DROP CONSTRAINT %I', existing.conname);
+    END LOOP;
+END $$;
+
+ALTER TABLE match_rulings ADD CONSTRAINT match_rulings_kind_allowed
+    CHECK (kind IN ('stands', 'overturned', 'replay', 'wrongWinner', 'wrongCall', 'timeoutA', 'timeoutB'));
 
 -- ============================================================
 -- ML pipeline results

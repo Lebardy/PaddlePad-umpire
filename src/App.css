@@ -2134,6 +2134,22 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
   max-width: 44rem;
   margin: 0 auto;
 }
+/* The overview fills a tablet: score and the last rally on the left, earlier rallies on the right. */
+.match-overview { max-width: 68rem; align-items: start; }
+.overview-main { display: grid; gap: 1rem; min-width: 0; }
+@media (min-width: 900px) {
+  .match-overview { grid-template-columns: minmax(0, 1.65fr) minmax(17rem, 1fr); gap: 1.25rem; }
+}
+.overview-board { margin-bottom: 0; }
+.overview-board .score-value { font-size: clamp(3rem, 7vw, 4.25rem); }
+.overview-timeouts {
+  grid-area: timeout;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+}
 .scorekeeper-wait { justify-items: center; text-align: center; padding-top: 2rem; }
 .wait-card {
   display: grid;
@@ -2183,7 +2199,11 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
 }
-.last-rally strong { font-family: var(--display); font-size: 1.9rem; line-height: 1.05; overflow-wrap: anywhere; }
+.last-rally strong { font-family: var(--display); font-size: clamp(1.9rem, 3.4vw, 2.4rem); line-height: 1.05; text-wrap: balance; overflow-wrap: anywhere; }
+.last-rally > span { font-size: 1.1rem; }
+.last-rally .overview-actions { margin-top: 0.4rem; }
+.last-rally .overview-actions button { flex: 1 1 9rem; min-height: 3.5rem; font-size: 1.05rem; }
+.last-rally .overview-actions .icon-solo { flex: 0 0 3.5rem; }
 .last-rally.is-removed > strong,
 .last-rally.is-removed > span:not(.ruling-state) { text-decoration: line-through; color: var(--text-muted); }
 .last-rally > span { color: var(--text-muted); overflow-wrap: anywhere; }
@@ -2217,18 +2237,43 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
   border-color: var(--border);
   color: var(--text-muted);
 }
+/* Each ruling its own tint; Conclude match stays the one solid button. */
+.overview-actions .ruling-appeal { background: var(--amber-soft); border-color: var(--amber-ring); color: var(--amber-text); }
+.overview-actions .ruling-winner { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.overview-actions .ruling-call { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
 .overview-actions .icon-solo { min-width: 2.75rem; padding: 0; background: var(--bg-elevated); border-color: var(--border); color: var(--text-muted); }
+.overview-side {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 1rem 1.1rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.overview-side h3 { margin: 0; }
+.overview-none { margin: 0; color: var(--text-muted); }
 .overview-rallies {
   display: grid;
-  gap: 0.25rem;
   margin: 0;
   padding: 0;
   list-style: none;
-  color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
-.overview-rallies li { overflow-wrap: anywhere; }
+.overview-rallies li {
+  display: grid;
+  grid-template-columns: 3.4rem minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.overview-rallies li:first-child { border-top: 0; }
+.overview-rally-score { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+.overview-rallies li > span:last-child { color: var(--text-muted); }
 .take-back { justify-self: start; }
+.overview-side .take-back { justify-self: stretch; min-height: 3rem; }
 .scorekeeper-picker {
   position: fixed;
   inset: auto 0 0 0;
