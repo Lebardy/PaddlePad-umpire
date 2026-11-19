@@ -144,7 +144,7 @@ section('what the site sees')
   check('a facility as the site sees it', rules.facilityPayload(payloadRow), {
     id: 'f1', name: 'Court Nine', area: 'Dumaguete', locationUrl: null, openingHours: null,
     hourlyFeeCentavos: 15000, feeText: '₱150 per hour',
-    umpireFeeCentavos: 10000, umpireFeeText: '₱100 per hour', details: null, filmsMatches: false, logoUrl: null,
+    umpireFeeCentavos: 10000, umpireFeeText: '₱100 per hour', details: null, filmsMatches: false, courtCount: null, logoUrl: null,
     createdAt: '2026-09-19T00:00:00Z', updatedAt: '2026-09-19T00:00:00Z',
   })
   check('no umpire fee reads as nothing, not "Fee not set"',
@@ -323,6 +323,17 @@ section('films matches')
   check('the site sees it on', rules.facilityPayload({ id: 'f', name: 'A', films_matches: true }).filmsMatches, true)
   check('a row read without the column is off', rules.facilityPayload({ id: 'f', name: 'A' }).filmsMatches, false)
 }
+
+console.log('\ncourt count')
+check('a number', rules.readFacility({ courtCount: 4 }, { partial: true }), { values: { court_count: 4 } })
+check('typed text', rules.readFacility({ courtCount: '12' }, { partial: true }), { values: { court_count: 12 } })
+check('empty clears it', rules.readFacility({ courtCount: '' }, { partial: true }), { values: { court_count: null } })
+check('0 is refused', rules.readFacility({ courtCount: 0 }, { partial: true }), { error: 'Courts: 1 to 20' })
+check('21 is refused', rules.readFacility({ courtCount: '21' }, { partial: true }), { error: 'Courts: 1 to 20' })
+check('2.5 is refused', rules.readFacility({ courtCount: 2.5 }, { partial: true }), { error: 'Courts: 1 to 20' })
+check('left out when creating without it', 'court_count' in rules.readFacility({ name: 'Somewhere' }).values, false)
+check('in the payload', rules.facilityPayload({ id: 'f', name: 'X', court_count: 6 }).courtCount, 6)
+check('unset in the payload', rules.facilityPayload({ id: 'f', name: 'X' }).courtCount, null)
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail === 0 ? 0 : 1)

@@ -94,11 +94,21 @@ export function readFacility(body = {}, { partial = false } = {}) {
     if (typeof body.filmsMatches !== 'boolean') return { error: 'Films matches must be on or off' }
     values.films_matches = body.filmsMatches
   }
+  // Read only when sent, like filmsMatches: a new place says nothing about courts until an admin does.
+  if (Object.prototype.hasOwnProperty.call(body, 'courtCount')) {
+    const raw = body.courtCount
+    if (raw === null || String(raw).trim() === '') values.court_count = null
+    else {
+      const count = Number(raw)
+      if (!Number.isInteger(count) || count < 1 || count > 20) return { error: 'Courts: 1 to 20' }
+      values.court_count = count
+    }
+  }
   return { values }
 }
 
 /** The only columns a facility create/update may ever set from caller-supplied values. */
-const FACILITY_VALUE_COLUMNS = ['name', 'area', 'location_url', 'opening_hours', 'hourly_fee_centavos', 'umpire_fee_centavos', 'details', 'films_matches']
+const FACILITY_VALUE_COLUMNS = ['name', 'area', 'location_url', 'opening_hours', 'hourly_fee_centavos', 'umpire_fee_centavos', 'details', 'films_matches', 'court_count']
 
 /**
  * Keeps only the fixed, known facility columns present in `values`,
@@ -231,6 +241,7 @@ export function facilityPayload(row) {
     umpireFeeText: row.umpire_fee_centavos == null ? null : feeText(row.umpire_fee_centavos),
     details: row.details ?? null,
     filmsMatches: row.films_matches === true,
+    courtCount: row.court_count ?? null,
     logoUrl: logoPath(row.id, row.logo_updated_at ?? null),
     createdAt: row.created_at,
     updatedAt: row.updated_at,

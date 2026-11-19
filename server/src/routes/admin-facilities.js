@@ -11,6 +11,7 @@ import {
   saveFacilityLogo, updateFacility,
 } from '../facility-store.js'
 import { isUuid } from '../validate.js'
+import { courtCountRefusal } from '../open-play-courts.js'
 import { levelLookup, loadCourtState, loadFacilityUmpires, loadOpenPlays, recentRatings } from '../open-play-store.js'
 import { guestsTotals, openPlayRow, openPlayWhen, readOpenPlay, visitSummary } from '../visit-rules.js'
 
@@ -43,6 +44,7 @@ const FIELD_LABELS = {
   umpire_fee_centavos: 'umpire fee',
   details: 'details',
   films_matches: 'match filming',
+  court_count: 'courts',
 }
 
 router.get('/', async (req, res) => {
@@ -110,6 +112,16 @@ router.patch('/:id', async (req, res) => {
       // and a save that changes nothing would still write an entry.
       const changed = changedFacilityColumns(before, read.values)
       if (changed.length === 0) return before
+      if (changed.includes('court_count')) {
+        const { rows } = await client.query(
+          `SELECT starts_at, ends_at, court_numbers FROM open_plays
+            WHERE facility_id = $1 AND ends_at > now() ORDER BY starts_at`,
+          [req.params.id],
+        )
+        const upcoming = rows.map((row) => ({ startsAt: row.starts_at, endsAt: row.ends_at, courtNumbers: row.court_numbers }))
+        const problem = courtCountRefusal(read.values.court_count, upcoming)
+        if (problem) throw refusal(409, problem)
+      }
 
       const updated = await updateFacility(client, req.params.id, read.values)
       // A rename gets its own wording, naming both the old and new name,

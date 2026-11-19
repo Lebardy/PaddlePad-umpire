@@ -3057,7 +3057,7 @@ async function main() {
 
     // --- 1: creating facilities ---
     const facA = await request('/admin/facilities', {
-      method: 'POST', bearer: fOwnerToken, body: { name: nameFacA, hourlyFee: '150', umpireFee: '100' },
+      method: 'POST', bearer: fOwnerToken, body: { name: nameFacA, hourlyFee: '150', umpireFee: '100', courtCount: 4 },
     })
     check('the owner creates facility A -> 201', facA.status === 201, JSON.stringify(facA.body).slice(0, 120))
     const facilityAId = facA.body.facility?.id
@@ -3617,6 +3617,11 @@ async function main() {
     const manilaAt = (day, hour) => new Date(today + day * 86_400_000 + hour * 3_600_000).toISOString()
     const opBody = { startsAt: manilaAt(1, 18), endsAt: manilaAt(1, 20), courts: 1, spots: 2, fee: '150', umpire: true, note: 'Smoke test' }
     const addOpenPlay = (body) => request(`/admin/facilities/${placeId}/open-plays`, { method: 'POST', bearer: opOwnerToken, body })
+    const setCourts = (courtCount) => request(`/admin/facilities/${placeId}`, { method: 'PATCH', bearer: opOwnerToken, body: { courtCount } })
+    const counted = await setCourts(6)
+    check('the owner sets 6 courts -> 200, courtCount 6', counted.status === 200 && counted.body.facility?.courtCount === 6, JSON.stringify(counted.body).slice(0, 120))
+    const tooMany = await setCourts(21)
+    check('21 courts -> 400, Courts: 1 to 20', tooMany.status === 400 && tooMany.body.error === 'Courts: 1 to 20', JSON.stringify(tooMany.body).slice(0, 100))
     const added = await addOpenPlay(opBody)
     check('the owner adds an open play, tomorrow 6-8 pm, 2 spots -> 201',
       added.status === 201 && Boolean(added.body.openPlay?.id), JSON.stringify(added.body).slice(0, 120))
