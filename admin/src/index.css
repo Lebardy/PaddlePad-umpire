@@ -914,6 +914,9 @@ tr.is-voided .reason { opacity: 0.6; }
 /* Wide enough for one row: the note gives way so Add open play stays on it. */
 @media (min-width: 1181px) { .guests-form .field.grow { flex-basis: 9rem; } }
 .guests-hint { flex-basis: 100%; }
+.guests-removes { flex-basis: 100%; margin: 0; font-weight: 600; color: var(--text); }
+.guests-form select:disabled { background: var(--surface-sunken); color: var(--text-muted); border-style: dashed; opacity: 1; cursor: not-allowed; }
+.guests-table .btn-quiet[aria-expanded='true'] { border-color: var(--primary); background: var(--primary-soft); }
 .guests-error, .guests-form + .table-wrap, .guests-error + .table-wrap { margin-top: 0.75rem; }
 .cell-figure { font-family: var(--label); font-weight: 700; font-size: 1.1rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* How full it is: the blue of proportions, light track to dark fill. */

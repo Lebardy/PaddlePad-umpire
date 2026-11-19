@@ -332,6 +332,7 @@ function OpenPlayForm({ facilityId, courtCount, plays, play = null, onSave, onCl
   const taken = takenCourts(plays, { startsAt: toIso(day, start), endsAt: toIso(day, end) }, play?.id)
   // A picked court another open play holds at the new hours drops out.
   const chosen = picked.filter((n) => !taken.has(n) && n <= (courtCount ?? 0))
+  const shownSpots = spotsEdited ? spots : String(spotsFor(chosen.length))
   const dropped = editing ? droppedWords(play.courtRoster, chosen, umpire) : []
 
   function changeStart(value) {
@@ -343,7 +344,6 @@ function OpenPlayForm({ facilityId, courtCount, plays, play = null, onSave, onCl
   function toggle(court) {
     const next = chosen.includes(court) ? chosen.filter((n) => n !== court) : [...chosen, court].sort((a, b) => a - b)
     setPicked(next)
-    if (!spotsEdited) setSpots(String(spotsFor(next.length)))
   }
 
   async function submit(event) {
@@ -353,7 +353,7 @@ function OpenPlayForm({ facilityId, courtCount, plays, play = null, onSave, onCl
     try {
       await onSave({
         startsAt: toIso(day, start), endsAt: toIso(day, end),
-        courtNumbers: chosen, spots: Number(spots), fee, umpire, note,
+        courtNumbers: chosen, spots: Number(shownSpots), fee, umpire, note,
       })
       if (!editing) setNote('')
     } catch (err) {
@@ -405,7 +405,7 @@ function OpenPlayForm({ facilityId, courtCount, plays, play = null, onSave, onCl
         </div>
         <label className="field field-number">
           <span>Spots</span>
-          <input type="number" inputMode="numeric" value={spots}
+          <input type="number" inputMode="numeric" value={shownSpots}
             onChange={(e) => { setSpotsEdited(true); setSpots(e.target.value) }} />
         </label>
         <label className="field field-number">
@@ -426,8 +426,8 @@ function OpenPlayForm({ facilityId, courtCount, plays, play = null, onSave, onCl
           {editing ? <><Icon name="check" size={16} />Save</> : <><Icon name="plus" size={16} />Add open play</>}
         </button>
         {editing && <button type="button" className="btn-quiet" onClick={onClose}><Icon name="x" size={16} />Close</button>}
-        {dropped.length > 0 && <p className="hint guests-hint">{dropped.join(' · ')}</p>}
-        {!editing && <p className="hint guests-hint">1 to 8 hours, ending by 11 pm. Greyed courts are taken then. Spots start at 8 per court. Leave the fee empty for free.</p>}
+        {dropped.length > 0 && <p className="guests-removes" role="status"><Icon name="alert" size={16} />{dropped.join(' · ')}</p>}
+        {!editing && <p className="hint guests-hint">Greyed courts are taken then. 8 spots per court.</p>}
       </form>
       {error && <p className="form-error guests-error" role="alert">{error}</p>}
     </>
