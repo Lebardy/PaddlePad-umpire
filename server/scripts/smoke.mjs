@@ -3882,6 +3882,21 @@ async function main() {
       JSON.stringify(afterEdit?.courtRoster?.map((c) => [c.court, c.umpire?.id ?? null])) === '[[1,null]]', JSON.stringify(afterEdit?.courtRoster))
     const reused = await addOpenPlay(morning(7, 10, [2]))
     check('Court 2 is free again at 7-10 am -> 201', reused.status === 201, JSON.stringify(reused.body).slice(0, 120))
+    // --- the time-change alert: the switch, and an edit with someone going ---
+    const openPlaySwitch = (who, on) => asPlayer('/player/me/open-play-alerts', { method: 'PUT', bearer: who.token, body: { on } })
+    const meBefore = await asPlayer('/player/me', { bearer: three.token })
+    check('Open play alerts start on', meBefore.body.player?.openPlayAlerts === true, JSON.stringify(meBefore.body.player))
+    const switchedOff = await openPlaySwitch(three, false)
+    check('turning them off -> 200, openPlayAlerts false', switchedOff.status === 200 && switchedOff.body.player?.openPlayAlerts === false,
+      JSON.stringify(switchedOff.body).slice(0, 120))
+    check('and rival alerts are untouched', switchedOff.body.player?.rivalAlerts === true, JSON.stringify(switchedOff.body.player))
+    const badSwitch = await openPlaySwitch(three, 'yes')
+    check('on: "yes" -> 400', badSwitch.status === 400, String(badSwitch.status))
+    const switchedOn = await openPlaySwitch(three, true)
+    check('back on -> 200', switchedOn.body.player?.openPlayAlerts === true, JSON.stringify(switchedOn.body).slice(0, 120))
+    await asPlayer(`/player/open-plays/${aId}/join`, { method: 'POST', bearer: three.token })
+    const moved = await editA(morning(8, 10, [1], { spots: 4, note: 'Moved to one court' }))
+    check('moving an open play someone is going to -> 200 (the alert goes after the answer)', moved.status === 200, JSON.stringify(moved.body).slice(0, 120))
 
     section('open play courts — start by tapping, named by the server')
     // Live now: starts at the next whole Manila hour (always inside the

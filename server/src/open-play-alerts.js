@@ -10,7 +10,7 @@ import webpush from 'web-push'
 import { getRallyRatings } from './rally-rating-store.js'
 import { DAILY_CAP, alertTitle, goingFor, pushGone, sendAfter } from './rivals.js'
 import { blocksFor, counterparts, ratingNeighbours } from './rivals-store.js'
-import { manilaDayStart, openPlayWhen } from './visit-rules.js'
+import { manilaDayStart, openPlayWhen, timeChangeAlert } from './visit-rules.js'
 
 /** The push keys, or null when any is missing: then nothing is queued and the bell is hidden. */
 export function pushConfig() {
@@ -73,6 +73,18 @@ export async function queueAlerts(query, openPlayId, joinerId, now) {
   return rowCount
 }
 
+/** One alert to one phone: 'sent', 'gone' (dropped, its push service no longer knows it) or 'failed'. */
+async function pushTo(query, phone, payload) {
+  try {
+    await webpush.sendNotification({ endpoint: phone.endpoint, keys: { p256dh: phone.p256dh, auth: phone.auth } }, payload, { TTL: 6 * 60 * 60, timeout: 10_000 })
+    return 'sent'
+  } catch (error) {
+    if (!pushGone(error.statusCode)) return 'failed'
+    await query('DELETE FROM push_subscriptions WHERE endpoint = $1', [phone.endpoint])
+    return 'gone'
+  }
+}
+
 /** Sends every alert that is due. Never throws for one phone: a failed push is counted and the row is done. */
 export async function sendDueAlerts(query, now) {
   const config = pushConfig()
@@ -126,17 +138,38 @@ export async function sendDueAlerts(query, now) {
     })
     const { rows: phones } = await query('SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE player_id = $1', [row.player_id])
     for (const phone of phones) {
-      try {
-        await webpush.sendNotification({ endpoint: phone.endpoint, keys: { p256dh: phone.p256dh, auth: phone.auth } }, payload, { TTL: 6 * 60 * 60, timeout: 10_000 })
-        counts.sent += 1
-      } catch (error) {
-        if (pushGone(error.statusCode)) {
-          counts.gone += 1
-          await query('DELETE FROM push_subscriptions WHERE endpoint = $1', [phone.endpoint])
-        } else counts.failed += 1
-      }
+      const result = await pushTo(query, phone, payload)
+      counts[result] += 1
     }
     await finish(row, 'sent', row.first_sent_at ?? now)
   }
   return counts
+}
+
+/**
+ * Tells the players going that an open play's day or hours changed: each
+ * active one with Open play alerts on, on every phone they signed up.
+ * Straight away, without the rival alerts' queue or daily cap.
+ */
+export async function sendTimeChange(query, openPlayId, before) {
+  const config = pushConfig()
+  if (!config) return 0
+  webpush.setVapidDetails(config.subject, config.publicKey, config.privateKey)
+  const { rows: [play] } = await query(
+    `SELECT o.starts_at, o.ends_at, o.facility_id, f.name FROM open_plays o JOIN facilities f ON f.id = o.facility_id WHERE o.id = $1`,
+    [openPlayId],
+  )
+  if (!play) return 0
+  const { title, body } = timeChangeAlert({ facilityName: play.name, before, after: { startsAt: play.starts_at, endsAt: play.ends_at } })
+  const payload = JSON.stringify({ title, body, tag: `${openPlayId}:time`, url: `/places/${play.facility_id}` })
+  const { rows: phones } = await query(
+    `SELECT s.endpoint, s.p256dh, s.auth FROM open_play_joins j
+       JOIN players p ON p.id = j.player_id AND p.open_play_alerts AND p.deactivated_at IS NULL AND p.paused_at IS NULL
+       JOIN push_subscriptions s ON s.player_id = p.id
+      WHERE j.open_play_id = $1`,
+    [openPlayId],
+  )
+  let sent = 0
+  for (const phone of phones) if ((await pushTo(query, phone, payload)) === 'sent') sent += 1
+  return sent
 }
