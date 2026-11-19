@@ -950,7 +950,7 @@ tr.is-voided .reason { opacity: 0.6; }
 }
 .court-count[aria-expanded='true'] { border-color: var(--primary); background: var(--primary-soft); }
 .court-count:focus-visible, .court-card select:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.court-strip td { background: var(--surface-sunken); }
+.court-strip td, .edit-strip td { background: var(--surface-sunken); }
 .court-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; }
 .court-card { display: grid; gap: 0.5rem; padding: 0.8rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); min-width: 0; }
 .court-card-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; min-height: 1.5rem; }
@@ -960,6 +960,20 @@ tr.is-voided .reason { opacity: 0.6; }
 .court-saved svg { color: var(--status-good); }
 .court-state { display: flex; align-items: center; gap: 0.45rem; color: var(--text-muted); font-size: 0.9rem; }
 .live-lamp { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--win-lamp); box-shadow: 0 0 6px var(--win-lamp); flex: none; }
+/* Court buttons in the form: a wrapping row of numbers; a court another open play holds is greyed with its hours under it. */
+.court-pick { flex: 1 1 100%; }
+.court-pick-row { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.court-pick-btn {
+  display: grid; place-items: center; align-content: center; min-width: 2.75rem; min-height: 2.75rem; padding: 0.2rem 0.6rem;
+  background: var(--surface); color: var(--text); border: 1.5px solid var(--border); border-radius: var(--radius-sm); cursor: pointer;
+  font-family: var(--label); font-weight: 700; font-size: 1.1rem; font-variant-numeric: tabular-nums;
+}
+.court-pick-btn small { font-family: var(--sans); font-weight: 400; font-size: 0.75rem; line-height: 1.1; }
+.court-pick-btn:hover:not(:disabled) { border-color: var(--primary); }
+.court-pick-btn[aria-pressed='true'] { background: var(--button); color: var(--button-ink); border-color: var(--button); }
+.court-pick-btn:disabled { background: var(--surface-sunken); color: var(--text-muted); opacity: 1; }
+.court-pick-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.court-pick-missing { color: var(--primary); font-weight: 600; text-decoration: underline; display: inline-flex; align-items: center; min-height: 2.75rem; }
 /* A row's Cancel and its Confirm / Not now are a finger's size on a tablet. */
 .guests-table .btn-small { min-height: 2.75rem; }
 /* The refusal ("Courts already started") reads on one line under Cancel, not in a three-line sliver. */
