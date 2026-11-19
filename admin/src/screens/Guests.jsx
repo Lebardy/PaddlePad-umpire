@@ -4,12 +4,14 @@ import Icon from '../components/Icon'
 import PageBoard from '../components/PageBoard'
 import RowConfirm from '../components/RowConfirm'
 import StatusTag from '../components/StatusTag'
-import { addOpenPlay, cancelOpenPlay, fetchGuests, listFacilities, setCourtUmpire } from '../lib/api'
+import { addOpenPlay, cancelOpenPlay, editOpenPlay, fetchGuests, listFacilities, setCourtUmpire } from '../lib/api'
 import { countWord } from '../lib/format'
 import { RowsSkeleton } from '../components/Skeleton'
 import {
-  comingWords, courtCount, dayOptions, endHours, feeWords, scoreWords, spotsFor, startHours, toIso, whenWords,
+  comingWords, courtCount, dayOptions, droppedWords, endHours, feeWords, formTimes, scoreWords, spotsFor, startHours,
+  takenCourts, toIso, whenWords,
 } from '../lib/guests'
+import { Link } from '../lib/router'
 
 const FACES = [1, 2, 3, 4, 5]
 const CHIP_LINES = [{ key: 'good', label: 'Made it good' }, { key: 'better', label: 'Could be better' }]
@@ -24,6 +26,7 @@ export default function Guests({ me, facilityLabel }) {
   const [confirming, setConfirming] = useState(null)
   const [newest, setNewest] = useState(null)
   const [openCourts, setOpenCourts] = useState(null)
+  const [editing, setEditing] = useState(null)
   const playsHeading = useRef(null)
 
   // The owner starts on the first place by name; a manager is always on their own.
@@ -60,7 +63,13 @@ export default function Guests({ me, facilityLabel }) {
     setConfirming(null)
     setNewest(null)
     setOpenCourts(null)
+    setEditing(null)
     setPicked(id)
+  }
+
+  function closeEdit(id) {
+    setEditing(null)
+    requestAnimationFrame(() => document.getElementById(`edit-btn-${id}`)?.focus())
   }
 
   // Errors are thrown back to the row's confirmation, which shows them there.
@@ -96,7 +105,10 @@ export default function Guests({ me, facilityLabel }) {
               </div>
               <OpenPlayForm
                 key={facilityId}
-                onAdd={async (body) => {
+                facilityId={facilityId}
+                courtCount={data.courtCount}
+                plays={data.openPlays}
+                onSave={async (body) => {
                   const added = await addOpenPlay(facilityId, body)
                   setNewest(added.id)
                   await load()
@@ -152,6 +164,11 @@ export default function Guests({ me, facilityLabel }) {
                             <td><StatusTag status={play.status} /></td>
                             <td className="col-actions">
                               <div className="row-actions">
+                                <button type="button" id={`edit-btn-${play.id}`} className="btn-quiet btn-small"
+                                  aria-expanded={editing === play.id} aria-controls={`edit-${play.id}`}
+                                  onClick={() => (editing === play.id ? closeEdit(play.id) : setEditing(play.id))}>
+                                  <Icon name="edit" size={16} />Edit
+                                </button>
                                 <RowConfirm
                                   label="Cancel"
                                   className="btn-danger btn-small"
@@ -176,6 +193,19 @@ export default function Guests({ me, facilityLabel }) {
                                     <CourtCard key={slot.court} facilityId={facilityId} play={play} slot={slot} umpires={data.umpires} onSaved={load} />
                                   ))}
                                 </div>
+                              </td>
+                            </tr>
+                          )}
+                          {editing === play.id && (
+                            <tr className="edit-strip" id={`edit-${play.id}`}>
+                              <td colSpan={7}>
+                                <OpenPlayForm facilityId={facilityId} courtCount={data.courtCount} plays={data.openPlays} play={play}
+                                  onSave={async (body) => {
+                                    await editOpenPlay(facilityId, play.id, body)
+                                    await load()
+                                    closeEdit(play.id)
+                                  }}
+                                  onClose={() => closeEdit(play.id)} />
                               </td>
                             </tr>
                           )}
@@ -272,27 +302,38 @@ function GuestTotals({ totals, visits }) {
   )
 }
 
-/** The form strip: an open play is added here, never in a pop-up. */
-function OpenPlayForm({ onAdd }) {
+/** The form strip: an open play is added here, or edited in a strip under its row, never in a pop-up. */
+function OpenPlayForm({ facilityId, courtCount, plays, play = null, onSave, onClose }) {
+  const editing = Boolean(play)
+  // Read once when the form opens: the day and start stay locked for an open play already under way.
+  const [started] = useState(() => editing && (Date.parse(play.startsAt) <= Date.now() || Boolean(play.courtRoster?.some((slot) => slot.session))))
+  const initial = editing ? formTimes(play.startsAt, play.endsAt) : null
   const [days, setDays] = useState(() => dayOptions(Date.now()))
-  const [day, setDay] = useState(days[1].value)
+  const [day, setDay] = useState(initial?.day ?? days[1].value)
   // Relabelled each minute, so a page left open past midnight never calls today "Tomorrow".
   useEffect(() => {
     const timer = setInterval(() => setDays(dayOptions(Date.now())), 60_000)
     return () => clearInterval(timer)
   }, [])
-  const [start, setStart] = useState(6)
-  const [end, setEnd] = useState(9)
-  const [courts, setCourts] = useState('1')
-  const [spots, setSpots] = useState('8')
-  // Spots follow the courts until someone types their own.
-  const [spotsEdited, setSpotsEdited] = useState(false)
-  const [fee, setFee] = useState('')
-  const [umpire, setUmpire] = useState(true)
-  const [note, setNote] = useState('')
+  const [start, setStart] = useState(initial?.start ?? 6)
+  const [end, setEnd] = useState(initial?.end ?? 9)
+  const [picked, setPicked] = useState(play?.courtNumbers ?? [])
+  const [spots, setSpots] = useState(play ? String(play.spots) : '')
+  // Spots follow the courts until someone types their own; an edit keeps its own.
+  const [spotsEdited, setSpotsEdited] = useState(editing)
+  const [fee, setFee] = useState(play?.feeCentavos != null ? String(play.feeCentavos / 100) : '')
+  const [umpire, setUmpire] = useState(play?.umpire ?? true)
+  const [note, setNote] = useState(play?.note ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const umpireLabel = useId()
+  const courtsLabel = useId()
+
+  const taken = takenCourts(plays, { startsAt: toIso(day, start), endsAt: toIso(day, end) }, play?.id)
+  // A picked court another open play holds at the new hours drops out.
+  const chosen = picked.filter((n) => !taken.has(n) && n <= (courtCount ?? 0))
+  const shownSpots = spotsEdited ? spots : String(spotsFor(chosen.length))
+  const dropped = editing ? droppedWords(play.courtRoster, chosen, umpire) : []
 
   function changeStart(value) {
     setStart(value)
@@ -300,9 +341,10 @@ function OpenPlayForm({ onAdd }) {
     setEnd((current) => Math.min(Math.max(current, ends[0].value), ends.at(-1).value))
   }
 
-  function changeCourts(value) {
-    setCourts(value)
-    if (!spotsEdited) setSpots(String(spotsFor(Number(value))))
+  function toggle(court) {
+    if (taken.has(court)) return
+    const next = chosen.includes(court) ? chosen.filter((n) => n !== court) : [...chosen, court].sort((a, b) => a - b)
+    setPicked(next)
   }
 
   async function submit(event) {
@@ -310,11 +352,11 @@ function OpenPlayForm({ onAdd }) {
     setBusy(true)
     setError(null)
     try {
-      await onAdd({
+      await onSave({
         startsAt: toIso(day, start), endsAt: toIso(day, end),
-        courts: Number(courts), spots: Number(spots), fee, umpire, note,
+        courtNumbers: chosen, spots: Number(shownSpots), fee, umpire, note,
       })
-      setNote('')
+      if (!editing) setNote('')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -327,13 +369,13 @@ function OpenPlayForm({ onAdd }) {
       <form className="form-strip guests-form" onSubmit={submit}>
         <label className="field">
           <span>Day</span>
-          <select value={day} onChange={(e) => setDay(e.target.value)}>
+          <select value={day} disabled={started} onChange={(e) => setDay(e.target.value)}>
             {days.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
           </select>
         </label>
         <label className="field">
           <span>Starts</span>
-          <select value={start} onChange={(e) => changeStart(Number(e.target.value))}>
+          <select value={start} disabled={started} onChange={(e) => changeStart(Number(e.target.value))}>
             {startHours.map((h) => <option key={h.value} value={h.value}>{h.label}</option>)}
           </select>
         </label>
@@ -343,13 +385,28 @@ function OpenPlayForm({ onAdd }) {
             {endHours(start).map((h) => <option key={h.value} value={h.value}>{h.label}</option>)}
           </select>
         </label>
-        <label className="field field-number">
-          <span>Courts</span>
-          <input type="number" inputMode="numeric" value={courts} onChange={(e) => changeCourts(e.target.value)} />
-        </label>
+        <div className="field court-pick" role="group" aria-labelledby={courtsLabel}>
+          <span id={courtsLabel}>Courts</span>
+          {courtCount == null ? (
+            <Link to={`/facilities/${facilityId}`} className="court-pick-missing"><Icon name="court" size={16} />Set your courts first</Link>
+          ) : (
+            <div className="court-pick-row">
+              {Array.from({ length: courtCount }, (_, i) => i + 1).map((court) => {
+                const holder = taken.get(court)
+                return (
+                  <button key={court} type="button" className="court-pick-btn" aria-pressed={chosen.includes(court)}
+                    aria-disabled={holder ? 'true' : undefined} aria-label={holder ? `Court ${court}, taken ${holder}` : `Court ${court}`}
+                    onClick={() => toggle(court)}>
+                    <b>{court}</b>{holder && <small>{holder}</small>}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
         <label className="field field-number">
           <span>Spots</span>
-          <input type="number" inputMode="numeric" value={spots}
+          <input type="number" inputMode="numeric" value={shownSpots}
             onChange={(e) => { setSpotsEdited(true); setSpots(e.target.value) }} />
         </label>
         <label className="field field-number">
@@ -366,8 +423,12 @@ function OpenPlayForm({ onAdd }) {
           <span>Note (optional)</span>
           <input maxLength={60} value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
-        <button type="submit" className="btn-primary" disabled={busy}><Icon name="plus" size={16} />Add open play</button>
-        <p className="hint guests-hint">1 to 8 hours, ending by 11 pm. Spots start at 8 per court. Leave the fee empty for free.</p>
+        <button type="submit" className="btn-primary" disabled={busy || (!editing && courtCount == null)}>
+          {editing ? <><Icon name="check" size={16} />Save</> : <><Icon name="plus" size={16} />Add open play</>}
+        </button>
+        {editing && <button type="button" className="btn-quiet" onClick={onClose}><Icon name="x" size={16} />Close</button>}
+        <p className="guests-removes" role="status">{dropped.length > 0 && <><Icon name="alert" size={16} />{dropped.join(' · ')}</>}</p>
+        {!editing && <p className="hint guests-hint">Greyed courts are taken then. 8 spots per court.</p>}
       </form>
       {error && <p className="form-error guests-error" role="alert">{error}</p>}
     </>

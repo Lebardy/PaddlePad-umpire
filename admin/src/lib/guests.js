@@ -65,12 +65,40 @@ export function feeWords(centavos) {
   return `₱${(centavos / 100).toLocaleString('en-US', { minimumFractionDigits: centavos % 100 ? 2 : 0 })}`
 }
 
-/** "Sat, Oct 17 · 6–9 AM", or "10 AM–2 PM" across noon. */
-export function whenWords(startsAt, endsAt) {
+/** "6–9 PM", or "10 AM–2 PM" across noon. */
+export function hoursWords(startsAt, endsAt) {
   const from = manila(startsAt).getUTCHours()
   const to = manila(endsAt).getUTCHours()
   const sameHalf = (from < 12) === (to < 12)
-  return `${dayText(startsAt)} · ${sameHalf ? from % 12 || 12 : hourText(from)}–${hourText(to)}`
+  return `${sameHalf ? from % 12 || 12 : hourText(from)}–${hourText(to)}`
+}
+
+/** "Sat, Oct 17 · 6–9 AM", or "10 AM–2 PM" across noon. */
+export const whenWords = (startsAt, endsAt) => `${dayText(startsAt)} · ${hoursWords(startsAt, endsAt)}`
+
+const time = (at) => new Date(at).getTime()
+
+/** The courts other open plays hold during these hours: court -> their hours. The server checks again. */
+export function takenCourts(plays, { startsAt, endsAt }, selfId = null) {
+  const taken = new Map()
+  for (const play of plays) {
+    if (play.id === selfId || !(time(play.startsAt) < time(endsAt) && time(startsAt) < time(play.endsAt))) continue
+    for (const court of play.courtNumbers) if (!taken.has(court)) taken.set(court, hoursWords(play.startsAt, play.endsAt))
+  }
+  return taken
+}
+
+/** An open play's day (valued as dayOptions values it) and hours, to fill the edit form. */
+export function formTimes(startsAt, endsAt) {
+  const shifted = time(startsAt) + MANILA
+  return { day: new Date(shifted - (shifted % DAY) - MANILA).toISOString(), start: manila(startsAt).getUTCHours(), end: manila(endsAt).getUTCHours() }
+}
+
+/** The umpires an edit takes off courts, one line each. */
+export function droppedWords(roster, courtNumbers, umpire) {
+  return (roster ?? [])
+    .filter((slot) => slot.umpire && (!umpire || !courtNumbers.includes(slot.court)))
+    .map((slot) => `Removes ${slot.umpire.name} from Court ${slot.court}`)
 }
 
 /** "2 / 3": courts with an umpire who can still start them, of all courts. */

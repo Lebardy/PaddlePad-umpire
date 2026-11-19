@@ -24,7 +24,7 @@ const firstName = (name) => String(name).trim().split(/\s+/)[0]
 export function courtStartProblem({ openPlay, umpire, court, startsAt, assignee, heldBy }) {
   if (!openPlay || openPlay.facilityId !== umpire.facilityId) return { refused: 'That open play is gone' }
   if (!openPlay.umpire) return { refused: 'That open play has no umpire' }
-  if (!Number.isInteger(court) || court < 1 || court > openPlay.courts) return { refused: `There is no Court ${court}` }
+  if (!Number.isInteger(court) || !openPlay.courtNumbers.includes(court)) return { refused: `There is no Court ${court}` }
   // Judged on when the umpire tapped Start, not when it reached us.
   const t = new Date(startsAt).getTime()
   if (t < new Date(openPlay.startsAt).getTime() - COURT_LEAD_MS) return { refused: "That open play hadn't started" }

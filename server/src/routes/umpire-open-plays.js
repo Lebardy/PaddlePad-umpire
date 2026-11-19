@@ -12,7 +12,7 @@ router.get('/today', async (req, res) => {
   if (!req.umpire.facilityId) return res.json({ openPlays: [] })
   const now = new Date()
   const { rows: plays } = await query(
-    `SELECT id, starts_at, ends_at, courts FROM open_plays
+    `SELECT id, starts_at, ends_at, court_numbers FROM open_plays
       WHERE facility_id = $1 AND umpire AND starts_at - $2::int * interval '1 millisecond' <= $3 AND ends_at >= $3
       ORDER BY starts_at`,
     [req.umpire.facilityId, COURT_LEAD_MS, now],
@@ -23,11 +23,11 @@ router.get('/today', async (req, res) => {
       id: p.id,
       startsAt: p.starts_at,
       endsAt: p.ends_at,
-      courts: Array.from({ length: p.courts }, (_, i) => {
-        const slot = state.get(p.id).get(i + 1)
+      courts: p.court_numbers.map((court) => {
+        const slot = state.get(p.id).get(court)
         const assignee = slot?.assignee?.active ? slot.assignee : null
         return {
-          court: i + 1,
+          court,
           assignedTo: !assignee ? null : assignee.id === req.umpire.id ? 'me' : 'other',
           started: Boolean(slot?.session),
         }
