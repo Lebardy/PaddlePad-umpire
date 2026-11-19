@@ -110,11 +110,11 @@ router.post('/', async (req, res) => {
       const wanted = { id: String(req.body.openPlayId ?? ''), court: Number(req.body.court) }
       // Locked so two phones starting the same court take turns here.
       const { rows: [play] } = isUuid(wanted.id)
-        ? await q('SELECT id, facility_id, umpire, courts, starts_at, ends_at FROM open_plays WHERE id = $1 FOR UPDATE', [wanted.id])
+        ? await q('SELECT id, facility_id, umpire, court_numbers, starts_at, ends_at FROM open_plays WHERE id = $1 FOR UPDATE', [wanted.id])
         : { rows: [] }
       const slot = play ? (await loadCourtState(q, [play.id])).get(play.id).get(wanted.court) : null
       const problem = courtStartProblem({
-        openPlay: play && { facilityId: play.facility_id, umpire: play.umpire, courts: play.courts, startsAt: play.starts_at, endsAt: play.ends_at },
+        openPlay: play && { facilityId: play.facility_id, umpire: play.umpire, courtNumbers: play.court_numbers, startsAt: play.starts_at, endsAt: play.ends_at },
         umpire: { id: req.umpire.id, facilityId: req.umpire.facilityId },
         court: wanted.court,
         startsAt,

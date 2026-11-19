@@ -408,12 +408,12 @@ router.put('/:id/open-plays/:openPlayId/courts/:court', async (req, res) => {
     const result = await withTransaction(async (client) => {
       const q = client.query.bind(client)
       const { rows: [play] } = await q(
-        'SELECT id, starts_at, ends_at, courts, umpire FROM open_plays WHERE id = $1 AND facility_id = $2 FOR UPDATE',
+        'SELECT id, starts_at, ends_at, court_numbers, umpire FROM open_plays WHERE id = $1 AND facility_id = $2 FOR UPDATE',
         [req.params.openPlayId, req.params.id],
       )
       if (!play) throw refusal(404, 'No such open play')
-      if (!Number.isInteger(court) || court < 1 || court > play.courts) throw refusal(404, 'No such court')
       if (!play.umpire) throw refusal(409, 'This open play has no umpire')
+      if (!Number.isInteger(court) || !play.court_numbers.includes(court)) throw refusal(404, 'No such court')
       let umpire = null
       if (umpireId) {
         const { rows: [found] } = await q(

@@ -21,7 +21,7 @@ function check(label, actual, expected) {
 
 const NOW = new Date('2026-10-30T10:00:00Z') // 6 PM Manila
 const at = (iso) => new Date(iso)
-const play = { facilityId: 'f1', umpire: true, courts: 3, startsAt: at('2026-10-30T10:00:00Z'), endsAt: at('2026-10-30T13:00:00Z') }
+const play = { facilityId: 'f1', umpire: true, courtNumbers: [1, 2, 3], startsAt: at('2026-10-30T10:00:00Z'), endsAt: at('2026-10-30T13:00:00Z') }
 const me = { id: 'u1', facilityId: 'f1' }
 const base = { openPlay: play, umpire: me, court: 2, startsAt: at('2026-10-30T10:05:00Z'), assignee: null, heldBy: null }
 const problem = (changes) => JSON.stringify(courtStartProblem({ ...base, ...changes }))
@@ -46,6 +46,9 @@ check('another facility', problem({ umpire: { id: 'u1', facilityId: 'f2' } }), J
 check('open play without an umpire', problem({ openPlay: { ...play, umpire: false } }), JSON.stringify({ refused: 'That open play has no umpire' }))
 check('court 0', problem({ court: 0 }), JSON.stringify({ refused: 'There is no Court 0' }))
 check('court 4 of 3', problem({ court: 4 }), JSON.stringify({ refused: 'There is no Court 4' }))
+const upper = { ...play, courtNumbers: [4, 5] }
+check('court 4 of courts 4 and 5', problem({ openPlay: upper, court: 4 }), 'null')
+check('court 1 is not one of them', problem({ openPlay: upper, court: 1 }), JSON.stringify({ refused: 'There is no Court 1' }))
 check('exactly an hour before is fine', problem({ startsAt: at('2026-10-30T09:00:00Z') }), 'null')
 check('more than an hour before', problem({ startsAt: at('2026-10-30T08:59:00Z') }), JSON.stringify({ refused: "That open play hadn't started" }))
 check('at the end is fine', problem({ startsAt: at('2026-10-30T13:00:00Z') }), 'null')
