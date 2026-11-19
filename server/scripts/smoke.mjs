@@ -3618,6 +3618,9 @@ async function main() {
     const opBody = { startsAt: manilaAt(1, 18), endsAt: manilaAt(1, 20), courts: 1, spots: 2, fee: '150', umpire: true, note: 'Smoke test' }
     const addOpenPlay = (body) => request(`/admin/facilities/${placeId}/open-plays`, { method: 'POST', bearer: opOwnerToken, body })
     const setCourts = (courtCount) => request(`/admin/facilities/${placeId}`, { method: 'PATCH', bearer: opOwnerToken, body: { courtCount } })
+    const firstTry = await addOpenPlay(opBody)
+    check('a place with no courts set -> 409, Set your courts first',
+      firstTry.status === 409 && firstTry.body.error === 'Set your courts first', JSON.stringify(firstTry.body).slice(0, 100))
     const counted = await setCourts(6)
     check('the owner sets 6 courts -> 200, courtCount 6', counted.status === 200 && counted.body.facility?.courtCount === 6, JSON.stringify(counted.body).slice(0, 120))
     const tooMany = await setCourts(21)
@@ -3825,6 +3828,60 @@ async function main() {
     const meAfterEnd = await asPlayer('/player/me', { bearer: one.token })
     check('once the session ends: inSession false',
       opEnded.status === 200 && meAfterEnd.body.inSession === false, `${opEnded.status} ${meAfterEnd.body.inSession}`)
+
+    section('open play — courts at a place, and editing')
+    // Day 6, mornings: clear of the evening open plays above.
+    const morning = (from, to, courtNumbers, extra = {}) => ({ ...opBody, startsAt: manilaAt(6, from), endsAt: manilaAt(6, to), courtNumbers, ...extra })
+    const playA = await addOpenPlay(morning(7, 10, [2, 1]))
+    check('7-10 am on Courts 2 and 1 -> 201, stored as 1, 2',
+      playA.status === 201 && JSON.stringify(playA.body.openPlay?.courtNumbers) === '[1,2]' && playA.body.openPlay?.courts === 2,
+      JSON.stringify(playA.body).slice(0, 160))
+    const aId = playA.body.openPlay?.id
+    const aWhen = openPlayWhen(manilaAt(6, 7), manilaAt(6, 10))
+    const clashed = await addOpenPlay(morning(9, 11, [2, 3]))
+    check('9-11 am on Courts 2 and 3 -> 409, Court 2 is taken',
+      clashed.status === 409 && clashed.body.error === `Court 2 is taken by the ${aWhen} open play`, JSON.stringify(clashed.body).slice(0, 140))
+    const touching = await addOpenPlay(morning(10, 12, [1, 2]))
+    check('10 am-12 pm on the same courts, end to end -> 201', touching.status === 201, JSON.stringify(touching.body).slice(0, 120))
+    const tooHigh = await addOpenPlay(morning(7, 8, [7]))
+    check('Court 7 at a 6-court place -> 400, This place has 6 courts',
+      tooHigh.status === 400 && tooHigh.body.error === 'This place has 6 courts', JSON.stringify(tooHigh.body).slice(0, 120))
+    const byCount = await addOpenPlay({ ...morning(8, 9, undefined), courts: 2 })
+    check('an older caller asking for 2 courts gets the lowest free: 3 and 4',
+      byCount.status === 201 && JSON.stringify(byCount.body.openPlay?.courtNumbers) === '[3,4]', JSON.stringify(byCount.body).slice(0, 140))
+    const raced = await Promise.all([addOpenPlay(morning(11, 12, [5])), addOpenPlay(morning(11, 12, [5]))])
+    check('two saves for Court 5 at once: one 201, the other 409',
+      raced.filter((r) => r.status === 201).length === 1 && raced.filter((r) => r.status === 409).length === 1,
+      JSON.stringify(raced.map((r) => r.status)))
+    const lowered = await setCourts(4)
+    check('lowering to 4 courts while Court 5 is booked -> 409',
+      lowered.status === 409 && /^Court 5 is in the .+ open play$/.test(lowered.body.error ?? ''), JSON.stringify(lowered.body).slice(0, 140))
+    const courtsPage = await request(`/admin/facilities/${placeId}/guests`, { bearer: opOwnerToken })
+    const rowA = courtsPage.body.openPlays?.find((p) => p.id === aId)
+    check("the guests page carries the court count and each open play's courts",
+      courtsPage.body.courtCount === 6 && JSON.stringify(rowA?.courtNumbers) === '[1,2]'
+        && JSON.stringify(rowA?.courtRoster?.map((c) => c.court)) === '[1,2]', JSON.stringify(rowA)?.slice(0, 160))
+
+    // --- editing ---
+    await request(`/admin/facilities/${placeId}/open-plays/${aId}/courts/2`, {
+      method: 'PUT', bearer: opOwnerToken, body: { umpireId: opUmpire.body.umpire?.id },
+    })
+    const editA = (body) => request(`/admin/facilities/${placeId}/open-plays/${aId}`, { method: 'PATCH', bearer: opOwnerToken, body })
+    const intoClash = await editA(morning(7, 11, [1, 2]))
+    check('moving it to 7-11 am runs into the 10 am one -> 409, Court 1 is taken',
+      intoClash.status === 409 && /^Court 1 is taken by the /.test(intoClash.body.error ?? ''), JSON.stringify(intoClash.body).slice(0, 140))
+    const noCourts = await editA(morning(7, 10, undefined))
+    check('an edit must say which courts -> 400, Pick at least one court',
+      noCourts.status === 400 && noCourts.body.error === 'Pick at least one court', JSON.stringify(noCourts.body).slice(0, 100))
+    const edited = await editA(morning(7, 10, [1], { spots: 4, note: 'Moved to one court' }))
+    check('down to Court 1, 4 spots -> 200',
+      edited.status === 200 && JSON.stringify(edited.body.openPlay?.courtNumbers) === '[1]' && edited.body.openPlay?.spots === 4,
+      JSON.stringify(edited.body).slice(0, 160))
+    const afterEdit = (await request(`/admin/facilities/${placeId}/guests`, { bearer: opOwnerToken })).body.openPlays?.find((p) => p.id === aId)
+    check('Court 2 and its umpire are gone from the roster',
+      JSON.stringify(afterEdit?.courtRoster?.map((c) => [c.court, c.umpire?.id ?? null])) === '[[1,null]]', JSON.stringify(afterEdit?.courtRoster))
+    const reused = await addOpenPlay(morning(7, 10, [2]))
+    check('Court 2 is free again at 7-10 am -> 201', reused.status === 201, JSON.stringify(reused.body).slice(0, 120))
 
     section('open play courts — start by tapping, named by the server')
     // Live now: starts at the next whole Manila hour (always inside the

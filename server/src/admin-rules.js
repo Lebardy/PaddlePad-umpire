@@ -48,6 +48,7 @@ export const ACTIONS = [
   'open_play.added',
   'open_play.cancelled',
   'open_play.court_assigned',
+  'open_play.edited',
   'match.looks_fine',
   'match.voided',
   'match.restored',

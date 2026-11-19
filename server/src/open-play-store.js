@@ -28,7 +28,7 @@ export async function levelLookup(query) {
 /** This week's open plays, soonest first, each with the active players going. One place's, given `facilityId`; just one, given `id`. */
 export async function loadOpenPlays(query, { facilityId = null, id = null, now }) {
   const { rows } = await query(
-    `SELECT o.id, o.facility_id, f.name AS facility_name, o.starts_at, o.ends_at, o.courts, o.spots,
+    `SELECT o.id, o.facility_id, f.name AS facility_name, o.starts_at, o.ends_at, o.courts, o.court_numbers, o.spots,
             o.fee_centavos, o.umpire, o.note,
             COALESCE(array_agg(j.player_id) FILTER (WHERE p.id IS NOT NULL), '{}') AS joined
        FROM open_plays o
@@ -47,6 +47,7 @@ export async function loadOpenPlays(query, { facilityId = null, id = null, now }
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     courts: row.courts,
+    courtNumbers: row.court_numbers,
     spots: row.spots,
     feeCentavos: row.fee_centavos,
     umpire: row.umpire,

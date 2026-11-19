@@ -11,7 +11,7 @@ import {
   saveFacilityLogo, updateFacility,
 } from '../facility-store.js'
 import { isUuid } from '../validate.js'
-import { courtCountRefusal } from '../open-play-courts.js'
+import { clashText, courtClash, courtCountRefusal, editRefusal, lowestFreeCourts, openPlayChanges } from '../open-play-courts.js'
 import { levelLookup, loadCourtState, loadFacilityUmpires, loadOpenPlays, recentRatings } from '../open-play-store.js'
 import { guestsTotals, openPlayRow, openPlayWhen, readOpenPlay, visitSummary } from '../visit-rules.js'
 
@@ -207,26 +207,29 @@ router.get('/:id/guests', async (req, res) => {
   if (!isUuid(req.params.id) || !mayManageFacility(req.admin, req.params.id)) {
     return res.status(404).json({ error: 'No such facility' })
   }
-  const [plays, { levelOf, levelsShown }, ratings, umpires] = await Promise.all([
+  const [plays, { levelOf, levelsShown }, ratings, umpires, facility] = await Promise.all([
     loadOpenPlays(query, { facilityId: req.params.id, now: new Date() }),
     levelLookup(query),
     recentRatings(query, req.params.id),
     loadFacilityUmpires(query, req.params.id),
+    findFacility(query, req.params.id),
   ])
   const courtState = await loadCourtState(query, plays.map((p) => p.id))
   res.json({
     totals: guestsTotals(plays),
     umpires,
+    courtCount: facility?.court_count ?? null,
     openPlays: plays.map((play) => {
       const { facility, atYourLevel, names, you, ...row } = openPlayRow(play, { joined: play.joined, levelOf, levelsShown })
       return {
         ...row,
+        courtNumbers: play.courtNumbers,
         status: row.count >= row.spots ? 'full' : 'open',
         // Only a play with an umpire has courts to hand out.
         courtRoster: play.umpire
-          ? Array.from({ length: play.courts }, (_, i) => {
-              const slot = courtState.get(play.id).get(i + 1)
-              return { court: i + 1, umpire: slot?.assignee ?? null, session: slot?.session ?? null }
+          ? play.courtNumbers.map((court) => {
+              const slot = courtState.get(play.id).get(court)
+              return { court, umpire: slot?.assignee ?? null, session: slot?.session ?? null }
             })
           : null,
       }
@@ -235,32 +238,121 @@ router.get('/:id/guests', async (req, res) => {
   })
 })
 
+const asPlay = (row) => ({
+  id: row.id, startsAt: row.starts_at, endsAt: row.ends_at, courtNumbers: row.court_numbers,
+  spots: row.spots, feeCentavos: row.fee_centavos, umpire: row.umpire, note: row.note,
+})
+
+/**
+ * Locks the place, so saves there take turns, and settles an open play's
+ * courts against its court count and its other open plays: the courts to
+ * store, or a refusal thrown. An older caller sends only how many courts
+ * and gets the lowest free ones.
+ */
+async function settleCourts(client, facilityId, values, selfId = null) {
+  const facility = await lockFacility(client, facilityId)
+  if (!facility) throw refusal(404, 'No such facility')
+  const count = facility.court_count
+  if (count == null) throw refusal(409, 'Set your courts first')
+  const { rows } = await client.query(
+    `SELECT id, starts_at, ends_at, court_numbers FROM open_plays
+      WHERE facility_id = $1 AND starts_at < $3 AND ends_at > $2 AND id IS DISTINCT FROM $4::uuid`,
+    [facilityId, values.startsAt, values.endsAt, selfId],
+  )
+  const others = rows.map(asPlay)
+  if (!values.courtNumbers) {
+    const picked = lowestFreeCourts(values, values.courts, count, others)
+    if (!picked) throw refusal(409, 'Not enough free courts then')
+    return picked
+  }
+  if (values.courtNumbers.some((n) => n > count)) throw refusal(400, `This place has ${count} ${count === 1 ? 'court' : 'courts'}`)
+  const clash = courtClash(values, others)
+  if (clash) throw refusal(409, clashText(clash))
+  return values.courtNumbers
+}
+
 router.post('/:id/open-plays', async (req, res) => {
   if (!isUuid(req.params.id) || !mayManageFacility(req.admin, req.params.id)) {
     return res.status(404).json({ error: 'No such facility' })
   }
   const read = readOpenPlay(req.body, new Date())
   if (read.error) return res.status(400).json({ error: read.error })
-  const { startsAt, endsAt, courts, spots, feeCentavos, umpire, note } = read.values
+  const { startsAt, endsAt, spots, feeCentavos, umpire, note } = read.values
   try {
     const openPlay = await withTransaction(async (client) => {
+      const courtNumbers = await settleCourts(client, req.params.id, read.values)
       const { rows } = await client.query(
-        `INSERT INTO open_plays (facility_id, starts_at, ends_at, courts, spots, fee_centavos, umpire, note, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO open_plays (facility_id, starts_at, ends_at, courts, court_numbers, spots, fee_centavos, umpire, note, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING id`,
-        [req.params.id, startsAt, endsAt, courts, spots, feeCentavos, umpire, note, req.admin.id],
+        [req.params.id, startsAt, endsAt, courtNumbers.length, courtNumbers, spots, feeCentavos, umpire, note, req.admin.id],
       )
       await recordActivity(client, {
         adminId: req.admin.id, action: 'open_play.added', targetType: 'facility', targetId: req.params.id,
         facilityId: req.params.id, summary: `Added open play ${openPlayWhen(startsAt, endsAt)}`,
       })
-      return { id: rows[0].id, ...read.values }
+      return { id: rows[0].id, ...read.values, courts: courtNumbers.length, courtNumbers }
     })
     res.status(201).json({ openPlay })
   } catch (error) {
-    // The owner may name any id; one that is no facility fails its foreign key.
-    if (error.code === '23503') return res.status(404).json({ error: 'No such facility' })
-    throw error
+    sendRefusal(res, error)
+  }
+})
+
+/** Changes an open play. Players going keep their spot; a court it no longer uses, or every court once it has no umpire, loses its umpire. */
+router.patch('/:id/open-plays/:openPlayId', async (req, res) => {
+  if (!isUuid(req.params.id) || !mayManageFacility(req.admin, req.params.id)) {
+    return res.status(404).json({ error: 'No such facility' })
+  }
+  if (!isUuid(req.params.openPlayId)) return res.status(404).json({ error: 'No such open play' })
+  const now = new Date()
+  try {
+    const { openPlay } = await withTransaction(async (client) => {
+      const q = client.query.bind(client)
+      const { rows: [row] } = await q(
+        `SELECT id, starts_at, ends_at, court_numbers, spots, fee_centavos, umpire, note FROM open_plays
+          WHERE id = $1 AND facility_id = $2 FOR UPDATE`,
+        [req.params.openPlayId, req.params.id],
+      )
+      if (!row) throw refusal(404, 'No such open play')
+      const before = asPlay(row)
+      const read = readOpenPlay(req.body, now, { keepStart: before.startsAt })
+      if (read.error) throw refusal(400, read.error)
+      if (!read.values.courtNumbers) throw refusal(400, 'Pick at least one court')
+      const after = { id: before.id, ...read.values }
+      const { rows: [{ going }] } = await q(
+        `SELECT count(*)::int AS going FROM open_play_joins j JOIN players p ON p.id = j.player_id
+          WHERE j.open_play_id = $1 AND p.deactivated_at IS NULL AND p.paused_at IS NULL`,
+        [before.id],
+      )
+      const { rows: started } = await q(
+        'SELECT court FROM sessions WHERE open_play_id = $1 AND court IS NOT NULL AND voided_at IS NULL ORDER BY court',
+        [before.id],
+      )
+      const problem = editRefusal(before, after, { now, going, startedCourts: started.map((s) => s.court) })
+      if (problem) throw refusal(409, problem)
+      await settleCourts(client, req.params.id, after, before.id)
+      const changes = openPlayChanges(before, after)
+      if (changes.length === 0) return { openPlay: after, before }
+      await q(
+        `UPDATE open_plays SET starts_at = $2, ends_at = $3, courts = $4, court_numbers = $5, spots = $6,
+                fee_centavos = $7, umpire = $8, note = $9
+          WHERE id = $1`,
+        [before.id, after.startsAt, after.endsAt, after.courts, after.courtNumbers, after.spots, after.feeCentavos, after.umpire, after.note],
+      )
+      await q(
+        'DELETE FROM open_play_courts WHERE open_play_id = $1 AND NOT ($2::boolean AND court = ANY($3::int[]))',
+        [before.id, after.umpire, after.courtNumbers],
+      )
+      await recordActivity(client, {
+        adminId: req.admin.id, action: 'open_play.edited', targetType: 'facility', targetId: req.params.id,
+        facilityId: req.params.id, summary: `Changed open play ${openPlayWhen(before.startsAt, before.endsAt)}: ${changes.join(', ')}`,
+      })
+      return { openPlay: after, before }
+    })
+    res.json({ openPlay })
+  } catch (error) {
+    sendRefusal(res, error)
   }
 })
 
