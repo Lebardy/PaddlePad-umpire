@@ -5,6 +5,7 @@ import LogoEditor from '../components/LogoEditor'
 import PanelTabs from '../components/PanelTabs'
 import StatusTag from '../components/StatusTag'
 import { fetchFacility, updateFacility } from '../lib/api'
+import { countWord } from '../lib/format'
 import { navigate } from '../lib/navigation'
 import { Link } from '../lib/router'
 import { SheetSkeleton } from '../components/Skeleton'
@@ -45,6 +46,7 @@ export default function FacilityDetail({ id, me }) {
       openingHours: facility.openingHours ?? '',
       hourlyFee: facility.hourlyFeeCentavos != null ? String(facility.hourlyFeeCentavos / 100) : '',
       umpireFee: facility.umpireFeeCentavos != null ? String(facility.umpireFeeCentavos / 100) : '',
+      courtCount: facility.courtCount != null ? String(facility.courtCount) : '',
       details: facility.details ?? '',
       filmsMatches: facility.filmsMatches === true,
     })
@@ -68,6 +70,7 @@ export default function FacilityDetail({ id, me }) {
         openingHours: fields.openingHours.trim(),
         hourlyFee: fields.hourlyFee.trim(),
         umpireFee: fields.umpireFee.trim(),
+        courtCount: fields.courtCount.trim(),
         details: fields.details.trim(),
         filmsMatches: fields.filmsMatches,
       })
@@ -106,6 +109,7 @@ export default function FacilityDetail({ id, me }) {
   ]
   const intro = [
     facility.area,
+    facility.courtCount && countWord(facility.courtCount, 'court', 'courts'),
     facility.feeText && `Court ${facility.feeText}`,
     facility.umpireFeeText && `Umpire ${facility.umpireFeeText}`,
     facility.openingHours,
@@ -156,10 +160,14 @@ export default function FacilityDetail({ id, me }) {
                 <input value={fields.locationUrl} maxLength={500} placeholder="https://maps.google.com/…"
                   onChange={(e) => setFields({ ...fields, locationUrl: e.target.value })} />
               </label>
+              <label className="field"><span>Opening hours</span>
+                <input value={fields.openingHours} maxLength={200} placeholder="e.g. 6 AM – 10 PM"
+                  onChange={(e) => setFields({ ...fields, openingHours: e.target.value })} />
+              </label>
               <div className="pair">
-                <label className="field"><span>Opening hours</span>
-                  <input value={fields.openingHours} maxLength={200} placeholder="e.g. 6 AM – 10 PM"
-                    onChange={(e) => setFields({ ...fields, openingHours: e.target.value })} />
+                <label className="field"><span>Courts</span>
+                  <input type="number" inputMode="numeric" min={1} max={20} value={fields.courtCount} placeholder="e.g. 4"
+                    onChange={(e) => setFields({ ...fields, courtCount: e.target.value })} />
                 </label>
                 <label className="field"><span>Court fee per hour, in pesos</span>
                   <input inputMode="decimal" value={fields.hourlyFee} placeholder="e.g. 150"
