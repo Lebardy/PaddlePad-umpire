@@ -7,7 +7,7 @@
 
 import {
   manilaHour, manilaDayStart, weekEnd, readOpenPlay, readRating, ratingOpen,
-  joinRefusal, openPlayRow, visitSummary, guestsTotals, openPlayWhen,
+  joinRefusal, openPlayRow, visitSummary, guestsTotals, openPlayWhen, timeChangeAlert,
 } from '../src/visit-rules.js'
 
 let pass = 0
@@ -128,6 +128,15 @@ console.log('\nan open play in the activity record')
 check('a morning', openPlayWhen(base.startsAt, base.endsAt), 'Sat, Oct 17 · 6–9 AM')
 check('across noon', openPlayWhen('2026-10-17T10:00:00+08:00', '2026-10-17T14:00:00+08:00'), 'Sat, Oct 17 · 10 AM–2 PM')
 check('an evening to 11 pm', openPlayWhen('2026-10-21T18:00:00+08:00', '2026-10-21T23:00:00+08:00'), 'Wed, Oct 21 · 6–11 PM')
+
+console.log('\nthe time-change alert')
+const was = { startsAt: '2026-10-16T18:00:00+08:00', endsAt: '2026-10-16T21:00:00+08:00' }
+check('later hours, same day', timeChangeAlert({ facilityName: 'Boulevard Paddle Courts', before: was, after: { startsAt: '2026-10-16T19:00:00+08:00', endsAt: '2026-10-16T22:00:00+08:00' } }),
+  { title: 'Fri open play at Boulevard Paddle Courts', body: 'Now 7–10 PM (was 6–9 PM)' })
+check('another day', timeChangeAlert({ facilityName: 'Boulevard Paddle Courts', before: was, after: { startsAt: '2026-10-17T18:00:00+08:00', endsAt: '2026-10-17T21:00:00+08:00' } }),
+  { title: 'Fri open play at Boulevard Paddle Courts', body: 'Now Sat 6–9 PM (was Fri 6–9 PM)' })
+check('across noon', timeChangeAlert({ facilityName: 'X', before: was, after: { startsAt: '2026-10-16T10:00:00+08:00', endsAt: '2026-10-16T14:00:00+08:00' } }).body,
+  'Now 10 AM–2 PM (was 6–9 PM)')
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exitCode = fail ? 1 : 0
