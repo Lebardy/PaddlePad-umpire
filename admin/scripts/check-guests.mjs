@@ -6,7 +6,8 @@
 // ============================================================
 
 import {
-  comingWords, courtCount, dayOptions, endHours, feeWords, levelWords, scoreWords, spotsFor, startHours, toIso, whenWords,
+  comingWords, courtCount, dayOptions, droppedWords, endHours, feeWords, formTimes, hoursWords, levelWords, scoreWords, spotsFor,
+  startHours, takenCourts, toIso, whenWords,
 } from '../src/lib/guests.js'
 
 let pass = 0
@@ -63,6 +64,22 @@ check('when, across noon', whenWords('2026-10-17T02:00:00Z', '2026-10-17T06:00:0
 check('two of three courts have an umpire', courtCount([{ umpire: { id: 'a' } }, { umpire: null }, { umpire: { id: 'b' } }]), '2 / 3')
 check('an assignee who can no longer start it does not count', courtCount([{ umpire: { id: 'a', active: false } }, { umpire: null }]), '0 / 2')
 check('none yet', courtCount([{ umpire: null }]), '0 / 1')
+
+console.log('\ncourts')
+const fri = (from, to) => [`2026-10-16T${from}:00+08:00`, `2026-10-16T${to}:00+08:00`].map((s) => new Date(s).toISOString())
+const [s6, e9] = fri('18', '21')
+const plays = [{ id: 'a', startsAt: s6, endsAt: e9, courtNumbers: [4, 5] }]
+const [s8, e10] = fri('20', '22')
+check('the hours alone', hoursWords(s6, e9), '6–9 PM')
+check('across noon', hoursWords(...fri('10', '14')), '10 AM–2 PM')
+check('courts held then, with whose hours', [...takenCourts(plays, { startsAt: s8, endsAt: e10 })], [[4, '6–9 PM'], [5, '6–9 PM']])
+check('end to end holds nothing', takenCourts(plays, { startsAt: e9, endsAt: fri('21', '23')[1] }).size, 0)
+check('its own courts are free to it', takenCourts(plays, { startsAt: s6, endsAt: e9 }, 'a').size, 0)
+check('the edit form times', formTimes(s6, e9), { day: '2026-10-15T16:00:00.000Z', start: 18, end: 21 })
+const roster = [{ court: 4, umpire: { name: 'Rico Mendoza' } }, { court: 5, umpire: null }, { court: 6, umpire: { name: 'Paolo Sy' } }]
+check('dropping an assigned court', droppedWords(roster, [5, 6], true), ['Removes Rico Mendoza from Court 4'])
+check('umpire off drops every pick', droppedWords(roster, [4, 5, 6], false), ['Removes Rico Mendoza from Court 4', 'Removes Paolo Sy from Court 6'])
+check('no roster', droppedWords(null, [1], true), [])
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
