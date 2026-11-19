@@ -1608,6 +1608,9 @@ async function main() {
       (await asPlayer('/player/me', { bearer: ownToken })).body.player?.name === ownName)
 
     // --- the merge ---
+    // Switches turned off on the account must stay off on the merged player.
+    await asPlayer('/player/me/rival-alerts', { method: 'PUT', bearer: ownToken, body: { on: false } })
+    await asPlayer('/player/me/open-play-alerts', { method: 'PUT', bearer: ownToken, body: { on: false } })
     const merged = await link({ code: spellingCode, confirm: true })
     check('confirming the link -> 200', merged.status === 200,
       JSON.stringify(merged.body).slice(0, 140))
@@ -1619,6 +1622,9 @@ async function main() {
       String(merged.body.player?.username))
     check('and the name being left behind is reported back',
       merged.body.previousName === ownName, String(merged.body.previousName))
+    check('and the alert switches the account turned off stay off',
+      merged.body.player?.rivalAlerts === false && merged.body.player?.openPlayAlerts === false,
+      JSON.stringify(merged.body.player))
 
     const mergedToken = merged.body.token
     check('the old token dies with the row it named -> 401',
