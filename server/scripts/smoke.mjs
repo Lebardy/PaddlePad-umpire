@@ -4012,6 +4012,44 @@ async function main() {
         { method: 'PUT', bearer: opOwnerToken, body: { umpireId: ramil.body.umpire?.id } },
       )
       check('assigning on an open play with no umpire -> 409', noUmpireAssign.status === 409, `${noUmpirePlay.status} ${noUmpireAssign.status}`)
+
+      // Edits once Court 1 is live. The open play starts within the hour, so the
+      // start lock holds whether or not the clock has passed the start yet.
+      const editLive = (body) => request(`/admin/facilities/${placeId}/open-plays/${courtPlayId}`, { method: 'PATCH', bearer: opOwnerToken, body })
+      const liveBody = {
+        startsAt: nextHour.toISOString(), endsAt: new Date(nextHour.getTime() + 3_600_000).toISOString(),
+        courtNumbers: [1, 2], spots: 8, fee: '', umpire: true, note: '',
+      }
+      const dropLive = await editLive({ ...liveBody, courtNumbers: [2] })
+      check('taking the started Court 1 off -> 409 "Court 1 has started, so it stays"',
+        dropLive.status === 409 && dropLive.body.error === 'Court 1 has started, so it stays', `${dropLive.status} ${dropLive.body.error}`)
+      const umpireOff = await editLive({ ...liveBody, umpire: false })
+      check('umpire off once a court started -> 409 "Courts have started, so the umpire stays on duty"',
+        umpireOff.status === 409 && umpireOff.body.error === 'Courts have started, so the umpire stays on duty', `${umpireOff.status} ${umpireOff.body.error}`)
+      const later = await editLive({ ...liveBody, startsAt: new Date(nextHour.getTime() + 3_600_000).toISOString(), endsAt: new Date(nextHour.getTime() + 7_200_000).toISOString() })
+      check('moving the start once a court started -> 409 "It has started, so its day and start stay"',
+        later.status === 409 && later.body.error === 'It has started, so its day and start stay', `${later.status} ${later.body.error}`)
+
+      // A play on Courts 5 and 6 only: the lookup lists those numbers, and Court 1 is not one of them.
+      const highPlay = await addOpenPlay({ ...liveBody, courts: 2, courtNumbers: [5, 6], note: 'Smoke 5 and 6' })
+      const highId = highPlay.body.openPlay?.id
+      check('a live open play on Courts 5 and 6 -> 201', highPlay.status === 201, JSON.stringify(highPlay.body).slice(0, 120))
+      const highToday = await request('/open-plays/today', { bearer: opUmpireToken })
+      check("the umpire's lookup lists it as Courts 5 and 6",
+        JSON.stringify(highToday.body.openPlays?.find((p) => p.id === highId)?.courts.map((c) => c.court)) === '[5,6]', JSON.stringify(highToday.body).slice(0, 200))
+      const startSix = await request('/sessions', {
+        method: 'POST', bearer: opUmpireToken,
+        body: { id: uuid(), startsAt: new Date().toISOString(), openPlayId: highId, court: 6 },
+      })
+      check('starting Court 6 -> 201, named "Open Play · Court 6 · …"',
+        startSix.status === 201 && /^Open Play · Court 6 · /.test(startSix.body.session?.name ?? ''), JSON.stringify(startSix.body).slice(0, 160))
+      const startOne = await request('/sessions', {
+        method: 'POST', bearer: opUmpireToken,
+        body: { id: uuid(), startsAt: new Date().toISOString(), openPlayId: highId, court: 1 },
+      })
+      check('starting Court 1 of it -> 201 plain with "There is no Court 1"',
+        startOne.status === 201 && /^Session · /.test(startOne.body.session?.name ?? '') && /There is no Court 1/.test(startOne.body.courtNotice ?? ''),
+        JSON.stringify(startOne.body).slice(0, 200))
     }
 
     section('scorekeeper split — a second umpire taps, the match umpire rules')

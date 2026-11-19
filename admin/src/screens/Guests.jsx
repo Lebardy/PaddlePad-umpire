@@ -306,7 +306,7 @@ function GuestTotals({ totals, visits }) {
 function OpenPlayForm({ facilityId, courtCount, plays, play = null, onSave, onClose }) {
   const editing = Boolean(play)
   // Read once when the form opens: the day and start stay locked for an open play already under way.
-  const [started] = useState(() => editing && Date.parse(play.startsAt) <= Date.now())
+  const [started] = useState(() => editing && (Date.parse(play.startsAt) <= Date.now() || Boolean(play.courtRoster?.some((slot) => slot.session))))
   const initial = editing ? formTimes(play.startsAt, play.endsAt) : null
   const [days, setDays] = useState(() => dayOptions(Date.now()))
   const [day, setDay] = useState(initial?.day ?? days[1].value)
@@ -342,6 +342,7 @@ function OpenPlayForm({ facilityId, courtCount, plays, play = null, onSave, onCl
   }
 
   function toggle(court) {
+    if (taken.has(court)) return
     const next = chosen.includes(court) ? chosen.filter((n) => n !== court) : [...chosen, court].sort((a, b) => a - b)
     setPicked(next)
   }
@@ -387,14 +388,14 @@ function OpenPlayForm({ facilityId, courtCount, plays, play = null, onSave, onCl
         <div className="field court-pick" role="group" aria-labelledby={courtsLabel}>
           <span id={courtsLabel}>Courts</span>
           {courtCount == null ? (
-            <Link to={`/facilities/${facilityId}`} className="court-pick-missing">Set your courts first</Link>
+            <Link to={`/facilities/${facilityId}`} className="court-pick-missing"><Icon name="court" size={16} />Set your courts first</Link>
           ) : (
             <div className="court-pick-row">
               {Array.from({ length: courtCount }, (_, i) => i + 1).map((court) => {
                 const holder = taken.get(court)
                 return (
                   <button key={court} type="button" className="court-pick-btn" aria-pressed={chosen.includes(court)}
-                    disabled={Boolean(holder)} aria-label={holder ? `Court ${court}, taken ${holder}` : `Court ${court}`}
+                    aria-disabled={holder ? 'true' : undefined} aria-label={holder ? `Court ${court}, taken ${holder}` : `Court ${court}`}
                     onClick={() => toggle(court)}>
                     <b>{court}</b>{holder && <small>{holder}</small>}
                   </button>
@@ -422,11 +423,11 @@ function OpenPlayForm({ facilityId, courtCount, plays, play = null, onSave, onCl
           <span>Note (optional)</span>
           <input maxLength={60} value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
-        <button type="submit" className="btn-primary" disabled={busy}>
+        <button type="submit" className="btn-primary" disabled={busy || (!editing && courtCount == null)}>
           {editing ? <><Icon name="check" size={16} />Save</> : <><Icon name="plus" size={16} />Add open play</>}
         </button>
         {editing && <button type="button" className="btn-quiet" onClick={onClose}><Icon name="x" size={16} />Close</button>}
-        {dropped.length > 0 && <p className="guests-removes" role="status"><Icon name="alert" size={16} />{dropped.join(' · ')}</p>}
+        <p className="guests-removes" role="status">{dropped.length > 0 && <><Icon name="alert" size={16} />{dropped.join(' · ')}</>}</p>
         {!editing && <p className="hint guests-hint">Greyed courts are taken then. 8 spots per court.</p>}
       </form>
       {error && <p className="form-error guests-error" role="alert">{error}</p>}

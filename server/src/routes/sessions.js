@@ -320,10 +320,12 @@ router.post('/:id/void', async (req, res) => {
 
   const params = [req.params.id, voided, req.umpire.id, reason]
   const scope = umpireScope(req.umpire.facilityId, params, 'facility_id')
-  // Restoring when another live session now holds the court: give the court up
-  // and become a plain session, as a refused start is stored.
-  const taken = `NOT $2 AND EXISTS (SELECT 1 FROM sessions o WHERE o.open_play_id = sessions.open_play_id
-    AND o.court = sessions.court AND o.voided_at IS NULL AND o.id <> sessions.id)`
+  // Restoring when another live session now holds the court, or an edit took the
+  // court off the open play: give the court up and become a plain session, as a
+  // refused start is stored.
+  const taken = `NOT $2 AND sessions.open_play_id IS NOT NULL AND (EXISTS (SELECT 1 FROM sessions o WHERE o.open_play_id = sessions.open_play_id
+    AND o.court = sessions.court AND o.voided_at IS NULL AND o.id <> sessions.id)
+    OR NOT EXISTS (SELECT 1 FROM open_plays p WHERE p.id = sessions.open_play_id AND sessions.court = ANY(p.court_numbers)))`
   let rows
   try {
     ;({ rows } = await query(

@@ -190,7 +190,14 @@ for (const play of plays) {
     going.push(pool.splice(at, 1)[0][0])
   }
   if (!DRY) {
-    const { openPlay } = await call(`/admin/facilities/${facility.id}/open-plays`, { method: 'POST', token: owner, body })
+    let openPlay
+    try {
+      ;({ openPlay } = await call(`/admin/facilities/${facility.id}/open-plays`, { method: 'POST', token: owner, body }))
+    } catch (err) {
+      if (!String(err.message).includes('Set your courts first')) throw err
+      console.log(`${facility.name}: no court count, open play skipped`)
+      continue
+    }
     for (const id of going) {
       await call(`/player/open-plays/${openPlay.id}/join`, { method: 'POST', token: await playerToken(id, token) })
       joins += 1

@@ -58,7 +58,7 @@ export function courtCountRefusal(count, upcoming) {
 export function editRefusal(before, after, { now, going, startedCourts }) {
   const at = now.getTime()
   if (t(before.endsAt) <= at) return 'This open play is over'
-  if (t(before.startsAt) <= at && t(after.startsAt) !== t(before.startsAt)) return 'It has started, so its day and start stay'
+  if ((t(before.startsAt) <= at || startedCourts.length > 0) && t(after.startsAt) !== t(before.startsAt)) return 'It has started, so its day and start stay'
   if (t(after.endsAt) <= at) return 'That end has passed'
   const kept = startedCourts.find((n) => !after.courtNumbers.includes(n))
   if (kept !== undefined) return `Court ${kept} has started, so it stays`

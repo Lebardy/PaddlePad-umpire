@@ -207,7 +207,7 @@ router.get('/:id/guests', async (req, res) => {
   if (!isUuid(req.params.id) || !mayManageFacility(req.admin, req.params.id)) {
     return res.status(404).json({ error: 'No such facility' })
   }
-  const [plays, { levelOf, levelsShown }, ratings, umpires, facility] = await Promise.all([
+  const [plays, { levelOf, levelsShown }, ratings, umpires, place] = await Promise.all([
     loadOpenPlays(query, { facilityId: req.params.id, now: new Date() }),
     levelLookup(query),
     recentRatings(query, req.params.id),
@@ -218,7 +218,7 @@ router.get('/:id/guests', async (req, res) => {
   res.json({
     totals: guestsTotals(plays),
     umpires,
-    courtCount: facility?.court_count ?? null,
+    courtCount: place?.court_count ?? null,
     openPlays: plays.map((play) => {
       const { facility, atYourLevel, names, you, ...row } = openPlayRow(play, { joined: play.joined, levelOf, levelsShown })
       return {

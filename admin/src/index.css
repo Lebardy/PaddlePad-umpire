@@ -972,9 +972,9 @@ tr.is-voided .reason { opacity: 0.6; }
   font-family: var(--label); font-weight: 700; font-size: 1.1rem; font-variant-numeric: tabular-nums;
 }
 .court-pick-btn small { font-family: var(--sans); font-weight: 400; font-size: 0.75rem; line-height: 1.1; }
-.court-pick-btn:hover:not(:disabled) { border-color: var(--primary); }
+.court-pick-btn:hover:not([aria-disabled='true']) { border-color: var(--primary); }
 .court-pick-btn[aria-pressed='true'] { background: var(--button); color: var(--button-ink); border-color: var(--button); }
-.court-pick-btn:disabled { background: var(--surface-sunken); color: var(--text-muted); opacity: 1; }
+.court-pick-btn[aria-disabled='true'] { cursor: not-allowed; background: var(--surface-sunken); color: var(--text-muted); opacity: 1; }
 .court-pick-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .court-pick-missing { color: var(--primary); font-weight: 600; text-decoration: underline; display: inline-flex; align-items: center; min-height: 2.75rem; }
 /* A row's Cancel and its Confirm / Not now are a finger's size on a tablet. */

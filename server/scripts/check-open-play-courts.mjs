@@ -58,6 +58,8 @@ console.log('\nediting')
 const ok = { now: at('17:30'), going: 3, startedCourts: [] }
 const during = { ...ok, now: at('19:30') }
 check('anything before it starts', editRefusal(six, play('a', '19:00', '22:00', [1], { spots: 8 }), ok), null)
+check('court started early: the start stays', editRefusal(six, play('a', '19:00', '22:00', [4, 5]), { ...ok, startedCourts: [4] }), 'It has started, so its day and start stay')
+check('court started early: the end can change', editRefusal(six, play('a', '18:00', '22:00', [4, 5]), { ...ok, startedCourts: [4] }), null)
 check('over', editRefusal(six, six, { ...ok, now: at('21:00') }), 'This open play is over')
 check('started: the start stays', editRefusal(six, play('a', '19:00', '21:00', [4, 5]), during), 'It has started, so its day and start stay')
 check('started: a later end', editRefusal(six, play('a', '18:00', '22:00', [4, 5]), during), null)
