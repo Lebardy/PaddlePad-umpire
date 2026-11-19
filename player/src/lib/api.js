@@ -460,6 +460,11 @@ export async function setRivalAlerts(on) {
   return patchStoredPlayer(data.player)
 }
 
+export async function setOpenPlayAlerts(on) {
+  const data = await apiFetch('/player/me/open-play-alerts', { method: 'PUT', body: { on } })
+  return patchStoredPlayer(data.player)
+}
+
 /** How the visit went: a face (1-5) and chips. Saving again replaces it. */
 export function rateVisit(sessionId, { score, chips }) {
   return apiFetch(`/player/sessions/${encodeURIComponent(sessionId)}/rating`, { method: 'POST', body: { score, chips } }).then((d) => d.visit)
