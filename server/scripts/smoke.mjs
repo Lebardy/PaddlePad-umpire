@@ -3894,7 +3894,8 @@ async function main() {
     check('on: "yes" -> 400', badSwitch.status === 400, String(badSwitch.status))
     const switchedOn = await openPlaySwitch(three, true)
     check('back on -> 200', switchedOn.body.player?.openPlayAlerts === true, JSON.stringify(switchedOn.body).slice(0, 120))
-    await asPlayer(`/player/open-plays/${aId}/join`, { method: 'POST', bearer: three.token })
+    const threeJoin = await asPlayer(`/player/open-plays/${aId}/join`, { method: 'POST', bearer: three.token })
+    check('Three joins the open play -> 200', threeJoin.status === 200, String(threeJoin.status))
     const moved = await editA(morning(8, 10, [1], { spots: 4, note: 'Moved to one court' }))
     check('moving an open play someone is going to -> 200 (the alert goes after the answer)', moved.status === 200, JSON.stringify(moved.body).slice(0, 120))
 

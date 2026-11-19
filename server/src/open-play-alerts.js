@@ -1,5 +1,5 @@
 // ============================================================
-// Open play alerts: a rival or best partner joined an open play.
+// Rival and partner alerts (a rival or best partner joined an open play), plus the Open play alerts time-change send below.
 //
 // A join queues one row per player whose block holds the joiner; a
 // one-minute timer sends what is due. The words are written at send
@@ -74,9 +74,9 @@ export async function queueAlerts(query, openPlayId, joinerId, now) {
 }
 
 /** One alert to one phone: 'sent', 'gone' (dropped, its push service no longer knows it) or 'failed'. */
-async function pushTo(query, phone, payload) {
+async function pushTo(query, phone, payload, ttl = 6 * 60 * 60) {
   try {
-    await webpush.sendNotification({ endpoint: phone.endpoint, keys: { p256dh: phone.p256dh, auth: phone.auth } }, payload, { TTL: 6 * 60 * 60, timeout: 10_000 })
+    await webpush.sendNotification({ endpoint: phone.endpoint, keys: { p256dh: phone.p256dh, auth: phone.auth } }, payload, { TTL: ttl, timeout: 10_000 })
     return 'sent'
   } catch (error) {
     if (!pushGone(error.statusCode)) return 'failed'
@@ -153,13 +153,13 @@ export async function sendDueAlerts(query, now) {
  */
 export async function sendTimeChange(query, openPlayId, before) {
   const config = pushConfig()
-  if (!config) return 0
+  if (!config) return { sent: 0, phones: 0 }
   webpush.setVapidDetails(config.subject, config.publicKey, config.privateKey)
   const { rows: [play] } = await query(
     `SELECT o.starts_at, o.ends_at, o.facility_id, f.name FROM open_plays o JOIN facilities f ON f.id = o.facility_id WHERE o.id = $1`,
     [openPlayId],
   )
-  if (!play) return 0
+  if (!play) return { sent: 0, phones: 0 }
   const { title, body } = timeChangeAlert({ facilityName: play.name, before, after: { startsAt: play.starts_at, endsAt: play.ends_at } })
   const payload = JSON.stringify({ title, body, tag: `${openPlayId}:time`, url: `/places/${play.facility_id}` })
   const { rows: phones } = await query(
@@ -169,7 +169,9 @@ export async function sendTimeChange(query, openPlayId, before) {
       WHERE j.open_play_id = $1`,
     [openPlayId],
   )
+  // Kept until the open play ends, so a phone that is off overnight still gets it.
+  const ttl = Math.max(60, Math.round((new Date(play.ends_at) - Date.now()) / 1000))
   let sent = 0
-  for (const phone of phones) if ((await pushTo(query, phone, payload)) === 'sent') sent += 1
-  return sent
+  for (const phone of phones) if ((await pushTo(query, phone, payload, ttl)) === 'sent') sent += 1
+  return { sent, phones: phones.length }
 }

@@ -265,7 +265,7 @@ migrate()
       setTimeout(tidy, 5 * 60_000).unref()
       setInterval(tidy, 24 * 60 * 60_000).unref()
     }
-    // Open play alerts that are due, every minute; held ones wait in their table, so a restart loses nothing.
+    // Rival and partner alerts (not the time-change Open play alerts) that are due, every minute; held ones wait in their table, so a restart loses nothing.
     if (pushConfig()) {
       let sending = false // a slow run must not overlap the next minute's, or an alert goes twice
       setInterval(() => {

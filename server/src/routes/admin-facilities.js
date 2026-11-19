@@ -353,7 +353,9 @@ router.patch('/:id/open-plays/:openPlayId', async (req, res) => {
     })
     // After the commit, never awaited: a slow or failed push must not hold up or undo the edit.
     if (timeChanged(before, openPlay)) {
-      sendTimeChange(query, openPlay.id, before).catch((error) => console.error('open play time alert:', error.message))
+      sendTimeChange(query, openPlay.id, before)
+        .then(({ sent, phones }) => console.log(`open play time alert: sent ${sent} of ${phones} for ${openPlay.id}`))
+        .catch((error) => console.error('open play time alert:', error.message))
     }
     res.json({ openPlay })
   } catch (error) {

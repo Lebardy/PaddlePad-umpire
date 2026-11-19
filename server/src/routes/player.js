@@ -750,7 +750,7 @@ router.get('/push/key', (req, res) => {
 
 const pushText = (value, max) => typeof value === 'string' && value.length > 0 && value.length <= max
 
-/** This phone wants alerts when a rival or best partner joins open play. */
+/** This phone wants rival and partner alerts (a rival or best partner joined open play) and Open play alerts (a time change). */
 router.put('/push', async (req, res) => {
   const { endpoint, keys } = req.body ?? {}
   if (!pushText(endpoint, 1000) || !validSubscription(endpoint, keys)) {
