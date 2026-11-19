@@ -4290,7 +4290,7 @@ async function main() {
     check('the owner signs in for the overview section -> 200', fOwnerIn.status === 200, redacted(fOwnerIn.body).slice(0, 80))
     const fOwnerToken = fOwnerIn.body.token
 
-    const facA = await request('/admin/facilities', { method: 'POST', bearer: fOwnerToken, body: { name: nameFacA } })
+    const facA = await request('/admin/facilities', { method: 'POST', bearer: fOwnerToken, body: { name: nameFacA, courtCount: 4 } })
     check('the owner creates facility A -> 201', facA.status === 201, redacted(facA.body).slice(0, 120))
     const facilityAId = facA.body.facility?.id
     const facB = await request('/admin/facilities', { method: 'POST', bearer: fOwnerToken, body: { name: nameFacB } })
