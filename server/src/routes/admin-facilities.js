@@ -11,7 +11,8 @@ import {
   saveFacilityLogo, updateFacility,
 } from '../facility-store.js'
 import { isUuid } from '../validate.js'
-import { clashText, courtClash, courtCountRefusal, editRefusal, lowestFreeCourts, openPlayChanges } from '../open-play-courts.js'
+import { sendTimeChange } from '../open-play-alerts.js'
+import { clashText, courtClash, courtCountRefusal, editRefusal, lowestFreeCourts, openPlayChanges, timeChanged } from '../open-play-courts.js'
 import { levelLookup, loadCourtState, loadFacilityUmpires, loadOpenPlays, recentRatings } from '../open-play-store.js'
 import { guestsTotals, openPlayRow, openPlayWhen, readOpenPlay, visitSummary } from '../visit-rules.js'
 
@@ -307,7 +308,7 @@ router.patch('/:id/open-plays/:openPlayId', async (req, res) => {
   if (!isUuid(req.params.openPlayId)) return res.status(404).json({ error: 'No such open play' })
   const now = new Date()
   try {
-    const { openPlay } = await withTransaction(async (client) => {
+    const { openPlay, before } = await withTransaction(async (client) => {
       const q = client.query.bind(client)
       const { rows: [row] } = await q(
         `SELECT id, starts_at, ends_at, court_numbers, spots, fee_centavos, umpire, note FROM open_plays
@@ -350,6 +351,12 @@ router.patch('/:id/open-plays/:openPlayId', async (req, res) => {
       })
       return { openPlay: after, before }
     })
+    // After the commit, never awaited: a slow or failed push must not hold up or undo the edit.
+    if (timeChanged(before, openPlay)) {
+      sendTimeChange(query, openPlay.id, before)
+        .then(({ sent, phones }) => console.log(`open play time alert: sent ${sent} of ${phones} for ${openPlay.id}`))
+        .catch((error) => console.error('open play time alert:', error.message))
+    }
     res.json({ openPlay })
   } catch (error) {
     sendRefusal(res, error)

@@ -8,7 +8,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(alert.title, {
     body: alert.body,
     tag: alert.tag,
-    renotify: false,
+    renotify: Boolean(alert.tag) && alert.update !== true,
     silent: alert.update === true,
     icon: '/pwa-192x192.png',
     data: { url: alert.url },

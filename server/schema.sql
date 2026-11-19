@@ -1013,8 +1013,12 @@ ALTER TABLE players ADD COLUMN IF NOT EXISTS near_rating_name BOOLEAN NOT NULL D
 -- They stay in other players' rival and partner lists either way.
 ALTER TABLE players ADD COLUMN IF NOT EXISTS rival_alerts BOOLEAN NOT NULL DEFAULT true;
 
+-- Whether this player is told when an open play they joined changes its
+-- day or hours. On until they turn it off; separate from rival alerts.
+ALTER TABLE players ADD COLUMN IF NOT EXISTS open_play_alerts BOOLEAN NOT NULL DEFAULT true;
+
 -- One row per phone that asked to be told when a rival or partner joins
--- open play. The endpoint is the phone's address at its push service.
+-- open play (rival and partner alerts), and of an open play time change (Open play alerts). The endpoint is the phone's address at its push service.
 CREATE TABLE IF NOT EXISTS push_subscriptions (
     endpoint    TEXT PRIMARY KEY,
     player_id   UUID NOT NULL REFERENCES players (id) ON DELETE CASCADE,

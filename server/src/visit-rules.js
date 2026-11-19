@@ -204,3 +204,16 @@ export function openPlayWhen(startsAt, endsAt) {
   const [to, toHalf] = clock(endsAt)
   return `${DAY_WORDS.format(new Date(startsAt))} · ${fromHalf === toHalf ? from : `${from} ${fromHalf}`}–${to} ${toHalf}`
 }
+
+const WEEKDAY = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', weekday: 'short' })
+
+/** The phone alert when an open play's time changes; the days are named only when the day moved. */
+export function timeChangeAlert({ facilityName, before, after }) {
+  const day = (play) => WEEKDAY.format(new Date(play.startsAt))
+  const sameDay = manilaDayStart(new Date(before.startsAt)).getTime() === manilaDayStart(new Date(after.startsAt)).getTime()
+  const words = (play) => {
+    const hours = openPlayWhen(play.startsAt, play.endsAt).split(' · ')[1]
+    return sameDay ? hours : `${day(play)} ${hours}`
+  }
+  return { title: `${day(before)} open play at ${facilityName}`, body: `Now ${words(after)} (was ${words(before)})` }
+}

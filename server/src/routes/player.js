@@ -68,12 +68,13 @@ function profileOf(row) {
     nearRatingName: row.near_rating_name === true,
     // !== false so callers whose rows lack the column answer true, as the column does.
     rivalAlerts: row.rival_alerts !== false,
+    openPlayAlerts: row.open_play_alerts !== false,
   }
 }
 
 router.get('/me', async (req, res) => {
   const { rows } = await query(
-    `SELECT id, name, claimed_at, username, google_email, near_rating_name, rival_alerts
+    `SELECT id, name, claimed_at, username, google_email, near_rating_name, rival_alerts, open_play_alerts
        FROM players WHERE id = $1`,
     [req.player.id],
   )
@@ -291,7 +292,7 @@ router.patch('/me', async (req, res) => {
     ;({ rows } = await query(
       `UPDATE players SET name = $2
         WHERE id = $1
-        RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts`,
+        RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts, open_play_alerts`,
       [req.player.id, name],
     ))
   } catch (err) {
@@ -313,7 +314,7 @@ router.put('/me/near-rating-name', async (req, res) => {
   if (typeof req.body?.on !== 'boolean') return res.status(400).json({ error: 'on must be true or false' })
   const { rows } = await query(
     `UPDATE players SET near_rating_name = $2 WHERE id = $1
-     RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts`,
+     RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts, open_play_alerts`,
     [req.player.id, req.body.on],
   )
   if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
@@ -325,7 +326,19 @@ router.put('/me/rival-alerts', async (req, res) => {
   if (typeof req.body?.on !== 'boolean') return res.status(400).json({ error: 'on must be true or false' })
   const { rows } = await query(
     `UPDATE players SET rival_alerts = $2 WHERE id = $1
-     RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts`,
+     RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts, open_play_alerts`,
+    [req.player.id, req.body.on],
+  )
+  if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
+  res.json({ player: profileOf(rows[0]) })
+})
+
+/** Whether this player is told when an open play they joined changes its day or hours. */
+router.put('/me/open-play-alerts', async (req, res) => {
+  if (typeof req.body?.on !== 'boolean') return res.status(400).json({ error: 'on must be true or false' })
+  const { rows } = await query(
+    `UPDATE players SET open_play_alerts = $2 WHERE id = $1
+     RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts, open_play_alerts`,
     [req.player.id, req.body.on],
   )
   if (!rows[0]) return res.status(401).json({ error: 'That player no longer exists' })
@@ -641,7 +654,7 @@ router.post('/link', async (req, res) => {
               deactivated_at = NULL,
               closed_by_admin_at = NULL
         WHERE id = $1
-        RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts`,
+        RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts, open_play_alerts`,
       // Google moves across with the username and password because the
       // row being deleted is the one holding it. The guard above
       // guarantees the surviving row has none of its own, so nothing is
@@ -737,7 +750,7 @@ router.get('/push/key', (req, res) => {
 
 const pushText = (value, max) => typeof value === 'string' && value.length > 0 && value.length <= max
 
-/** This phone wants alerts when a rival or best partner joins open play. */
+/** This phone wants rival and partner alerts (a rival or best partner joined open play) and Open play alerts (a time change). */
 router.put('/push', async (req, res) => {
   const { endpoint, keys } = req.body ?? {}
   if (!pushText(endpoint, 1000) || !validSubscription(endpoint, keys)) {

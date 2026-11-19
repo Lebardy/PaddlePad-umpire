@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { fetchPushKey, removePush, savePush, setRivalAlerts } from '../lib/api'
+import { fetchPushKey, removePush, savePush, setOpenPlayAlerts, setRivalAlerts } from '../lib/api'
 import Icon from './Icon'
 
 // The key arrives as base64url; the browser wants its bytes.
@@ -12,19 +12,19 @@ const iPhone = /iPhone|iPad|iPod/.test(navigator.userAgent)
 const standalone = window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true
 
 /**
- * The Alerts section of You. The first switch is the player's own choice to take part at all,
- * saved on the server: off, their joins alert nobody and nothing is sent to them.
- * Under it, while that is on, "Alert me when a rival or partner joins open play" for this phone,
- * which asks the phone only when tapped. That row is hidden where alerts are off on the server
- * or the browser cannot push; on an iPhone outside the Home Screen it says how to get there,
- * since Apple allows web push only from there.
+ * The Alerts section of You. Two switches are the player's own choices, saved on the server:
+ * rival and partner alerts (off, their joins alert nobody) and open play alerts.
+ * Under them, while either is on, this phone's own sign-up, which asks the phone only when tapped.
+ * That row is hidden where alerts are off on the server or the browser cannot push; on an iPhone
+ * outside the Home Screen it says how to get there, since Apple allows web push only from there.
  */
 function AlertSwitch({ player, onPlayerChange }) {
   const [state, setState] = useState('loading') // loading | hidden | install | blocked | off | on
   const [key, setKey] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const takesPart = player.rivalAlerts !== false
+  const rivalsOn = player.rivalAlerts !== false
+  const openPlayOn = player.openPlayAlerts !== false
+  const [saving, setSaving] = useState(null) // null | 'rivals' | 'openPlay'
   const note = useRef(null)
   const tapped = useRef(false)
 
@@ -46,15 +46,15 @@ function AlertSwitch({ player, onPlayerChange }) {
     return () => { live = false }
   }, [])
 
-  async function flip() {
+  async function flip(which) {
     if (saving) return
-    setSaving(true)
+    setSaving(which)
     try {
-      onPlayerChange(await setRivalAlerts(!takesPart))
+      onPlayerChange(which === 'rivals' ? await setRivalAlerts(!rivalsOn) : await setOpenPlayAlerts(!openPlayOn))
     } catch {
       // Unchanged on failure: the switch keeps showing what is saved.
     } finally {
-      setSaving(false)
+      setSaving(null)
     }
   }
 
@@ -101,15 +101,19 @@ function AlertSwitch({ player, onPlayerChange }) {
         <Icon name="bell" size={16} />
         Alerts
       </h2>
-      <button type="button" className="you-switch" role="switch" aria-checked={takesPart} aria-busy={saving} onClick={flip}>
+      <button type="button" className="you-switch" role="switch" aria-checked={rivalsOn} aria-busy={saving === 'rivals'} onClick={() => flip('rivals')}>
         <span>Rival and partner alerts</span>
         <span className="you-switch-track" aria-hidden="true"><span /></span>
       </button>
-      {!takesPart && <p className="detail-note">Your joins alert no one, and no alerts reach you.</p>}
-      {takesPart && (state === 'install' || state === 'blocked') && <p ref={note} tabIndex={-1}>{words}</p>}
-      {takesPart && (state === 'on' || state === 'off') && (
+      {!rivalsOn && <p className="detail-note">Your joins alert no one.</p>}
+      <button type="button" className="you-switch" role="switch" aria-checked={openPlayOn} aria-busy={saving === 'openPlay'} onClick={() => flip('openPlay')}>
+        <span>Open play alerts</span>
+        <span className="you-switch-track" aria-hidden="true"><span /></span>
+      </button>
+      {(rivalsOn || openPlayOn) && (state === 'install' || state === 'blocked') && <p ref={note} tabIndex={-1}>{words}</p>}
+      {(rivalsOn || openPlayOn) && (state === 'on' || state === 'off') && (
         <button type="button" className="you-switch" role="switch" aria-checked={state === 'on'} aria-busy={busy} onClick={toggle}>
-          <span>Alert me when a rival or partner joins open play</span>
+          <span>Alerts on this phone</span>
           <span className="you-switch-track" aria-hidden="true"><span /></span>
         </button>
       )}
