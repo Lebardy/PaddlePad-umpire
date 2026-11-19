@@ -49,14 +49,27 @@ function wholeHour(value) {
 
 const within = (value, min, max) => Number.isInteger(value) && value >= min && value <= max
 
-/** An open play from the admin form: `{ values }` or `{ error }` in words. */
-export function readOpenPlay(body = {}, now) {
+/** The courts picked on the form, sorted; null when they aren't each 1 to 20 with no repeats; [] when none. */
+export function readCourtNumbers(value) {
+  if (!Array.isArray(value)) return null
+  if (!value.every((n) => within(n, 1, MAX_COURTS)) || new Set(value).size !== value.length) return null
+  return [...value].sort((a, b) => a - b)
+}
+
+/**
+ * An open play from the admin form: `{ values }` or `{ error }` in words.
+ * `keepStart` is an edited open play's stored start: kept unchanged, it
+ * may already have passed. A caller that sends `courts` but no
+ * `courtNumbers` gets `courtNumbers: null` and the route picks them.
+ */
+export function readOpenPlay(body = {}, now, { keepStart = null } = {}) {
   const start = wholeHour(body.startsAt)
   if (!start) return { error: 'Pick a day and a start hour' }
   const end = wholeHour(body.endsAt)
   if (!end) return { error: 'Pick an end hour' }
-  if (start <= now) return { error: 'That time has passed' }
-  if (start >= weekEnd(now)) return { error: 'Pick a day in the next 7 days' }
+  const kept = keepStart != null && start.getTime() === new Date(keepStart).getTime()
+  if (!kept && start <= now) return { error: 'That time has passed' }
+  if (!kept && start >= weekEnd(now)) return { error: 'Pick a day in the next 7 days' }
   if (manilaHour(start) < FIRST_HOUR) return { error: 'Start at 6 am or later' }
   const hours = (end - start) / HOUR
   if (hours < 1) return { error: 'End after it starts' }
@@ -64,7 +77,12 @@ export function readOpenPlay(body = {}, now) {
   if (manilaDayStart(end).getTime() !== manilaDayStart(start).getTime() || manilaHour(end) > LAST_END) {
     return { error: 'End by 11 pm' }
   }
-  if (!within(body.courts, 1, MAX_COURTS)) return { error: 'Courts: 1 to 20' }
+  let courtNumbers = null
+  if (body.courtNumbers !== undefined) {
+    courtNumbers = readCourtNumbers(body.courtNumbers)
+    if (courtNumbers?.length === 0) return { error: 'Pick at least one court' }
+    if (!courtNumbers) return { error: 'Courts: 1 to 20' }
+  } else if (!within(body.courts, 1, MAX_COURTS)) return { error: 'Courts: 1 to 20' }
   if (!within(body.spots, 2, MAX_SPOTS)) return { error: 'Spots: 2 to 200' }
   const fee = pesosToCentavos(body.fee)
   if (fee === undefined || fee > MAX_FEE_CENTAVOS) return { error: 'Enter the fee in pesos, or leave it empty for free' }
@@ -73,7 +91,7 @@ export function readOpenPlay(body = {}, now) {
   if (note.length > NOTE_MAX) return { error: 'Keep the note to 60 characters' }
   return {
     values: {
-      startsAt: start, endsAt: end, courts: body.courts, spots: body.spots,
+      startsAt: start, endsAt: end, courts: courtNumbers ? courtNumbers.length : body.courts, courtNumbers, spots: body.spots,
       feeCentavos: fee || null, umpire: body.umpire, note: note || null,
     },
   }

@@ -30,7 +30,7 @@ check('this week ends at midnight after the seventh day', weekEnd(now).toISOStri
 console.log('\nan open play from the admin form')
 const base = { startsAt: '2026-10-17T06:00:00+08:00', endsAt: '2026-10-17T09:00:00+08:00', courts: 2, spots: 16, fee: '150', umpire: true, note: ' Beginners welcome ' }
 const op = (change) => readOpenPlay({ ...base, ...change }, now)
-check('a good one', op({}), { values: { startsAt: '2026-10-16T22:00:00.000Z', endsAt: '2026-10-17T01:00:00.000Z', courts: 2, spots: 16, feeCentavos: 15000, umpire: true, note: 'Beginners welcome' } })
+check('a good one', op({}), { values: { startsAt: '2026-10-16T22:00:00.000Z', endsAt: '2026-10-17T01:00:00.000Z', courts: 2, courtNumbers: null, spots: 16, feeCentavos: 15000, umpire: true, note: 'Beginners welcome' } })
 check('a start that is not a time', op({ startsAt: 'nonsense' }), { error: 'Pick a day and a start hour' })
 check('a start off the hour', op({ startsAt: '2026-10-17T06:30:00+08:00' }), { error: 'Pick a day and a start hour' })
 check('no end', op({ endsAt: undefined }), { error: 'Pick an end hour' })
@@ -44,6 +44,18 @@ check('past 11 pm', op({ startsAt: '2026-10-17T22:00:00+08:00', endsAt: '2026-10
 check('ending at 11 pm is fine', Boolean(op({ startsAt: '2026-10-17T22:00:00+08:00', endsAt: '2026-10-17T23:00:00+08:00' }).values), true)
 check('no courts', op({ courts: 0 }), { error: 'Courts: 1 to 20' })
 check('courts as text', op({ courts: '2' }), { error: 'Courts: 1 to 20' })
+check('courts picked, stored in order', op({ courts: undefined, courtNumbers: [5, 2] }).values?.courtNumbers, [2, 5])
+check('and counted', op({ courts: undefined, courtNumbers: [5, 2] }).values?.courts, 2)
+check('no court picked', op({ courtNumbers: [] }), { error: 'Pick at least one court' })
+check('a court twice', op({ courtNumbers: [2, 2] }), { error: 'Courts: 1 to 20' })
+check('court 21', op({ courtNumbers: [21] }), { error: 'Courts: 1 to 20' })
+check('court as text', op({ courtNumbers: ['2'] }), { error: 'Courts: 1 to 20' })
+const startedAt = '2026-10-15T07:00:00+08:00'
+check('an edit keeping a start already past',
+  Boolean(readOpenPlay({ ...base, startsAt: startedAt, endsAt: '2026-10-15T09:00:00+08:00' }, now, { keepStart: startedAt }).values), true)
+check('an edit moving the start into the past',
+  readOpenPlay({ ...base, startsAt: '2026-10-15T06:00:00+08:00', endsAt: '2026-10-15T09:00:00+08:00' }, now, { keepStart: startedAt }),
+  { error: 'That time has passed' })
 check('one spot', op({ spots: 1 }), { error: 'Spots: 2 to 200' })
 check('an empty fee is free', op({ fee: '' }).values.feeCentavos, null)
 check('a zero fee is free', op({ fee: '0' }).values.feeCentavos, null)

@@ -957,6 +957,30 @@ CREATE TABLE IF NOT EXISTS open_play_courts (
     -- One court per umpire per open play.
     UNIQUE (open_play_id, umpire_id)
 );
+
+-- How many courts the place has, numbered 1 to N; open play picks from
+-- them. Empty until an admin sets it.
+ALTER TABLE facilities ADD COLUMN IF NOT EXISTS court_count INTEGER
+    CHECK (court_count IS NULL OR court_count BETWEEN 1 AND 20);
+
+-- Which of the place's courts an open play uses; `courts` stays as how
+-- many. One time only, when the column is new: open plays from before
+-- get courts 1 to N, as their umpires and sessions already say, and a
+-- place with any gets the most it ever used as its court count.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = current_schema() AND table_name = 'open_plays' AND column_name = 'court_numbers') THEN
+    ALTER TABLE open_plays ADD COLUMN court_numbers INTEGER[];
+    UPDATE open_plays SET court_numbers = ARRAY(SELECT generate_series(1, courts));
+    UPDATE facilities f SET court_count = m.most
+      FROM (SELECT facility_id, max(courts) AS most FROM open_plays GROUP BY facility_id) m
+     WHERE f.id = m.facility_id AND f.court_count IS NULL;
+    ALTER TABLE open_plays ALTER COLUMN court_numbers SET NOT NULL;
+    ALTER TABLE open_plays ADD CONSTRAINT open_plays_court_numbers_count CHECK (cardinality(court_numbers) = courts);
+  END IF;
+END $$;
+
 -- What a session was named from. All empty for sessions from before
 -- this, and for old installed apps that still send a typed name.
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS starts_at    TIMESTAMPTZ;
