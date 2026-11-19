@@ -502,7 +502,7 @@ router.post('/link', async (req, res) => {
 
     const { rows: targets } = await client.query(
       `SELECT id, name, username, password_hash, google_sub, google_email,
-              registered_at
+              registered_at, near_rating_name, rival_alerts, open_play_alerts
          FROM players WHERE id = $1 FOR UPDATE`,
       [req.player.id],
     )
@@ -652,7 +652,11 @@ router.post('/link', async (req, res) => {
               registered_at  = COALESCE(registered_at, $4),
               claimed_at     = COALESCE(claimed_at, now()),
               deactivated_at = NULL,
-              closed_by_admin_at = NULL
+              closed_by_admin_at = NULL,
+              -- The switches are the player's own choices, so they come from their account.
+              near_rating_name = $7,
+              rival_alerts     = $8,
+              open_play_alerts = $9
         WHERE id = $1
         RETURNING id, name, claimed_at, username, google_email, near_rating_name, rival_alerts, open_play_alerts`,
       // Google moves across with the username and password because the
@@ -667,6 +671,9 @@ router.post('/link', async (req, res) => {
         target.registered_at,
         target.google_sub,
         target.google_email,
+        target.near_rating_name,
+        target.rival_alerts,
+        target.open_play_alerts,
       ],
     )
 
