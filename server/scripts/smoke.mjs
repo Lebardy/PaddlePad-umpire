@@ -4026,9 +4026,13 @@ async function main() {
       const umpireOff = await editLive({ ...liveBody, umpire: false })
       check('umpire off once a court started -> 409 "Courts have started, so the umpire stays on duty"',
         umpireOff.status === 409 && umpireOff.body.error === 'Courts have started, so the umpire stays on duty', `${umpireOff.status} ${umpireOff.body.error}`)
-      const later = await editLive({ ...liveBody, startsAt: new Date(nextHour.getTime() + 3_600_000).toISOString(), endsAt: new Date(nextHour.getTime() + 7_200_000).toISOString() })
-      check('moving the start once a court started -> 409 "It has started, so its day and start stay"',
-        later.status === 409 && later.body.error === 'It has started, so its day and start stay', `${later.status} ${later.body.error}`)
+      if (manilaHourNow >= 21) {
+        console.log('  ...  moving the start skipped: one hour later would end after 11 pm')
+      } else {
+        const later = await editLive({ ...liveBody, startsAt: new Date(nextHour.getTime() + 3_600_000).toISOString(), endsAt: new Date(nextHour.getTime() + 7_200_000).toISOString() })
+        check('moving the start once a court started -> 409 "It has started, so its day and start stay"',
+          later.status === 409 && later.body.error === 'It has started, so its day and start stay', `${later.status} ${later.body.error}`)
+      }
 
       // A play on Courts 5 and 6 only: the lookup lists those numbers, and Court 1 is not one of them.
       const highPlay = await addOpenPlay({ ...liveBody, courts: 2, courtNumbers: [5, 6], note: 'Smoke 5 and 6' })

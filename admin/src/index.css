@@ -915,6 +915,7 @@ tr.is-voided .reason { opacity: 0.6; }
 @media (min-width: 1181px) { .guests-form .field.grow { flex-basis: 9rem; } }
 .guests-hint { flex-basis: 100%; }
 .guests-removes { flex-basis: 100%; margin: 0; font-weight: 600; color: var(--text); }
+.guests-removes:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .guests-form select:disabled { background: var(--surface-sunken); color: var(--text-muted); border-style: dashed; opacity: 1; cursor: not-allowed; }
 .guests-table .btn-quiet[aria-expanded='true'] { border-color: var(--primary); background: var(--primary-soft); }
 .guests-error, .guests-form + .table-wrap, .guests-error + .table-wrap { margin-top: 0.75rem; }
