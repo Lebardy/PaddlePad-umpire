@@ -364,6 +364,13 @@ function PointByPoint({ id, match, selected, onSelect }) {
     return () => controller.abort()
   }, [id, times])
 
+  // Both save links run out with the video's: once the page has held the answer for 110 minutes, ask again.
+  useEffect(() => {
+    if (!loaded || loaded.id !== id) return undefined
+    const timer = setTimeout(() => setAsked((was) => ({ id, times: (was.id === id ? was.times : 0) + 1 })), 110 * 60_000)
+    return () => clearTimeout(timer)
+  }, [loaded, id])
+
   const game = loaded?.id === id ? loaded.game : null
   const points = loaded?.id === id ? loaded.points : null
   const video = loaded?.id === id ? loaded.video : null
@@ -373,16 +380,18 @@ function PointByPoint({ id, match, selected, onSelect }) {
   // Kept with the match it belongs to, like `removing`: a result that lands after the player moved on is dropped.
   const [savingRow, setSaving] = useState({ id, busy: null, progress: 0, ready: false, failed: false })
   const saving = savingRow.id === id ? savingRow : { busy: null, progress: 0, ready: false, failed: false }
-  const cut = useRef({ url: null, file: null })
+  // The reel is kept by the link's path and the highlights, so a re-signed link does not cut it again.
+  const cut = useRef({ key: null, file: null })
   const sharing = useMemo(() => canShareVideo(), [])
   const update = (next) => setSaving((was) => (was.id === id ? { ...was, ...next } : was))
 
   async function reelFile() {
-    if (cut.current.url === video.url && cut.current.file) return cut.current.file
+    const key = `${new URL(video.url).pathname} ${JSON.stringify(video.highlights)}`
+    if (cut.current.key === key && cut.current.file) return cut.current.file
     const read = rangeReader(video.url)
     const blob = await cutClips(read, await readIndex(read), video.highlights, (progress) => update({ progress }))
     const file = new File([blob], `${video.fileName} highlights.mp4`, { type: 'video/mp4' })
-    cut.current = { url: video.url, file }
+    cut.current = { key, file }
     return file
   }
 
@@ -393,8 +402,10 @@ function PointByPoint({ id, match, selected, onSelect }) {
       const file = await reelFile()
       if (kind === 'download') { downloadBlob(file, file.name); return update(idle) }
       // The player is on another match by now: the file is kept, but nothing opens or shows here.
-      if (shown.current !== id) return
+      if (shown.current !== id) return update(idle)
       const answer = await shareFile(file)
+      // Too big for the share sheet (Chrome stops at 50 MiB): the player gets the file saved instead.
+      if (answer === 'too-big') downloadBlob(file, file.name)
       update({ ...idle, ready: answer === 'needs-tap' })
     } catch {
       update({ ...idle, failed: true })
@@ -443,8 +454,8 @@ function PointByPoint({ id, match, selected, onSelect }) {
             count={video.highlights?.length ?? 0}
             playing={playing}
             onPlay={playReel}
-            onShare={sharing ? () => save('share') : undefined}
-            onDownload={() => save('download')}
+            onShare={sharing && video.repacked !== false ? () => save('share') : undefined}
+            onDownload={video.repacked !== false ? () => save('download') : undefined}
             busy={saving.busy}
             progress={saving.progress}
             ready={saving.ready}

@@ -33,7 +33,7 @@ function Highlights({ count, playing, onPlay, onShare, onDownload, busy = null, 
       {(onShare || onDownload) && (
         <span className="highlights-save">
           {onShare && (
-            <button type="button" className={`highlights-icon${ready ? ' is-ready' : ''}`} aria-label="Share highlights" aria-disabled={busy !== null} onClick={() => busy === null && onShare()}>
+            <button type="button" className={`highlights-icon${ready ? ' is-ready' : ''}`} aria-label={ready ? 'Share highlights, ready' : 'Share highlights'} aria-disabled={busy !== null} onClick={() => busy === null && onShare()}>
               {ring('share')}<Icon name="share" size={20} />
             </button>
           )}
