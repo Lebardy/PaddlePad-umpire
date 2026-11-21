@@ -9,11 +9,15 @@ export function canShareVideo() {
   }
 }
 
+/** Chrome refuses to share a file over 50 MiB (it answers like a cancel), so a bigger one is saved instead. */
+export const SHARE_LIMIT_BYTES = 50 * 1024 * 1024
+
 /**
- * Opens the share sheet with `file`. 'needs-tap' when the browser refused because the
+ * Opens the share sheet with `file`. 'too-big' when it is over the limit (nothing is opened). 'needs-tap' when the browser refused because the
  * tap that asked was too long ago (cutting took a while): a second tap shares it.
  */
 export async function shareFile(file) {
+  if (file.size > SHARE_LIMIT_BYTES) return 'too-big'
   try {
     await navigator.share({ files: [file], title: file.name.replace(/\.mp4$/, '') })
     return 'shared'
