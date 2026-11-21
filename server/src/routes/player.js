@@ -28,6 +28,7 @@ import { findFacility, listFacilities } from '../facility-store.js'
 import { playerFacilityPage, playerFacilitySummary } from '../facility-rules.js'
 import { bucketConfig } from '../bucket.js'
 import { pointVideo } from '../point-video.js'
+import { videoFileName } from '../video-name.js'
 import { playerInGoingOnSession } from '../overview-store.js'
 import {
   joinOpenPlay, leaveOpenPlay, levelLookup, loadOpenPlays, namedFor, saveRating, visitFor,
@@ -252,7 +253,12 @@ router.get('/matches/:id/game', async (req, res) => {
     byYou: by === req.player.id,
   }))
 
-  res.json({ margins, game: readGame(margins, row.point_target), points, video: await pointVideo(row, events, log, req.player.id) })
+  const fileName = videoFileName({
+    startedAt: row.started_at,
+    sideA: row.team_a.map((id) => nameOf.get(id) ?? ''),
+    sideB: row.team_b.map((id) => nameOf.get(id) ?? ''),
+  })
+  res.json({ margins, game: readGame(margins, row.point_target), points, video: await pointVideo(row, events, log, req.player.id, fileName) })
 })
 
 /**

@@ -11,8 +11,9 @@ import { pointRallyOrder } from './player-stats.js'
  * seconds). `row` is the match, `events` its rows in play order
  * (with `at`), `log` the same events as the scoring engine reads them,
  * and whether this player may remove it: only the one who filmed it.
+ * With `fileName` (players only), also a link that saves the file under that name.
  */
-export async function pointVideo(row, events, log, playerId) {
+export async function pointVideo(row, events, log, playerId, fileName) {
   const config = bucketConfig()
   if (!config) return null
   const { rows } = await query(
@@ -41,5 +42,6 @@ export async function pointVideo(row, events, log, playerId) {
     seconds: order.map((rally) => everyRally[rally] ?? null),
     highlights: highlightClips({ ...timing, rallies: timed, picked: video.highlights ?? [] })
       .map(({ start, end }) => ({ start, end })),
+    ...(fileName ? { fileName, downloadUrl: signedReadUrl(config, video.file_key, { download: `${fileName}.mp4` }) } : {}),
   }
 }

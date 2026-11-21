@@ -81,5 +81,16 @@ section('an upload form')
   check('a different secret has a different signature', stranger.fields['X-Amz-Signature'] === form.fields['X-Amz-Signature'], false)
 }
 
+section('a download link')
+{
+  const plain = new URL(signedReadUrl(bucketConfig(amazon), 'test.txt', { now: then }))
+  const saved = new URL(signedReadUrl(bucketConfig(amazon), 'test.txt', { now: then, download: 'PaddlePad 2026-11-20 Cruz vs Sy.mp4' }))
+  check('asks the bucket to save it under that name', saved.searchParams.get('response-content-disposition'),
+    'attachment; filename="PaddlePad 2026-11-20 Cruz vs Sy.mp4"')
+  check('a plain read link asks nothing of the kind', plain.searchParams.has('response-content-disposition'), false)
+  check('the name is part of what is signed', saved.searchParams.get('X-Amz-Signature') === plain.searchParams.get('X-Amz-Signature'), false)
+  check('the space is escaped the scheme\'s way', saved.search.includes('filename%3D%22PaddlePad%202026-11-20'), true)
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail === 0 ? 0 : 1)
