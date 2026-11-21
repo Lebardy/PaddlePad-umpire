@@ -150,12 +150,17 @@ export async function cutClips(read, index, clips, onProgress) {
   if (!video) throw new Error('this video has no pictures')
   const picked = { vide: [], soun: [] }   // sample numbers, in output order
   const chunks = []                      // { handler, count, bytes: Uint8Array[] } in file order
+  let held = -1                          // the last picture the clips so far hold
   for (const [n, clip] of clips.entries()) {
     const at = (t, s) => t.times[s] / t.scale
     let first = 0
     for (let s = 0; s < video.times.length && at(video, s) <= clip.start; s++) if (video.keys[s]) first = s
+    // A highlight starting inside the one before (the next rally) carries on from it rather than playing it again.
+    if (first <= held) first = held + 1
+    if (first >= video.times.length) { onProgress?.((n + 1) / clips.length); continue }
     let last = first
     while (last + 1 < video.times.length && at(video, last + 1) < clip.end) last++
+    held = last
     const from = at(video, first); const to = (video.times[last] + video.durations[last]) / video.scale
     const vids = range(first, last)
     const sounds = sound ? sound.times.map((_, s) => s).filter((s) => at(sound, s) >= from && at(sound, s) < to) : []

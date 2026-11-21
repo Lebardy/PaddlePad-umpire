@@ -35,7 +35,6 @@ const reader = (blob) => async (from, to) => new Uint8Array(await blob.slice(fro
 
 // ---- a made-up ordinary MP4: 10 s of video at 10 a second (key every 2 s), sound at 50 a second ----
 const u32 = (n) => { const b = Buffer.alloc(4); b.writeUInt32BE(n >>> 0); return b }
-const u64 = (n) => { const b = Buffer.alloc(8); b.writeBigUInt64BE(BigInt(n)); return b }
 const box = (kind, ...parts) => { const body = Buffer.concat(parts); return Buffer.concat([u32(8 + body.length), Buffer.from(kind, 'latin1'), body]) }
 const full = (kind, version, flags, ...parts) => box(kind, u32(version * 2 ** 24 + flags), ...parts)
 
@@ -123,6 +122,10 @@ section('a made-up video')
   check('a reel has each clip\'s pictures', reel.vide.marks.length, 10 + 10 + 10)
   check('its times run on with no gap', reel.vide.times.slice(9, 12), [900, 1000, 1100])
 
+  const joined = await marksOf(await cutClips(read, index, [{ start: 0, end: 3 }, { start: 2, end: 5 }]))
+  check('neighbouring highlights play on without a repeat', [joined.vide.marks.length, new Set(joined.vide.marks).size, joined.vide.marks.at(-1)], [50, 50, 'v00049'])
+  check('and no sound is repeated', [joined.soun.marks.length, new Set(joined.soun.marks).size], [250, 250])
+
   let progress = []
   await cutClips(read, index, [{ start: 0, end: 1 }, { start: 4, end: 5 }], (f) => progress.push(f))
   check('progress is told after each clip', progress, [0.5, 1])
@@ -141,9 +144,9 @@ const folder = names.every((n) => existsSync(new URL(n, own))) || !process.env.C
   : pathToFileURL(join(process.env.CLIP_RECORDINGS, '/'))
 const real = names.map((n) => new URL(n, folder))
 let probe = true
-try { execFileSync('ffprobe', ['-version'], { stdio: 'ignore' }) } catch { probe = false }
+try { for (const tool of ['ffprobe', 'ffmpeg']) execFileSync(tool, ['-version'], { stdio: 'ignore' }) } catch { probe = false }
 if (!probe || !real.every((u) => existsSync(u))) {
-  console.log('\nthe real recordings or ffprobe are not on this machine: skipped')
+  console.log('\nthe real recordings or ffprobe/ffmpeg are not on this machine: skipped')
 } else {
   const out = mkdtempSync(join(tmpdir(), 'clip-'))
   const ff = (file, ...args) => execFileSync('ffprobe', ['-v', 'error', ...args, '-of', 'json', file], { encoding: 'utf8' })
@@ -165,7 +168,7 @@ if (!probe || !real.every((u) => existsSync(u))) {
       const asked = clips.reduce((n, c) => n + Math.min(c.end, index.seconds) - c.start, 0)
       check(`${label}: opens with a picture and a sound track`, Boolean(video && sound), true)
       check(`${label}: lasts at least what was asked and not much more`, Number(video.duration) >= asked - 0.2 && Number(video.duration) <= longest, true)
-      check(`${label}: sound starts with the picture`, Math.abs(Number(video.start_time) - Number(sound.start_time)) < 0.1, true)
+      check(`${label}: sound is as long as the picture`, Math.abs(Number(video.duration) - Number(sound.duration)) <= 0.15, true)
       const first = JSON.parse(ff(file, '-select_streams', 'v:0', '-read_intervals', '%+#1', '-show_entries', 'frame=key_frame')).frames[0]
       check(`${label}: starts on a key picture`, first?.key_frame, 1)
       // A full decode proves the bytes are where the tables say.
