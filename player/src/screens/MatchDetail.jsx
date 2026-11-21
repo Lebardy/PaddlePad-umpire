@@ -370,28 +370,34 @@ function PointByPoint({ id, match, selected, onSelect }) {
   const { ref: filmRef, pick, playReel, onTimeUpdate, onSeeking, playing } = usePointVideo(video, game?.moments.length ?? 0, selected, onSelect)
 
   // Saving the highlights: the reel, cut once, is kept while this video link lasts.
-  const [saving, setSaving] = useState({ busy: null, progress: 0, ready: false, failed: false })
+  // Kept with the match it belongs to, like `removing`: a result that lands after the player moved on is dropped.
+  const [savingRow, setSaving] = useState({ id, busy: null, progress: 0, ready: false, failed: false })
+  const saving = savingRow.id === id ? savingRow : { busy: null, progress: 0, ready: false, failed: false }
   const cut = useRef({ url: null, file: null })
   const sharing = useMemo(() => canShareVideo(), [])
+  const update = (next) => setSaving((was) => (was.id === id ? { ...was, ...next } : was))
 
   async function reelFile() {
     if (cut.current.url === video.url && cut.current.file) return cut.current.file
     const read = rangeReader(video.url)
-    const blob = await cutClips(read, await readIndex(read), video.highlights, (progress) => setSaving((s) => ({ ...s, progress })))
+    const blob = await cutClips(read, await readIndex(read), video.highlights, (progress) => update({ progress }))
     const file = new File([blob], `${video.fileName} highlights.mp4`, { type: 'video/mp4' })
     cut.current = { url: video.url, file }
     return file
   }
 
   async function save(kind) {
-    setSaving({ busy: kind, progress: 0, ready: false, failed: false })
+    const idle = { busy: null, progress: 0, ready: false, failed: false }
+    setSaving({ id, busy: kind, progress: 0, ready: false, failed: false })
     try {
       const file = await reelFile()
-      if (kind === 'download') { downloadBlob(file, file.name); return setSaving({ busy: null, progress: 0, ready: false, failed: false }) }
+      if (kind === 'download') { downloadBlob(file, file.name); return update(idle) }
+      // The player is on another match by now: the file is kept, but nothing opens or shows here.
+      if (shown.current !== id) return
       const answer = await shareFile(file)
-      setSaving({ busy: null, progress: 0, ready: answer === 'needs-tap', failed: false })
+      update({ ...idle, ready: answer === 'needs-tap' })
     } catch {
-      setSaving({ busy: null, progress: 0, ready: false, failed: true })
+      update({ ...idle, failed: true })
     }
   }
 
@@ -466,7 +472,7 @@ function PointByPoint({ id, match, selected, onSelect }) {
           {step === 'idle' && (
             <>
               {video.downloadUrl && (
-                <a className="video-download" href={video.downloadUrl} download aria-label="Download full match"><Icon name="download" size={20} /></a>
+                <a className="video-download" href={video.downloadUrl} download aria-label="Download full match"><Icon name="downloadVideo" size={20} /></a>
               )}
               {video.mayRemove && (
                 <button ref={goButton} type="button" className="video-remove-go" onClick={() => setRemoving({ id, step: 'asking' })}><Icon name="trash" size={18} />Remove video</button>
