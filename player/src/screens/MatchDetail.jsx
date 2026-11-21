@@ -13,7 +13,7 @@
 // bottom; nothing above waits for it.
 // ============================================================
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from '../components/Link'
 import { navigate } from '../lib/router'
 import { usePlayerData } from '../lib/PlayerData'
@@ -22,6 +22,8 @@ import { longestRun, matchStory, turningPoint } from '../lib/story'
 import Sparkline from '../components/Sparkline'
 import MomentumRibbon from '../components/MomentumRibbon'
 import Highlights from '../components/Highlights'
+import { cutClips, rangeReader, readIndex } from '../lib/clipMp4'
+import { canShareVideo, downloadBlob, shareFile } from '../lib/saveFile'
 import { usePointVideo } from '../lib/usePointVideo'
 import Icon from '../components/Icon'
 import StackedBar from '../components/StackedBar'
@@ -366,6 +368,33 @@ function PointByPoint({ id, match, selected, onSelect }) {
   const points = loaded?.id === id ? loaded.points : null
   const video = loaded?.id === id ? loaded.video : null
   const { ref: filmRef, pick, playReel, onTimeUpdate, onSeeking, playing } = usePointVideo(video, game?.moments.length ?? 0, selected, onSelect)
+
+  // Saving the highlights: the reel, cut once, is kept while this video link lasts.
+  const [saving, setSaving] = useState({ busy: null, progress: 0, ready: false, failed: false })
+  const cut = useRef({ url: null, file: null })
+  const sharing = useMemo(() => canShareVideo(), [])
+
+  async function reelFile() {
+    if (cut.current.url === video.url && cut.current.file) return cut.current.file
+    const read = rangeReader(video.url)
+    const blob = await cutClips(read, await readIndex(read), video.highlights, (progress) => setSaving((s) => ({ ...s, progress })))
+    const file = new File([blob], `${video.fileName} highlights.mp4`, { type: 'video/mp4' })
+    cut.current = { url: video.url, file }
+    return file
+  }
+
+  async function save(kind) {
+    setSaving({ busy: kind, progress: 0, ready: false, failed: false })
+    try {
+      const file = await reelFile()
+      if (kind === 'download') { downloadBlob(file, file.name); return setSaving({ busy: null, progress: 0, ready: false, failed: false }) }
+      const answer = await shareFile(file)
+      setSaving({ busy: null, progress: 0, ready: answer === 'needs-tap', failed: false })
+    } catch {
+      setSaving({ busy: null, progress: 0, ready: false, failed: true })
+    }
+  }
+
   if (!game || game.moments.length === 0) return null
 
   async function remove() {
@@ -404,7 +433,17 @@ function PointByPoint({ id, match, selected, onSelect }) {
             onSeeking={onSeeking}
             onError={() => { if (times < 1) setAsked({ id, times: times + 1 }) }}
           />
-          <Highlights count={video.highlights?.length ?? 0} playing={playing} onPlay={playReel} />
+          <Highlights
+            count={video.highlights?.length ?? 0}
+            playing={playing}
+            onPlay={playReel}
+            onShare={sharing ? () => save('share') : undefined}
+            onDownload={() => save('download')}
+            busy={saving.busy}
+            progress={saving.progress}
+            ready={saving.ready}
+          />
+          {saving.failed && <p className="save-failed" role="alert"><Icon name="alert" size={18} />Couldn’t save it. Try again.</p>}
         </>
       )}
       <MomentumRibbon
@@ -422,10 +461,17 @@ function PointByPoint({ id, match, selected, onSelect }) {
         hint={video ? 'Tap a point to watch it' : undefined}
         watching={Boolean(video)}
       />
-      {video?.mayRemove && (
+      {video && (
         <div className="video-remove">
           {step === 'idle' && (
-            <button ref={goButton} type="button" className="video-remove-go" onClick={() => setRemoving({ id, step: 'asking' })}><Icon name="trash" size={18} />Remove video</button>
+            <>
+              {video.downloadUrl && (
+                <a className="video-download" href={video.downloadUrl} download aria-label="Download full match"><Icon name="download" size={20} /></a>
+              )}
+              {video.mayRemove && (
+                <button ref={goButton} type="button" className="video-remove-go" onClick={() => setRemoving({ id, step: 'asking' })}><Icon name="trash" size={18} />Remove video</button>
+              )}
+            </>
           )}
           {step !== 'idle' && (
             <>
