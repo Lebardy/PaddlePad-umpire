@@ -17,7 +17,7 @@ export async function pointVideo(row, events, log, playerId, fileName) {
   const config = bucketConfig()
   if (!config) return null
   const { rows } = await query(
-    `SELECT source, player_id, file_key, duration_ms, width, height, first_frame_at, highlights
+    `SELECT source, player_id, file_key, duration_ms, width, height, first_frame_at, highlights, repacked
        FROM match_videos WHERE match_id = $1 AND state = 'ready'`,
     [row.id],
   )
@@ -38,6 +38,7 @@ export async function pointVideo(row, events, log, playerId, fileName) {
     durationMs: video.duration_ms,
     width: video.width,
     height: video.height,
+    repacked: video.repacked,
     mayRemove: video.source === 'player' && video.player_id === playerId,
     seconds: order.map((rally) => everyRally[rally] ?? null),
     highlights: highlightClips({ ...timing, rallies: timed, picked: video.highlights ?? [] })
