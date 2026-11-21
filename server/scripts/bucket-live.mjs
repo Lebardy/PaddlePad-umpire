@@ -42,6 +42,10 @@ try {
   check('a signed link reads it back the same', read.status === 200 && back.length === 1024 && back.every((b, i) => b === bytes[i]), String(read.status))
   const part = await fetch(signedReadUrl(config, key, { seconds: 60 }), { headers: { Range: 'bytes=100-199' } })
   check('and reads a part of it', part.status === 206 && (await part.arrayBuffer()).byteLength === 100, String(part.status))
+  const saving = await fetch(signedReadUrl(config, key, { seconds: 60, download: 'PaddlePad live check.mp4' }), { headers: { Range: 'bytes=0-9' } })
+  check('a download link is answered as a file to save under its name',
+    (saving.headers.get('content-disposition') ?? '').startsWith('attachment') && saving.headers.get('content-disposition').includes('PaddlePad live check.mp4'),
+    String(saving.headers.get('content-disposition')))
   check('no link, no file', (await fetch(`${config.origin}/${key}`)).status === 403)
   check('a link signed with another secret is refused',
     (await fetch(signedReadUrl({ ...config, secret: 'not-the-secret' }, key, { seconds: 60 }))).status === 403)

@@ -53,8 +53,11 @@ function sign(config, { time, day }, canonicalRequest) {
   return { scope, signature: hmac(signingKey(config, day), toSign).toString('hex') }
 }
 
-/** A link that reads one file, good for `seconds`. Nothing is asked of the bucket to make it. */
-export function signedReadUrl(config, key, { seconds = 7200, now = new Date() } = {}) {
+/**
+ * A link that reads one file, good for `seconds`. Nothing is asked of the bucket to make it.
+ * With `download`, the bucket answers it as a file to save under that name, not to play.
+ */
+export function signedReadUrl(config, key, { seconds = 7200, now = new Date(), download } = {}) {
   const at = stamp(now)
   const params = {
     'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
@@ -63,6 +66,7 @@ export function signedReadUrl(config, key, { seconds = 7200, now = new Date() } 
     'X-Amz-Expires': seconds,
     'X-Amz-SignedHeaders': 'host',
   }
+  if (download) params['response-content-disposition'] = `attachment; filename="${download}"`
   const query = queryOf(params)
   const { signature } = sign(config, at, `GET\n${pathOf(key)}\n${query}\nhost:${config.host}\n\nhost\nUNSIGNED-PAYLOAD`)
   return `${config.origin}${pathOf(key)}?${query}&X-Amz-Signature=${signature}`

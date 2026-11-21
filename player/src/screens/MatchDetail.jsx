@@ -13,7 +13,7 @@
 // bottom; nothing above waits for it.
 // ============================================================
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from '../components/Link'
 import { navigate } from '../lib/router'
 import { usePlayerData } from '../lib/PlayerData'
@@ -22,6 +22,8 @@ import { longestRun, matchStory, turningPoint } from '../lib/story'
 import Sparkline from '../components/Sparkline'
 import MomentumRibbon from '../components/MomentumRibbon'
 import Highlights from '../components/Highlights'
+import { cutClips, rangeReader, readIndex } from '../lib/clipMp4'
+import { canShareVideo, downloadBlob, shareFile } from '../lib/saveFile'
 import { usePointVideo } from '../lib/usePointVideo'
 import Icon from '../components/Icon'
 import StackedBar from '../components/StackedBar'
@@ -362,10 +364,54 @@ function PointByPoint({ id, match, selected, onSelect }) {
     return () => controller.abort()
   }, [id, times])
 
+  // Both save links run out with the video's: once the page has held the answer for 110 minutes, ask again.
+  useEffect(() => {
+    if (!loaded || loaded.id !== id) return undefined
+    const timer = setTimeout(() => setAsked((was) => ({ id, times: (was.id === id ? was.times : 0) + 1 })), 110 * 60_000)
+    return () => clearTimeout(timer)
+  }, [loaded, id])
+
   const game = loaded?.id === id ? loaded.game : null
   const points = loaded?.id === id ? loaded.points : null
   const video = loaded?.id === id ? loaded.video : null
   const { ref: filmRef, pick, playReel, onTimeUpdate, onSeeking, playing } = usePointVideo(video, game?.moments.length ?? 0, selected, onSelect)
+
+  // Saving the highlights: the reel, cut once, is kept while this video link lasts.
+  // Kept with the match it belongs to, like `removing`: a result that lands after the player moved on is dropped.
+  const [savingRow, setSaving] = useState({ id, busy: null, progress: 0, ready: false, failed: false })
+  const saving = savingRow.id === id ? savingRow : { busy: null, progress: 0, ready: false, failed: false }
+  // The reel is kept by the link's path and the highlights, so a re-signed link does not cut it again.
+  const cut = useRef({ key: null, file: null })
+  const sharing = useMemo(() => canShareVideo(), [])
+  const update = (next) => setSaving((was) => (was.id === id ? { ...was, ...next } : was))
+
+  async function reelFile() {
+    const key = `${new URL(video.url).pathname} ${JSON.stringify(video.highlights)}`
+    if (cut.current.key === key && cut.current.file) return cut.current.file
+    const read = rangeReader(video.url)
+    const blob = await cutClips(read, await readIndex(read), video.highlights, (progress) => update({ progress }))
+    const file = new File([blob], `${video.fileName} highlights.mp4`, { type: 'video/mp4' })
+    cut.current = { key, file }
+    return file
+  }
+
+  async function save(kind) {
+    const idle = { busy: null, progress: 0, ready: false, failed: false }
+    setSaving({ id, busy: kind, progress: 0, ready: false, failed: false })
+    try {
+      const file = await reelFile()
+      if (kind === 'download') { downloadBlob(file, file.name); return update(idle) }
+      // The player is on another match by now: the file is kept, but nothing opens or shows here.
+      if (shown.current !== id) return update(idle)
+      const answer = await shareFile(file)
+      // Too big for the share sheet (Chrome stops at 50 MiB): the player gets the file saved instead.
+      if (answer === 'too-big') downloadBlob(file, file.name)
+      update({ ...idle, ready: answer === 'needs-tap' })
+    } catch {
+      update({ ...idle, failed: true })
+    }
+  }
+
   if (!game || game.moments.length === 0) return null
 
   async function remove() {
@@ -404,7 +450,17 @@ function PointByPoint({ id, match, selected, onSelect }) {
             onSeeking={onSeeking}
             onError={() => { if (times < 1) setAsked({ id, times: times + 1 }) }}
           />
-          <Highlights count={video.highlights?.length ?? 0} playing={playing} onPlay={playReel} />
+          <Highlights
+            count={video.highlights?.length ?? 0}
+            playing={playing}
+            onPlay={playReel}
+            onShare={sharing && video.repacked !== false ? () => save('share') : undefined}
+            onDownload={video.repacked !== false ? () => save('download') : undefined}
+            busy={saving.busy}
+            progress={saving.progress}
+            ready={saving.ready}
+          />
+          {saving.failed && <p className="save-failed" role="alert"><Icon name="alert" size={18} />Couldn’t save it. Try again.</p>}
         </>
       )}
       <MomentumRibbon
@@ -422,10 +478,17 @@ function PointByPoint({ id, match, selected, onSelect }) {
         hint={video ? 'Tap a point to watch it' : undefined}
         watching={Boolean(video)}
       />
-      {video?.mayRemove && (
+      {video && (
         <div className="video-remove">
           {step === 'idle' && (
-            <button ref={goButton} type="button" className="video-remove-go" onClick={() => setRemoving({ id, step: 'asking' })}><Icon name="trash" size={18} />Remove video</button>
+            <>
+              {video.downloadUrl && (
+                <a className="video-download" href={video.downloadUrl} download aria-label="Download full match"><Icon name="downloadVideo" size={20} /></a>
+              )}
+              {video.mayRemove && (
+                <button ref={goButton} type="button" className="video-remove-go" onClick={() => setRemoving({ id, step: 'asking' })}><Icon name="trash" size={18} />Remove video</button>
+              )}
+            </>
           )}
           {step !== 'idle' && (
             <>

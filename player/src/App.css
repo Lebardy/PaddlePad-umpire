@@ -2672,6 +2672,27 @@ a.person-row:active { background: var(--surface-sunken); }
 .highlights-one:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .detail-shape.is-filmed > .highlights + .ribbon { margin-top: 0.7rem; }
 
+/* Share and Download at the bar's end; on a narrow phone the bar wraps and they keep their own line's end. */
+.highlights-save { display: inline-flex; gap: 0.4rem; margin-left: auto; }
+/* With the two icons the numbers keep a full 44px target and the bar wraps when they do not fit. */
+.highlights:has(.highlights-save) { flex-wrap: wrap; }
+.highlights:has(.highlights-save) .highlights-one { flex: 0 0 2.75rem; }
+.highlights:has(.highlights-save) .highlights-play { margin-right: 0; }
+.highlights-icon, .video-download {
+  position: relative; width: 2.75rem; height: 2.75rem; display: inline-grid; place-items: center;
+  border: 2px solid color-mix(in srgb, var(--text) 22%, transparent); border-radius: 999px; background: transparent; color: var(--text); cursor: pointer;
+}
+.highlights-icon:active, .video-download:active { transform: scale(0.94); }
+.highlights-icon.is-ready { background: var(--button); border-color: var(--button); color: var(--button-ink); }
+.highlights-icon[aria-disabled='true'] { cursor: progress; }
+.highlights-icon:focus-visible, .video-download:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.save-ring { position: absolute; inset: -2px; width: calc(100% + 4px); height: calc(100% + 4px); transform: rotate(-90deg); }
+.save-ring circle { fill: none; stroke: var(--lamp); stroke-width: 3; transition: stroke-dasharray 200ms ease-out; }
+.video-remove:has(.video-download) { display: flex; align-items: center; gap: 0.6rem; }
+.video-download { margin-left: auto; }
+.save-failed { display: flex; align-items: center; gap: 0.4rem; margin: 0.5rem 0 0; color: var(--status-critical); }
+@media (prefers-reduced-motion: reduce) { .save-ring circle { transition: none; } }
+
 /* A phone held sideways: the video takes the height of the screen on
    the left, and the strip, the boxes and the names sit beside it in a
    pane that scrolls by itself. "Remove video" waits under the fold. */
