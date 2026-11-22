@@ -3,14 +3,14 @@ import { bucketConfig, signedReadUrl } from './bucket.js'
 import { highlightClips, rallySeconds } from './video-times.js'
 import { pointRallyOrder } from './player-stats.js'
 import { orderVideos, sideOf } from './video-sides.js'
-import { surname } from './video-name.js'
+import { displaySurname } from './video-name.js'
 
 /** `(side) => surnames` of that side's players (`[]` for no side), for a row with `team_a` and `team_b`. */
 export async function sideSurnames(matchRow) {
   const team = { A: matchRow.team_a, B: matchRow.team_b }
   const { rows: people } = await query('SELECT id, name FROM players WHERE id = ANY($1::uuid[])', [[...matchRow.team_a, ...matchRow.team_b]])
   const nameOf = new Map(people.map((p) => [p.id, p.name]))
-  return (side) => (team[side] ?? []).map((id) => surname(nameOf.get(id) ?? '')).filter(Boolean)
+  return (side) => (team[side] ?? []).map((id) => displaySurname(nameOf.get(id) ?? '')).filter(Boolean)
 }
 
 /**
