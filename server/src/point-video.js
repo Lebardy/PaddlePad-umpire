@@ -5,6 +5,14 @@ import { pointRallyOrder } from './player-stats.js'
 import { orderVideos, sideOf } from './video-sides.js'
 import { surname } from './video-name.js'
 
+/** `(side) => surnames` of that side's players (`[]` for no side), for a row with `team_a` and `team_b`. */
+export async function sideSurnames(matchRow) {
+  const team = { A: matchRow.team_a, B: matchRow.team_b }
+  const { rows: people } = await query('SELECT id, name FROM players WHERE id = ANY($1::uuid[])', [[...matchRow.team_a, ...matchRow.team_b]])
+  const nameOf = new Map(people.map((p) => [p.id, p.name]))
+  return (side) => (team[side] ?? []).map((id) => surname(nameOf.get(id) ?? '')).filter(Boolean)
+}
+
 /**
  * A match's videos for the point boxes: `{ video, otherVideo }`, the one
  * to show first and the other side's, each null when there is none or
@@ -31,10 +39,7 @@ export async function pointVideos(row, events, log, { playerId, fileName, prefer
   )
   const [first, second] = orderVideos(rows, prefer)
   if (!first) return none
-  const team = { A: row.team_a, B: row.team_b }
-  const { rows: people } = await query('SELECT id, name FROM players WHERE id = ANY($1::uuid[])', [[...row.team_a, ...row.team_b]])
-  const nameOf = new Map(people.map((p) => [p.id, p.name]))
-  const sideNames = (side) => (team[side] ?? []).map((id) => surname(nameOf.get(id) ?? '')).filter(Boolean)
+  const sideNames = await sideSurnames(row)
 
   const timed = events.filter((e) => e.type === 'rally').map((e) => ({ id: e.id, atMs: new Date(e.at).getTime() }))
   // For each point, which rally scored it.
