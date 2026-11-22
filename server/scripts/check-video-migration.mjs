@@ -143,6 +143,11 @@ try {
     check('videoBySide with nothing is the first row', (await videoBySide(m1, undefined))?.side, 'A')
     check('videoBySide with junk is the first row', (await videoBySide(m1, 'C'))?.side, 'A')
     check('the facility video is first of all', (await findVideo(m2))?.source, 'facility')
+    await pool.query("UPDATE match_videos SET state = 'filming' WHERE match_id = $1 AND side = 'A'", [m1])
+    check('A filming, B ready: the admin default picks B', (await videoBySide(m1, undefined, { ready: true }))?.side, 'B')
+    await pool.query("UPDATE match_videos SET state = 'filming' WHERE match_id = $1", [m1])
+    check('nothing ready: the admin default is the first row', (await videoBySide(m1, undefined, { ready: true }))?.side, 'A')
+    await pool.query("UPDATE match_videos SET state = 'ready' WHERE match_id = $1", [m1])
 
     // The beat's newest-match query (routes/player-video.js), copied (plus m.id = $2, since the other made-up matches are open too): a player is "being filmed" only on their own side.
     const newest = async (player) => (await pool.query(

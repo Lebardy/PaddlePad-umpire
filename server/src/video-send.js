@@ -26,16 +26,17 @@ const wholeNumber = (value, max) => Number.isInteger(value) && value >= 1 && val
 /**
  * A match's video row. With `deviceId`, that phone's row. Without it, the
  * first of any state: the facility's, else side A's, else side B's.
+ * With `ready`, the first ready one, else that first of any state.
  */
-export async function findVideo(matchId, { deviceId } = {}) {
+export async function findVideo(matchId, { deviceId, ready } = {}) {
   const { rows } = deviceId === undefined
-    ? await query('SELECT * FROM match_videos WHERE match_id = $1 ORDER BY side NULLS FIRST LIMIT 1', [matchId])
+    ? await query(`SELECT * FROM match_videos WHERE match_id = $1 ORDER BY ${ready ? `(state = 'ready') DESC, ` : ''}side NULLS FIRST LIMIT 1`, [matchId])
     : await query('SELECT * FROM match_videos WHERE match_id = $1 AND device_id = $2', [matchId, String(deviceId)])
   return rows[0] ?? null
 }
 
-/** The row `side` names ('facility', 'A' or 'B'); anything else is the first row. */
-export async function videoBySide(matchId, side) {
+/** The row `side` names ('facility', 'A' or 'B'); anything else is the first row (see findVideo for `ready`). */
+export async function videoBySide(matchId, side, { ready } = {}) {
   if (side === 'facility') {
     const { rows } = await query(`SELECT * FROM match_videos WHERE match_id = $1 AND source = 'facility'`, [matchId])
     return rows[0] ?? null
@@ -44,7 +45,7 @@ export async function videoBySide(matchId, side) {
     const { rows } = await query('SELECT * FROM match_videos WHERE match_id = $1 AND side = $2', [matchId, side])
     return rows[0] ?? null
   }
-  return findVideo(matchId)
+  return findVideo(matchId, { ready })
 }
 
 /** Stars go with the last video: a match left with no video holds none. */

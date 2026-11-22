@@ -74,7 +74,7 @@ router.delete('/:id/video', async (req, res) => {
   if (req.admin.role !== 'owner') return res.status(403).json({ error: 'Only the owner can remove a video' })
   const row = await matchInScope(req)
   if (!row) return res.status(404).json(NO_MATCH)
-  const video = await videoBySide(row.id, req.query.side)
+  const video = await videoBySide(row.id, req.query.side, { ready: true })
   if (!video) return res.status(404).json({ error: 'This match has no video' })
   // File first, then the row: a row with no file would offer a video that cannot play.
   if (video.file_key) await deleteFile(config, video.file_key)
