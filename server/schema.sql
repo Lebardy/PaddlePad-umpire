@@ -888,7 +888,8 @@ ALTER TABLE matches ADD COLUMN IF NOT EXISTS clock_offset_ms INTEGER;
 -- A match's video. The file itself is in the bucket, sent there by the
 -- phone that filmed it; this row says whose it is, where it is, and
 -- when its first picture was taken, which is all that lining it up with
--- the rallies needs. One per match, gone with the match.
+-- the rallies needs. One per side of a match, or one facility video (see
+-- the two-filmers block below); gone with the match.
 CREATE TABLE IF NOT EXISTS match_videos (
     match_id        UUID PRIMARY KEY REFERENCES matches (id) ON DELETE CASCADE,
     -- A facility's phone on an umpire's account, or a player's own.
@@ -914,10 +915,50 @@ CREATE TABLE IF NOT EXISTS match_videos (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     ready_at        TIMESTAMPTZ
 );
--- The umpire's picked rallies (match_events ids), shown as a reel. They
--- belong to the video: removing it removes them.
-ALTER TABLE match_videos ADD COLUMN IF NOT EXISTS highlights UUID[] NOT NULL DEFAULT '{}'
+-- Two filmers (2026-11): a match holds one player video per side, or
+-- one facility video with no side. Rows have their own id now; the
+-- match id alone no longer names one.
+ALTER TABLE match_videos ADD COLUMN IF NOT EXISTS id UUID NOT NULL DEFAULT gen_random_uuid();
+ALTER TABLE match_videos ADD COLUMN IF NOT EXISTS side TEXT CHECK (side IN ('A', 'B'));
+-- A player's video from before this is their side's; one whose filmer
+-- was deleted is counted as side A's.
+UPDATE match_videos v
+   SET side = CASE WHEN v.player_id IS NOT NULL AND m.team_b @> ARRAY[v.player_id] THEN 'B' ELSE 'A' END
+  FROM matches m
+ WHERE m.id = v.match_id AND v.source = 'player' AND v.side IS NULL;
+DO $$
+BEGIN
+    -- The key moves from the match to the row, once.
+    IF EXISTS (SELECT 1 FROM pg_constraint
+                WHERE conrelid = 'match_videos'::regclass AND contype = 'p'
+                  AND pg_get_constraintdef(oid) ILIKE '%(match_id)%') THEN
+        ALTER TABLE match_videos DROP CONSTRAINT match_videos_pkey;
+        ALTER TABLE match_videos ADD PRIMARY KEY (id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                    WHERE conrelid = 'match_videos'::regclass AND conname = 'match_videos_side_by_source') THEN
+        ALTER TABLE match_videos ADD CONSTRAINT match_videos_side_by_source
+            CHECK ((source = 'facility') = (side IS NULL));
+    END IF;
+END $$;
+-- One per side, and one facility video ('F'), per match.
+CREATE UNIQUE INDEX IF NOT EXISTS match_videos_one_per_side ON match_videos (match_id, coalesce(side, 'F'));
+
+-- The umpire's picked rallies (match_events ids), shown as a reel on
+-- every video of the match. They belonged to the one video before two
+-- filmers; they are carried over once, then that column goes.
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS highlights UUID[] NOT NULL DEFAULT '{}'
     CHECK (cardinality(highlights) <= 5);
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'match_videos' AND column_name = 'highlights') THEN
+        UPDATE matches m SET highlights = v.highlights
+          FROM match_videos v
+         WHERE v.match_id = m.id AND cardinality(v.highlights) > 0 AND cardinality(m.highlights) = 0;
+        ALTER TABLE match_videos DROP COLUMN highlights;
+    END IF;
+END $$;
 
 -- Open play: hours a place posts for anyone to come and play, with its
 -- courts, spots, fee per player (paid there; null is free) and umpire.
