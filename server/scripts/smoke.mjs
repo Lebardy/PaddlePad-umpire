@@ -2939,21 +2939,39 @@ async function main() {
         check('a claim with no deviceId -> 400', (await pClaim(vPlayerToken, undefined)).status === 400)
         check('a player in the match claims it -> 201', (await pClaim(vPlayerToken, pPhone)).status === 201)
         check('the same phone again is fine -> 201', (await pClaim(vPlayerToken, pPhone)).status === 201)
-        const pSecond = await pClaim(pTwoToken, pOtherPhone)
-        check('the other player is refused and told who is filming -> 409',
-          pSecond.status === 409 && pSecond.body.covered?.by === 'player' && /^Smoke Video One/.test(pSecond.body.covered?.name ?? ''), JSON.stringify(pSecond.body))
+        check("the other side's player claims it too, one phone per side -> 201", (await pClaim(pTwoToken, pOtherPhone)).status === 201)
         check("the match's umpire sees it being filmed", (await request(`/video/matches/${pMatch}`, { bearer: token })).body.video?.state === 'filming')
+
+        // A doubles match: a partner shares a side, so a partner is refused where the other side was not.
+        const [pPartner, pRival] = (await Promise.all(['Smoke Video Partner', 'Smoke Video Rival'].map((name) =>
+          request('/players', { method: 'POST', bearer: token, body: { name: `${name} ${Date.now()}` } })))).map((made) => made.body.player.id)
+        await request(`/sessions/${vSession}/players`, { method: 'PUT', bearer: token, body: { playerIds: [...vPlayers, pPartner, pRival] } })
+        const pPartnerToken = (await asPlayer('/auth/player/claim', {
+          method: 'POST', body: { code: (await request(`/players/${pPartner}/claim-code`, { bearer: token })).body.claimCode },
+        })).body.token
+        const pPartnerPhone = `smoke-partner-phone-${Date.now()}`
+        const pDouble = crypto.randomUUID()
+        await request('/matches', {
+          method: 'POST', bearer: token,
+          body: { id: pDouble, sessionId: vSession, teamA: [vPlayers[0], pPartner], teamB: [vPlayers[1], pRival], stacking: { A: false, B: false },
+            firstServer: { team: 'A', playerId: vPlayers[0] }, pointTarget: 11, startedAt: Date.now() },
+        })
+        const pDoubleClaim = (bearer, deviceId) => asPlayer(`/player/matches/${pDouble}/video/claim`, { method: 'POST', bearer, body: { deviceId } })
+        check('in doubles, a player claims their side -> 201', (await pDoubleClaim(vPlayerToken, pPhone)).status === 201)
+        const pPartnerRefused = await pDoubleClaim(pPartnerToken, pPartnerPhone)
+        check('their partner is refused and told who is filming -> 409',
+          pPartnerRefused.status === 409 && pPartnerRefused.body.covered?.by === 'player' && /^Smoke Video One/.test(pPartnerRefused.body.covered?.name ?? ''), JSON.stringify(pPartnerRefused.body))
 
         console.log('  (waiting 61 s, for the first phone to count as gone)')
         await new Promise((resolve) => setTimeout(resolve, 61_000))
-        check("after 60 s of silence the other player's phone takes the match over -> 201", (await pClaim(pTwoToken, pOtherPhone)).status === 201)
-        const pBack = await pClaim(vPlayerToken, pPhone)
+        check("after 60 s of silence the partner's phone takes the side over -> 201", (await pDoubleClaim(pPartnerToken, pPartnerPhone)).status === 201)
+        const pBack = await pDoubleClaim(vPlayerToken, pPhone)
         check('and the first phone is then the one refused, by name -> 409',
-          pBack.status === 409 && /^Smoke Video Two/.test(pBack.body.covered?.name ?? ''), JSON.stringify(pBack.body))
-        const pFilmingBeat = (bearer, deviceId) => asPlayer('/player/video/camera/beat', { method: 'POST', bearer, body: { deviceId, state: 'filming', matchId: pMatch } })
+          pBack.status === 409 && /^Smoke Video Partner/.test(pBack.body.covered?.name ?? ''), JSON.stringify(pBack.body))
+        const pFilmingBeat = (bearer, deviceId, matchId = pDouble) => asPlayer('/player/video/camera/beat', { method: 'POST', bearer, body: { deviceId, state: 'filming', matchId } })
         const pLost = await pFilmingBeat(vPlayerToken, pPhone)
-        check('the phone that lost the match is told so by its own beat, with the name of who films it now',
-          pLost.status === 200 && pLost.body.taken?.by === 'player' && /^Smoke Video Two/.test(pLost.body.taken?.name ?? ''), JSON.stringify(pLost.body).slice(0, 200))
+        check('the phone that lost the side is told so by its own beat, with the name of who films it now',
+          pLost.status === 200 && pLost.body.taken?.by === 'player' && /^Smoke Video Partner/.test(pLost.body.taken?.name ?? ''), JSON.stringify(pLost.body).slice(0, 200))
         check('a player outside the match who names it in a beat is told nothing about it', (await pFilmingBeat(vOutsiderToken, pPhone)).body.taken == null)
         console.log('  (waiting 35 s, then the holder beats)')
         await new Promise((resolve) => setTimeout(resolve, 35_000))
@@ -2967,11 +2985,12 @@ async function main() {
         check("and the holder's own beat is not told its match was taken", pKeep.body.taken == null, JSON.stringify(pKeep.body).slice(0, 160))
         check("and its score reads the point: 1-0, A still serving",
           pKeep.body.match?.score?.a === 1 && pKeep.body.match?.score?.b === 0 && pKeep.body.match?.score?.serving === 'A', JSON.stringify(pKeep.body.match?.score))
+        await pFilmingBeat(pPartnerToken, pPartnerPhone)
         console.log('  (waiting 35 s more, 70 s since the takeover)')
         await new Promise((resolve) => setTimeout(resolve, 35_000))
-        const pStill = await pClaim(vPlayerToken, pPhone)
-        check('a holder that keeps beating keeps the match: 70 s after taking it over, the other phone is still refused -> 409',
-          pStill.status === 409 && /^Smoke Video Two/.test(pStill.body.covered?.name ?? ''), JSON.stringify(pStill.body))
+        const pStill = await pDoubleClaim(vPlayerToken, pPhone)
+        check('a holder that keeps beating keeps the side: 70 s after taking it over, the other phone is still refused -> 409',
+          pStill.status === 409 && /^Smoke Video Partner/.test(pStill.body.covered?.name ?? ''), JSON.stringify(pStill.body))
 
         const pEvents = [20_000, 35_000].map((ms, seq) => ({
           id: crypto.randomUUID(), seq, type: 'rally', at: pStartedAt + ms, actingPlayerId: vPlayers[1], outcome: 'winner', zone: 'baseline',
@@ -2987,7 +3006,8 @@ async function main() {
         const pDone = (bearer, deviceId) => asPlayer(`/player/matches/${pMatch}/video/done`, { method: 'POST', bearer, body: { deviceId } })
         check("a player's video over 2 GB -> 413", (await pUp(pTwoToken, { ...pMeta, bytes: 2 * 1024 ** 3 + 1 })).status === 413)
         check("a player's video with no size -> 400", (await pUp(pTwoToken, { ...pMeta, bytes: 0 })).status === 400)
-        check('the player whose claim was taken over cannot send -> 409', (await pUp(vPlayerToken, { ...pMeta, deviceId: pPhone, bytes: 1024 })).status === 409)
+        check('the player whose claim was taken over cannot send -> 409',
+          (await asPlayer(`/player/matches/${pDouble}/video/upload`, { method: 'POST', bearer: vPlayerToken, body: { ...pMeta, deviceId: pPhone, bytes: 1024 } })).status === 409)
         check('the holder cannot send from another phone -> 409', (await pUp(pTwoToken, { ...pMeta, deviceId: pPhone, bytes: 1024 })).status === 409)
         check('a player outside the match cannot send -> 404', (await pUp(vOutsiderToken, { ...pMeta, bytes: 1024 })).status === 404)
         const pForm = await pUp(pTwoToken, { ...pMeta, bytes: 1024 })
@@ -2999,23 +3019,44 @@ async function main() {
         pFile.append('file', new Blob([new Uint8Array(1024)], { type: 'video/mp4' }), 'clip.mp4')
         const pStored = await fetch(pForm.body.form.url, { method: 'POST', body: pFile })
         check("the bucket takes the player's file", pStored.status >= 200 && pStored.status < 300, String(pStored.status))
-        check('done, said by the other player -> 409', (await pDone(vPlayerToken, pOtherPhone)).status === 409)
+        check("done, said by the other side's player -> 409", (await pDone(vPlayerToken, pOtherPhone)).status === 409)
         check("the player's done -> 200", (await pDone(pTwoToken, pOtherPhone)).status === 200)
+        // The other side sends its own video of the same match.
+        const aForm = await pUp(vPlayerToken, { ...pMeta, deviceId: pPhone, bytes: 1024 })
+        check("the other side's player asks to send theirs -> 200", aForm.status === 200, String(aForm.status))
+        const aFile = new FormData()
+        for (const [name, value] of Object.entries(aForm.body.form?.fields ?? {})) aFile.append(name, value)
+        aFile.append('file', new Blob([new Uint8Array(1024)], { type: 'video/mp4' }), 'clip.mp4')
+        await fetch(aForm.body.form.url, { method: 'POST', body: aFile })
+        check("and their done -> 200", (await pDone(vPlayerToken, pPhone)).status === 200)
 
-        const pGame = async (bearer) => (await asPlayer(`/player/matches/${pMatch}/game`, { bearer })).body.video
-        const pSeenByFilmer = await pGame(pTwoToken)
-        const pSeenByOther = await pGame(vPlayerToken)
-        check('both players can watch it; only the one who filmed it may remove it',
-          /^https:\/\//.test(pSeenByFilmer?.url ?? '') && pSeenByFilmer.mayRemove === true && /^https:\/\//.test(pSeenByOther?.url ?? '') && pSeenByOther.mayRemove === false,
-          JSON.stringify([pSeenByFilmer?.mayRemove, pSeenByOther?.mayRemove]))
-        check("the match's umpire can watch a player's video too", (await request(`/video/matches/${pMatch}`, { bearer: token })).body.video?.state === 'ready')
-        const pRemove = (bearer) => asPlayer(`/player/matches/${pMatch}/video`, { method: 'DELETE', bearer })
-        check('the other player cannot remove it -> 404', (await pRemove(vPlayerToken)).status === 404)
+        const pRead = async (bearer) => (await asPlayer(`/player/matches/${pMatch}/game`, { bearer })).body
+        const pGame = async (bearer) => (await pRead(bearer)).video
+        const pSeenByFilmer = await pRead(pTwoToken)
+        const pSeenByOther = await pRead(vPlayerToken)
+        check('each side sees its own video first and the other side\'s next, and may remove only its own',
+          /^https:\/\//.test(pSeenByFilmer.video?.url ?? '') && pSeenByFilmer.video.mayRemove === true && pSeenByFilmer.otherVideo?.mayRemove === false &&
+          /^https:\/\//.test(pSeenByOther.video?.url ?? '') && pSeenByOther.video.mayRemove === true && pSeenByOther.otherVideo?.mayRemove === false &&
+          pSeenByFilmer.video.url !== pSeenByOther.video.url,
+          JSON.stringify([pSeenByFilmer.video?.mayRemove, pSeenByFilmer.otherVideo?.mayRemove, pSeenByOther.video?.mayRemove, pSeenByOther.otherVideo?.mayRemove]))
+        const pUmpire = async () => (await request(`/video/matches/${pMatch}`, { bearer: token })).body
+        const pUmpireSees = await pUmpire()
+        check("the match's umpire sees side A's video first and side B's next", pUmpireSees.video?.state === 'ready' && pUmpireSees.video.side === 'A' && pUmpireSees.otherVideo?.side === 'B',
+          JSON.stringify([pUmpireSees.video?.side, pUmpireSees.otherVideo?.side]))
+        const pRemove = (bearer, id = pMatch) => asPlayer(`/player/matches/${id}/video`, { method: 'DELETE', bearer })
         check('a player outside the match cannot remove it -> 404', (await pRemove(vOutsiderToken)).status === 404)
-        check('the player who filmed it removes it -> 204', (await pRemove(pTwoToken)).status === 204)
-        check('then nobody has a video of that match', (await pGame(pTwoToken)) === null && (await request(`/video/matches/${pMatch}`, { bearer: token })).body.video === null)
-        check('and its file is gone from the bucket', (await fetch(pSeenByFilmer.url)).status === 404)
+        check('a player whose claim was taken over has nothing to remove -> 404', (await pRemove(vPlayerToken, pDouble)).status === 404)
+        // No side named: the owner's Remove acts on the first ready video, side A's, which is what the owner's page shows.
+        check('the owner removes the match video with no side named -> 204', (await request(`/admin/matches/${pMatch}/video`, { method: 'DELETE', bearer: vOwner })).status === 204)
+        check("that took side A's video and left side B's",
+          (await pGame(vPlayerToken))?.mayRemove === false && /^https:\/\//.test((await pGame(vPlayerToken))?.url ?? '') && (await pUmpire()).video?.side === 'B' &&
+          (await fetch(pSeenByOther.video.url)).status === 404 && (await fetch(pSeenByFilmer.video.url)).status === 200)
+        check('the side whose video is gone has nothing to remove -> 404', (await pRemove(vPlayerToken)).status === 404)
+        check('the player who filmed the other side removes theirs -> 204', (await pRemove(pTwoToken)).status === 204)
+        check('then nobody has a video of that match', (await pGame(pTwoToken)) === null && (await pUmpire()).video === null)
+        check('and its file is gone from the bucket', (await fetch(pSeenByFilmer.video.url)).status === 404)
         check('removing it again -> 404', (await pRemove(pTwoToken)).status === 404)
+        check('the umpire cancels the doubles match -> 204', (await request(`/matches/${pDouble}`, { method: 'DELETE', bearer: token })).status === 204)
       } finally {
         // Each on its own, so one failing does not leave the facilities filming.
         for (const manager of [vManager, vManagerOther]) {
