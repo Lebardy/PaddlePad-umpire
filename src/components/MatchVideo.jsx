@@ -28,6 +28,7 @@ function MatchVideo({ matchId, events, describe }) {
   const resume = useRef(null)
   const chose = useRef(false)
   const [tick, setTick] = useState(0)
+  const [offline, setOffline] = useState(false)
 
   // Asked again every 10 seconds while either video is on its way, so it
   // appears by itself once the phone has finished sending. A remove or a
@@ -42,13 +43,16 @@ function MatchVideo({ matchId, events, describe }) {
         // Until the umpire picks an angle, stay on one that is ready.
         if (!chose.current && found?.video?.state !== 'ready' && found?.otherVideo?.state === 'ready') setAngle(1)
         setError(null)
+        setOffline(false)
         if (found?.video && [found.video, found.otherVideo].some((v) => v && v.state !== 'ready')) timer = setTimeout(ask, 10_000)
       })
       .catch((error) => {
         // No video service reads as no video; any other failure (a wifi blip) is shown and asked again.
         if (!live) return
         if (error.status === 404) return setAnswer(null)
-        setError(error.message)
+        // A wifi blip gets a short quiet line, not the full red message.
+        if (error.status === 0) setOffline(true)
+        else setError(error.message)
         timer = setTimeout(ask, 10_000)
       })
     ask()
@@ -195,6 +199,7 @@ function MatchVideo({ matchId, events, describe }) {
           <button className="video-remove" onClick={remove} disabled={busy}><Icon name="trash" size={18} />Remove video</button>
         </div>
       )}
+      {offline && <p className="video-coming" role="status"><Icon name="offline" size={18} />No connection. Retrying…</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
 
       <ul className="video-rallies">
