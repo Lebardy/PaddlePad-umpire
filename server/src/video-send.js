@@ -9,6 +9,7 @@
 
 import { randomBytes } from 'node:crypto'
 import { query } from './db.js'
+import { clearStarsIfBare as clearBare } from './video-tidy.js'
 import { MAX_VIDEO_BYTES, bucketConfig, fileSize, signedUploadForm } from './bucket.js'
 
 // A filming claim whose phone has said nothing for this long may be taken over.
@@ -47,12 +48,7 @@ export async function videoBySide(matchId, side) {
 }
 
 /** Stars go with the last video: a match left with no video holds none. */
-export function clearStarsIfBare(matchId) {
-  return query(
-    `UPDATE matches SET highlights = '{}' WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM match_videos WHERE match_id = $1)`,
-    [matchId],
-  )
-}
+export const clearStarsIfBare = (matchId) => clearBare(query, matchId)
 
 /**
  * A camera says what it filmed and asks to send it. Answers

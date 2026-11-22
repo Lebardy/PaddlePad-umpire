@@ -125,6 +125,8 @@ router.post('/matches/:id/video/claim', async (req, res) => {
   let holder = null
   try {
     await withTransaction(async (client) => {
+      // A match with no video rows has nothing to lock, so lock the match: the facility's claim cannot slip in beside this one.
+      await client.query('SELECT 1 FROM matches WHERE id = $1 FOR UPDATE', [match.id])
       const { rows } = await client.query(
         `SELECT v.id, v.source, v.side, v.state, v.device_id, v.player_id, p.name AS holder,
                 v.seen_at < now() - make_interval(secs => $2) AS silent
