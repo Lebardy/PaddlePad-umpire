@@ -245,7 +245,11 @@ try {
     await pool.query("UPDATE match_videos SET seen_at = now() WHERE match_id = $1 AND side = 'A'", [m4])
     const live = await videoAnswer(row4, bucketConfig())
     check('umpire: a live side A comes first, filming', [live.video.side, live.video.state, live.otherVideo.side], ['A', 'filming', 'B'])
-    check('umpire: a star the video does not cover stays in starred', (await videoAnswer({ ...row4, highlights: [r1] }, bucketConfig())).starred, [r1])
+    // A rally that ended before B's first frame: starred, but not in B's clips.
+    const early = uuid(33)
+    await pool.query("INSERT INTO match_events (id, match_id, seq, type, payload, at) VALUES ($1, $2, 1, 'rally', '{}', now() - interval '1 hour')", [early, m4])
+    const covered = await videoAnswer({ ...row4, highlights: [early] }, bucketConfig())
+    check('umpire: a star the video does not cover stays in starred', [covered.starred, covered.otherVideo.highlights.map((h) => h.id)], [[early], []])
     await pool.query("DELETE FROM match_videos WHERE match_id = $1", [m4])
     check('umpire: no video at all', await videoAnswer(row4, bucketConfig()), { video: null, otherVideo: null, starred: [] })
     const only = await pointVideos(row1, events1, log1, { playerId: maria })
