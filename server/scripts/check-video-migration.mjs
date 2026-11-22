@@ -242,7 +242,16 @@ try {
     check('no video at all', await pointVideos({ ...row2, id: uuid(99) }, [], [], {}), { video: null, otherVideo: null })
   }
 
-  if (process.env.MIGRATION_COPY_FROM) {
+  // A source the deploy already migrated has no video highlights column left, so it cannot be copied into the old schema.
+  const migrated = process.env.MIGRATION_COPY_FROM && await (async () => {
+    const probe = new pg.Client({ connectionString: process.env.MIGRATION_COPY_FROM })
+    await probe.connect()
+    try {
+      return (await probe.query("SELECT 1 FROM information_schema.columns WHERE table_name = 'match_videos' AND column_name = 'highlights'")).rowCount === 0
+    } finally { await probe.end() }
+  })()
+  if (migrated) console.log('copy section skipped: the source is already migrated')
+  if (process.env.MIGRATION_COPY_FROM && !migrated) {
     section('a copy of the source database')
     const src = new pg.Client({ connectionString: process.env.MIGRATION_COPY_FROM })
     await src.connect()
