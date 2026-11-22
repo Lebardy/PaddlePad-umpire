@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon'
 import { fetchMatchVideo, lineUpMatchVideo, removeMatchVideo, setMatchHighlights } from '../lib/api'
 import { clockText } from '../lib/videoClock'
+import { keepLinks } from '../lib/keepLinks'
 
 /**
  * A finished match's video: watch it, jump to any rally, fix its
@@ -15,16 +16,6 @@ import { clockText } from '../lib/videoClock'
  * early or late: pause where any rally ends, tap that rally, and every
  * other rally follows from the tablet's own gaps between them.
  */
-// A newer answer, but each ready video keeps the link it already has.
-function keepLinks(was, saved) {
-  if (!was || !saved) return saved
-  const keep = (v) => {
-    const old = v && [was.video, was.otherVideo].find((w) => w?.url && w.side === v.side)
-    return old && v.url ? { ...v, url: old.url } : v
-  }
-  return { ...saved, video: keep(saved.video), otherVideo: keep(saved.otherVideo) }
-}
-
 function MatchVideo({ matchId, events, describe }) {
   const [answer, setAnswer] = useState(null)
   const [angle, setAngle] = useState(0)
@@ -35,6 +26,7 @@ function MatchVideo({ matchId, events, describe }) {
   const [at, setAt] = useState(0)
   const player = useRef(null)
   const resume = useRef(null)
+  const chose = useRef(false)
   const [tick, setTick] = useState(0)
 
   // Asked again every 10 seconds while either video is on its way, so it
@@ -47,6 +39,8 @@ function MatchVideo({ matchId, events, describe }) {
       .then((found) => {
         if (!live) return
         setAnswer((was) => keepLinks(was, found))
+        // Until the umpire picks an angle, stay on one that is ready.
+        if (!chose.current && found?.video?.state !== 'ready' && found?.otherVideo?.state === 'ready') setAngle(1)
         setError(null)
         if (found?.video && [found.video, found.otherVideo].some((v) => v && v.state !== 'ready')) timer = setTimeout(ask, 10_000)
       })
@@ -97,6 +91,7 @@ function MatchVideo({ matchId, events, describe }) {
   // Switching camera keeps the place: the rally being watched, and whether it was playing.
   function choose(next) {
     if (next === angle) return
+    chose.current = true
     const target = next === 1 ? answer.otherVideo : answer.video
     resume.current = video.state === 'ready' && target.state === 'ready' ? { id: playing, going: player.current ? !player.current.paused : false } : null
     setFixing(false)
@@ -104,6 +99,7 @@ function MatchVideo({ matchId, events, describe }) {
   }
 
   function placed(event) {
+    setAt(event.currentTarget.currentTime)
     const was = resume.current
     resume.current = null
     if (!was) return
@@ -124,8 +120,9 @@ function MatchVideo({ matchId, events, describe }) {
       const saved = await setMatchHighlights(matchId, next)
       // Keep each video's link: a fresh one would reload the video and lose the umpire's place.
       setAnswer((was) => keepLinks(was, saved))
+      setTick((t) => t + 1)
     } catch (err) {
-      setAnswer(before)
+      setAnswer((was) => ({ ...was, starred: before.starred }))
       setError(err.message)
     } finally {
       setSaving(false)
