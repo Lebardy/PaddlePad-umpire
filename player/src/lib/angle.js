@@ -1,11 +1,18 @@
 /**
  * Where the other camera's video picks up when the player switches: the picked
  * point's second there, else the start of the highlight the reel is on, else
- * `second: null` (start where that video starts). `reelIndex` carries on only
- * when that video has the highlight.
+ * `second: null` (start where that video starts). The reel is matched by rally,
+ * as each video holds only the stars it covers: the same rally there, else the
+ * next starred rally that video has, else no reel.
  */
-export function carryPlace({ to, selected, reelIndex }) {
+export function carryPlace({ from, to, selected, reelIndex }) {
   const second = selected === null || selected === undefined ? null : to.seconds?.[selected] ?? null
-  const clip = reelIndex === null || reelIndex === undefined ? null : to.highlights?.[reelIndex] ?? null
-  return { second: second ?? clip?.start ?? null, reelIndex: clip ? reelIndex : null }
+  const reel = reelIndex === null || reelIndex === undefined ? [] : from.highlights?.slice(reelIndex) ?? []
+  let at = -1
+  for (const { rally } of reel) {
+    at = (to.highlights ?? []).findIndex((h) => h.rally === rally)
+    if (at >= 0) break
+  }
+  const clip = at >= 0 ? to.highlights[at] : null
+  return { second: second ?? clip?.start ?? null, reelIndex: clip ? at : null }
 }

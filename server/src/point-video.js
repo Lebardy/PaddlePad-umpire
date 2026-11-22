@@ -60,7 +60,7 @@ export async function pointVideos(row, events, log, { playerId, fileName, prefer
       mayRemove: video.source === 'player' && video.player_id === playerId,
       seconds: order.map((rally) => everyRally[rally] ?? null),
       highlights: highlightClips({ ...timing, rallies: timed, picked: video.picked ?? [] })
-        .map(({ start, end }) => ({ start, end })),
+        .map(({ id, start, end }) => ({ start, end, rally: id })),
       ...(name ? { fileName: name, downloadUrl: signedReadUrl(config, video.file_key, { download: `${name}.mp4` }) } : {}),
     }
   }

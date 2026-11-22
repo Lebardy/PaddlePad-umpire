@@ -65,7 +65,7 @@ export function usePointVideo(video, count, selected, onSelect) {
     const node = ref.current
     // Without a play yet the new video would not fetch anything, so ask for its start.
     if (node) node.preload = 'metadata'
-    carry.current = { to: next, selected, reelIndex: clip, only: reel?.only ?? false, playing: Boolean(node) && !node.paused }
+    carry.current = { from: video, to: next, selected, reelIndex: clip, only: reel?.only ?? false, playing: Boolean(node) && !node.paused }
   }
 
   function onLoadedMetadata(event) {
@@ -77,7 +77,7 @@ export function usePointVideo(video, count, selected, onSelect) {
     const node = event.currentTarget
     // A running reel moves the picked box on its own, so the reel's highlight is the place to keep.
     const selected = pending.reelIndex === null ? pending.selected : null
-    const place = carryPlace({ to: pending.to, selected, reelIndex: pending.reelIndex })
+    const place = carryPlace({ from: pending.from, to: pending.to, selected, reelIndex: pending.reelIndex })
     if (place.reelIndex !== null) setReel({ video: pending.to, index: place.reelIndex, only: pending.only })
     if (place.second !== null) { jumping.current = node.readyState > 0 || place.second > 0; node.currentTime = place.second }
     if (pending.playing) node.play().catch(() => {})
