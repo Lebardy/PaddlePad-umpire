@@ -2115,7 +2115,7 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
 .camera-pill .camera-dot { width: 0.6rem; height: 0.6rem; background: var(--danger); box-shadow: none; }
 
 /* A finished match's video. */
-.match-video { display: grid; gap: 0.65rem; margin-bottom: 1.25rem; }
+.match-video { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.65rem; margin-bottom: 1.25rem; }
 .match-video h3 { display: flex; align-items: center; gap: 0.45rem; margin: 0; font: 700 0.85rem var(--label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
 .video-angles { margin-bottom: 0; flex-wrap: nowrap; }
 .video-angles button { display: flex; align-items: center; justify-content: center; gap: 0.4rem; min-width: 0; min-height: 44px; }
