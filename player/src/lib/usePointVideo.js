@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { reelStep } from './reel'
+import { carryPlace } from './angle'
 
 /**
  * A match video beside its point boxes: tap a box to watch that point,
@@ -58,13 +59,37 @@ export function usePointVideo(video, count, selected, onSelect) {
     if (playing !== null && playing !== selected) onSelect(playing)
   }
 
+  // The other side's video, picking up where this one is: the picked point's second there, or the reel's highlight.
+  const carry = useRef(null)
+  function switchTo(next) {
+    const node = ref.current
+    // Without a play yet the new video would not fetch anything, so ask for its start.
+    if (node) node.preload = 'metadata'
+    carry.current = { from: video, to: next, selected, reelIndex: clip, only: reel?.only ?? false, playing: Boolean(node) && !node.paused }
+  }
+
+  function onLoadedMetadata(event) {
+    const pending = carry.current
+    if (!pending) return
+    carry.current = null
+    // The player moved to another match before this source loaded: nothing to carry.
+    if (pending.to !== video) return
+    const node = event.currentTarget
+    // A running reel moves the picked box on its own, so the reel's highlight is the place to keep.
+    const selected = pending.reelIndex === null ? pending.selected : null
+    const place = carryPlace({ from: pending.from, to: pending.to, selected, reelIndex: pending.reelIndex })
+    if (place.reelIndex !== null) setReel({ video: pending.to, index: place.reelIndex, only: pending.only })
+    if (place.second !== null) { jumping.current = node.readyState > 0 || place.second > 0; node.currentTime = place.second }
+    if (pending.playing) node.play().catch(() => {})
+  }
+
   function onSeeking() {
     if (jumping.current) { jumping.current = false; return }
     setReel(null)
   }
 
   return {
-    ref, pick, playReel, onTimeUpdate, onSeeking,
+    ref, pick, playReel, onTimeUpdate, onSeeking, switchTo, onLoadedMetadata,
     playing: clip,
   }
 }

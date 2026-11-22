@@ -13,7 +13,8 @@ import { requireAdminAccount } from '../auth.js'
 import { facilityFilterFor } from '../facility-rules.js'
 import { deriveMatchState } from '../pickleball.js'
 import { matchPagePoints, pageMatch } from '../match-page.js'
-import { pointVideo } from '../point-video.js'
+import { pointVideos } from '../point-video.js'
+import { clearStarsIfBare, videoBySide } from '../video-send.js'
 import { isUuid } from '../validate.js'
 
 const router = Router()
@@ -61,7 +62,7 @@ router.get('/:id', async (req, res) => {
   res.json({
     match: pageMatch(row, {
       points: matchPagePoints(row, log, names),
-      video: await pointVideo(row, events, log),
+      ...await pointVideos(row, events, log, { prefer: null }),
       names, score, hasVideoRow: held.length > 0, isOwner: req.admin.role === 'owner',
     }),
   })
@@ -73,18 +74,19 @@ router.delete('/:id/video', async (req, res) => {
   if (req.admin.role !== 'owner') return res.status(403).json({ error: 'Only the owner can remove a video' })
   const row = await matchInScope(req)
   if (!row) return res.status(404).json(NO_MATCH)
-  const { rows } = await query('SELECT file_key FROM match_videos WHERE match_id = $1', [row.id])
-  if (!rows[0]) return res.status(404).json({ error: 'This match has no video' })
+  const video = await videoBySide(row.id, req.query.side, { ready: true })
+  if (!video) return res.status(404).json({ error: 'This match has no video' })
   // File first, then the row: a row with no file would offer a video that cannot play.
-  if (rows[0].file_key) await deleteFile(config, rows[0].file_key)
+  if (video.file_key) await deleteFile(config, video.file_key)
   await withTransaction(async (client) => {
-    const removed = await client.query('DELETE FROM match_videos WHERE match_id = $1', [row.id])
+    const removed = await client.query('DELETE FROM match_videos WHERE id = $1', [video.id])
     if (removed.rowCount === 0) return // a second, overlapping removal: the first one records it
     await recordActivity(client, {
       adminId: req.admin.id, action: 'match.video_removed', targetType: 'match', targetId: row.id, facilityId: row.facility_id,
       summary: `Removed the video of ${await matchLabel(client.query.bind(client), row)}`,
     })
   })
+  await clearStarsIfBare(row.id)
   res.status(204).end()
 })
 

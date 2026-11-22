@@ -27,7 +27,7 @@ import { rallyRatingFor, ratingHistoryFor } from '../rally-rating.js'
 import { findFacility, listFacilities } from '../facility-store.js'
 import { playerFacilityPage, playerFacilitySummary } from '../facility-rules.js'
 import { bucketConfig } from '../bucket.js'
-import { pointVideo } from '../point-video.js'
+import { pointVideos } from '../point-video.js'
 import { videoFileName } from '../video-name.js'
 import { playerInGoingOnSession } from '../overview-store.js'
 import {
@@ -162,17 +162,17 @@ router.get('/board', async (req, res) => {
   res.json({ board: await getMonthlyBoard(query) })
 })
 
-/** The match of the month's video for anyone on the board, or null: the whole match and its highlights. */
+/** The match of the month's videos for anyone on the board, the winners' first: the whole match and its highlights. */
 async function boardVideo(matchId) {
   const { rows } = await query(
     `SELECT id, team_a, team_b, first_server_team, first_server_player, right_start_a, right_start_b,
-            point_target, started_at, clock_offset_ms
+            point_target, started_at, clock_offset_ms, winner
        FROM matches WHERE id = $1`,
     [matchId],
   )
-  if (!rows[0]) return null
+  if (!rows[0]) return { video: null, otherVideo: null }
   const { rows: events } = await query('SELECT id, type, payload, at FROM match_events WHERE match_id = $1 ORDER BY seq', [matchId])
-  return pointVideo(rows[0], events, events.map((e) => ({ type: e.type, ...e.payload })))
+  return pointVideos(rows[0], events, events.map((e) => ({ type: e.type, ...e.payload })), { prefer: rows[0].winner })
 }
 
 /**
@@ -185,7 +185,7 @@ async function boardVideo(matchId) {
 router.get('/board/match/:id', async (req, res) => {
   const story = await getMatchOfTheMonthStory(query, req.params.id)
   if (!story) return res.status(404).json({ error: 'That is not this month\'s match of the month' })
-  res.json({ match: { ...story, video: await boardVideo(req.params.id) } })
+  res.json({ match: { ...story, ...await boardVideo(req.params.id) } })
 })
 
 /**
@@ -258,7 +258,7 @@ router.get('/matches/:id/game', async (req, res) => {
     sideA: row.team_a.map((id) => nameOf.get(id) ?? ''),
     sideB: row.team_b.map((id) => nameOf.get(id) ?? ''),
   })
-  res.json({ margins, game: readGame(margins, row.point_target), points, video: await pointVideo(row, events, log, req.player.id, fileName) })
+  res.json({ margins, game: readGame(margins, row.point_target), points, ...await pointVideos(row, events, log, { playerId: req.player.id, fileName }) })
 })
 
 /**

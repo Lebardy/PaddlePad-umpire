@@ -43,11 +43,13 @@ globalThis.fetch = async (url, { method }) => {
   return new Response('<ListBucketResult><IsTruncated>false</IsTruncated></ListBucketResult>', { status: 200 })
 }
 const removedRows = []
+const clearedStars = []
 const stubQuery = async (text, params) => {
-  if (text.startsWith('SELECT match_id')) {
-    return { rows: ['one', 'bad', 'three'].map((name) => ({ match_id: name, file_key: `videos/${name}/v.mp4`, state: 'ready' })) }
+  if (text.startsWith('SELECT id')) {
+    return { rows: ['one', 'bad', 'three'].map((name) => ({ id: name, match_id: name, file_key: `videos/${name}/v.mp4`, state: 'ready' })) }
   }
   if (text.startsWith('DELETE')) removedRows.push(params[0])
+  if (text.startsWith('UPDATE matches')) clearedStars.push(params[0])
   return { rows: [] }
 }
 const realError = console.error
@@ -63,6 +65,8 @@ try {
 }
 check('a refused delete does not end the run', result, { expired: 2, unfinished: 0, orphans: 0 })
 check('only the good rows were removed', removedRows, ['one', 'three'])
+
+check('stars are cleared only for the removed videos\' matches', clearedStars, ['one', 'three'])
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail === 0 ? 0 : 1)
