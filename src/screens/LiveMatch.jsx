@@ -991,7 +991,7 @@ function LiveMatch({ matchId, onBack }) {
       {/* Nothing shows when the match has no video, or video is off here.
           Only the main umpire can read a match's video. */}
       {match.status === 'completed' && iConclude && (
-        <MatchVideo matchId={matchId} events={match.events} describe={(event) => describeEvent(event, name, teamWords)} />
+        <MatchVideo key={matchId} matchId={matchId} events={match.events} describe={(event) => describeEvent(event, name, teamWords)} />
       )}
 
       {match.status === 'completed' && (

@@ -19,8 +19,9 @@ import { eventFromRow } from '../pickleball.js'
 import { isUuid } from '../validate.js'
 import { bucketConfig, deleteFile, signedReadUrl } from '../bucket.js'
 import { firstFrameFromLineUp, highlightClips, rallySeconds } from '../video-times.js'
+import { sideSurnames } from '../point-video.js'
 import { cameraStatus, noteBeat } from '../camera-beats.js'
-import { CLAIM_SILENT_SECONDS, clearStarsIfBare, deviceName, findVideo, finishUpload, startUpload, videoBySide } from '../video-send.js'
+import { CLAIM_SILENT_SECONDS, clearStarsIfBare, deviceName, finishUpload, startUpload, videoBySide } from '../video-send.js'
 
 const router = Router()
 
@@ -46,7 +47,7 @@ function refusal(statusCode, message) {
 async function ownMatch(req) {
   if (!isUuid(req.params.id) || !req.umpire.facilityId) return null
   const { rows } = await query(
-    `SELECT m.id, m.started_at, m.clock_offset_ms, m.highlights, f.films_matches
+    `SELECT m.id, m.started_at, m.clock_offset_ms, m.highlights, m.team_a, m.team_b, f.films_matches
        FROM matches m
        JOIN sessions s ON s.id = m.session_id
        JOIN facilities f ON f.id = s.facility_id
@@ -57,25 +58,28 @@ async function ownMatch(req) {
 }
 
 /**
- * What a watcher is told about a match's video: `video`, the first row of
- * any state (so the app sees filming and sending), and `otherVideo`, the
- * other side's ready one or null. Both null when there is no video.
+ * What a watcher is told about a match's video: `video` and `otherVideo`,
+ * the match's rows in the order facility, A, B, each in any state (so the
+ * app sees filming and sending), and `starred`, the match's own star ids.
+ * An unfinished row silent for an hour is left out: nothing is coming.
+ * Both are null when there is no video.
  */
 export async function videoAnswer(match, config) {
-  const video = await findVideo(match.id)
-  // A phone closed mid-match leaves the row unfinished until the clean-up; after an hour of silence nothing is coming.
-  if (!video || (video.state !== 'ready' && Date.now() - new Date(video.seen_at).getTime() > 60 * 60_000)) {
-    return { video: null, otherVideo: null }
-  }
-  const { rows: other } = await query(
-    `SELECT * FROM match_videos WHERE match_id = $1 AND state = 'ready' AND id <> $2 ORDER BY side NULLS FIRST LIMIT 1`,
-    [match.id, video.id],
+  const { rows } = await query(
+    `SELECT * FROM match_videos WHERE match_id = $1
+       AND (state = 'ready' OR seen_at > now() - interval '60 minutes')
+     ORDER BY side NULLS FIRST`,
+    [match.id],
   )
-  const { rows: events } = video.state === 'ready' || other[0]
+  const starred = match.highlights ?? []
+  const [first, second] = rows
+  if (!first) return { video: null, otherVideo: null, starred }
+  const names = await sideSurnames(match)
+  const { rows: events } = rows.some((v) => v.state === 'ready')
     ? await query(`SELECT id, at FROM match_events WHERE match_id = $1 AND type = 'rally' ORDER BY seq`, [match.id])
     : { rows: [] }
   const answer = (v) => {
-    const base = { state: v.state, linedUpBy: v.lined_up_by, repacked: v.repacked, side: v.side }
+    const base = { state: v.state, linedUpBy: v.lined_up_by, repacked: v.repacked, side: v.side, sideNames: names(v.side) }
     if (v.state !== 'ready') return base
     const timing = {
       startedAtMs: new Date(match.started_at).getTime(),
@@ -92,11 +96,11 @@ export async function videoAnswer(match, config) {
       width: v.width,
       height: v.height,
       rallies: events.map((e, index) => ({ id: e.id, second: seconds[index] })),
-      highlights: highlightClips({ ...timing, rallies: timed, picked: match.highlights ?? [] })
+      highlights: highlightClips({ ...timing, rallies: timed, picked: starred })
         .map(({ id, start, end }) => ({ id, start, end })),
     }
   }
-  return { video: answer(video), otherVideo: other[0] ? answer(other[0]) : null }
+  return { video: answer(first), otherVideo: second ? answer(second) : null, starred }
 }
 
 router.post('/camera/beat', async (req, res) => {
@@ -215,7 +219,7 @@ router.post('/matches/:id/line-up', async (req, res) => {
   const match = await ownMatch(req)
   if (!match) return res.status(404).json({ error: 'No such match' })
   const second = req.body?.second
-  const video = await videoBySide(match.id, req.body?.side)
+  const video = await videoBySide(match.id, req.body?.side, { ready: true })
   if (!video || video.state !== 'ready') return res.status(409).json({ error: 'This match has no video to line up' })
   const { rows } = isUuid(req.body?.eventId)
     ? await query(`SELECT at FROM match_events WHERE id = $1 AND match_id = $2 AND type = 'rally'`, [req.body.eventId, match.id])
@@ -258,7 +262,7 @@ router.put('/matches/:id/highlights', async (req, res) => {
 router.delete('/matches/:id', async (req, res) => {
   const match = await ownMatch(req)
   if (!match) return res.status(404).json({ error: 'No such match' })
-  const video = await videoBySide(match.id, req.query.side)
+  const video = await videoBySide(match.id, req.query.side, { ready: true })
   if (video?.file_key) await deleteFile(bucketConfig(), video.file_key)
   if (video) await query('DELETE FROM match_videos WHERE id = $1', [video.id])
   await clearStarsIfBare(match.id)

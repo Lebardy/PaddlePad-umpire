@@ -216,14 +216,42 @@ try {
     check('each download is named too', [decodeURIComponent(forAna.video.downloadUrl).includes('(Cruz-Reyes).mp4'), decodeURIComponent(forAna.otherVideo.downloadUrl).includes('(Santos-Bautista).mp4')], [true, true])
     check('no file name asked: none given', 'fileName' in bare.video, false)
 
-    // The umpire's answer: first row of any state, plus the other side's ready row.
+    // The umpire's answer: both videos in any state, with side names and the match's stars.
     const { videoAnswer } = await import('../src/routes/video.js')
     const answer = await videoAnswer(row1, bucketConfig())
     check('umpire: video is side A, other is side B', [answer.video.side, answer.otherVideo.side], ['A', 'B'])
     check('umpire: other has the same shape', Object.keys(answer.otherVideo).sort(), Object.keys(answer.video).sort())
+    check('umpire: starred is the match\'s own stars', answer.starred, [r1, r2])
+    check('umpire: side names are surnames', [answer.video.sideNames, answer.otherVideo.sideNames], [['Cruz', 'Reyes'], ['Santos', 'Bautista']])
+    check('umpire: both have their clips', [answer.video.highlights.map((h) => h.id), answer.otherVideo.highlights.map((h) => h.id)], [[r1, r2], [r1, r2]])
     await pool.query("UPDATE match_videos SET state = 'filming' WHERE match_id = $1 AND side = 'B'", [m1])
     const half = await videoAnswer(row1, bucketConfig())
-    check('umpire: the other side is not ready, so no other', [half.video.side, half.otherVideo], ['A', null])
+    check('umpire: the other side is still filming, and is shown', [half.video.side, half.otherVideo.side, half.otherVideo.state], ['A', 'B', 'filming'])
+
+    // A stale unfinished row does not hide a good video; a live one is shown beside it.
+    const lito = uuid(5)
+    const m4 = uuid(24)
+    await pool.query(
+      "INSERT INTO matches (id, session_id, team_a, team_b, first_server_team, first_server_player) VALUES ($1, (SELECT session_id FROM matches WHERE id = $2), $3, $4, 'A', $5)",
+      [m4, m1, [ana], [lito], ana])
+    await pool.query(
+      `INSERT INTO match_videos (match_id, source, player_id, side, device_id, state, seen_at, file_key, duration_ms, width, height, first_frame_at, repacked)
+       VALUES ($1, 'player', $2, 'A', 'phone-A', 'filming', now() - interval '2 hours', NULL, NULL, NULL, NULL, NULL, false),
+              ($1, 'player', $3, 'B', 'phone-B', 'ready', now(), 'videos/c.mp4', 600000, 1920, 1080, now(), true)`,
+      [m4, ana, lito])
+    const [row4] = await load(m4)
+    const stale = await videoAnswer(row4, bucketConfig())
+    check('umpire: a stale side A is left out, side B shown', [stale.video.side, stale.otherVideo], ['B', null])
+    await pool.query("UPDATE match_videos SET seen_at = now() WHERE match_id = $1 AND side = 'A'", [m4])
+    const live = await videoAnswer(row4, bucketConfig())
+    check('umpire: a live side A comes first, filming', [live.video.side, live.video.state, live.otherVideo.side], ['A', 'filming', 'B'])
+    // A rally that ended before B's first frame: starred, but not in B's clips.
+    const early = uuid(33)
+    await pool.query("INSERT INTO match_events (id, match_id, seq, type, payload, at) VALUES ($1, $2, 1, 'rally', '{}', now() - interval '1 hour')", [early, m4])
+    const covered = await videoAnswer({ ...row4, highlights: [early] }, bucketConfig())
+    check('umpire: a star the video does not cover stays in starred', [covered.starred, covered.otherVideo.highlights.map((h) => h.id)], [[early], []])
+    await pool.query("DELETE FROM match_videos WHERE match_id = $1", [m4])
+    check('umpire: no video at all', await videoAnswer(row4, bucketConfig()), { video: null, otherVideo: null, starred: [] })
     const only = await pointVideos(row1, events1, log1, { playerId: maria })
     check('one ready video: no other, name unchanged', [only.video.side, only.otherVideo], ['A', null])
     check('one ready video: no suffix', only.video.fileName, undefined)
@@ -239,6 +267,8 @@ try {
     check('facility: no other video', fac.otherVideo, null)
     check('facility: file name unchanged', fac.video.fileName, 'PaddlePad 2026-11-20 Cruz vs Garcia')
     check('facility: no side, may not remove', [fac.video.side, fac.video.mayRemove], [null, false])
+    const facAnswer = await videoAnswer(row2, bucketConfig())
+    check('umpire facility: no side names, no other, no stars', [facAnswer.video.sideNames, facAnswer.otherVideo, facAnswer.starred], [[], null, []])
     check('no video at all', await pointVideos({ ...row2, id: uuid(99) }, [], [], {}), { video: null, otherVideo: null })
   }
 

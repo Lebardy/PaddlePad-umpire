@@ -7,9 +7,9 @@ const plain = (text) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[
 const PARTICLES = new Set(['de', 'del', 'dela', 'delos', 'san', 'sta', 'santa'])
 const SUFFIXES = new Set(['jr', 'sr', 'ii', 'iii', 'iv'])
 // The last word, with the particles before it ("de los Santos") and without a trailing Jr, III and the like.
-export function surname(name) {
-  const words = plain(name).trim().split(/\s+/)
-  while (words.length > 1 && SUFFIXES.has(words.at(-1).toLowerCase())) words.pop()
+export function surname(name, clean = plain) {
+  const words = clean(name).trim().split(/\s+/)
+  while (words.length > 1 && SUFFIXES.has(words.at(-1).toLowerCase().replace('.', ''))) words.pop()
   let from = words.length - 1
   for (;;) {
     const before = words[from - 1]?.toLowerCase()
@@ -19,6 +19,8 @@ export function surname(name) {
   }
   return words.slice(from).join(' ')
 }
+// The same surname as people write it, accents and punctuation kept, for labels on screen.
+export const displaySurname = (name) => surname(name, (text) => text.trim())
 const side = (names) => names.map((n) => surname(n ?? '')).filter(Boolean).join('-')
 
 export function videoFileName({ startedAt, sideA, sideB }) {
