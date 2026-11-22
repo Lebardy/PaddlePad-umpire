@@ -22,9 +22,36 @@ export const deviceName = (value) => (typeof value === 'string' && value.length 
 
 const wholeNumber = (value, max) => Number.isInteger(value) && value >= 1 && value <= max
 
-export async function findVideo(matchId) {
-  const { rows } = await query('SELECT * FROM match_videos WHERE match_id = $1', [matchId])
+/**
+ * A match's video row. With `deviceId`, that phone's row. Without it, the
+ * first of any state: the facility's, else side A's, else side B's.
+ */
+export async function findVideo(matchId, { deviceId } = {}) {
+  const { rows } = deviceId === undefined
+    ? await query('SELECT * FROM match_videos WHERE match_id = $1 ORDER BY side NULLS FIRST LIMIT 1', [matchId])
+    : await query('SELECT * FROM match_videos WHERE match_id = $1 AND device_id = $2', [matchId, String(deviceId)])
   return rows[0] ?? null
+}
+
+/** The row `side` names ('facility', 'A' or 'B'); anything else is the first row. */
+export async function videoBySide(matchId, side) {
+  if (side === 'facility') {
+    const { rows } = await query(`SELECT * FROM match_videos WHERE match_id = $1 AND source = 'facility'`, [matchId])
+    return rows[0] ?? null
+  }
+  if (side === 'A' || side === 'B') {
+    const { rows } = await query('SELECT * FROM match_videos WHERE match_id = $1 AND side = $2', [matchId, side])
+    return rows[0] ?? null
+  }
+  return findVideo(matchId)
+}
+
+/** Stars go with the last video: a match left with no video holds none. */
+export function clearStarsIfBare(matchId) {
+  return query(
+    `UPDATE matches SET highlights = '{}' WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM match_videos WHERE match_id = $1)`,
+    [matchId],
+  )
 }
 
 /**
@@ -41,16 +68,16 @@ export async function startUpload(matchId, body, holds) {
     return { status: 400, body: { error: 'The video needs its size, its picture size, its length and when it began' } }
   }
 
-  const video = await findVideo(matchId)
-  if (!video || !holds(video) || video.device_id !== String(deviceId ?? '') || video.state === 'ready') return NOT_FILMING
+  const video = await findVideo(matchId, { deviceId: deviceId ?? '' })
+  if (!video || !holds(video) || video.state === 'ready') return NOT_FILMING
   // Trying again after a failed send reuses the name, so nothing is left behind.
   const key = video.file_key ?? `videos/${matchId}/${randomBytes(8).toString('hex')}.mp4`
   const claimed = await query(
     `UPDATE match_videos
         SET state = 'sending', file_key = $2, bytes = $3, width = $4, height = $5, duration_ms = $6,
             first_frame_at = to_timestamp($7::double precision / 1000), repacked = $8, seen_at = now()
-      WHERE match_id = $1 AND device_id = $9`,
-    [matchId, key, bytes, width, height, durationMs, firstFrameAt, repacked !== false, video.device_id],
+      WHERE id = $1 AND device_id = $9`,
+    [video.id, key, bytes, width, height, durationMs, firstFrameAt, repacked !== false, video.device_id],
   )
   // The claim was taken over since it was read.
   if (claimed.rowCount === 0) return NOT_FILMING
@@ -59,16 +86,16 @@ export async function startUpload(matchId, body, holds) {
 
 /** The camera says the file has gone. Believed only once the bucket holds exactly that many bytes. */
 export async function finishUpload(matchId, deviceId, holds) {
-  const video = await findVideo(matchId)
-  if (!video || !holds(video) || video.device_id !== String(deviceId ?? '')) return NOT_FILMING
+  const video = await findVideo(matchId, { deviceId: deviceId ?? '' })
+  if (!video || !holds(video)) return NOT_FILMING
   if (video.state === 'ready') return { status: 200, body: { ok: true } }
   if (video.state !== 'sending') return NOT_ARRIVED
   // Believe the bucket, not the phone.
   const size = await fileSize(bucketConfig(), video.file_key)
   if (size !== Number(video.bytes)) return NOT_ARRIVED
   const marked = await query(
-    `UPDATE match_videos SET state = 'ready', ready_at = now() WHERE match_id = $1 AND device_id = $2 AND state = 'sending'`,
-    [matchId, video.device_id],
+    `UPDATE match_videos SET state = 'ready', ready_at = now() WHERE id = $1 AND device_id = $2 AND state = 'sending'`,
+    [video.id, video.device_id],
   )
   if (marked.rowCount === 0) return NOT_FILMING
   return { status: 200, body: { ok: true } }

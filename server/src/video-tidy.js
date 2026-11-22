@@ -24,7 +24,7 @@ export function orphanKeys(files, knownKeys, nowMs) {
 export async function tidyVideos({ query, config, now = new Date() }) {
   const nowMs = now.getTime()
   const { rows } = await query(
-    `SELECT match_id, file_key, state FROM match_videos
+    `SELECT id, file_key, state FROM match_videos
       WHERE (state = 'ready' AND ready_at < $1) OR (state <> 'ready' AND created_at < $2)`,
     [new Date(nowMs - KEEP_DAYS * DAY_MS), new Date(nowMs - DAY_MS)],
   )
@@ -33,7 +33,7 @@ export async function tidyVideos({ query, config, now = new Date() }) {
   for (const row of rows) {
     try {
       if (row.file_key) await deleteFile(config, row.file_key)
-      await query('DELETE FROM match_videos WHERE match_id = $1', [row.match_id])
+      await query('DELETE FROM match_videos WHERE id = $1', [row.id])
       gone.push(row)
     } catch (error) {
       console.error('video clean-up could not remove a video:', error.message)

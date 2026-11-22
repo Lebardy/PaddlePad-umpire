@@ -18,7 +18,8 @@ import { liveScore } from '../live-score.js'
 import { eventFromRow } from '../pickleball.js'
 import { isUuid } from '../validate.js'
 import { bucketConfig, deleteFile } from '../bucket.js'
-import { CLAIM_SILENT_SECONDS, deviceName, findVideo, finishUpload, startUpload } from '../video-send.js'
+import { CLAIM_SILENT_SECONDS, clearStarsIfBare, deviceName, finishUpload, startUpload } from '../video-send.js'
+import { heldFor, sideOf } from '../video-sides.js'
 import { playerClaimVerdict } from '../claim-rules.js'
 
 const router = Router()
@@ -35,7 +36,7 @@ router.use(['/video', '/matches/:id/video'], (req, res, next) => {
 async function ownMatch(req) {
   if (!isUuid(req.params.id)) return null
   const { rows } = await query(
-    `SELECT m.id, m.status, COALESCE(f.films_matches, false) AS films_matches, f.name AS facility_name
+    `SELECT m.id, m.status, m.team_a, m.team_b, COALESCE(f.films_matches, false) AS films_matches, f.name AS facility_name
        FROM matches m
        JOIN sessions s ON s.id = m.session_id
        LEFT JOIN facilities f ON f.id = s.facility_id
@@ -52,7 +53,8 @@ const mine = (req) => (video) => video.source === 'player' && video.player_id ==
 /** Who holds the video of a match this player is in, when it is not this phone: { by, name }, as a refused claim says it. */
 async function takenBy(matchId, playerId, deviceId) {
   const { rows } = await query(
-    `SELECT v.source, v.player_id, v.device_id, p.name AS holder, f.name AS facility_name
+    `SELECT v.source, v.side, v.player_id, v.device_id, p.name AS holder, f.name AS facility_name,
+            CASE WHEN m.team_a @> ARRAY[$2]::uuid[] THEN 'A' ELSE 'B' END AS my_side
        FROM match_videos v
        JOIN matches m ON m.id = v.match_id
        JOIN sessions s ON s.id = m.session_id
@@ -61,7 +63,7 @@ async function takenBy(matchId, playerId, deviceId) {
       WHERE v.match_id = $1 AND (m.team_a @> ARRAY[$2]::uuid[] OR m.team_b @> ARRAY[$2]::uuid[])`,
     [matchId, playerId],
   )
-  const held = rows[0]
+  const held = heldFor(rows, rows[0]?.my_side)
   if (!held || (held.source === 'player' && held.player_id === playerId && held.device_id === deviceId)) return undefined
   return held.source === 'facility'
     ? { by: 'facility', name: held.facility_name ?? 'The facility' }
@@ -91,6 +93,7 @@ router.post('/video/camera/beat', async (req, res) => {
        FROM matches m
        JOIN sessions s ON s.id = m.session_id
        LEFT JOIN match_videos v ON v.match_id = m.id
+        AND (v.side IS NULL OR v.side = CASE WHEN m.team_a @> ARRAY[$1]::uuid[] THEN 'A' ELSE 'B' END)
       WHERE (m.team_a @> ARRAY[$1]::uuid[] OR m.team_b @> ARRAY[$1]::uuid[])
         AND m.status = 'in_progress' AND m.voided_at IS NULL AND s.voided_at IS NULL
         AND m.started_at > now() - interval '3 hours'
@@ -117,12 +120,13 @@ router.post('/matches/:id/video/claim', async (req, res) => {
   const deviceId = deviceName(req.body?.deviceId)
   if (!deviceId) return res.status(400).json({ error: 'A deviceId is required' })
 
+  const side = sideOf(match, req.player.id)
   let verdict = 'player'
   let holder = null
   try {
     await withTransaction(async (client) => {
       const { rows } = await client.query(
-        `SELECT v.source, v.state, v.device_id, v.player_id, p.name AS holder,
+        `SELECT v.id, v.source, v.side, v.state, v.device_id, v.player_id, p.name AS holder,
                 v.seen_at < now() - make_interval(secs => $2) AS silent
            FROM match_videos v
            LEFT JOIN players p ON p.id = v.player_id
@@ -130,15 +134,15 @@ router.post('/matches/:id/video/claim', async (req, res) => {
             FOR UPDATE OF v`,
         [match.id, CLAIM_SILENT_SECONDS],
       )
-      const held = rows[0] ?? null
+      const held = heldFor(rows, side)
       holder = held?.holder ?? null
       verdict = playerClaimVerdict({ filmsMatches: match.films_matches, held, playerId: req.player.id, deviceId })
       if (verdict !== 'take') return
       // A phone that went silent while filming never sent anything, so there is no file to remove.
-      if (held) await client.query('DELETE FROM match_videos WHERE match_id = $1', [match.id])
+      if (held) await client.query('DELETE FROM match_videos WHERE id = $1', [held.id])
       await client.query(
-        `INSERT INTO match_videos (match_id, source, player_id, device_id) VALUES ($1, 'player', $2, $3)`,
-        [match.id, req.player.id, deviceId],
+        `INSERT INTO match_videos (match_id, source, player_id, device_id, side) VALUES ($1, 'player', $2, $3, $4)`,
+        [match.id, req.player.id, deviceId, side],
       )
     })
   } catch (error) {
@@ -170,10 +174,14 @@ router.post('/matches/:id/video/done', async (req, res) => {
 // Only the player who filmed it. Its umpire and the owner remove a video from their own apps.
 router.delete('/matches/:id/video', async (req, res) => {
   const match = await ownMatch(req)
-  const video = match ? await findVideo(match.id) : null
-  if (!video || !mine(req)(video)) return res.status(404).json({ error: 'No such video' })
+  const { rows } = match
+    ? await query(`SELECT * FROM match_videos WHERE match_id = $1 AND source = 'player' AND player_id = $2`, [match.id, req.player.id])
+    : { rows: [] }
+  const video = rows[0]
+  if (!video) return res.status(404).json({ error: 'No such video' })
   if (video.file_key) await deleteFile(bucketConfig(), video.file_key)
-  await query('DELETE FROM match_videos WHERE match_id = $1 AND player_id = $2', [match.id, req.player.id])
+  await query('DELETE FROM match_videos WHERE id = $1', [video.id])
+  await clearStarsIfBare(match.id)
   res.status(204).end()
 })
 

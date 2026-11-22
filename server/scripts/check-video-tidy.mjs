@@ -44,8 +44,8 @@ globalThis.fetch = async (url, { method }) => {
 }
 const removedRows = []
 const stubQuery = async (text, params) => {
-  if (text.startsWith('SELECT match_id')) {
-    return { rows: ['one', 'bad', 'three'].map((name) => ({ match_id: name, file_key: `videos/${name}/v.mp4`, state: 'ready' })) }
+  if (text.startsWith('SELECT id')) {
+    return { rows: ['one', 'bad', 'three'].map((name) => ({ id: name, file_key: `videos/${name}/v.mp4`, state: 'ready' })) }
   }
   if (text.startsWith('DELETE')) removedRows.push(params[0])
   return { rows: [] }

@@ -119,6 +119,58 @@ try {
     check('a facility video with a side is refused', await failsWith(c, "INSERT INTO match_videos (match_id, source, side, device_id) VALUES ($1, 'facility', 'A', 'phone-2')", [m3]), '23514')
   }
 
+  section('claiming, sending and removing per side')
+  {
+    process.env.DATABASE_URL = urlFor('pp_migration_check')
+    const { pool } = await import('../src/db.js')
+    const { findVideo, videoBySide, clearStarsIfBare } = await import('../src/video-send.js')
+    open.push({ end: () => pool.end() })
+    const [ana, maria] = [1, 3].map(uuid)
+    const [m1, m2] = [21, 22].map(uuid)
+    const [r1, r2] = [31, 32].map(uuid)
+    await pool.query("DELETE FROM match_videos WHERE match_id = $1 AND side = 'A'", [m1])
+    await pool.query("UPDATE match_videos SET device_id = 'phone-B' WHERE match_id = $1", [m1])
+    check('one side-B video: it is the first', (await findVideo(m1))?.side, 'B')
+    check('a phone finds its own row', (await findVideo(m1, { deviceId: 'phone-B' }))?.side, 'B')
+    check('another phone finds nothing', await findVideo(m1, { deviceId: 'phone-A' }), null)
+    await pool.query("INSERT INTO match_videos (match_id, source, side, device_id, state) VALUES ($1, 'player', 'A', 'phone-A', 'ready')", [m1])
+    check('with a side-A row too, side A is first', (await findVideo(m1))?.side, 'A')
+    check('the phone still finds its own row', (await findVideo(m1, { deviceId: 'phone-B' }))?.side, 'B')
+    check('videoBySide B', (await videoBySide(m1, 'B'))?.side, 'B')
+    check('videoBySide A', (await videoBySide(m1, 'A'))?.device_id, 'phone-A')
+    check('videoBySide facility', (await videoBySide(m2, 'facility'))?.source, 'facility')
+    check('videoBySide facility on a match without one', await videoBySide(m1, 'facility'), null)
+    check('videoBySide with nothing is the first row', (await videoBySide(m1, undefined))?.side, 'A')
+    check('videoBySide with junk is the first row', (await videoBySide(m1, 'C'))?.side, 'A')
+    check('the facility video is first of all', (await findVideo(m2))?.source, 'facility')
+
+    // The beat's newest-match query (routes/player-video.js), copied (plus m.id = $2, since the other made-up matches are open too): a player is "being filmed" only on their own side.
+    const newest = async (player) => (await pool.query(
+      `SELECT m.id FROM matches m
+         JOIN sessions s ON s.id = m.session_id
+         LEFT JOIN match_videos v ON v.match_id = m.id
+          AND (v.side IS NULL OR v.side = CASE WHEN m.team_a @> ARRAY[$1]::uuid[] THEN 'A' ELSE 'B' END)
+        WHERE (m.team_a @> ARRAY[$1]::uuid[] OR m.team_b @> ARRAY[$1]::uuid[])
+          AND m.status = 'in_progress' AND m.voided_at IS NULL AND s.voided_at IS NULL
+          AND m.started_at > now() - interval '3 hours' AND m.id = $2
+          AND (v.state = 'filming' OR GREATEST(m.started_at, m.scoring_claimed_at) > now() - interval '15 minutes')
+        ORDER BY m.started_at DESC LIMIT 1`, [player, m1])).rows[0]?.id ?? null
+    await pool.query("UPDATE matches SET status = 'in_progress', started_at = now() - interval '1 hour', scoring_claimed_at = NULL WHERE id = $1", [m1])
+    await pool.query("UPDATE match_videos SET state = 'filming' WHERE match_id = $1 AND side = 'B'", [m1])
+    check('side B is filming: side B sees the match', await newest(maria), m1)
+    check('side B is filming: side A does not', await newest(ana), null)
+
+    // Stars go with the last video, and only then.
+    await pool.query('UPDATE matches SET highlights = $2::uuid[] WHERE id = $1', [m1, [r1, r2]])
+    const stars = async () => (await pool.query('SELECT highlights FROM matches WHERE id = $1', [m1])).rows[0].highlights
+    await pool.query("DELETE FROM match_videos WHERE match_id = $1 AND side = 'B'", [m1])
+    await clearStarsIfBare(m1)
+    check('another video remains: the stars stay', await stars(), [r1, r2])
+    await pool.query('DELETE FROM match_videos WHERE match_id = $1', [m1])
+    await clearStarsIfBare(m1)
+    check('the last video is gone: the stars go', await stars(), [])
+  }
+
   if (process.env.MIGRATION_COPY_FROM) {
     section('a copy of the source database')
     const src = new pg.Client({ connectionString: process.env.MIGRATION_COPY_FROM })

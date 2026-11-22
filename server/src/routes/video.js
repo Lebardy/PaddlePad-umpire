@@ -20,7 +20,7 @@ import { isUuid } from '../validate.js'
 import { bucketConfig, deleteFile, signedReadUrl } from '../bucket.js'
 import { firstFrameFromLineUp, highlightClips, rallySeconds } from '../video-times.js'
 import { cameraStatus, noteBeat } from '../camera-beats.js'
-import { CLAIM_SILENT_SECONDS, deviceName, findVideo, finishUpload, startUpload } from '../video-send.js'
+import { CLAIM_SILENT_SECONDS, clearStarsIfBare, deviceName, findVideo, finishUpload, startUpload, videoBySide } from '../video-send.js'
 
 const router = Router()
 
@@ -46,7 +46,7 @@ function refusal(statusCode, message) {
 async function ownMatch(req) {
   if (!isUuid(req.params.id) || !req.umpire.facilityId) return null
   const { rows } = await query(
-    `SELECT m.id, m.started_at, m.clock_offset_ms, f.films_matches
+    `SELECT m.id, m.started_at, m.clock_offset_ms, m.highlights, f.films_matches
        FROM matches m
        JOIN sessions s ON s.id = m.session_id
        JOIN facilities f ON f.id = s.facility_id
@@ -83,7 +83,7 @@ async function videoAnswer(match, config) {
     width: video.width,
     height: video.height,
     rallies: events.map((e, index) => ({ id: e.id, second: seconds[index] })),
-    highlights: highlightClips({ ...timing, rallies: timed, picked: video.highlights ?? [] })
+    highlights: highlightClips({ ...timing, rallies: timed, picked: match.highlights ?? [] })
       .map(({ id, start, end }) => ({ id, start, end })),
   }
 }
@@ -139,27 +139,25 @@ router.post('/matches/:id/claim', async (req, res) => {
   const deviceId = deviceName(req.body?.deviceId)
   if (!deviceId) return res.status(400).json({ error: 'A deviceId is required' })
 
-  let replacedKey = null
+  let replacedKeys = []
   try {
     await withTransaction(async (client) => {
       const { rows } = await client.query(
-        `SELECT source, state, device_id, file_key, seen_at < now() - make_interval(secs => $2) AS silent
+        `SELECT id, source, state, device_id, file_key, seen_at < now() - make_interval(secs => $2) AS silent
            FROM match_videos WHERE match_id = $1 FOR UPDATE`,
         [match.id, CLAIM_SILENT_SECONDS],
       )
-      const held = rows[0]
-      if (held && held.source === 'facility') {
+      const held = rows.find((r) => r.source === 'facility')
+      if (held) {
         const mine = held.state === 'filming' && held.device_id === deviceId
         if (mine) return
         // A facility's finished or sending video stays; only a filming
         // claim whose phone has gone silent may be taken over.
         if (!(held.state === 'filming' && held.silent)) throw refusal(409, 'This match already has a video')
       }
-      // The facility's video is the one kept, so a player's gives way.
-      if (held) {
-        replacedKey = held.file_key
-        await client.query('DELETE FROM match_videos WHERE match_id = $1', [match.id])
-      }
+      // The facility's video is the one kept, so the players' give way (the stars stay: they are rally ids).
+      replacedKeys = rows.map((r) => r.file_key).filter(Boolean)
+      await client.query('DELETE FROM match_videos WHERE match_id = $1', [match.id])
       await client.query(
         `INSERT INTO match_videos (match_id, source, umpire_id, device_id) VALUES ($1, 'facility', $2, $3)`,
         [match.id, req.umpire.id, deviceId],
@@ -171,7 +169,9 @@ router.post('/matches/:id/claim', async (req, res) => {
     if (error.code === '23505') return res.status(409).json({ error: 'This match already has a video' })
     throw error
   }
-  if (replacedKey) await deleteFile(bucketConfig(), replacedKey).catch((error) => console.error('could not delete a replaced video', error.message))
+  for (const key of replacedKeys) {
+    await deleteFile(bucketConfig(), key).catch((error) => console.error('could not delete a replaced video', error.message))
+  }
   res.status(201).json({ ok: true })
 })
 
@@ -202,7 +202,7 @@ router.post('/matches/:id/line-up', async (req, res) => {
   const match = await ownMatch(req)
   if (!match) return res.status(404).json({ error: 'No such match' })
   const second = req.body?.second
-  const video = await findVideo(match.id)
+  const video = await videoBySide(match.id, req.body?.side)
   if (!video || video.state !== 'ready') return res.status(409).json({ error: 'This match has no video to line up' })
   const { rows } = isUuid(req.body?.eventId)
     ? await query(`SELECT at FROM match_events WHERE id = $1 AND match_id = $2 AND type = 'rally'`, [req.body.eventId, match.id])
@@ -214,8 +214,8 @@ router.post('/matches/:id/line-up', async (req, res) => {
     rallyAtMs: new Date(rows[0].at).getTime(), offsetMs: match.clock_offset_ms, videoSecond: second,
   })
   await query(
-    `UPDATE match_videos SET first_frame_at = to_timestamp($2::double precision / 1000), lined_up_by = 'umpire' WHERE match_id = $1`,
-    [match.id, firstFrame],
+    `UPDATE match_videos SET first_frame_at = to_timestamp($2::double precision / 1000), lined_up_by = 'umpire' WHERE id = $1`,
+    [video.id, firstFrame],
   )
   res.json({ video: await videoAnswer(match, bucketConfig()) })
 })
@@ -227,8 +227,8 @@ const PICK_RALLIES = { error: 'Pick up to 5 rallies of this match' }
 router.put('/matches/:id/highlights', async (req, res) => {
   const match = await ownMatch(req)
   if (!match) return res.status(404).json({ error: 'No such match' })
-  const video = await findVideo(match.id)
-  if (!video || video.state !== 'ready') return res.status(409).json({ error: 'This match has no video' })
+  const { rowCount } = await query(`SELECT 1 FROM match_videos WHERE match_id = $1 AND state = 'ready'`, [match.id])
+  if (rowCount === 0) return res.status(409).json({ error: 'This match has no video' })
   const ids = req.body?.rallyIds
   if (!Array.isArray(ids) || ids.length > 5 || !ids.every(isUuid) || new Set(ids).size !== ids.length) {
     return res.status(400).json(PICK_RALLIES)
@@ -238,16 +238,17 @@ router.put('/matches/:id/highlights', async (req, res) => {
     [match.id, ids],
   )
   if (rows.length !== ids.length) return res.status(400).json(PICK_RALLIES)
-  await query('UPDATE match_videos SET highlights = $2::uuid[] WHERE match_id = $1', [match.id, ids])
-  res.json({ video: await videoAnswer(match, bucketConfig()) })
+  await query('UPDATE matches SET highlights = $2::uuid[] WHERE id = $1', [match.id, ids])
+  res.json({ video: await videoAnswer({ ...match, highlights: ids }, bucketConfig()) })
 })
 
 router.delete('/matches/:id', async (req, res) => {
   const match = await ownMatch(req)
   if (!match) return res.status(404).json({ error: 'No such match' })
-  const video = await findVideo(match.id)
+  const video = await videoBySide(match.id, req.query.side)
   if (video?.file_key) await deleteFile(bucketConfig(), video.file_key)
-  await query('DELETE FROM match_videos WHERE match_id = $1', [match.id])
+  if (video) await query('DELETE FROM match_videos WHERE id = $1', [video.id])
+  await clearStarsIfBare(match.id)
   res.status(204).end()
 })
 

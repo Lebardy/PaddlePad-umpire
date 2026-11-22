@@ -684,13 +684,15 @@ router.delete('/:id', async (req, res) => {
   }
 
   // The video's row goes with the match; its file has to be asked for.
-  const video = await query('SELECT file_key FROM match_videos WHERE match_id = $1', [req.params.id])
+  const videos = await query('SELECT file_key FROM match_videos WHERE match_id = $1 AND file_key IS NOT NULL', [req.params.id])
   await query('DELETE FROM matches WHERE id = $1', [req.params.id])
   invalidateRallyRatings()
   const config = bucketConfig()
-  if (config && video.rows[0]?.file_key) {
+  if (config) {
     // Best effort: a file left behind is swept by the daily clean-up.
-    await deleteFile(config, video.rows[0].file_key).catch((error) => console.error('could not delete a cancelled match\'s video', error.message))
+    for (const { file_key: key } of videos.rows) {
+      await deleteFile(config, key).catch((error) => console.error('could not delete a cancelled match\'s video', error.message))
+    }
   }
   res.status(204).end()
 })
