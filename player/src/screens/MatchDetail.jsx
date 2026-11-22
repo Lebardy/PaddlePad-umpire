@@ -22,6 +22,7 @@ import { longestRun, matchStory, turningPoint } from '../lib/story'
 import Sparkline from '../components/Sparkline'
 import MomentumRibbon from '../components/MomentumRibbon'
 import Highlights from '../components/Highlights'
+import AngleSwitch from '../components/AngleSwitch'
 import { cutClips, rangeReader, readIndex } from '../lib/clipMp4'
 import { canShareVideo, downloadBlob, shareFile } from '../lib/saveFile'
 import { usePointVideo } from '../lib/usePointVideo'
@@ -359,7 +360,7 @@ function PointByPoint({ id, match, selected, onSelect }) {
   useEffect(() => {
     const controller = new AbortController()
     fetchMatchGame(id, { signal: controller.signal })
-      .then((data) => setLoaded({ id, game: data.game, points: data.points, video: data.video ?? null }))
+      .then((data) => setLoaded({ id, game: data.game, points: data.points, video: data.video ?? null, otherVideo: data.otherVideo ?? null }))
       .catch(() => {})
     return () => controller.abort()
   }, [id, times])
@@ -373,8 +374,13 @@ function PointByPoint({ id, match, selected, onSelect }) {
 
   const game = loaded?.id === id ? loaded.game : null
   const points = loaded?.id === id ? loaded.points : null
-  const video = loaded?.id === id ? loaded.video : null
-  const { ref: filmRef, pick, playReel, onTimeUpdate, onSeeking, playing } = usePointVideo(video, game?.moments.length ?? 0, selected, onSelect)
+  const first = loaded?.id === id ? loaded.video : null
+  const other = loaded?.id === id ? loaded.otherVideo : null
+  // Which side's camera is on screen (0 = the one the server put first), kept with the match like `removing`.
+  const [camera, setCamera] = useState({ id, angle: 0 })
+  const angle = camera.id === id && other ? camera.angle : 0
+  const video = angle === 1 ? other : first
+  const { ref: filmRef, pick, playReel, onTimeUpdate, onSeeking, switchTo, onLoadedMetadata, playing } = usePointVideo(video, game?.moments.length ?? 0, selected, onSelect)
 
   // Saving the highlights: the reel, cut once, is kept while this video link lasts.
   // Kept with the match it belongs to, like `removing`: a result that lands after the player moved on is dropped.
@@ -425,7 +431,9 @@ function PointByPoint({ id, match, selected, onSelect }) {
       if (error.status !== 404) return setRemoving((was) => (was.id === id ? { id, step: 'failed' } : was))
     }
     setRemoving((was) => (was.id === id ? { id, step: 'idle' } : was))
-    setLoaded((was) => (was?.id === id ? { ...was, video: null } : was))
+    // The other side's video, if there is one, takes its place as the first.
+    setLoaded((was) => (was?.id === id ? { ...was, video: angle === 1 ? was.video : was.otherVideo, otherVideo: null } : was))
+    setCamera({ id, angle: 0 })
     // The row and the video are gone: the place moves to the heading they sat under.
     if (shown.current === id) focusNext.current = heading
     // The Matches list and this page's chip say "has video" from the list read; refresh is the provider's quiet one.
@@ -448,8 +456,10 @@ function PointByPoint({ id, match, selected, onSelect }) {
             aria-label="Video of this match"
             onTimeUpdate={onTimeUpdate}
             onSeeking={onSeeking}
+            onLoadedMetadata={onLoadedMetadata}
             onError={() => { if (times < 1) setAsked({ id, times: times + 1 }) }}
           />
+          <AngleSwitch videos={[first, other]} on={angle} onChange={(next) => { switchTo(next === 1 ? other : first); setCamera({ id, angle: next }) }} />
           <Highlights
             count={video.highlights?.length ?? 0}
             playing={playing}

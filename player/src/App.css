@@ -3141,3 +3141,23 @@ a.person-row:active { background: var(--surface-sunken); }
 @media (prefers-reduced-motion: reduce) {
   .you-switch-track, .you-switch-track span { transition: none; }
 }
+
+/* Two cameras: one pill each under the video; the pressed one is on screen. */
+.angle-switch { display: flex; gap: 0.4rem; margin-top: 0.7rem; }
+.angle-pill {
+  flex: 1 1 0; min-width: 0; min-height: 2.75rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; padding: 0.3rem 0.7rem;
+  border: 2px solid color-mix(in srgb, var(--text) 22%, transparent); border-radius: 999px; background: transparent; color: var(--text);
+  font: 700 0.95rem/1.1 var(--label); cursor: pointer;
+  transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out, transform 80ms ease-out;
+}
+.angle-pill svg { flex: none; }
+.angle-pill span { min-width: 0; overflow-wrap: anywhere; }
+.angle-pill:active { transform: scale(0.94); }
+.angle-pill[aria-pressed='true'] { background: var(--button); border-color: var(--button); color: var(--button-ink); }
+.angle-pill:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.detail-shape.is-filmed > .angle-switch + .highlights { margin-top: 0.5rem; }
+@media (prefers-reduced-motion: reduce) { .angle-pill { transition: none; } }
+@media (orientation: landscape) and (max-height: 520px) {
+  .detail-shape.is-filmed > .angle-switch { grid-area: 3 / 1; }
+  .detail-shape.is-filmed > .angle-switch + .highlights { grid-area: 4 / 1; }
+}
