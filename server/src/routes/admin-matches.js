@@ -13,7 +13,7 @@ import { requireAdminAccount } from '../auth.js'
 import { facilityFilterFor } from '../facility-rules.js'
 import { deriveMatchState } from '../pickleball.js'
 import { matchPagePoints, pageMatch } from '../match-page.js'
-import { pointVideo } from '../point-video.js'
+import { pointVideos } from '../point-video.js'
 import { clearStarsIfBare, videoBySide } from '../video-send.js'
 import { isUuid } from '../validate.js'
 
@@ -62,7 +62,7 @@ router.get('/:id', async (req, res) => {
   res.json({
     match: pageMatch(row, {
       points: matchPagePoints(row, log, names),
-      video: await pointVideo(row, events, log),
+      ...await pointVideos(row, events, log, { prefer: null }),
       names, score, hasVideoRow: held.length > 0, isOwner: req.admin.role === 'owner',
     }),
   })

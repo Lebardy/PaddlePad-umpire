@@ -56,36 +56,47 @@ async function ownMatch(req) {
   return rows[0] ?? null
 }
 
-/** What a watcher is told about a match's video, or null when it has none. */
-async function videoAnswer(match, config) {
+/**
+ * What a watcher is told about a match's video: `video`, the first row of
+ * any state (so the app sees filming and sending), and `otherVideo`, the
+ * other side's ready one or null. Both null when there is no video.
+ */
+export async function videoAnswer(match, config) {
   const video = await findVideo(match.id)
-  if (!video) return null
   // A phone closed mid-match leaves the row unfinished until the clean-up; after an hour of silence nothing is coming.
-  if (video.state !== 'ready' && Date.now() - new Date(video.seen_at).getTime() > 60 * 60_000) return null
-  const base = { state: video.state, linedUpBy: video.lined_up_by, repacked: video.repacked }
-  if (video.state !== 'ready') return base
-  const { rows: events } = await query(
-    `SELECT id, at FROM match_events WHERE match_id = $1 AND type = 'rally' ORDER BY seq`,
-    [match.id],
+  if (!video || (video.state !== 'ready' && Date.now() - new Date(video.seen_at).getTime() > 60 * 60_000)) {
+    return { video: null, otherVideo: null }
+  }
+  const { rows: other } = await query(
+    `SELECT * FROM match_videos WHERE match_id = $1 AND state = 'ready' AND id <> $2 ORDER BY side NULLS FIRST LIMIT 1`,
+    [match.id, video.id],
   )
-  const timing = {
-    startedAtMs: new Date(match.started_at).getTime(),
-    offsetMs: match.clock_offset_ms,
-    firstFrameAtMs: new Date(video.first_frame_at).getTime(),
-    durationMs: video.duration_ms,
+  const { rows: events } = video.state === 'ready' || other[0]
+    ? await query(`SELECT id, at FROM match_events WHERE match_id = $1 AND type = 'rally' ORDER BY seq`, [match.id])
+    : { rows: [] }
+  const answer = (v) => {
+    const base = { state: v.state, linedUpBy: v.lined_up_by, repacked: v.repacked, side: v.side }
+    if (v.state !== 'ready') return base
+    const timing = {
+      startedAtMs: new Date(match.started_at).getTime(),
+      offsetMs: match.clock_offset_ms,
+      firstFrameAtMs: new Date(v.first_frame_at).getTime(),
+      durationMs: v.duration_ms,
+    }
+    const timed = events.map((e) => ({ id: e.id, atMs: new Date(e.at).getTime() }))
+    const seconds = rallySeconds({ ...timing, rallies: timed })
+    return {
+      ...base,
+      url: signedReadUrl(config, v.file_key),
+      durationMs: v.duration_ms,
+      width: v.width,
+      height: v.height,
+      rallies: events.map((e, index) => ({ id: e.id, second: seconds[index] })),
+      highlights: highlightClips({ ...timing, rallies: timed, picked: match.highlights ?? [] })
+        .map(({ id, start, end }) => ({ id, start, end })),
+    }
   }
-  const timed = events.map((e) => ({ id: e.id, atMs: new Date(e.at).getTime() }))
-  const seconds = rallySeconds({ ...timing, rallies: timed })
-  return {
-    ...base,
-    url: signedReadUrl(config, video.file_key),
-    durationMs: video.duration_ms,
-    width: video.width,
-    height: video.height,
-    rallies: events.map((e, index) => ({ id: e.id, second: seconds[index] })),
-    highlights: highlightClips({ ...timing, rallies: timed, picked: match.highlights ?? [] })
-      .map(({ id, start, end }) => ({ id, start, end })),
-  }
+  return { video: answer(video), otherVideo: other[0] ? answer(other[0]) : null }
 }
 
 router.post('/camera/beat', async (req, res) => {
@@ -197,7 +208,7 @@ router.post('/matches/:id/done', async (req, res) => {
 router.get('/matches/:id', async (req, res) => {
   const match = await ownMatch(req)
   if (!match) return res.status(404).json({ error: 'No such match' })
-  res.json({ video: await videoAnswer(match, bucketConfig()) })
+  res.json(await videoAnswer(match, bucketConfig()))
 })
 
 router.post('/matches/:id/line-up', async (req, res) => {
@@ -219,7 +230,7 @@ router.post('/matches/:id/line-up', async (req, res) => {
     `UPDATE match_videos SET first_frame_at = to_timestamp($2::double precision / 1000), lined_up_by = 'umpire' WHERE id = $1`,
     [video.id, firstFrame],
   )
-  res.json({ video: await videoAnswer(match, bucketConfig()) })
+  res.json(await videoAnswer(match, bucketConfig()))
 })
 
 const PICK_RALLIES = { error: 'Pick up to 5 rallies of this match' }
@@ -241,7 +252,7 @@ router.put('/matches/:id/highlights', async (req, res) => {
   )
   if (rows.length !== ids.length) return res.status(400).json(PICK_RALLIES)
   await query('UPDATE matches SET highlights = $2::uuid[] WHERE id = $1', [match.id, ids])
-  res.json({ video: await videoAnswer({ ...match, highlights: ids }, bucketConfig()) })
+  res.json(await videoAnswer({ ...match, highlights: ids }, bucketConfig()))
 })
 
 router.delete('/matches/:id', async (req, res) => {

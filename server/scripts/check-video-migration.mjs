@@ -171,6 +171,72 @@ try {
     check('the last video is gone: the stars go', await stars(), [])
   }
 
+  section('every reader gets the video to show first, and the other side\'s')
+  {
+    Object.assign(process.env, {
+      VIDEO_BUCKET: 'test-bucket', VIDEO_BUCKET_ENDPOINT: 'https://s3.example.com', VIDEO_BUCKET_REGION: 'us-east-1',
+      VIDEO_BUCKET_KEY_ID: 'AKIAEXAMPLE', VIDEO_BUCKET_SECRET: 'secret-example',
+    })
+    const { pool } = await import('../src/db.js')
+    const { bucketConfig } = await import('../src/bucket.js')
+    const { pointVideos } = await import('../src/point-video.js')
+    const [ana, maria] = [1, 3].map(uuid)
+    const [m1, m2] = [21, 22].map(uuid)
+    const [r1, r2] = [31, 32].map(uuid)
+    await pool.query('UPDATE matches SET highlights = $2::uuid[] WHERE id = $1', [m1, [r1, r2]])
+    await pool.query(
+      `INSERT INTO match_videos (match_id, source, player_id, side, device_id, state, file_key, duration_ms, width, height, first_frame_at, repacked)
+       VALUES ($1, 'player', $2, 'A', 'phone-A', 'ready', 'videos/a.mp4', 600000, 1920, 1080, (SELECT min(at) - interval '5 seconds' FROM match_events WHERE match_id = $1), true),
+              ($1, 'player', $3, 'B', 'phone-B', 'ready', 'videos/b.mp4', 600000, 1920, 1080, (SELECT min(at) - interval '5 seconds' FROM match_events WHERE match_id = $1), true)`,
+      [m1, ana, maria])
+    const load = async (id) => {
+      const row = (await pool.query('SELECT * FROM matches WHERE id = $1', [id])).rows[0]
+      const events = (await pool.query('SELECT id, type, payload, at FROM match_events WHERE match_id = $1 ORDER BY seq', [id])).rows
+      return [row, events, events.map((e) => ({ type: e.type, ...e.payload }))]
+    }
+    const [row1, events1, log1] = await load(m1)
+    const fileName = 'PaddlePad 2026-11-20 Cruz-Reyes vs Santos-Bautista'
+    const forAna = await pointVideos(row1, events1, log1, { playerId: ana, fileName })
+    const forMaria = await pointVideos(row1, events1, log1, { playerId: maria, fileName })
+    const bare = await pointVideos(row1, events1, log1, { prefer: null })
+    check('a side-A player: A first, B other', [forAna.video.side, forAna.otherVideo.side], ['A', 'B'])
+    check('a side-B player: B first, A other', [forMaria.video.side, forMaria.otherVideo.side], ['B', 'A'])
+    check('prefer null: side A first', [bare.video.side, bare.otherVideo.side], ['A', 'B'])
+    check('both carry the match\'s highlights', [forAna.video.highlights.length, forAna.otherVideo.highlights.length], [2, 2])
+    check('may remove only the one filmed by this player', [forAna.video.mayRemove, forAna.otherVideo.mayRemove], [true, false])
+    check('the other side\'s player: reverse', [forMaria.video.mayRemove, forMaria.otherVideo.mayRemove], [true, false])
+    check('side names are surnames', [forAna.video.sideNames, forAna.otherVideo.sideNames], [['Cruz', 'Reyes'], ['Santos', 'Bautista']])
+    check('each file name ends with its side', [forAna.video.fileName, forAna.otherVideo.fileName],
+      [`${fileName} (Cruz-Reyes)`, `${fileName} (Santos-Bautista)`])
+    check('each download is named too', [decodeURIComponent(forAna.video.downloadUrl).includes('(Cruz-Reyes).mp4'), decodeURIComponent(forAna.otherVideo.downloadUrl).includes('(Santos-Bautista).mp4')], [true, true])
+    check('no file name asked: none given', 'fileName' in bare.video, false)
+
+    // The umpire's answer: first row of any state, plus the other side's ready row.
+    const { videoAnswer } = await import('../src/routes/video.js')
+    const answer = await videoAnswer(row1, bucketConfig())
+    check('umpire: video is side A, other is side B', [answer.video.side, answer.otherVideo.side], ['A', 'B'])
+    check('umpire: other has the same shape', Object.keys(answer.otherVideo).sort(), Object.keys(answer.video).sort())
+    await pool.query("UPDATE match_videos SET state = 'filming' WHERE match_id = $1 AND side = 'B'", [m1])
+    const half = await videoAnswer(row1, bucketConfig())
+    check('umpire: the other side is not ready, so no other', [half.video.side, half.otherVideo], ['A', null])
+    const only = await pointVideos(row1, events1, log1, { playerId: maria })
+    check('one ready video: no other, name unchanged', [only.video.side, only.otherVideo], ['A', null])
+    check('one ready video: no suffix', only.video.fileName, undefined)
+    const single = await pointVideos(row1, events1, log1, { playerId: ana, fileName })
+    check('one ready video: file name unchanged', single.video.fileName, fileName)
+    await pool.query("UPDATE match_videos SET state = 'ready' WHERE match_id = $1", [m1])
+
+    await pool.query(
+      `UPDATE match_videos SET file_key = 'videos/f.mp4', duration_ms = 600000, width = 1920, height = 1080, first_frame_at = now(), repacked = true
+        WHERE match_id = $1`, [m2])
+    const [row2, events2, log2] = await load(m2)
+    const fac = await pointVideos(row2, events2, log2, { playerId: ana, fileName: 'PaddlePad 2026-11-20 Cruz vs Garcia' })
+    check('facility: no other video', fac.otherVideo, null)
+    check('facility: file name unchanged', fac.video.fileName, 'PaddlePad 2026-11-20 Cruz vs Garcia')
+    check('facility: no side, may not remove', [fac.video.side, fac.video.mayRemove], [null, false])
+    check('no video at all', await pointVideos({ ...row2, id: uuid(99) }, [], [], {}), { video: null, otherVideo: null })
+  }
+
   if (process.env.MIGRATION_COPY_FROM) {
     section('a copy of the source database')
     const src = new pg.Client({ connectionString: process.env.MIGRATION_COPY_FROM })
