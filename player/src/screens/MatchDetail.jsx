@@ -384,15 +384,17 @@ function PointByPoint({ id, match, selected, onSelect }) {
 
   // Saving the highlights: the reel, cut once, is kept while this video link lasts.
   // Kept with the match it belongs to, like `removing`: a result that lands after the player moved on is dropped.
-  const [savingRow, setSaving] = useState({ id, busy: null, progress: 0, ready: false, failed: false })
-  const saving = savingRow.id === id ? savingRow : { busy: null, progress: 0, ready: false, failed: false }
+  // And with the camera on screen (its path), so a cut started on one camera shows nothing under the other.
+  const vpath = video ? new URL(video.url).pathname : null
+  const [savingRow, setSaving] = useState({ id, vpath, busy: null, progress: 0, ready: false, failed: false })
+  const saving = savingRow.id === id && savingRow.vpath === vpath ? savingRow : { busy: null, progress: 0, ready: false, failed: false }
   // The reel is kept by the link's path and the highlights, so a re-signed link does not cut it again.
   const cut = useRef({ key: null, file: null })
   const sharing = useMemo(() => canShareVideo(), [])
-  const update = (next) => setSaving((was) => (was.id === id ? { ...was, ...next } : was))
+  const update = (next) => setSaving((was) => (was.id === id && was.vpath === vpath ? { ...was, ...next } : was))
 
   async function reelFile() {
-    const key = `${new URL(video.url).pathname} ${JSON.stringify(video.highlights)}`
+    const key = `${vpath} ${JSON.stringify(video.highlights)}`
     if (cut.current.key === key && cut.current.file) return cut.current.file
     const read = rangeReader(video.url)
     const blob = await cutClips(read, await readIndex(read), video.highlights, (progress) => update({ progress }))
@@ -403,7 +405,7 @@ function PointByPoint({ id, match, selected, onSelect }) {
 
   async function save(kind) {
     const idle = { busy: null, progress: 0, ready: false, failed: false }
-    setSaving({ id, busy: kind, progress: 0, ready: false, failed: false })
+    setSaving({ id, vpath, busy: kind, progress: 0, ready: false, failed: false })
     try {
       const file = await reelFile()
       if (kind === 'download') { downloadBlob(file, file.name); return update(idle) }
@@ -432,8 +434,8 @@ function PointByPoint({ id, match, selected, onSelect }) {
     }
     setRemoving((was) => (was.id === id ? { id, step: 'idle' } : was))
     // The other side's video, if there is one, takes its place as the first.
-    setLoaded((was) => (was?.id === id ? { ...was, video: angle === 1 ? was.video : was.otherVideo, otherVideo: null } : was))
-    setCamera({ id, angle: 0 })
+    setLoaded((was) => (was?.id === id ? { ...was, video: was.video?.mayRemove ? was.otherVideo : was.video, otherVideo: null } : was))
+    setCamera((was) => (was.id === id ? { id, angle: 0 } : was))
     // The row and the video are gone: the place moves to the heading they sat under.
     if (shown.current === id) focusNext.current = heading
     // The Matches list and this page's chip say "has video" from the list read; refresh is the provider's quiet one.
@@ -459,7 +461,7 @@ function PointByPoint({ id, match, selected, onSelect }) {
             onLoadedMetadata={onLoadedMetadata}
             onError={() => { if (times < 1) setAsked({ id, times: times + 1 }) }}
           />
-          <AngleSwitch videos={[first, other]} on={angle} onChange={(next) => { switchTo(next === 1 ? other : first); setCamera({ id, angle: next }) }} />
+          <AngleSwitch videos={[first, other]} on={angle} onChange={(next) => { switchTo(next === 1 ? other : first); setCamera({ id, angle: next }); setRemoving((was) => (was.id === id && was.step === 'asking' ? { id, step: 'idle' } : was)) }} />
           <Highlights
             count={video.highlights?.length ?? 0}
             playing={playing}
