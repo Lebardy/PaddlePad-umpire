@@ -810,6 +810,7 @@ section {
 /* Choices are a segmented row: one visibly on. */
 .format-toggle,
 .server-choice,
+.video-angles,
 .theme-choices {
   display: flex;
   flex-wrap: wrap;
@@ -822,6 +823,7 @@ section {
 
 .format-toggle button,
 .server-choice button,
+.video-angles button,
 .theme-choice {
   flex: 1;
   min-width: 6rem;
@@ -838,6 +840,7 @@ section {
 
 .format-toggle button.active,
 .server-choice button.active,
+.video-angles button[aria-pressed='true'],
 .theme-choice.is-on {
   background: var(--bg-elevated);
   color: var(--primary);
@@ -2114,6 +2117,8 @@ details.guide-section[open] > summary .guide-chevron { transform: rotate(90deg);
 /* A finished match's video. */
 .match-video { display: grid; gap: 0.65rem; margin-bottom: 1.25rem; }
 .match-video h3 { display: flex; align-items: center; gap: 0.45rem; margin: 0; font: 700 0.85rem var(--label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.video-angles { margin-bottom: 0; flex-wrap: nowrap; }
+.video-angles button { display: flex; align-items: center; justify-content: center; gap: 0.4rem; min-width: 0; min-height: 44px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .match-video-player { width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius-md); background: #101815; }
 .video-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
 .video-actions button, .video-fix button, .video-this {

@@ -15,16 +15,28 @@ import { clockText } from '../lib/videoClock'
  * early or late: pause where any rally ends, tap that rally, and every
  * other rally follows from the tablet's own gaps between them.
  */
+// A newer answer, but each ready video keeps the link it already has.
+function keepLinks(was, saved) {
+  if (!was || !saved) return saved
+  const keep = (v) => {
+    const old = v && [was.video, was.otherVideo].find((w) => w?.url && w.side === v.side)
+    return old && v.url ? { ...v, url: old.url } : v
+  }
+  return { ...saved, video: keep(saved.video), otherVideo: keep(saved.otherVideo) }
+}
+
 function MatchVideo({ matchId, events, describe }) {
-  const [video, setVideo] = useState(null)
+  const [answer, setAnswer] = useState(null)
+  const [angle, setAngle] = useState(0)
   const [fixing, setFixing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [at, setAt] = useState(0)
   const player = useRef(null)
+  const resume = useRef(null)
 
-  // Asked again every 10 seconds while a video is on its way, so it
+  // Asked again every 10 seconds while either video is on its way, so it
   // appears by itself once the phone has finished sending.
   useEffect(() => {
     let live = true
@@ -32,8 +44,8 @@ function MatchVideo({ matchId, events, describe }) {
     const ask = () => fetchMatchVideo(matchId)
       .then((found) => {
         if (!live) return
-        setVideo(found)
-        if (found && found.state !== 'ready') timer = setTimeout(ask, 10_000)
+        setAnswer((was) => keepLinks(was, found))
+        if (found?.video && [found.video, found.otherVideo].some((v) => v && v.state !== 'ready')) timer = setTimeout(ask, 10_000)
       })
       .catch((error) => {
         // No video service reads as no video; any other failure (a wifi blip) is asked again.
@@ -43,9 +55,32 @@ function MatchVideo({ matchId, events, describe }) {
     return () => { live = false; clearTimeout(timer) }
   }, [matchId])
 
-  if (!video) return null
+  if (!answer?.video) return null
+  const video = angle === 1 && answer.otherVideo ? answer.otherVideo : answer.video
+  const side = video.side ?? 'facility'
+  const picked = new Set(answer.starred)
+  const full = picked.size >= 5
+  const angles = [answer.video, answer.otherVideo].filter(Boolean)
+  const title = (
+    <h3>
+      <Icon name="camera" size={18} />Video
+      <span className="video-star-count" aria-label={`${picked.size} of 5 highlights`}><Icon name="star" size={14} />{picked.size}/5</span>
+    </h3>
+  )
+  const switcher = answer.otherVideo && (
+    <div className="video-angles" role="group" aria-label="Camera">
+      {angles.map((v, i) => (
+        <button key={i} aria-pressed={v === video} onClick={() => choose(i)}>
+          <Icon name="camera" size={18} />{v.sideNames.length ? v.sideNames.join(' \u00b7 ') : `Camera ${i + 1}`}
+        </button>
+      ))}
+    </div>
+  )
+  const coming = <p className="video-coming"><Icon name="camera" size={18} />The video is on its way.</p>
+
   if (video.state !== 'ready') {
-    return <p className="video-coming"><Icon name="camera" size={18} />The video is on its way.</p>
+    if (!answer.otherVideo) return coming
+    return <section className="match-video">{title}{switcher}{coming}</section>
   }
 
   const byId = new Map(events.map((event) => [event.id, event]))
@@ -53,23 +88,38 @@ function MatchVideo({ matchId, events, describe }) {
   // The rally being watched: the last one whose start has gone by.
   const playing = rallies.reduce((found, rally) => (rally.second !== null && rally.second <= at + 0.25 ? rally.id : found), null)
 
-  const picked = new Set((video.highlights ?? []).map((h) => h.id))
-  const full = picked.size >= 5
+  // Switching camera keeps the place: the rally being watched, and whether it was playing.
+  function choose(next) {
+    if (next === angle) return
+    const target = next === 1 ? answer.otherVideo : answer.video
+    resume.current = target.state === 'ready' ? { id: playing, going: player.current ? !player.current.paused : false } : null
+    setFixing(false)
+    setAngle(next)
+  }
+
+  function placed(event) {
+    const was = resume.current
+    resume.current = null
+    if (!was) return
+    const second = video.rallies.find((rally) => rally.id === was.id)?.second
+    if (second != null) event.currentTarget.currentTime = second
+    if (was.going) event.currentTarget.play().catch(() => {})
+  }
 
   // Starring saves at once; the star changes first and goes back if the save fails.
   async function star(rallyId) {
     if (saving) return
     const next = picked.has(rallyId) ? [...picked].filter((id) => id !== rallyId) : [...picked, rallyId]
-    const before = video
-    setVideo({ ...video, highlights: next.map((id) => ({ id })) })
+    const before = answer
+    setAnswer({ ...answer, starred: next })
     setSaving(true)
     setError(null)
     try {
       const saved = await setMatchHighlights(matchId, next)
-      // Only the stars change: the answer's fresh link would reload the video and lose the umpire's place.
-      setVideo((was) => (was && saved ? { ...was, highlights: saved.highlights } : saved))
+      // Keep each video's link: a fresh one would reload the video and lose the umpire's place.
+      setAnswer((was) => keepLinks(was, saved))
     } catch (err) {
-      setVideo(before)
+      setAnswer(before)
       setError(err.message)
     } finally {
       setSaving(false)
@@ -87,7 +137,7 @@ function MatchVideo({ matchId, events, describe }) {
     setBusy(true)
     setError(null)
     try {
-      setVideo(await lineUpMatchVideo(matchId, rallyId, player.current.currentTime))
+      setAnswer(await lineUpMatchVideo(matchId, rallyId, player.current.currentTime, side))
       setFixing(false)
     } catch (err) {
       setError(err.message)
@@ -101,20 +151,21 @@ function MatchVideo({ matchId, events, describe }) {
     setBusy(true)
     setError(null)
     try {
-      await removeMatchVideo(matchId)
-      setVideo(null)
+      await removeMatchVideo(matchId, side)
+      // The other angle, if any, becomes the video; the stars stay on the match.
+      setAngle(0)
+      setAnswer(await fetchMatchVideo(matchId))
     } catch (err) {
       setError(err.message)
+    } finally {
       setBusy(false)
     }
   }
 
   return (
     <section className="match-video">
-      <h3>
-        <Icon name="camera" size={18} />Video
-        <span className="video-star-count" aria-label={`${picked.size} of 5 highlights`}><Icon name="star" size={14} />{picked.size}/5</span>
-      </h3>
+      {title}
+      {switcher}
       <video
         ref={player}
         className="match-video-player"
@@ -122,6 +173,7 @@ function MatchVideo({ matchId, events, describe }) {
         controls
         playsInline
         preload="metadata"
+        onLoadedMetadata={placed}
         onTimeUpdate={(event) => setAt(event.currentTarget.currentTime)}
       />
 

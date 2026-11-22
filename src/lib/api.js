@@ -545,21 +545,21 @@ export function finishVideoUpload(matchId, deviceId) {
   return apiFetch(`/video/matches/${matchId}/done`, { method: 'POST', body: { deviceId }, signal: AbortSignal.timeout(20_000) })
 }
 
-/** A match's video as the server describes it, or null when it has none. */
+/** A match's videos as the server describes them: { video, otherVideo, starred }. */
 export function fetchMatchVideo(matchId) {
-  return apiFetch(`/video/matches/${matchId}`).then((d) => d.video)
+  return apiFetch(`/video/matches/${matchId}`)
 }
 
-/** Fix timing: this rally ended at this second of the video. */
-export function lineUpMatchVideo(matchId, eventId, second) {
-  return apiFetch(`/video/matches/${matchId}/line-up`, { method: 'POST', body: { eventId, second } }).then((d) => d.video)
+/** Fix timing: this rally ended at this second of the video on this side ('A', 'B' or 'facility'). */
+export function lineUpMatchVideo(matchId, eventId, second, side) {
+  return apiFetch(`/video/matches/${matchId}/line-up`, { method: 'POST', body: { eventId, second, side } })
 }
 
 /** The umpire's highlights for a filmed match: the whole list of starred rally ids, at most 5. */
 export function setMatchHighlights(matchId, rallyIds) {
-  return apiFetch(`/video/matches/${matchId}/highlights`, { method: 'PUT', body: { rallyIds } }).then((d) => d.video)
+  return apiFetch(`/video/matches/${matchId}/highlights`, { method: 'PUT', body: { rallyIds } })
 }
 
-export function removeMatchVideo(matchId) {
-  return apiFetch(`/video/matches/${matchId}`, { method: 'DELETE' })
+export function removeMatchVideo(matchId, side) {
+  return apiFetch(`/video/matches/${matchId}?side=${side}`, { method: 'DELETE' })
 }
