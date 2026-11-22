@@ -35,9 +35,11 @@ function MatchVideo({ matchId, events, describe }) {
   const [at, setAt] = useState(0)
   const player = useRef(null)
   const resume = useRef(null)
+  const [tick, setTick] = useState(0)
 
   // Asked again every 10 seconds while either video is on its way, so it
-  // appears by itself once the phone has finished sending.
+  // appears by itself once the phone has finished sending. A remove or a
+  // line-up bumps `tick`, which asks afresh and starts the waiting again.
   useEffect(() => {
     let live = true
     let timer = null
@@ -45,15 +47,19 @@ function MatchVideo({ matchId, events, describe }) {
       .then((found) => {
         if (!live) return
         setAnswer((was) => keepLinks(was, found))
+        setError(null)
         if (found?.video && [found.video, found.otherVideo].some((v) => v && v.state !== 'ready')) timer = setTimeout(ask, 10_000)
       })
       .catch((error) => {
-        // No video service reads as no video; any other failure (a wifi blip) is asked again.
-        if (live && error.status !== 404) timer = setTimeout(ask, 10_000)
+        // No video service reads as no video; any other failure (a wifi blip) is shown and asked again.
+        if (!live) return
+        if (error.status === 404) return setAnswer(null)
+        setError(error.message)
+        timer = setTimeout(ask, 10_000)
       })
     ask()
     return () => { live = false; clearTimeout(timer) }
-  }, [matchId])
+  }, [matchId, tick])
 
   if (!answer?.video) return null
   const video = angle === 1 && answer.otherVideo ? answer.otherVideo : answer.video
@@ -71,7 +77,7 @@ function MatchVideo({ matchId, events, describe }) {
     <div className="video-angles" role="group" aria-label="Camera">
       {angles.map((v, i) => (
         <button key={i} aria-pressed={v === video} onClick={() => choose(i)}>
-          <Icon name="camera" size={18} />{v.sideNames.length ? v.sideNames.join(' \u00b7 ') : `Camera ${i + 1}`}
+          <Icon name="camera" size={18} /><span>{v.sideNames.length ? v.sideNames.join(' \u00b7 ') : `Camera ${i + 1}`}</span>
         </button>
       ))}
     </div>
@@ -92,7 +98,7 @@ function MatchVideo({ matchId, events, describe }) {
   function choose(next) {
     if (next === angle) return
     const target = next === 1 ? answer.otherVideo : answer.video
-    resume.current = target.state === 'ready' ? { id: playing, going: player.current ? !player.current.paused : false } : null
+    resume.current = video.state === 'ready' && target.state === 'ready' ? { id: playing, going: player.current ? !player.current.paused : false } : null
     setFixing(false)
     setAngle(next)
   }
@@ -138,6 +144,7 @@ function MatchVideo({ matchId, events, describe }) {
     setError(null)
     try {
       setAnswer(await lineUpMatchVideo(matchId, rallyId, player.current.currentTime, side))
+      setTick((t) => t + 1)
       setFixing(false)
     } catch (err) {
       setError(err.message)
@@ -154,7 +161,7 @@ function MatchVideo({ matchId, events, describe }) {
       await removeMatchVideo(matchId, side)
       // The other angle, if any, becomes the video; the stars stay on the match.
       setAngle(0)
-      setAnswer(await fetchMatchVideo(matchId))
+      setTick((t) => t + 1)
     } catch (err) {
       setError(err.message)
     } finally {
