@@ -72,12 +72,14 @@ export function usePointVideo(video, count, selected, onSelect) {
     const pending = carry.current
     if (!pending) return
     carry.current = null
+    // The player moved to another match before this source loaded: nothing to carry.
+    if (pending.to !== video) return
     const node = event.currentTarget
     // A running reel moves the picked box on its own, so the reel's highlight is the place to keep.
     const selected = pending.reelIndex === null ? pending.selected : null
     const place = carryPlace({ to: pending.to, selected, reelIndex: pending.reelIndex })
     if (place.reelIndex !== null) setReel({ video: pending.to, index: place.reelIndex, only: pending.only })
-    if (place.second !== null) { jumping.current = true; node.currentTime = place.second }
+    if (place.second !== null) { jumping.current = node.readyState > 0 || place.second > 0; node.currentTime = place.second }
     if (pending.playing) node.play().catch(() => {})
   }
 

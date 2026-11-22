@@ -316,7 +316,7 @@ function BoardMatch({ id }) {
   return (
     <div className="board-match">
       <BackLink />
-      {match ? <Story match={match} onExpired={() => { if (times < 1) setTimes(times + 1) }} /> : error ? <p className="muted-inline">{error}</p> : <PageSkeleton board />}
+      {match ? <Story key={match.id} match={match} onExpired={() => { if (times < 1) setTimes(times + 1) }} /> : error ? <p className="muted-inline">{error}</p> : <PageSkeleton board />}
     </div>
   )
 }

@@ -10,7 +10,7 @@ function AngleSwitch({ videos: [first, other], on, onChange }) {
     <div className="angle-switch" role="group" aria-label="Camera">
       {[first, other].map((video, i) => (
         <button key={i} type="button" className="angle-pill" aria-pressed={on === i} onClick={() => on !== i && onChange(i)}>
-          <Icon name="camera" size={18} /><span>{video.sideNames.join(' · ')}</span>
+          <Icon name="camera" size={18} /><span>{video.sideNames.join(' · ') || `Camera ${i + 1}`}</span>
         </button>
       ))}
     </div>
